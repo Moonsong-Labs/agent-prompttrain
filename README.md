@@ -231,6 +231,10 @@ Docker Containers:
 
 For deploying Claude Nexus in production environments.
 
+__Important Considerations__:
+
+_In order to comply with the Anthropic Terms of Service, you need to have a Claude subscription for each user of AI Nexus._
+
 ### 📖 Deployment Guides
 
 Choose your deployment method:
