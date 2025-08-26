@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { MessageController } from './controllers/MessageController.js'
+import { TokenCountController } from './controllers/TokenCountController.js'
 import { ProxyService } from './services/ProxyService.js'
 import { AuthenticationService } from './services/AuthenticationService.js'
 import { ClaudeApiClient } from './services/ClaudeApiClient.js'
@@ -28,6 +29,7 @@ class Container {
   private claudeApiClient?: ClaudeApiClient
   private proxyService?: ProxyService
   private messageController?: MessageController
+  private tokenCountController?: TokenCountController
   private mcpServer?: McpServer
   private promptRegistry?: PromptRegistryService
   private githubSyncService?: GitHubSyncService
@@ -115,6 +117,7 @@ class Container {
     )
 
     this.messageController = new MessageController(this.proxyService)
+    this.tokenCountController = new TokenCountController(this.proxyService)
 
     // Initialize MCP services if enabled
     if (config.mcp.enabled) {
@@ -202,6 +205,13 @@ class Container {
     return this.messageController
   }
 
+  getTokenCountController(): TokenCountController {
+    if (!this.tokenCountController) {
+      throw new Error('TokenCountController not initialized')
+    }
+    return this.tokenCountController
+  }
+
   getMcpHandler(): JsonRpcHandler | undefined {
     return this.jsonRpcHandler
   }
@@ -279,6 +289,10 @@ class LazyContainer {
 
   getMessageController(): MessageController {
     return this.ensureInstance().getMessageController()
+  }
+
+  getTokenCountController(): TokenCountController {
+    return this.ensureInstance().getTokenCountController()
   }
 
   getMcpHandler(): JsonRpcHandler | undefined {
