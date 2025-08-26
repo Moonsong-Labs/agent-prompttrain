@@ -643,10 +643,7 @@ export class ProxyService {
    * Handle a token count request
    * Forwards the request to Claude API's count_tokens endpoint
    */
-  async handleTokenCountRequest(
-    rawRequest: any,
-    context: RequestContext
-  ): Promise<Response> {
+  async handleTokenCountRequest(rawRequest: any, context: RequestContext): Promise<Response> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
         logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
@@ -673,7 +670,7 @@ export class ProxyService {
     try {
       // Authenticate
       let auth: AuthResult
-      
+
       // Passthrough mode when client auth disabled and Bearer token present
       if (config.features.enableClientAuth === false && context.apiKey?.startsWith('Bearer ')) {
         log.debug('Using passthrough authentication for token count (client auth disabled)', {

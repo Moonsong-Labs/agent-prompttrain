@@ -47,13 +47,9 @@ export class ClaudeApiClient {
   /**
    * Forward a token count request to Claude API
    */
-  async forwardTokenCount(
-    rawRequest: any,
-    auth: AuthResult,
-    requestId: string
-  ): Promise<Response> {
+  async forwardTokenCount(rawRequest: any, auth: AuthResult, requestId: string): Promise<Response> {
     const url = `${this.config.baseUrl}/v1/messages/count_tokens`
-    
+
     // Build headers for token count request
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
