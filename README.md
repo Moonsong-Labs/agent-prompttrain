@@ -233,7 +233,7 @@ For deploying Agent Prompt Train in production environments.
 
 **Important Considerations**:
 
-_In order to comply with the Anthropic Terms of Service, you need to have a Claude subscription for each user of AI Nexus._
+_In order to comply with the Anthropic Terms of Service, you need to have a Claude subscription for each user of Agent Prompt Train._
 
 ### 📖 Deployment Guides
 
@@ -385,14 +385,14 @@ Agent Prompt Train supports deployment to multiple environments:
 - **Production (`prod`)** - Live production services
 - **Staging (`staging`)** - Pre-production testing environment
 
-For AWS EC2 deployments, use the `manage-nexus-proxies.sh` script with environment filtering:
+For AWS EC2 deployments, use the `manage-agent-prompttrain-proxies.sh` script with environment filtering:
 
 ```bash
 # Deploy to production servers only
-./scripts/ops/manage-nexus-proxies.sh --env prod up
+./scripts/ops/manage-agent-prompttrain-proxies.sh --env prod up
 
 # Check staging server status
-./scripts/ops/manage-nexus-proxies.sh --env staging status
+./scripts/ops/manage-agent-prompttrain-proxies.sh --env staging status
 ```
 
 See [AWS Infrastructure Guide](docs/03-Operations/deployment/aws-infrastructure.md) for detailed multi-environment setup.

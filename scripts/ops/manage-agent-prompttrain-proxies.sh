@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to manage agent-prompttrain-proxy Docker containers across all Nexus Proxy EC2 instances
+# Script to manage agent-prompttrain-proxy Docker containers across all Agent Prompt Train EC2 instances
 # Dynamically fetches EC2 instances from AWS
 
 # Colors for output
@@ -33,7 +33,7 @@ usage() {
     echo "  $0 exec \"docker ps\"            # Show docker containers on all servers"
     echo "  $0 exec server1 \"df -h\"        # Check disk space on specific server"
     echo ""
-    echo "The script will dynamically fetch EC2 instances with 'Nexus Proxy' in their name,"
+    echo "The script will dynamically fetch EC2 instances with 'Agent Prompt Train' in their name,"
     echo "filtered by environment tag if specified."
     exit 1
 }
@@ -157,7 +157,7 @@ fetch_ec2_instances() {
     # Build jq filter based on whether env filter is specified
     local jq_filter='
         [.Reservations[].Instances[] | 
-        select(.Tags[]?.Value | ascii_downcase | contains("nexus") and contains("proxy")) | 
+        select(.Tags[]?.Value | ascii_downcase | contains("agent") and contains("prompttrain")) | 
         select(.State.Name == "running") |
         {
             Name: (.Tags[] | select(.Key=="Name").Value),
@@ -178,9 +178,9 @@ fetch_ec2_instances() {
     
     if [ "$raw_instances" = "[]" ] || [ -z "$raw_instances" ]; then
         if [[ -n "$ENV_FILTER" ]]; then
-            echo -e "${RED}No running EC2 instances found with 'Nexus Proxy' in their name and env='$ENV_FILTER'.${NC}"
+            echo -e "${RED}No running EC2 instances found with 'Agent Prompt Train' in their name and env='$ENV_FILTER'.${NC}"
         else
-            echo -e "${RED}No running EC2 instances found with 'Nexus Proxy' in their name.${NC}"
+            echo -e "${RED}No running EC2 instances found with 'Agent Prompt Train' in their name.${NC}"
         fi
         exit 1
     fi
