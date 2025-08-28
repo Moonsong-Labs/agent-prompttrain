@@ -68,7 +68,7 @@ resource "aws_instance" "nexus_proxy_prod" {
     curl -fsSL https://get.docker.com | bash
 
     # Clone repository
-    git clone https://github.com/yourusername/agent-prompttrain.git /home/ubuntu/agent-prompttrain
+    git clone https://github.com/moonsong-labs/agent-prompttrain.git /home/ubuntu/agent-prompttrain
     chown -R ubuntu:ubuntu /home/ubuntu/agent-prompttrain
 
     # Create required directories

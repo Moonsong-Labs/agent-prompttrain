@@ -25,7 +25,7 @@ The Docker Compose configuration includes:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/agent-prompttrain.git
+git clone https://github.com/moonsong-labs/agent-prompttrain.git
 cd agent-prompttrain
 
 # Copy and edit environment file

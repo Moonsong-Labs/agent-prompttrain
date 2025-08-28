@@ -13,7 +13,7 @@ This guide covers setting up and developing Agent Prompt Train.
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/agent-prompttrain.git
+git clone https://github.com/moonsong-labs/agent-prompttrain.git
 cd agent-prompttrain
 bun install
 ```

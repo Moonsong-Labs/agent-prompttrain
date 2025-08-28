@@ -19,7 +19,7 @@ Before you begin, ensure you have the following:
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/agent-prompttrain.git
+git clone https://github.com/moonsong-labs/agent-prompttrain.git
 cd agent-prompttrain
 ```
 
@@ -100,7 +100,7 @@ bun run dev:dashboard  # Dashboard on port 3001
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/agent-prompttrain.git
+git clone https://github.com/moonsong-labs/agent-prompttrain.git
 cd agent-prompttrain
 
 # Create .env file
