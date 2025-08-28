@@ -1,4 +1,4 @@
-# Claude Nexus Dashboard Service - Production Dockerfile
+# Agent PromptTrain Dashboard Service - Production Dockerfile
 # Web dashboard for monitoring and analytics
 
 # ===== Builder Stage =====

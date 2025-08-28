@@ -1,6 +1,6 @@
 # Repository Grooming Guide
 
-This document outlines the grooming process for maintaining a clean and healthy Claude Nexus Proxy repository.
+This document outlines the grooming process for maintaining a clean and healthy Agent PromptTrain repository.
 
 ## Overview
 

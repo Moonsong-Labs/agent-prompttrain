@@ -115,7 +115,7 @@ describe('Client Authentication Middleware', () => {
       })
 
       expect(res.status).toBe(401)
-      expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Claude Nexus Proxy"')
+      expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Agent PromptTrain"')
     })
 
     it('should reject requests with invalid API key', async () => {

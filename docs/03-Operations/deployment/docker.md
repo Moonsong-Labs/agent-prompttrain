@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying Claude Nexus Proxy to production environments.
+This guide covers deploying Agent PromptTrain to production environments.
 
 ## Deployment Options
 
@@ -31,7 +31,7 @@ BUILD_ACTION=push ./docker/build-images.sh
 
 # Or build individually with buildx
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -f docker/proxy/Dockerfile -t moonsonglabs/claude-nexus-proxy .
+  -f docker/proxy/Dockerfile -t moonsonglabs/agent-prompttrain-proxy .
 ```
 
 #### Run with Docker Compose
@@ -57,7 +57,7 @@ docker run -d \
   -p 3000:3000 \
   -e DATABASE_URL=$DATABASE_URL \
   -v $(pwd)/credentials:/app/credentials:ro \
-  moonsonglabs/claude-nexus-proxy
+  moonsonglabs/agent-prompttrain-proxy
 
 # Run dashboard
 # ⚠️ CRITICAL: Always set DASHBOARD_API_KEY to prevent unauthorized access
@@ -66,7 +66,7 @@ docker run -d \
   -p 3001:3001 \
   -e DATABASE_URL=$DATABASE_URL \
   -e DASHBOARD_API_KEY=$DASHBOARD_API_KEY \
-  claude-nexus-dashboard
+  agent-prompttrain-dashboard
 ```
 
 ### 2. Bare Metal with Bun
@@ -109,13 +109,13 @@ Using systemd:
 ```ini
 # /etc/systemd/system/claude-proxy.service
 [Unit]
-Description=Claude Nexus Proxy
+Description=Agent PromptTrain
 After=network.target postgresql.service
 
 [Service]
 Type=simple
 User=proxy
-WorkingDirectory=/opt/claude-nexus
+WorkingDirectory=/opt/agent-prompttrain
 Environment="DATABASE_URL=postgresql://..."
 ExecStart=/usr/local/bin/bun run services/proxy/dist/index.js
 Restart=always
@@ -392,12 +392,12 @@ networks:
 
 ```bash
 # Secure credentials
-chmod 700 /opt/claude-nexus/credentials
-chmod 600 /opt/claude-nexus/credentials/*
+chmod 700 /opt/agent-prompttrain/credentials
+chmod 600 /opt/agent-prompttrain/credentials/*
 
 # Application files
-chown -R proxy:proxy /opt/claude-nexus
-chmod -R 755 /opt/claude-nexus
+chown -R proxy:proxy /opt/agent-prompttrain
+chmod -R 755 /opt/agent-prompttrain
 ```
 
 ## Backup and Recovery
@@ -414,7 +414,7 @@ BACKUP_DIR=/backups
 pg_dump $DATABASE_URL | gzip > $BACKUP_DIR/db_$DATE.sql.gz
 
 # Credentials backup
-tar czf $BACKUP_DIR/credentials_$DATE.tar.gz /opt/claude-nexus/credentials
+tar czf $BACKUP_DIR/credentials_$DATE.tar.gz /opt/agent-prompttrain/credentials
 
 # Retention (keep 7 days)
 find $BACKUP_DIR -name "*.gz" -mtime +7 -delete
@@ -444,10 +444,10 @@ docker-compose up -d
 
 ```bash
 # Update proxy without downtime
-docker service update --image moonsonglabs/claude-nexus-proxy:new proxy
+docker service update --image moonsonglabs/agent-prompttrain-proxy:new proxy
 
 # Update dashboard
-docker service update --image claude-nexus-dashboard:new dashboard
+docker service update --image agent-prompttrain-dashboard:new dashboard
 ```
 
 ### Database Maintenance
@@ -469,7 +469,7 @@ psql $DATABASE_URL -c "REINDEX DATABASE claude_nexus;"
 docker stats
 
 # Limit container memory
-docker run -m 1g moonsonglabs/claude-nexus-proxy
+docker run -m 1g moonsonglabs/agent-prompttrain-proxy
 ```
 
 ### Slow Queries

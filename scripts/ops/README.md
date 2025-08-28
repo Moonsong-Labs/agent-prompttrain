@@ -1,12 +1,12 @@
 # Operations Scripts
 
-This directory contains operational scripts for managing Claude Nexus Proxy deployments.
+This directory contains operational scripts for managing Agent PromptTrain deployments.
 
 ## Scripts
 
 ### manage-nexus-proxies.sh
 
-Manages Claude Nexus Proxy Docker containers across all EC2 instances tagged with "Nexus Proxy" in their name.
+Manages Agent PromptTrain Docker containers across all EC2 instances tagged with "Nexus Proxy" in their name.
 
 **Features:**
 
@@ -24,8 +24,8 @@ Manages Claude Nexus Proxy Docker containers across all EC2 instances tagged wit
 
 **Commands:**
 
-- `up` - Pull latest code (git pull) and start/update the claude-nexus-proxy container
-- `down` - Stop the claude-nexus-proxy container
+- `up` - Pull latest code (git pull) and start/update the agent-prompttrain-proxy container
+- `down` - Stop the agent-prompttrain-proxy container
 - `status` - Check container status
 
 **Options:**
@@ -63,14 +63,14 @@ The script filters EC2 instances based on the `env` tag:
 - EC2 instances must have:
   - "Nexus Proxy" in their Name tag
   - Optional `env` tag with value `prod` or `staging`
-  - Git repository cloned at `~/claude-nexus` on each server
+  - Git repository cloned at `~/agent-prompttrain` on each server
   - Git access configured (for pulling from origin/main)
   - `.env` file located at `~/.env` (in user's home directory)
   - `credentials` directory at `~/credentials` (if using credential files)
 
 ### update-proxy.sh
 
-Updates Claude Nexus Proxy Docker containers to a specific version.
+Updates Agent PromptTrain Docker containers to a specific version.
 
 **Usage:**
 

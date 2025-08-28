@@ -1,5 +1,5 @@
 /**
- * Structured logging types for the Claude Nexus Proxy
+ * Structured logging types for the Agent PromptTrain
  */
 
 // Base log entry with common fields

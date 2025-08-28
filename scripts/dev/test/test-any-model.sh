@@ -5,7 +5,7 @@ echo "Testing unrestricted model support..."
 # Start the proxy
 docker run -d --name test-proxy -p 3000:3000 \
   -e DEBUG=true \
-  claude-nexus-proxy
+  agent-prompttrain-proxy
 
 echo "Waiting for server to start..."
 sleep 3

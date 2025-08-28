@@ -13,7 +13,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: claude-nexus-dev-db
+    container_name: agent-prompttrain-dev-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -35,7 +35,7 @@ services:
     build:
       context: ./claude-cli
       dockerfile: Dockerfile
-    container_name: claude-nexus-dev-cli
+    container_name: agent-prompttrain-dev-cli
     environment:
       # Proxy configuration pointing to host machine
       ANTHROPIC_BASE_URL: http://host.docker.internal:3000
@@ -56,4 +56,4 @@ volumes:
 
 networks:
   default:
-    name: claude-nexus-dev-network
+    name: agent-prompttrain-dev-network

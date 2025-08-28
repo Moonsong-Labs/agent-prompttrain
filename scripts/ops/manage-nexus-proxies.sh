@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to manage claude-nexus-proxy Docker containers across all Nexus Proxy EC2 instances
+# Script to manage agent-prompttrain-proxy Docker containers across all Nexus Proxy EC2 instances
 # Dynamically fetches EC2 instances from AWS
 
 # Colors for output
@@ -16,9 +16,9 @@ usage() {
     echo "Usage: $0 [--env {prod|staging}] {up|down|status|exec} [server-name|command]"
     echo ""
     echo "Commands:"
-    echo "  up      - Enable/start the claude-nexus-proxy container"
-    echo "  down    - Disable/stop the claude-nexus-proxy container"
-    echo "  status  - Check the status of the claude-nexus-proxy container"
+    echo "  up      - Enable/start the agent-prompttrain-proxy container"
+    echo "  down    - Disable/stop the agent-prompttrain-proxy container"
+    echo "  status  - Check the status of the agent-prompttrain-proxy container"
     echo "  exec    - Execute a bash command on the server(s)"
     echo ""
     echo "Options:"
@@ -129,7 +129,7 @@ pull_latest_code() {
     echo -e "${BLUE}Pulling latest code on $name...${NC}"
     
     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-        "cd ~/claude-nexus && git pull origin main" 2>&1
+        "cd ~/agent-prompttrain && git pull origin main" 2>&1
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Code updated successfully${NC}"
@@ -224,14 +224,14 @@ execute_on_server_async() {
             "up")
                 # Pull latest code before updating
                 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                    "cd ~/claude-nexus && git pull origin main" 2>&1
+                    "cd ~/agent-prompttrain && git pull origin main" 2>&1
                 
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}✓ Code updated${NC}"
                     
                     # Now run the update script
                     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                        "cd ~ && ./claude-nexus-proxy/scripts/ops/update-proxy.sh latest proxy" 2>&1
+                        "cd ~ && ./agent-prompttrain-proxy/scripts/ops/update-proxy.sh latest proxy" 2>&1
                 else
                     echo -e "${RED}✗ Failed to pull latest code. Aborting update for $name.${NC}"
                     echo -e "${RED}Please resolve git issues on the server before retrying.${NC}"
@@ -240,11 +240,11 @@ execute_on_server_async() {
                 ;;
             "down")
                 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                    "docker stop claude-nexus-proxy 2>/dev/null || true" 2>&1
+                    "docker stop agent-prompttrain-proxy 2>/dev/null || true" 2>&1
                 ;;
             "status")
                 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                    "docker ps -a --filter name=claude-nexus-proxy --format 'table {{.Names}}\t{{.Status}}'" 2>&1
+                    "docker ps -a --filter name=agent-prompttrain-proxy --format 'table {{.Names}}\t{{.Status}}'" 2>&1
                 ;;
             "exec")
                 # Execute the custom command - SSH handles escaping properly
@@ -283,14 +283,14 @@ execute_on_server() {
         "up")
             # Pull latest code before updating
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                "cd ~/claude-nexus && git pull origin main" 2>&1
+                "cd ~/agent-prompttrain && git pull origin main" 2>&1
             
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✓ Code updated${NC}"
                 
                 # Now run the update script
                 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                    "cd ~ && ./claude-nexus-proxy/scripts/ops/update-proxy.sh latest proxy" 2>&1
+                    "cd ~ && ./agent-prompttrain-proxy/scripts/ops/update-proxy.sh latest proxy" 2>&1
             else
                 echo -e "${RED}✗ Failed to pull latest code. Aborting update for $name.${NC}"
                 echo -e "${RED}Please resolve git issues on the server before retrying.${NC}"
@@ -299,11 +299,11 @@ execute_on_server() {
             ;;
         "down")
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                "docker stop claude-nexus-proxy 2>/dev/null || true" 2>&1
+                "docker stop agent-prompttrain-proxy 2>/dev/null || true" 2>&1
             ;;
         "status")
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$ip \
-                "docker ps -a --filter name=claude-nexus-proxy --format 'table {{.Names}}\t{{.Status}}'" 2>&1
+                "docker ps -a --filter name=agent-prompttrain-proxy --format 'table {{.Names}}\t{{.Status}}'" 2>&1
             ;;
         "exec")
             # Execute the custom command - SSH handles escaping properly
@@ -320,7 +320,7 @@ execute_on_server() {
 }
 
 # Main execution
-echo -e "${GREEN}=== Claude Nexus Proxy Manager ===${NC}"
+echo -e "${GREEN}=== Agent PromptTrain Manager ===${NC}"
 if [[ -n "$ENV_FILTER" ]]; then
     if [[ "$ENV_FILTER" == "prod" ]]; then
         echo -e "Environment: ${RED}PRODUCTION${NC}"

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 import { layout } from '../layout/index.js'
 
 export const tokenUsageRoutes = new Hono<{

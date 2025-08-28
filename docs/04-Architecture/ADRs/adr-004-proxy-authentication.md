@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Claude Nexus Proxy initially operated as an open relay, forwarding any request to the Claude API as long as the domain had valid Claude credentials. This created security risks:
+The Agent PromptTrain initially operated as an open relay, forwarding any request to the Claude API as long as the domain had valid Claude credentials. This created security risks:
 
 - Anyone knowing the proxy endpoint could use it
 - No way to revoke access without changing Claude API keys
@@ -136,7 +136,7 @@ We will implement **Bearer Token Authentication** with domain-specific API keys 
 
 ## Links
 
-- [PR #2: Proxy-level authentication](https://github.com/Moonsong-Labs/claude-nexus/pull/2)
+- [PR #2: Proxy-level authentication](https://github.com/Moonsong-Labs/agent-prompttrain/pull/2)
 - [Security Guide](../../03-Operations/security.md)
 - [Authentication Guide](../../02-User-Guide/authentication.md)
 

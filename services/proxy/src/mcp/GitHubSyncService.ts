@@ -5,7 +5,7 @@
 import { Octokit } from '@octokit/rest'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { config, getErrorMessage, getErrorStack, getErrorCode } from '@claude-nexus/shared'
+import { config, getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger.js'
 import type { PromptRegistryService } from './PromptRegistryService.js'
 

@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers setting up and developing Claude Nexus Proxy.
+This guide covers setting up and developing Agent PromptTrain.
 
 ## Prerequisites
 
@@ -13,8 +13,8 @@ This guide covers setting up and developing Claude Nexus Proxy.
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/claude-nexus.git
-cd claude-nexus
+git clone https://github.com/yourusername/agent-prompttrain.git
+cd agent-prompttrain
 bun install
 ```
 
@@ -60,7 +60,7 @@ bun run dev:dashboard  # Port 3001
 ## Project Structure
 
 ```
-claude-nexus/
+agent-prompttrain/
 ├── packages/
 │   └── shared/          # Shared types and utilities
 ├── services/

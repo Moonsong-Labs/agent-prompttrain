@@ -1,4 +1,4 @@
-# Claude Nexus Proxy Service - Production Dockerfile
+# Agent PromptTrain Service - Production Dockerfile
 # Optimized for minimal size and security
 
 # ===== Builder Stage =====

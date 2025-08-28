@@ -5,7 +5,7 @@
 
 import { serve } from '@hono/node-server'
 import { Pool } from 'pg'
-import { config, createLogger } from '@claude-nexus/shared'
+import { config, createLogger } from '@agent-prompttrain/shared'
 import { createProxyApp } from './app.js'
 import { ProxyService } from './services/ProxyService.js'
 import { AuthenticationService } from './services/AuthenticationService.js'

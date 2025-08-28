@@ -8,7 +8,7 @@ import {
   type GetAnalysisResponse,
   type RegenerateAnalysisResponse,
   isValidUUID,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { HttpError } from '../errors/HttpError.js'
 
 export const analysisRoutes = new Hono<{

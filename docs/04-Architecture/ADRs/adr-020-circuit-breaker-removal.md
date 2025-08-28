@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Claude Nexus Proxy initially implemented a circuit breaker pattern to protect Claude API from being overwhelmed during outages. The circuit breaker would open after detecting failures, preventing requests from reaching Claude API and returning immediate errors to clients.
+Agent PromptTrain initially implemented a circuit breaker pattern to protect Claude API from being overwhelmed during outages. The circuit breaker would open after detecting failures, preventing requests from reaching Claude API and returning immediate errors to clients.
 
 However, this protective mechanism has proven problematic:
 

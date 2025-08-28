@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 import { csrfProtection } from '../middleware/csrf.js'
 import {
   ConversationGraph,

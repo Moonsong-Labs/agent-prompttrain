@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 
 /**
  * Migration script to add sub-task tracking columns to the database
@@ -208,7 +208,7 @@ async function migrateSubtaskSchema() {
       // Currently only updates the first task invocation (index 0) in the array.
       // If a parent request spawns multiple sub-tasks, only the first gets linked.
       // Need to match sub-task prompts to specific array indices for complete linking.
-      // See: https://github.com/Moonsong-Labs/claude-nexus-proxy/pull/13#review
+      // See: https://github.com/Moonsong-Labs/agent-prompttrain-proxy/pull/13#review
       if (linkedCount && linkedCount > 0) {
         const updateLinkedConversationsQuery = `
           WITH linked_tasks AS (

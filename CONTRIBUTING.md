@@ -1,4 +1,4 @@
-# Contributing to Claude Nexus Proxy
+# Contributing to Agent PromptTrain
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -9,7 +9,7 @@ Please be respectful and constructive in all interactions. We aim to maintain a 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/claude-nexus.git`
+2. Clone your fork: `git clone https://github.com/yourusername/agent-prompttrain.git`
 3. Create a feature branch: `git checkout -b feature/your-feature-name`
 4. Make your changes
 5. Submit a pull request
@@ -241,4 +241,4 @@ Contributors will be:
 - Check existing issues and discussions first
 - Join our community chat [if applicable]
 
-Thank you for contributing to Claude Nexus Proxy!
+Thank you for contributing to Agent PromptTrain!

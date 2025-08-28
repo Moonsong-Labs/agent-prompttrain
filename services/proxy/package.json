@@ -1,11 +1,11 @@
 {
-  "name": "@claude-nexus/proxy",
+  "name": "@agent-prompttrain/proxy",
   "version": "2.0.0",
-  "description": "Claude Nexus Proxy Service - API proxy for Claude with telemetry and multi-subscription support",
+  "description": "Agent PromptTrain Service - API proxy for Claude with telemetry and multi-subscription support",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
-    "claude-nexus": "./dist/main.js"
+    "agent-prompttrain": "./dist/main.js"
   },
   "scripts": {
     "dev": "bun run src/main.ts",

@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { getErrorMessage, getErrorStack, getErrorCode } from '@claude-nexus/shared'
+import { getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
 
 // Log levels
 export enum LogLevel {

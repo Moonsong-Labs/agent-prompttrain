@@ -95,7 +95,7 @@ We will use **GitHub Actions** for all CI/CD workflows.
          with:
            context: .
            file: docker/${{ matrix.service }}/Dockerfile
-           tags: claude-nexus-${{ matrix.service }}:${{ github.sha }}
+           tags: agent-prompttrain-${{ matrix.service }}:${{ github.sha }}
    ```
 
 3. **Error Handling**:
@@ -174,7 +174,7 @@ We will use **GitHub Actions** for all CI/CD workflows.
 
 ## Links
 
-- [PR #1: CI/CD Setup](https://github.com/Moonsong-Labs/claude-nexus/pull/1)
+- [PR #1: CI/CD Setup](https://github.com/Moonsong-Labs/agent-prompttrain/pull/1)
 - [GitHub Actions Documentation](https://docs.github.com/actions)
 - [Deployment Guide](../../03-Operations/deployment/)
 

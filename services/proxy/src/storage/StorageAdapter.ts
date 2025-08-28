@@ -13,7 +13,7 @@ import {
   type ClaudeMessage,
   type ParentQueryCriteria,
   type TaskInvocation,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 // import { TaskInvocationCache } from './TaskInvocationCache.js' // Removed - using SQL query instead
 
 /**

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Claude Nexus Proxy needs to support both x86_64 (amd64) and ARM64 architectures to accommodate:
+The Agent PromptTrain needs to support both x86_64 (amd64) and ARM64 architectures to accommodate:
 
 - Apple Silicon Macs (M1/M2/M3)
 - ARM-based cloud instances (AWS Graviton, etc.)

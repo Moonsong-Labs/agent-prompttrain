@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Claude Nexus Proxy project consists of multiple interconnected services: a proxy API service, a monitoring dashboard, shared utilities, and various scripts. We need to decide how to organize these components in a way that promotes code reuse, simplifies dependency management, and maintains clear boundaries between services.
+The Agent PromptTrain project consists of multiple interconnected services: a proxy API service, a monitoring dashboard, shared utilities, and various scripts. We need to decide how to organize these components in a way that promotes code reuse, simplifies dependency management, and maintains clear boundaries between services.
 
 ## Decision Drivers
 
@@ -38,7 +38,7 @@ The Claude Nexus Proxy project consists of multiple interconnected services: a p
 We will use a **monorepo structure with Bun workspaces**, organizing the codebase as follows:
 
 ```
-claude-nexus/
+agent-prompttrain/
 ├── packages/shared/      # Shared types and utilities
 ├── services/
 │   ├── proxy/           # Proxy API service
@@ -54,7 +54,7 @@ Root `package.json`:
 
 ```json
 {
-  "name": "claude-nexus-monorepo",
+  "name": "agent-prompttrain-monorepo",
   "private": true,
   "workspaces": ["packages/*", "services/*"],
   "scripts": {
@@ -72,7 +72,7 @@ Root `package.json`:
 
 ### Positive
 
-- **Shared Code**: Types, configurations, and utilities are easily shared via `@claude-nexus/shared`
+- **Shared Code**: Types, configurations, and utilities are easily shared via `@agent-prompttrain/shared`
 - **Independent Services**: Each service can be built and deployed separately
 - **Unified Development**: Single `bun install` installs all dependencies
 - **Atomic Changes**: Related changes across services can be committed together

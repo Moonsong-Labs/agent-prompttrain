@@ -285,7 +285,7 @@ In January 2025, we completed a major architectural evolution to consolidate all
 
 ## Links
 
-- [PR #13: Conversation and sub-task tracking](https://github.com/Moonsong-Labs/claude-nexus/pull/13)
+- [PR #13: Conversation and sub-task tracking](https://github.com/Moonsong-Labs/agent-prompttrain/pull/13)
 - [Dashboard Guide](../../02-User-Guide/dashboard-guide.md#sub-task-visualization)
 - [API Reference](../../02-User-Guide/api-reference.md#subtasks)
 

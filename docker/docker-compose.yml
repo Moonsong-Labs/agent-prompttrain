@@ -11,7 +11,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: claude-nexus-db
+    container_name: agent-prompttrain-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -32,8 +32,8 @@ services:
     build:
       context: ../
       dockerfile: docker/proxy/Dockerfile
-    image: claude-nexus-proxy:local
-    container_name: claude-nexus-proxy
+    image: agent-prompttrain-proxy:local
+    container_name: agent-prompttrain-proxy
     environment:
       # Server configuration
       PORT: 3000
@@ -52,7 +52,7 @@ services:
       # Slack notifications (optional)
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
       SLACK_CHANNEL: ${SLACK_CHANNEL}
-      SLACK_USERNAME: ${SLACK_USERNAME:-Claude Nexus Proxy}
+      SLACK_USERNAME: ${SLACK_USERNAME:-Agent PromptTrain}
       SLACK_ICON_EMOJI: ${SLACK_ICON_EMOJI:-:robot_face:}
       SLACK_ENABLED: ${SLACK_ENABLED:-false}
       
@@ -81,7 +81,7 @@ services:
     build:
       context: ../
       dockerfile: docker/dashboard/Dockerfile
-    image: claude-nexus-dashboard:local
+    image: agent-prompttrain-dashboard:local
     environment:
       # Server configuration
       PORT: 3001
@@ -132,4 +132,4 @@ volumes:
 
 networks:
   default:
-    name: claude-nexus-network
+    name: agent-prompttrain-network

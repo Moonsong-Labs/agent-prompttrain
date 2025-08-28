@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Claude Nexus Proxy needed a way to share and manage prompts across different Claude instances and teams. The Model Context Protocol (MCP) provides a standardized way to serve prompts that can be consumed by Claude Desktop and other MCP-compatible clients.
+Agent PromptTrain needed a way to share and manage prompts across different Claude instances and teams. The Model Context Protocol (MCP) provides a standardized way to serve prompts that can be consumed by Claude Desktop and other MCP-compatible clients.
 
 ## Decision
 
@@ -104,5 +104,5 @@ claude mcp add nexus-prompts --scope user -- bunx -y mcp-remote@latest \
 ## References
 
 - [Model Context Protocol Specification](https://modelcontextprotocol.io)
-- [PR #83: Initial MCP Implementation](https://github.com/Moonsong-Labs/claude-nexus/pull/83)
-- [PR #87: MCP Server Fixes](https://github.com/Moonsong-Labs/claude-nexus/pull/87)
+- [PR #83: Initial MCP Implementation](https://github.com/Moonsong-Labs/agent-prompttrain/pull/83)
+- [PR #87: MCP Server Fixes](https://github.com/Moonsong-Labs/agent-prompttrain/pull/87)

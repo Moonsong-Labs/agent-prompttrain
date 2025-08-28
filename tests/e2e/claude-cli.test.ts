@@ -13,7 +13,7 @@ describe('Claude CLI End-to-End Tests', () => {
   beforeAll(async () => {
     // Start Docker services if not already running
     try {
-      await exec(`${dockerCompose} ps | grep -q claude-nexus-proxy`)
+      await exec(`${dockerCompose} ps | grep -q agent-prompttrain-proxy`)
     } catch {
       console.log('Starting Docker services...')
       await exec(`${dockerCompose} --profile dev --profile claude up -d`)

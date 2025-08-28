@@ -1,8 +1,11 @@
 import { container } from '../../container.js'
 import { logger } from '../../middleware/logger.js'
-import { AI_WORKER_CONFIG } from '@claude-nexus/shared/config'
-import type { AnalysisStatus, ConversationAnalysis } from '@claude-nexus/shared/types/ai-analysis'
-import { getErrorMessage, getErrorStack, getErrorCode } from '@claude-nexus/shared'
+import { AI_WORKER_CONFIG } from '@agent-prompttrain/shared/config'
+import type {
+  AnalysisStatus,
+  ConversationAnalysis,
+} from '@agent-prompttrain/shared/types/ai-analysis'
+import { getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
 
 const MAX_RETRIES = AI_WORKER_CONFIG.MAX_RETRIES
 const JOB_TIMEOUT_MINUTES = AI_WORKER_CONFIG.JOB_TIMEOUT_MINUTES

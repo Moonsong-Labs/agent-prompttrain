@@ -1,6 +1,6 @@
 # Monitoring Guide
 
-Comprehensive monitoring ensures your Claude Nexus Proxy operates reliably and efficiently.
+Comprehensive monitoring ensures your Agent PromptTrain operates reliably and efficiently.
 
 ## Overview
 
@@ -252,7 +252,7 @@ Example dashboard config:
 ```json
 {
   "dashboard": {
-    "title": "Claude Nexus Proxy",
+    "title": "Agent PromptTrain",
     "panels": [
       {
         "title": "Request Rate",

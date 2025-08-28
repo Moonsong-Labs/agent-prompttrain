@@ -8,7 +8,7 @@ import {
   ClaudeStreamEvent,
   isClaudeError,
   getErrorMessage,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger'
 import { retryWithBackoff, retryConfigs } from '../utils/retry'
 

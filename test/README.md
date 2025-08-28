@@ -1,6 +1,6 @@
 # Test Suite
 
-This directory contains the test suite for Claude Nexus Proxy.
+This directory contains the test suite for Agent PromptTrain.
 
 ## Structure
 

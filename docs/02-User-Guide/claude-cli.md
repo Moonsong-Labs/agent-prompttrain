@@ -1,10 +1,10 @@
 # Claude CLI Integration
 
-This document describes how to use Claude CLI with the Claude Nexus Proxy.
+This document describes how to use Claude CLI with the Agent PromptTrain.
 
 ## Overview
 
-The Claude Nexus Proxy includes a Docker service that runs Claude CLI connected to your local proxy. This allows you to:
+The Agent PromptTrain includes a Docker service that runs Claude CLI connected to your local proxy. This allows you to:
 
 - Use Claude CLI with your proxy configuration
 - Track usage through the proxy's monitoring

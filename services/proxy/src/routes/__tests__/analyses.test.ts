@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, mock } from 'bun:test'
 import { Hono } from 'hono'
 import type { Pool, QueryResult, QueryResultRow } from 'pg'
 import { analysisRoutes } from '../analyses.js'
-import { ConversationAnalysisStatus } from '@claude-nexus/shared/types/ai-analysis'
+import { ConversationAnalysisStatus } from '@agent-prompttrain/shared/types/ai-analysis'
 import { logger } from '../../middleware/logger.js'
 
 // Create a mock Pool type that's easier to work with

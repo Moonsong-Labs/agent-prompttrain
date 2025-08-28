@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide will walk you through installing Claude Nexus Proxy in various environments.
+This guide will walk you through installing Agent PromptTrain in various environments.
 
 ## Prerequisites
 
@@ -19,8 +19,8 @@ Before you begin, ensure you have the following:
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/claude-nexus.git
-cd claude-nexus
+git clone https://github.com/yourusername/agent-prompttrain.git
+cd agent-prompttrain
 ```
 
 #### 2. Install Dependencies
@@ -100,8 +100,8 @@ bun run dev:dashboard  # Dashboard on port 3001
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/claude-nexus.git
-cd claude-nexus
+git clone https://github.com/yourusername/agent-prompttrain.git
+cd agent-prompttrain
 
 # Create .env file
 cp .env.example .env
@@ -118,8 +118,8 @@ docker compose logs -f
 
 ```bash
 # Pull the images
-docker pull moonsonglabs/claude-nexus-proxy:latest
-docker pull moonsonglabs/claude-nexus-dashboard:latest
+docker pull moonsonglabs/agent-prompttrain-proxy:latest
+docker pull moonsonglabs/agent-prompttrain-dashboard:latest
 
 # Run PostgreSQL
 docker run -d \
@@ -137,7 +137,7 @@ docker run -d \
   -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/claude_nexus \
   -e STORAGE_ENABLED=true \
   -v $(pwd)/credentials:/app/credentials \
-  moonsonglabs/claude-nexus-proxy:latest
+  moonsonglabs/agent-prompttrain-proxy:latest
 
 # Run the dashboard
 docker run -d \
@@ -145,7 +145,7 @@ docker run -d \
   -p 3001:3001 \
   -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/claude_nexus \
   -e DASHBOARD_API_KEY=your-dashboard-key \
-  moonsonglabs/claude-nexus-dashboard:latest
+  moonsonglabs/agent-prompttrain-dashboard:latest
 ```
 
 ### Method 3: Production Installation

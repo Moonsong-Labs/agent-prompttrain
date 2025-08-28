@@ -1,6 +1,6 @@
 # Scripts Directory
 
-This directory contains utility scripts for managing the Claude Nexus Proxy project, organized by purpose.
+This directory contains utility scripts for managing the Agent PromptTrain project, organized by purpose.
 
 ## Directory Structure
 

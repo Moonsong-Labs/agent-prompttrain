@@ -1,17 +1,17 @@
-# Claude Nexus Docker Images
+# Agent PromptTrain Docker Images
 
-This directory contains the Docker configurations for the Claude Nexus Proxy project, split into two separate microservices following best practices.
+This directory contains the Docker configurations for the Agent PromptTrain project, split into two separate microservices following best practices.
 
 ## Images
 
-### 1. Proxy Service (`moonsonglabs/claude-nexus-proxy`)
+### 1. Proxy Service (`moonsonglabs/agent-prompttrain-proxy`)
 
 - Port: 3000
 - Handles Claude API proxying
 - Manages authentication and token tracking
 - Stores request/response data
 
-### 2. Dashboard Service (`moonsonglabs/claude-nexus-dashboard`)
+### 2. Dashboard Service (`moonsonglabs/agent-prompttrain-dashboard`)
 
 - Port: 3001
 - Web UI for monitoring and analytics
@@ -44,7 +44,7 @@ BUILD_ACTION=push ./build-images.sh
 
 ```bash
 # Check manifest for multiple platforms
-docker buildx imagetools inspect moonsonglabs/claude-nexus-proxy:latest
+docker buildx imagetools inspect moonsonglabs/agent-prompttrain-proxy:latest
 ```
 
 ## Building Images
@@ -75,10 +75,10 @@ docker buildx imagetools inspect moonsonglabs/claude-nexus-proxy:latest
 ```bash
 # Build individually with Docker buildx
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -f proxy/Dockerfile -t moonsonglabs/claude-nexus-proxy:v9 ..
+  -f proxy/Dockerfile -t moonsonglabs/agent-prompttrain-proxy:v9 ..
 
 # Single platform build
-docker build -f proxy/Dockerfile -t moonsonglabs/claude-nexus-proxy:v9 ..
+docker build -f proxy/Dockerfile -t moonsonglabs/agent-prompttrain-proxy:v9 ..
 ```
 
 ## Pushing Images
@@ -111,7 +111,7 @@ The `docker-compose.yml` file is located in this `docker/` directory.
 
 # Or from docker directory
 cd docker
-docker-compose --project-name claude-nexus --env-file ../.env up -d
+docker-compose --project-name agent-prompttrain --env-file ../.env up -d
 
 # Run specific service
 ./docker-up.sh up proxy
@@ -130,13 +130,13 @@ docker-compose --project-name claude-nexus --env-file ../.env up -d
 # Proxy service
 docker run -p 3000:3000 \
   -v ./credentials:/app/credentials:ro \
-  moonsonglabs/claude-nexus-proxy:latest
+  moonsonglabs/agent-prompttrain-proxy:latest
 
 # Dashboard service
 docker run -p 3001:3001 \
   -e DASHBOARD_API_KEY=your-key \
   -e PROXY_API_URL=http://localhost:3000 \
-  moonsonglabs/claude-nexus-dashboard:latest
+  moonsonglabs/agent-prompttrain-dashboard:latest
 ```
 
 ## Environment Variables

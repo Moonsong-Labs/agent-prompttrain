@@ -1,6 +1,6 @@
 # Docker Compose Deployment
 
-Deploy the complete Claude Nexus Proxy stack using Docker Compose for a production-ready setup.
+Deploy the complete Agent PromptTrain stack using Docker Compose for a production-ready setup.
 
 ## Overview
 
@@ -25,8 +25,8 @@ The Docker Compose configuration includes:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/claude-nexus.git
-cd claude-nexus
+git clone https://github.com/yourusername/agent-prompttrain.git
+cd agent-prompttrain
 
 # Copy and edit environment file
 cp .env.example .env
@@ -89,7 +89,7 @@ services:
       retries: 5
 
   proxy:
-    image: moonsonglabs/claude-nexus-proxy:latest
+    image: moonsonglabs/agent-prompttrain-proxy:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,7 +104,7 @@ services:
     restart: unless-stopped
 
   dashboard:
-    image: moonsonglabs/claude-nexus-dashboard:latest
+    image: moonsonglabs/agent-prompttrain-dashboard:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -228,7 +228,7 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: /data/claude-nexus/postgres
+      device: /data/agent-prompttrain/postgres
       o: bind
 ```
 

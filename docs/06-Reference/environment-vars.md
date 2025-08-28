@@ -1,6 +1,6 @@
 # Environment Variables Reference
 
-Complete reference for all environment variables used in Claude Nexus Proxy.
+Complete reference for all environment variables used in Agent PromptTrain.
 
 ## Essential Configuration
 
@@ -292,13 +292,13 @@ config()
 Pass environment variables to Docker:
 
 ```bash
-docker run -e DATABASE_URL=postgresql://... moonsonglabs/claude-nexus-proxy
+docker run -e DATABASE_URL=postgresql://... moonsonglabs/agent-prompttrain-proxy
 ```
 
 Or use env file:
 
 ```bash
-docker run --env-file .env moonsonglabs/claude-nexus-proxy
+docker run --env-file .env moonsonglabs/agent-prompttrain-proxy
 ```
 
 ### From Docker Compose

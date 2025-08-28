@@ -14,4 +14,4 @@ if [ ! -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Run docker compose from the docker directory, but use the .env file from project root
-cd "$SCRIPT_DIR/docker" && docker compose --project-name claude-nexus-local --env-file "$SCRIPT_DIR/.env" "$@"
+cd "$SCRIPT_DIR/docker" && docker compose --project-name agent-prompttrain-local --env-file "$SCRIPT_DIR/.env" "$@"

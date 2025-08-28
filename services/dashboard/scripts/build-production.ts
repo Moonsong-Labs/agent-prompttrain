@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-console.log('🏗️  Building Claude Nexus Dashboard Service for Production...')
+console.log('🏗️  Building Agent PromptTrain Dashboard Service for Production...')
 
 // Generate prompt assets first (skip in Docker where file already exists)
 if (!process.env.DOCKER_BUILD) {
@@ -44,7 +44,7 @@ try {
 
   // Create a minimal package.json for production
   const pkgJson = {
-    name: '@claude-nexus/dashboard',
+    name: '@agent-prompttrain/dashboard',
     version: '2.0.0',
     type: 'module',
     main: 'main.js',
@@ -58,7 +58,7 @@ try {
 
   // Create entry point wrapper
   const entryWrapper = `#!/usr/bin/env node
-// Production entry point for Claude Nexus Dashboard
+// Production entry point for Agent PromptTrain Dashboard
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

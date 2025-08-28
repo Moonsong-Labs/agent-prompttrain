@@ -15,6 +15,10 @@ export default tseslint.config(
       'test-*.mjs',
       '**/preload.js',
       '**/tests/**',
+      // Add specific problematic files/directories
+      '**/public/**/*.js',
+      '**/scripts/**/*.ts',
+      '**/build-*.ts',
     ],
   },
 

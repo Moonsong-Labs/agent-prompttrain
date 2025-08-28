@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-console.log('🏗️  Building Claude Nexus Proxy Service for Production...')
+console.log('🏗️  Building Agent PromptTrain Service for Production...')
 
 const distDir = join(__dirname, '..', 'dist')
 const srcDir = join(__dirname, '..', 'src')
@@ -32,7 +32,7 @@ try {
 
   // Create a minimal package.json for production
   const pkgJson = {
-    name: '@claude-nexus/proxy',
+    name: '@agent-prompttrain/proxy',
     version: '2.0.0',
     type: 'module',
     main: 'main.js',
@@ -47,7 +47,7 @@ try {
 
   // Create entry point wrapper for better error handling
   const entryWrapper = `#!/usr/bin/env node
-// Production entry point for Claude Nexus Proxy
+// Production entry point for Agent PromptTrain
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

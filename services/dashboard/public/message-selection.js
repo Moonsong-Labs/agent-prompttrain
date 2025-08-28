@@ -1,4 +1,4 @@
-// Message selection functionality for Claude Nexus Dashboard
+// Message selection functionality for Agent PromptTrain Dashboard
 
 // 1. Hash parsing function
 function parseMessageHash(hash) {

@@ -5,7 +5,7 @@ import {
   type CreateAnalysisRequest,
   type GetAnalysisResponse,
   getAnalysisPromptTemplate,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { container } from '../../container.js'
 import { logger } from '../../middleware/logger.js'
 import { escapeHtml, escapeHtmlArray } from '../../utils/html.js'

@@ -1,6 +1,6 @@
 import { AnalysisWorker } from './AnalysisWorker.js'
 import { logger } from '../../middleware/logger.js'
-import { AI_WORKER_CONFIG, GEMINI_CONFIG } from '@claude-nexus/shared/config'
+import { AI_WORKER_CONFIG, GEMINI_CONFIG } from '@agent-prompttrain/shared/config'
 
 let workerInstance: AnalysisWorker | null = null
 

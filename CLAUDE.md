@@ -159,12 +159,12 @@ To ensure consistency, all contributions should adhere to the following key styl
 
 ## Project Description
 
-Claude Nexus Proxy - High-performance proxy for Claude API with real-time monitoring dashboard. Built with Bun and Hono framework.
+Agent PromptTrain - High-performance proxy for Claude API with real-time monitoring dashboard. Built with Bun and Hono framework.
 
 ### Repository Structure
 
 ```
-claude-nexus/
+agent-prompttrain/
 ├── packages/shared/     # Shared types and utilities
 ├── services/
 │   ├── proxy/          # API proxy service (Port 3000)

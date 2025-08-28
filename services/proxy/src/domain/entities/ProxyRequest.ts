@@ -1,4 +1,4 @@
-import { ClaudeMessagesRequest, countSystemMessages } from '@claude-nexus/shared'
+import { ClaudeMessagesRequest, countSystemMessages } from '@agent-prompttrain/shared'
 
 export type RequestType = 'query_evaluation' | 'inference' | 'quota'
 

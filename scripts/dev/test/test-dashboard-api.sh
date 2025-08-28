@@ -4,7 +4,7 @@
 DASHBOARD_URL="http://localhost:3001"
 API_KEY="alan"
 
-echo "Testing Claude Nexus Dashboard API..."
+echo "Testing Agent PromptTrain Dashboard API..."
 echo "=================================="
 
 # Test health endpoint (no auth required)

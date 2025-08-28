@@ -1,6 +1,6 @@
 # Internals
 
-Deep dive into the Claude Nexus Proxy implementation details, architecture patterns, and design decisions.
+Deep dive into the Agent PromptTrain implementation details, architecture patterns, and design decisions.
 
 ## System Architecture
 
@@ -577,7 +577,7 @@ spec:
     spec:
       containers:
         - name: proxy
-          image: moonsonglabs/claude-nexus-proxy:latest
+          image: moonsonglabs/agent-prompttrain-proxy:latest
           env:
             - name: DATABASE_URL
               valueFrom:

@@ -547,7 +547,7 @@ export class StorageWriter {
       return ''
     }
     // Use SHA-256 with a salt for secure hashing
-    const salt = process.env.API_KEY_SALT || 'claude-nexus-proxy-default-salt'
+    const salt = process.env.API_KEY_SALT || 'agent-prompttrain-proxy-default-salt'
     return createHash('sha256')
       .update(apiKey + salt)
       .digest('hex')

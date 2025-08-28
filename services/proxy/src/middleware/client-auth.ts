@@ -21,7 +21,7 @@ export function clientAuthMiddleware() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+          'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
         }
       )
     }
@@ -37,7 +37,7 @@ export function clientAuthMiddleware() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+          'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
         }
       )
     }
@@ -84,7 +84,7 @@ export function clientAuthMiddleware() {
           },
           401,
           {
-            'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+            'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
           }
         )
       }
@@ -121,7 +121,7 @@ export function clientAuthMiddleware() {
           },
           401,
           {
-            'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+            'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
           }
         )
       }

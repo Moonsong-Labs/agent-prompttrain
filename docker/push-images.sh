@@ -1,5 +1,5 @@
 #!/bin/bash
-# Push Claude Nexus Docker images to Docker Hub with multi-arch manifest support
+# Push Agent PromptTrain Docker images to Docker Hub with multi-arch manifest support
 
 set -e
 
@@ -36,7 +36,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     exit 0
 fi
 
-echo -e "${BLUE}Pushing Claude Nexus Docker Images...${NC}"
+echo -e "${BLUE}Pushing Agent PromptTrain Docker Images...${NC}"
 echo -e "${YELLOW}Tag: ${TAG}${NC}"
 
 # Check if user is logged in to Docker Hub
@@ -92,17 +92,17 @@ push_image() {
 }
 
 # Push proxy image
-if ! push_image "moonsonglabs/claude-nexus-proxy:${TAG}" "Proxy"; then
+if ! push_image "moonsonglabs/agent-prompttrain-proxy:${TAG}" "Proxy"; then
     exit 1
 fi
 
 # Push dashboard image
-if ! push_image "moonsonglabs/claude-nexus-dashboard:${TAG}" "Dashboard"; then
+if ! push_image "moonsonglabs/agent-prompttrain-dashboard:${TAG}" "Dashboard"; then
     exit 1
 fi
 
 # Push all-in-one image
-if ! push_image "moonsonglabs/claude-nexus-all-in:${TAG}" "All-in-One"; then
+if ! push_image "moonsonglabs/agent-prompttrain-all-in:${TAG}" "All-in-One"; then
     exit 1
 fi
 
@@ -110,15 +110,15 @@ fi
 if [ "$TAG" != "latest" ] && [ "$PUSH_LATEST" = "yes" ]; then
     echo -e "\n${BLUE}Also pushing 'latest' tags...${NC}"
     
-    if ! push_image "moonsonglabs/claude-nexus-proxy:latest" "Proxy (latest)"; then
+    if ! push_image "moonsonglabs/agent-prompttrain-proxy:latest" "Proxy (latest)"; then
         exit 1
     fi
     
-    if ! push_image "moonsonglabs/claude-nexus-dashboard:latest" "Dashboard (latest)"; then
+    if ! push_image "moonsonglabs/agent-prompttrain-dashboard:latest" "Dashboard (latest)"; then
         exit 1
     fi
     
-    if ! push_image "moonsonglabs/claude-nexus-all-in:latest" "All-in-One (latest)"; then
+    if ! push_image "moonsonglabs/agent-prompttrain-all-in:latest" "All-in-One (latest)"; then
         exit 1
     fi
 fi
@@ -128,7 +128,7 @@ echo -e "\n${GREEN}Push completed successfully!${NC}"
 # Check and display manifest information if available
 echo -e "\n${BLUE}Checking multi-architecture support...${NC}"
 for image in proxy dashboard all-in; do
-    full_image="moonsonglabs/claude-nexus-${image}:${TAG}"
+    full_image="moonsonglabs/agent-prompttrain-${image}:${TAG}"
     if docker buildx imagetools inspect "$full_image" &>/dev/null; then
         echo -e "${GREEN}✓ ${image} supports multiple architectures:${NC}"
         docker buildx imagetools inspect "$full_image" 2>/dev/null | grep -E "Platform:|linux/" | head -5
@@ -138,14 +138,14 @@ for image in proxy dashboard all-in; do
 done
 
 echo -e "\nImages available at:"
-echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/claude-nexus-proxy${NC}"
-echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/claude-nexus-dashboard${NC}"
-echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/claude-nexus-all-in${NC}"
+echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/agent-prompttrain-proxy${NC}"
+echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/agent-prompttrain-dashboard${NC}"
+echo -e "  ${YELLOW}https://hub.docker.com/r/moonsonglabs/agent-prompttrain-all-in${NC}"
 
 echo -e "\nTo pull and run:"
 echo -e "  ${BLUE}# All-in-One (recommended for demos)${NC}"
-echo -e "  ${BLUE}docker pull moonsonglabs/claude-nexus-all-in:${TAG}${NC}"
-echo -e "  ${BLUE}docker run -d -p 3000:3000 -p 3001:3001 moonsonglabs/claude-nexus-all-in:${TAG}${NC}"
+echo -e "  ${BLUE}docker pull moonsonglabs/agent-prompttrain-all-in:${TAG}${NC}"
+echo -e "  ${BLUE}docker run -d -p 3000:3000 -p 3001:3001 moonsonglabs/agent-prompttrain-all-in:${TAG}${NC}"
 echo -e "  ${BLUE}# Or pull services separately:${NC}"
-echo -e "  ${BLUE}docker pull moonsonglabs/claude-nexus-proxy:${TAG}${NC}"
-echo -e "  ${BLUE}docker pull moonsonglabs/claude-nexus-dashboard:${TAG}${NC}"
+echo -e "  ${BLUE}docker pull moonsonglabs/agent-prompttrain-proxy:${TAG}${NC}"
+echo -e "  ${BLUE}docker pull moonsonglabs/agent-prompttrain-dashboard:${TAG}${NC}"

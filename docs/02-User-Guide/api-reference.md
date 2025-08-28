@@ -1,6 +1,6 @@
 # API Reference
 
-Claude Nexus Proxy provides a transparent proxy to Claude's API with additional features.
+Agent PromptTrain provides a transparent proxy to Claude's API with additional features.
 
 ## Base URL
 

@@ -164,7 +164,7 @@ We will use **HTMX with server-side rendering** for the dashboard.
 
 ## Links
 
-- [PR #11: Enhanced Dashboard](https://github.com/Moonsong-Labs/claude-nexus/pull/11)
+- [PR #11: Enhanced Dashboard](https://github.com/Moonsong-Labs/agent-prompttrain/pull/11)
 - [HTMX Documentation](https://htmx.org)
 - [Dashboard Guide](../../02-User-Guide/dashboard-guide.md)
 

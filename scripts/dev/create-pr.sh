@@ -52,4 +52,4 @@ ENCODED_BODY=$(urlencode "$BODY")
 
 echo "Click this URL to create the PR:"
 echo ""
-echo "https://github.com/Moonsong-Labs/claude-nexus-proxy/compare/main...technical-debt-cleanup?quick_pull=1&title=$ENCODED_TITLE&body=$ENCODED_BODY"
+echo "https://github.com/Moonsong-Labs/agent-prompttrain-proxy/compare/main...technical-debt-cleanup?quick_pull=1&title=$ENCODED_TITLE&body=$ENCODED_BODY"

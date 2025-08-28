@@ -1,8 +1,8 @@
 import { promises as fs } from 'fs'
 import path from 'path'
-import { ClaudeMessagesRequest } from '@claude-nexus/shared'
+import { ClaudeMessagesRequest } from '@agent-prompttrain/shared'
 import { Context } from 'hono'
-import { config } from '@claude-nexus/shared/config'
+import { config } from '@agent-prompttrain/shared/config'
 import { getRequestLogger } from '../middleware/logger'
 
 interface TestSample {

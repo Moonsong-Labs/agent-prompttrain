@@ -37,8 +37,8 @@ Given our monorepo structure (ADR-001), we need to decide how to package and dep
 
 We will use **completely separate Docker images** for each service:
 
-- `claude-nexus-proxy`: Contains only the proxy service
-- `claude-nexus-dashboard`: Contains only the dashboard service
+- `agent-prompttrain-proxy`: Contains only the proxy service
+- `agent-prompttrain-dashboard`: Contains only the dashboard service
 
 ### Implementation Details
 
