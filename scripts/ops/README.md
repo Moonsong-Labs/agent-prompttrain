@@ -1,12 +1,12 @@
 # Operations Scripts
 
-This directory contains operational scripts for managing Agent PromptTrain deployments.
+This directory contains operational scripts for managing Agent Prompt Train deployments.
 
 ## Scripts
 
 ### manage-nexus-proxies.sh
 
-Manages Agent PromptTrain Docker containers across all EC2 instances tagged with "Nexus Proxy" in their name.
+Manages Agent Prompt Train Docker containers across all EC2 instances tagged with "Nexus Proxy" in their name.
 
 **Features:**
 
@@ -70,7 +70,7 @@ The script filters EC2 instances based on the `env` tag:
 
 ### update-proxy.sh
 
-Updates Agent PromptTrain Docker containers to a specific version.
+Updates Agent Prompt Train Docker containers to a specific version.
 
 **Usage:**
 

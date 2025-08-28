@@ -23,7 +23,7 @@ export const layout = (
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>${title} - Agent PromptTrain Dashboard</title>
+        <title>${title} - Agent Prompt Train Dashboard</title>
         ${csrfToken ? html`<meta name="csrf-token" content="${csrfToken}" />` : ''}
         <style>
           ${raw(dashboardStyles)}
@@ -206,7 +206,7 @@ export const layout = (
           <div class="container">
             <h1 style="display: flex; align-items: center; gap: 0.5rem;">
               ${raw(nexusLogo())}
-              <span>Agent PromptTrain Dashboard</span>
+              <span>Agent Prompt Train Dashboard</span>
             </h1>
             <div class="space-x-4" style="display: flex; align-items: center;">
               <a href="/dashboard" class="text-sm text-blue-600">Dashboard</a>

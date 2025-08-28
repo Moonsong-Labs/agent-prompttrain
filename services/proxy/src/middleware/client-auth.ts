@@ -21,7 +21,7 @@ export function clientAuthMiddleware() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
+          'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
         }
       )
     }
@@ -37,7 +37,7 @@ export function clientAuthMiddleware() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
+          'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
         }
       )
     }
@@ -84,7 +84,7 @@ export function clientAuthMiddleware() {
           },
           401,
           {
-            'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
+            'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
           }
         )
       }
@@ -121,7 +121,7 @@ export function clientAuthMiddleware() {
           },
           401,
           {
-            'WWW-Authenticate': 'Bearer realm="Agent PromptTrain"',
+            'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
           }
         )
       }

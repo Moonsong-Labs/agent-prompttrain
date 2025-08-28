@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a detailed implementation plan for integrating a Model Context Protocol (MCP) server into the Agent PromptTrain. The MCP server will serve prompts from a GitHub repository and provide a dashboard UI for prompt management.
+This document provides a detailed implementation plan for integrating a Model Context Protocol (MCP) server into the Agent Prompt Train. The MCP server will serve prompts from a GitHub repository and provide a dashboard UI for prompt management.
 
 ## Architecture Summary
 

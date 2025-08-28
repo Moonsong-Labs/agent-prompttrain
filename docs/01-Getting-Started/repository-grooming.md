@@ -1,6 +1,6 @@
 # Repository Grooming Guide
 
-This document outlines the grooming process for maintaining a clean and healthy Agent PromptTrain repository.
+This document outlines the grooming process for maintaining a clean and healthy Agent Prompt Train repository.
 
 ## Overview
 

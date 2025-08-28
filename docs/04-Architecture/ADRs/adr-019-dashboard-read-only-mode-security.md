@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Agent PromptTrain dashboard was modified to support a "read-only mode" that allows access without authentication when `DASHBOARD_API_KEY` is not set. This was implemented to simplify development and quick deployments, but it introduces significant security concerns that need to be documented and addressed.
+The Agent Prompt Train dashboard was modified to support a "read-only mode" that allows access without authentication when `DASHBOARD_API_KEY` is not set. This was implemented to simplify development and quick deployments, but it introduces significant security concerns that need to be documented and addressed.
 
 ### Current Implementation
 

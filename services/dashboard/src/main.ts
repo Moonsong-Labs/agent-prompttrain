@@ -83,7 +83,7 @@ function getPackageVersion(): string {
 }
 
 function showHelp() {
-  console.log(`Agent PromptTrain Dashboard Service v${getPackageVersion()}
+  console.log(`Agent Prompt Train Dashboard Service v${getPackageVersion()}
 
 Usage: agent-prompttrain-dashboard [options]
 
@@ -155,7 +155,7 @@ async function main() {
     }
 
     // Print dashboard configuration
-    console.log(`Agent PromptTrain Dashboard Service v${getPackageVersion()}`)
+    console.log(`Agent Prompt Train Dashboard Service v${getPackageVersion()}`)
     console.log('Mode: Web Dashboard for monitoring and analytics')
 
     console.log('\nConfiguration:')

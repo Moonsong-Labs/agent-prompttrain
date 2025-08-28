@@ -1,6 +1,6 @@
 # API Reference
 
-Agent PromptTrain provides a transparent proxy to Claude's API with additional features.
+Agent Prompt Train provides a transparent proxy to Claude's API with additional features.
 
 ## Base URL
 

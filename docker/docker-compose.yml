@@ -52,7 +52,7 @@ services:
       # Slack notifications (optional)
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
       SLACK_CHANNEL: ${SLACK_CHANNEL}
-      SLACK_USERNAME: ${SLACK_USERNAME:-Agent PromptTrain}
+      SLACK_USERNAME: ${SLACK_USERNAME:-Agent Prompt Train}
       SLACK_ICON_EMOJI: ${SLACK_ICON_EMOJI:-:robot_face:}
       SLACK_ENABLED: ${SLACK_ENABLED:-false}
       

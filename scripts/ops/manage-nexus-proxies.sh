@@ -320,7 +320,7 @@ execute_on_server() {
 }
 
 # Main execution
-echo -e "${GREEN}=== Agent PromptTrain Manager ===${NC}"
+echo -e "${GREEN}=== Agent Prompt Train Manager ===${NC}"
 if [[ -n "$ENV_FILTER" ]]; then
     if [[ "$ENV_FILTER" == "prod" ]]; then
         echo -e "Environment: ${RED}PRODUCTION${NC}"

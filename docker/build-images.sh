@@ -37,7 +37,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     exit 0
 fi
 
-echo -e "${BLUE}Building Agent PromptTrain Docker Images...${NC}"
+echo -e "${BLUE}Building Agent Prompt Train Docker Images...${NC}"
 if [ "$TAG" != "latest" ]; then
     echo -e "${YELLOW}Will tag images as: latest and ${TAG}${NC}"
 else

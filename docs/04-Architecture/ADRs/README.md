@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory contains Architecture Decision Records (ADRs) for the Agent PromptTrain project.
+This directory contains Architecture Decision Records (ADRs) for the Agent Prompt Train project.
 
 ## What is an ADR?
 

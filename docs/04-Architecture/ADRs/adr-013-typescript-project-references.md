@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Agent PromptTrain monorepo has been experiencing persistent type checking issues related to circular dependencies between packages. The shared package (`@agent-prompttrain/shared`) needs to be built before the services can type check, but the standard `tsc --noEmit` approach doesn't handle this dependency ordering well.
+The Agent Prompt Train monorepo has been experiencing persistent type checking issues related to circular dependencies between packages. The shared package (`@agent-prompttrain/shared`) needs to be built before the services can type check, but the standard `tsc --noEmit` approach doesn't handle this dependency ordering well.
 
 The issue manifests as "Cannot find module '@agent-prompttrain/shared' or its corresponding type declarations" errors during type checking, even though the code compiles and runs correctly with Bun. This creates friction during development and CI/CD processes.
 

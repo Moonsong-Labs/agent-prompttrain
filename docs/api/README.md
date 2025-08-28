@@ -1,6 +1,6 @@
 # API Documentation
 
-This directory contains API documentation for Agent PromptTrain services.
+This directory contains API documentation for Agent Prompt Train services.
 
 ## AI Analysis API
 

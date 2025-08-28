@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Agent PromptTrain needed a way to share and manage prompts across different Claude instances and teams. The Model Context Protocol (MCP) provides a standardized way to serve prompts that can be consumed by Claude Desktop and other MCP-compatible clients.
+Agent Prompt Train needed a way to share and manage prompts across different Claude instances and teams. The Model Context Protocol (MCP) provides a standardized way to serve prompts that can be consumed by Claude Desktop and other MCP-compatible clients.
 
 ## Decision
 

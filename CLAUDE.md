@@ -159,7 +159,7 @@ To ensure consistency, all contributions should adhere to the following key styl
 
 ## Project Description
 
-Agent PromptTrain - High-performance proxy for Claude API with real-time monitoring dashboard. Built with Bun and Hono framework.
+Agent Prompt Train - High-performance proxy for Claude API with real-time monitoring dashboard. Built with Bun and Hono framework.
 
 ### Repository Structure
 

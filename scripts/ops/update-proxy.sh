@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to update Agent PromptTrain Docker containers
+# Script to update Agent Prompt Train Docker containers
 # Usage: ./update-proxy.sh <version> [service]
 # Examples:
 #   ./update-proxy.sh v8          # Updates both containers

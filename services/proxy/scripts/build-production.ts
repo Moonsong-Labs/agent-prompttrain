@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-console.log('🏗️  Building Agent PromptTrain Service for Production...')
+console.log('🏗️  Building Agent Prompt Train Service for Production...')
 
 const distDir = join(__dirname, '..', 'dist')
 const srcDir = join(__dirname, '..', 'src')
@@ -47,7 +47,7 @@ try {
 
   // Create entry point wrapper for better error handling
   const entryWrapper = `#!/usr/bin/env node
-// Production entry point for Agent PromptTrain
+// Production entry point for Agent Prompt Train
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

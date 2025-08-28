@@ -1,5 +1,5 @@
 #!/bin/bash
-# Push Agent PromptTrain Docker images to Docker Hub with multi-arch manifest support
+# Push Agent Prompt Train Docker images to Docker Hub with multi-arch manifest support
 
 set -e
 
@@ -36,7 +36,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     exit 0
 fi
 
-echo -e "${BLUE}Pushing Agent PromptTrain Docker Images...${NC}"
+echo -e "${BLUE}Pushing Agent Prompt Train Docker Images...${NC}"
 echo -e "${YELLOW}Tag: ${TAG}${NC}"
 
 # Check if user is logged in to Docker Hub

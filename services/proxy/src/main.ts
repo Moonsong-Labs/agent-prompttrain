@@ -97,7 +97,7 @@ function getPackageVersion(): string {
 }
 
 function showHelp() {
-  console.log(`Agent PromptTrain Service v${getPackageVersion()}
+  console.log(`Agent Prompt Train Service v${getPackageVersion()}
 
 Usage: agent-prompttrain-proxy [options]
 
@@ -118,7 +118,7 @@ Environment Variables:
   STORAGE_ENABLED             Enable request/response storage (default: false)
   SLACK_WEBHOOK_URL           Slack webhook URL for notifications (optional)
   SLACK_CHANNEL               Slack channel override (optional)
-  SLACK_USERNAME              Slack bot username (default: Agent PromptTrain)
+  SLACK_USERNAME              Slack bot username (default: Agent Prompt Train)
   SLACK_ICON_EMOJI            Slack bot icon (default: :robot_face:)
   SLACK_ENABLED               Enable/disable Slack notifications (default: false)
 
@@ -167,7 +167,7 @@ async function main() {
 
   try {
     // Print proxy configuration
-    console.log(`Agent PromptTrain Service v${getPackageVersion()}`)
+    console.log(`Agent Prompt Train Service v${getPackageVersion()}`)
     console.log('Mode: passthrough (direct proxy to Claude API)')
     console.log('Target: Claude API (https://api.anthropic.com)')
 

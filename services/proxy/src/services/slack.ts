@@ -36,7 +36,7 @@ export function initializeSlack(config: Partial<SlackConfig>) {
   slackConfig = {
     webhook_url: config.webhook_url,
     channel: config.channel,
-    username: config.username || 'Agent PromptTrain',
+    username: config.username || 'Agent Prompt Train',
     icon_emoji: config.icon_emoji || ':robot_face:',
     enabled: config.enabled !== false,
   }
@@ -113,7 +113,7 @@ export function initializeDomainSlack(
   const config = {
     webhook_url: slackConfig.webhook_url,
     channel: slackConfig.channel,
-    username: slackConfig.username || 'Agent PromptTrain',
+    username: slackConfig.username || 'Agent Prompt Train',
     icon_emoji: slackConfig.icon_emoji || ':robot_face:',
     enabled: slackConfig.enabled !== false,
   }

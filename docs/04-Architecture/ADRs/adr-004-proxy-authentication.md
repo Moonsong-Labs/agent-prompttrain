@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Agent PromptTrain initially operated as an open relay, forwarding any request to the Claude API as long as the domain had valid Claude credentials. This created security risks:
+The Agent Prompt Train initially operated as an open relay, forwarding any request to the Claude API as long as the domain had valid Claude credentials. This created security risks:
 
 - Anyone knowing the proxy endpoint could use it
 - No way to revoke access without changing Claude API keys

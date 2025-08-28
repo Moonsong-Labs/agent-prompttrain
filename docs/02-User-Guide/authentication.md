@@ -1,6 +1,6 @@
 # Authentication Guide
 
-Agent PromptTrain supports multiple authentication methods to secure access to both the proxy itself and the Claude API.
+Agent Prompt Train supports multiple authentication methods to secure access to both the proxy itself and the Claude API.
 
 ## Overview
 

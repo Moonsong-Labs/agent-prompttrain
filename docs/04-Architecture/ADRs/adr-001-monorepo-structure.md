@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Agent PromptTrain project consists of multiple interconnected services: a proxy API service, a monitoring dashboard, shared utilities, and various scripts. We need to decide how to organize these components in a way that promotes code reuse, simplifies dependency management, and maintains clear boundaries between services.
+The Agent Prompt Train project consists of multiple interconnected services: a proxy API service, a monitoring dashboard, shared utilities, and various scripts. We need to decide how to organize these components in a way that promotes code reuse, simplifies dependency management, and maintains clear boundaries between services.
 
 ## Decision Drivers
 

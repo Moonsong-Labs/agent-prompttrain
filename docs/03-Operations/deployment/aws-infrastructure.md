@@ -1,10 +1,10 @@
 # AWS Infrastructure Deployment
 
-This guide covers deploying Agent PromptTrain on AWS EC2 infrastructure with support for multiple environments.
+This guide covers deploying Agent Prompt Train on AWS EC2 infrastructure with support for multiple environments.
 
 ## Environment Architecture
 
-Agent PromptTrain supports two primary environments:
+Agent Prompt Train supports two primary environments:
 
 - **Production (`prod`)** - Live production services
 - **Staging (`staging`)** - Pre-production testing environment

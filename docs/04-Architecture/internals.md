@@ -1,6 +1,6 @@
 # Internals
 
-Deep dive into the Agent PromptTrain implementation details, architecture patterns, and design decisions.
+Deep dive into the Agent Prompt Train implementation details, architecture patterns, and design decisions.
 
 ## System Architecture
 

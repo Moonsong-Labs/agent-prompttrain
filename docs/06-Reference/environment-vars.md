@@ -1,6 +1,6 @@
 # Environment Variables Reference
 
-Complete reference for all environment variables used in Agent PromptTrain.
+Complete reference for all environment variables used in Agent Prompt Train.
 
 ## Essential Configuration
 

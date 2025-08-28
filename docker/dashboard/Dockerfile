@@ -1,4 +1,4 @@
-# Agent PromptTrain Dashboard Service - Production Dockerfile
+# Agent Prompt Train Dashboard Service - Production Dockerfile
 # Web dashboard for monitoring and analytics
 
 # ===== Builder Stage =====

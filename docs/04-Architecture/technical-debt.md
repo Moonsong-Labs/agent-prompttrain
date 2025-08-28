@@ -1,6 +1,6 @@
 # Technical Debt Register
 
-This document tracks known technical debt in the Agent PromptTrain project. Each item includes context, impact, and proposed remediation.
+This document tracks known technical debt in the Agent Prompt Train project. Each item includes context, impact, and proposed remediation.
 
 ## High Priority
 

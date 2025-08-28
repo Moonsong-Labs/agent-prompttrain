@@ -1,6 +1,6 @@
 # API Schemas Reference
 
-Complete reference for request and response schemas used in Agent PromptTrain.
+Complete reference for request and response schemas used in Agent Prompt Train.
 
 ## Claude API Schemas
 

@@ -1,7 +1,7 @@
 {
   "name": "@agent-prompttrain/proxy",
   "version": "2.0.0",
-  "description": "Agent PromptTrain Service - API proxy for Claude with telemetry and multi-subscription support",
+  "description": "Agent Prompt Train Service - API proxy for Claude with telemetry and multi-subscription support",
   "type": "module",
   "main": "dist/main.js",
   "bin": {

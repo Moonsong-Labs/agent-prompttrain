@@ -1,11 +1,11 @@
-# <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="12" r="2"/><path d="M12 9 L12 7"/><path d="M15 12 L18 12"/><path d="M12 15 L12 18"/><path d="M9 12 L6 12"/></svg>Agent PromptTrain
+# <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="12" r="2"/><path d="M12 9 L12 7"/><path d="M15 12 L18 12"/><path d="M12 15 L12 18"/><path d="M9 12 L6 12"/></svg>Agent Prompt Train
 
-Agent PromptTrain is a Claude Code management server for teams that includes comprehensive monitoring, conversation tracking, and dashboard visualizations. Agent PromptTrain allows you to understand, manage, and improve your team's Claude Code usage.
+Agent Prompt Train is a Claude Code management server for teams that includes comprehensive monitoring, conversation tracking, and dashboard visualizations. Agent Prompt Train allows you to understand, manage, and improve your team's Claude Code usage.
 (_Supports Claude Max plan_)
 
 ### 📖 Quick Navigation
 
-- [**Getting Started**](#quick-start) - Set up Agent PromptTrain in seconds
+- [**Getting Started**](#quick-start) - Set up Agent Prompt Train in seconds
 - [**Features**](#-features) - Explore capabilities and functionality
 - [**Development**](#development-setup) - Build and contribute
 - [**Documentation**](#documentation) - Complete guides and references
@@ -13,7 +13,7 @@ Agent PromptTrain is a Claude Code management server for teams that includes com
 
 ## 🎯 Objectives
 
-Agent PromptTrain empowers development teams to maximize their Claude AI usage through:
+Agent Prompt Train empowers development teams to maximize their Claude AI usage through:
 
 - 🔍 **Complete Visibility**: Real-time access to conversations, tool invocations, and prompts for effective troubleshooting and debugging
 - 📈 **Historical Analytics**: Comprehensive activity history enabling usage monitoring, pattern identification, and continuous improvement
@@ -23,13 +23,13 @@ Agent PromptTrain empowers development teams to maximize their Claude AI usage t
 
 ![Image](https://github.com/user-attachments/assets/91652db7-ebac-4386-994d-5775f455622f)
 
-Experience Agent PromptTrain in action with our live demo:
+Experience Agent Prompt Train in action with our live demo:
 
 👉 **[https://nexus-demo.moonsonglabs.dev](https://nexus-demo.moonsonglabs.dev)**
 
 _Note: This is a read-only demo showcasing real usage data from our development team._
 
-<img src="https://github.com/user-attachments/assets/aebffb8c-9535-4073-aa76-be31ee05a402" alt="Agent PromptTrain Dashboard" width="800">
+<img src="https://github.com/user-attachments/assets/aebffb8c-9535-4073-aa76-be31ee05a402" alt="Agent Prompt Train Dashboard" width="800">
 
 ## ✨ Features
 
@@ -45,7 +45,7 @@ _Note: This is a read-only demo showcasing real usage data from our development 
 
 ## 📚 Key Concepts
 
-Understanding these terms will help you navigate Agent PromptTrain effectively:
+Understanding these terms will help you navigate Agent Prompt Train effectively:
 
 ### Core Concepts
 
@@ -107,7 +107,7 @@ For administrators or heavy users, you can follow the token usage and see when a
 
 ## Quick Start
 
-Get Agent PromptTrain running locally in seconds.
+Get Agent Prompt Train running locally in seconds.
 
 ### 🔥 Super Quick Start (All-in-One Docker + Claude CLI)
 
@@ -116,7 +116,7 @@ Get Agent PromptTrain running locally in seconds.
 - [Docker](https://docker.com)
 - Claude Code (_already installed and setup_)
 
-Start the Agent PromptTrain (_docker image with: Postgres + Proxy + Dashboard_):
+Start the Agent Prompt Train (_docker image with: Postgres + Proxy + Dashboard_):
 
 ```bash
 docker run -d -p 3000:3000 -p 3001:3001 --name agent-prompttrain moonsonglabs/agent-prompttrain-all-in:latest
@@ -146,7 +146,7 @@ For developers who want to modify the proxy or dashboard code with **hot reload*
 
 - [Bun](https://bun.sh) runtime (v1.0+)
 - [Docker](https://docker.com) and Docker Compose
-- Claude API Key or Claude Max subscription for each developer using Agent PromptTrain
+- Claude API Key or Claude Max subscription for each developer using Agent Prompt Train
 
 ### 🛠️ Development Workflow
 
@@ -229,7 +229,7 @@ Docker Containers:
 
 ## Production Deployment
 
-For deploying Agent PromptTrain in production environments.
+For deploying Agent Prompt Train in production environments.
 
 **Important Considerations**:
 
@@ -252,7 +252,7 @@ Choose your deployment method:
 
 ### ⚠️ Important Considerations
 
-- **In order to comply with the Anthropic Terms of Service, you need to have a Claude Max subscription for each user of Agent PromptTrain.**
+- **In order to comply with the Anthropic Terms of Service, you need to have a Claude Max subscription for each user of Agent Prompt Train.**
 - Always set `DASHBOARD_API_KEY` in production
 - Configure proper SSL/TLS certificates
 - Set up monitoring and alerting
@@ -380,7 +380,7 @@ See [Development Guide](docs/01-Getting-Started/development.md) for development 
 
 ### Environments (MoonsongLabs Internal)
 
-Agent PromptTrain supports deployment to multiple environments:
+Agent Prompt Train supports deployment to multiple environments:
 
 - **Production (`prod`)** - Live production services
 - **Staging (`staging`)** - Pre-production testing environment
@@ -465,7 +465,7 @@ Comprehensive documentation is available in the [docs](docs/) directory:
 
 ## Contributing
 
-⚠️ Disclaimer: This project has been entirely vibe Coded (using Agent PromptTrain) with the goal to not manually touch a single file.
+⚠️ Disclaimer: This project has been entirely vibe Coded (using Agent Prompt Train) with the goal to not manually touch a single file.
 
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
 

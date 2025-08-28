@@ -1,4 +1,4 @@
-# Agent PromptTrain Dashboard Service
+# Agent Prompt Train Dashboard Service
 
 The dashboard service provides a web UI for monitoring and analyzing Claude API usage.
 

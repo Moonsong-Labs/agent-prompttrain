@@ -1,8 +1,8 @@
-# Agent PromptTrain Architecture
+# Agent Prompt Train Architecture
 
 ## Overview
 
-Agent PromptTrain has been refactored into a microservices architecture with two separate services:
+Agent Prompt Train has been refactored into a microservices architecture with two separate services:
 
 1. **Proxy Service** - Handles API proxying, authentication, and data collection
 2. **Dashboard Service** - Provides web UI for monitoring and analytics

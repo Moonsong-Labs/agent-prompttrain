@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This guide covers all configuration options for Agent PromptTrain.
+This guide covers all configuration options for Agent Prompt Train.
 
 ## Environment Variables
 

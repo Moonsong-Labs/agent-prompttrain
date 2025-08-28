@@ -1,6 +1,6 @@
 # Features
 
-Agent PromptTrain is a high-performance proxy for the Claude API with comprehensive monitoring and management capabilities.
+Agent Prompt Train is a high-performance proxy for the Claude API with comprehensive monitoring and management capabilities.
 
 ## Core Features
 
@@ -136,7 +136,7 @@ Agent PromptTrain is a high-performance proxy for the Claude API with comprehens
 
 ## Feature Comparison
 
-| Feature               | Agent PromptTrain     | Direct Claude API |
+| Feature               | Agent Prompt Train    | Direct Claude API |
 | --------------------- | --------------------- | ----------------- |
 | Token Tracking        | ✅ Comprehensive      | ❌ Limited        |
 | Usage Analytics       | ✅ Built-in Dashboard | ❌ Manual         |

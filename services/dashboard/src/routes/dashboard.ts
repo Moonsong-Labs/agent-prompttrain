@@ -19,7 +19,7 @@ const layout = (title: string, content: any) => html`
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>${title} - Agent PromptTrain Dashboard</title>
+      <title>${title} - Agent Prompt Train Dashboard</title>
       <style>
         * {
           box-sizing: border-box;
@@ -188,7 +188,7 @@ const layout = (title: string, content: any) => html`
     <body>
       <nav>
         <div class="container">
-          <h1>Agent PromptTrain Dashboard</h1>
+          <h1>Agent Prompt Train Dashboard</h1>
           <div class="space-x-4">
             <span class="text-sm text-gray-600" id="current-domain">All Domains</span>
             <a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>

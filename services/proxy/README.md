@@ -1,4 +1,4 @@
-# Agent PromptTrain Service
+# Agent Prompt Train Service
 
 The proxy service handles all API proxying functionality for Claude API with authentication, telemetry, and storage capabilities.
 

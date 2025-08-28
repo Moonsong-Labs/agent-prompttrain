@@ -1,6 +1,6 @@
 # Docker Compose Deployment
 
-Deploy the complete Agent PromptTrain stack using Docker Compose for a production-ready setup.
+Deploy the complete Agent Prompt Train stack using Docker Compose for a production-ready setup.
 
 ## Overview
 

@@ -1,6 +1,6 @@
-# Agent PromptTrain Docker Images
+# Agent Prompt Train Docker Images
 
-This directory contains the Docker configurations for the Agent PromptTrain project, split into two separate microservices following best practices.
+This directory contains the Docker configurations for the Agent Prompt Train project, split into two separate microservices following best practices.
 
 ## Images
 

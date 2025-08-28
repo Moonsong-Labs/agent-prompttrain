@@ -1,6 +1,6 @@
 # Performance Troubleshooting
 
-This guide helps identify and resolve performance issues in Agent PromptTrain.
+This guide helps identify and resolve performance issues in Agent Prompt Train.
 
 ## Common Performance Issues
 

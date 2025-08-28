@@ -115,7 +115,7 @@ describe('Client Authentication Middleware', () => {
       })
 
       expect(res.status).toBe(401)
-      expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Agent PromptTrain"')
+      expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Agent Prompt Train"')
     })
 
     it('should reject requests with invalid API key', async () => {

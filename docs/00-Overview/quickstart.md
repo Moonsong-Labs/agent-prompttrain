@@ -1,4 +1,4 @@
-# Agent PromptTrain - Quick Start
+# Agent Prompt Train - Quick Start
 
 ## Prerequisites
 

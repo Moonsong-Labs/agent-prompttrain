@@ -1,6 +1,6 @@
 # Test Suite
 
-This directory contains the test suite for Agent PromptTrain.
+This directory contains the test suite for Agent Prompt Train.
 
 ## Structure
 

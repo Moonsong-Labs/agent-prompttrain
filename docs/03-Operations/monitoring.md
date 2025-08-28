@@ -1,6 +1,6 @@
 # Monitoring Guide
 
-Comprehensive monitoring ensures your Agent PromptTrain operates reliably and efficiently.
+Comprehensive monitoring ensures your Agent Prompt Train operates reliably and efficiently.
 
 ## Overview
 
@@ -252,7 +252,7 @@ Example dashboard config:
 ```json
 {
   "dashboard": {
-    "title": "Agent PromptTrain",
+    "title": "Agent Prompt Train",
     "panels": [
       {
         "title": "Request Rate",

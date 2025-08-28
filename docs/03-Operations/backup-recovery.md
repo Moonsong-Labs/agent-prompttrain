@@ -1,6 +1,6 @@
 # Backup and Recovery Guide
 
-Protect your Agent PromptTrain data with comprehensive backup and disaster recovery procedures.
+Protect your Agent Prompt Train data with comprehensive backup and disaster recovery procedures.
 
 ## Overview
 
@@ -394,7 +394,7 @@ GROUP BY backup_type;
 if ! ./scripts/backup-daily.sh; then
     curl -X POST $SLACK_WEBHOOK_URL \
         -H 'Content-type: application/json' \
-        -d '{"text":"⚠️ Agent PromptTrain backup failed!"}'
+        -d '{"text":"⚠️ Agent Prompt Train backup failed!"}'
 fi
 
 # Alert on old backups

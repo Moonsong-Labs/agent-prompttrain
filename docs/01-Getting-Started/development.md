@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers setting up and developing Agent PromptTrain.
+This guide covers setting up and developing Agent Prompt Train.
 
 ## Prerequisites
 

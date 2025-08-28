@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-console.log('🏗️  Building Agent PromptTrain Dashboard Service for Production...')
+console.log('🏗️  Building Agent Prompt Train Dashboard Service for Production...')
 
 // Generate prompt assets first (skip in Docker where file already exists)
 if (!process.env.DOCKER_BUILD) {
@@ -58,7 +58,7 @@ try {
 
   // Create entry point wrapper
   const entryWrapper = `#!/usr/bin/env node
-// Production entry point for Agent PromptTrain Dashboard
+// Production entry point for Agent Prompt Train Dashboard
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

@@ -1,6 +1,6 @@
-# Agent PromptTrain Documentation
+# Agent Prompt Train Documentation
 
-Welcome to the Agent PromptTrain documentation. This guide will help you understand, deploy, and operate the Claude API proxy with monitoring dashboard.
+Welcome to the Agent Prompt Train documentation. This guide will help you understand, deploy, and operate the Claude API proxy with monitoring dashboard.
 
 ## Documentation Structure
 

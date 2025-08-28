@@ -1,6 +1,6 @@
-# Agent PromptTrain Tests
+# Agent Prompt Train Tests
 
-This directory contains automated tests for the Agent PromptTrain.
+This directory contains automated tests for the Agent Prompt Train.
 
 ## Test Structure
 

@@ -1,4 +1,4 @@
-# Agent PromptTrain Service - Production Dockerfile
+# Agent Prompt Train Service - Production Dockerfile
 # Optimized for minimal size and security
 
 # ===== Builder Stage =====

@@ -3,7 +3,7 @@ import { execSync } from 'child_process'
 import { parseArgs } from 'util'
 
 /**
- * Database backup script - creates a backup of the Agent PromptTrain database
+ * Database backup script - creates a backup of the Agent Prompt Train database
  * Refactored version with improved structure and type safety
  *
  * Supports filtering by timestamp to backup complete conversations with recent activity

@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying Agent PromptTrain to production environments.
+This guide covers deploying Agent Prompt Train to production environments.
 
 ## Deployment Options
 
@@ -109,7 +109,7 @@ Using systemd:
 ```ini
 # /etc/systemd/system/claude-proxy.service
 [Unit]
-Description=Agent PromptTrain
+Description=Agent Prompt Train
 After=network.target postgresql.service
 
 [Service]

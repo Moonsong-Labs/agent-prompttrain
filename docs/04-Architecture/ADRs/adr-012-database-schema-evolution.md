@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-As the Agent PromptTrain evolves, we need a systematic approach to manage database schema changes. Initially, the project used a single `init-database.sql` script, which worked well for fresh installations but created challenges for:
+As the Agent Prompt Train evolves, we need a systematic approach to manage database schema changes. Initially, the project used a single `init-database.sql` script, which worked well for fresh installations but created challenges for:
 
 - Existing deployments needing schema updates
 - Tracking schema version history

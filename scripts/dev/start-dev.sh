@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting Agent PromptTrain Development Environment"
+echo "Starting Agent Prompt Train Development Environment"
 echo "=================================================="
 
 # Kill any existing processes on ports 3000 and 3001

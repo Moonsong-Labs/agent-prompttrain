@@ -1,6 +1,6 @@
 # Scripts Directory
 
-This directory contains utility scripts for managing the Agent PromptTrain project, organized by purpose.
+This directory contains utility scripts for managing the Agent Prompt Train project, organized by purpose.
 
 ## Directory Structure
 

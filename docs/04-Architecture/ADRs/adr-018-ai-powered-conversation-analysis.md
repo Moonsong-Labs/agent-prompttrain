@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-As the Agent PromptTrain processes increasing volumes of conversations, users need insights into conversation patterns, quality, and outcomes. Currently, users must manually review conversations to understand:
+As the Agent Prompt Train processes increasing volumes of conversations, users need insights into conversation patterns, quality, and outcomes. Currently, users must manually review conversations to understand:
 
 - Conversation effectiveness and quality
 - Common user patterns and pain points

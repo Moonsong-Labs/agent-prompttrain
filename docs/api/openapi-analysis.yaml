@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Agent PromptTrain - AI Analysis API
+  title: Agent Prompt Train - AI Analysis API
   description: |
-    API endpoints for managing AI-powered conversation analysis in the Agent PromptTrain.
+    API endpoints for managing AI-powered conversation analysis in the Agent Prompt Train.
 
     These endpoints allow you to request, retrieve, and regenerate AI analyses of conversations
     tracked by the proxy. The analysis provides insights including summaries, key topics,
@@ -32,7 +32,7 @@ info:
 
   version: 1.0.0
   contact:
-    name: Agent PromptTrain
+    name: Agent Prompt Train
     url: https://github.com/Moonsong-Labs/agent-prompttrain
 
 servers:

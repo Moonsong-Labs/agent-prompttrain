@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide will walk you through installing Agent PromptTrain in various environments.
+This guide will walk you through installing Agent Prompt Train in various environments.
 
 ## Prerequisites
 
