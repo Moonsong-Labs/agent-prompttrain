@@ -26,7 +26,7 @@ export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 export const ANTHROPIC_API_KEY_REGEX = /^sk-ant-[a-zA-Z0-9-_]+$/
 
 /**
- * Agent PromptTrain API key pattern
+ * Agent Prompt Train API key pattern
  * Matches: cnp_live_xxxxx or cnp_test_xxxxx
  */
 export const CNP_API_KEY_REGEX = /^cnp_(live|test)_[a-zA-Z0-9_]+$/

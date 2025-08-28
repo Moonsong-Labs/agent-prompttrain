@@ -1,7 +1,7 @@
 {
   "name": "@agent-prompttrain/shared",
   "version": "2.0.0",
-  "description": "Shared utilities and types for Agent PromptTrain services",
+  "description": "Shared utilities and types for Agent Prompt Train services",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

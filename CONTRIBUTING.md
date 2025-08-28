@@ -1,4 +1,4 @@
-# Contributing to Agent PromptTrain
+# Contributing to Agent Prompt Train
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -241,4 +241,4 @@ Contributors will be:
 - Check existing issues and discussions first
 - Join our community chat [if applicable]
 
-Thank you for contributing to Agent PromptTrain!
+Thank you for contributing to Agent Prompt Train!

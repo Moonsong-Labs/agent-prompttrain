@@ -1,4 +1,4 @@
--- Initialize Claude Nexus Proxy Database
+-- Initialize Agent Prompt Train Database
 -- This script creates the necessary tables for the proxy
 
 -- Create api_requests table with all required columns including branch_id

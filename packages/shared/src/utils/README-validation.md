@@ -1,6 +1,6 @@
 # Validation Utilities
 
-This module provides comprehensive validation utilities for the Agent PromptTrain project, eliminating code duplication and ensuring consistent validation across all services.
+This module provides comprehensive validation utilities for the Agent Prompt Train project, eliminating code duplication and ensuring consistent validation across all services.
 
 ## Overview
 

@@ -1,5 +1,5 @@
 /**
- * Structured logging types for the Agent PromptTrain
+ * Structured logging types for the Agent Prompt Train
  */
 
 // Base log entry with common fields

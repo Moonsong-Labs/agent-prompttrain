@@ -1,4 +1,4 @@
-# Agent PromptTrain Shared Package
+# Agent Prompt Train Shared Package
 
 Shared types, configurations, and utilities used by both proxy and dashboard services.
 

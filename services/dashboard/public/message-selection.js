@@ -1,4 +1,4 @@
-// Message selection functionality for Agent PromptTrain Dashboard
+// Message selection functionality for Agent Prompt Train Dashboard
 
 // 1. Hash parsing function
 function parseMessageHash(hash) {
