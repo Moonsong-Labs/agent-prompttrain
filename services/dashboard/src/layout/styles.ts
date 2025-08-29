@@ -56,8 +56,8 @@ export const dashboardStyles = `
     --msg-system-border: #9ca3af;
     --msg-tool-use-bg: #fef3c7;
     --msg-tool-use-border: #f59e0b;
-    --msg-tool-result-bg: #dcfce7;
-    --msg-tool-result-border: #22c55e;
+    --msg-tool-result-bg: #f3e8ff;
+    --msg-tool-result-border: #9333ea;
     
     /* Code block colors */
     --code-bg: #1e293b;
@@ -117,8 +117,8 @@ export const dashboardStyles = `
     --msg-system-border: #6b7280;
     --msg-tool-use-bg: #78350f;
     --msg-tool-use-border: #f59e0b;
-    --msg-tool-result-bg: #14532d;
-    --msg-tool-result-border: #22c55e;
+    --msg-tool-result-bg: #4c1d95;
+    --msg-tool-result-border: #9333ea;
     
     /* Code block colors */
     --code-bg: #0f172a;
