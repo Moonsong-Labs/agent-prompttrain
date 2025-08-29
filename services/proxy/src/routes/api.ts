@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { Pool } from 'pg'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage, getErrorStack } from '@claude-nexus/shared'
+import { getErrorMessage, getErrorStack } from '@agent-prompttrain/shared'
 import { container } from '../container.js'
 
 // Query parameter schemas

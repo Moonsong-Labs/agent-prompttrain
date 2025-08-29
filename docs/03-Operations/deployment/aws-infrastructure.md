@@ -1,10 +1,10 @@
 # AWS Infrastructure Deployment
 
-This guide covers deploying Claude Nexus Proxy on AWS EC2 infrastructure with support for multiple environments.
+This guide covers deploying Agent Prompt Train on AWS EC2 infrastructure with support for multiple environments.
 
 ## Environment Architecture
 
-Claude Nexus Proxy supports two primary environments:
+Agent Prompt Train supports two primary environments:
 
 - **Production (`prod`)** - Live production services
 - **Staging (`staging`)** - Pre-production testing environment
@@ -29,7 +29,7 @@ Each EC2 instance should have the following structure in the ubuntu user's home 
 ```
 /home/ubuntu/
 ├── .env                          # Environment configuration
-├── claude-nexus/                 # Git repository
+├── agent-prompttrain/                 # Git repository
 │   └── scripts/ops/              # Operational scripts
 ├── credentials/                  # Domain credential files
 │   ├── domain1.com.credentials.json
@@ -68,8 +68,8 @@ resource "aws_instance" "nexus_proxy_prod" {
     curl -fsSL https://get.docker.com | bash
 
     # Clone repository
-    git clone https://github.com/yourusername/claude-nexus.git /home/ubuntu/claude-nexus
-    chown -R ubuntu:ubuntu /home/ubuntu/claude-nexus
+    git clone https://github.com/moonsong-labs/agent-prompttrain.git /home/ubuntu/agent-prompttrain
+    chown -R ubuntu:ubuntu /home/ubuntu/agent-prompttrain
 
     # Create required directories
     mkdir -p /home/ubuntu/credentials

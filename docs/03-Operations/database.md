@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Nexus Proxy uses PostgreSQL to store API request/response data, conversation tracking, and token usage metrics. The database schema is designed for efficient querying and real-time analytics.
+Agent Prompt Train uses PostgreSQL to store API request/response data, conversation tracking, and token usage metrics. The database schema is designed for efficient querying and real-time analytics.
 
 ## Tables
 

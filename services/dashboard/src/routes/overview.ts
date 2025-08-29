@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
-import { getErrorMessage, getModelContextLimit, getBatteryColor } from '@claude-nexus/shared'
+import { getErrorMessage, getModelContextLimit, getBatteryColor } from '@agent-prompttrain/shared'
 import {
   formatNumber,
   formatDuration,

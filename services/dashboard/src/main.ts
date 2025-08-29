@@ -83,9 +83,9 @@ function getPackageVersion(): string {
 }
 
 function showHelp() {
-  console.log(`Claude Nexus Dashboard Service v${getPackageVersion()}
+  console.log(`Agent Prompt Train Dashboard Service v${getPackageVersion()}
 
-Usage: claude-nexus-dashboard [options]
+Usage: agent-prompttrain-dashboard [options]
 
 Options:
   -v, --version              Show version number
@@ -102,10 +102,10 @@ Environment Variables:
   PROXY_API_URL               URL of the proxy service for real-time updates (optional)
 
 Examples:
-  claude-nexus-dashboard
-  claude-nexus-dashboard --port 8080
-  claude-nexus-dashboard --host localhost --port 3001
-  claude-nexus-dashboard --env-file .env.production
+  agent-prompttrain-dashboard
+  agent-prompttrain-dashboard --port 8080
+  agent-prompttrain-dashboard --host localhost --port 3001
+  agent-prompttrain-dashboard --env-file .env.production
 
 Dashboard Access:
   If DASHBOARD_API_KEY is set, the dashboard requires authentication.
@@ -155,7 +155,7 @@ async function main() {
     }
 
     // Print dashboard configuration
-    console.log(`Claude Nexus Dashboard Service v${getPackageVersion()}`)
+    console.log(`Agent Prompt Train Dashboard Service v${getPackageVersion()}`)
     console.log('Mode: Web Dashboard for monitoring and analytics')
 
     console.log('\nConfiguration:')

@@ -96,7 +96,7 @@ async function generateSimpleClient() {
   console.log('🚀 Generating simple TypeScript client...')
 
   const clientCode = `/**
- * Auto-generated API client for Claude Nexus Proxy AI Analysis API
+ * Auto-generated API client for Agent Prompt Train AI Analysis API
  * Generated from: ${OPENAPI_SPEC}
  * Generated on: ${new Date().toISOString()}
  */
@@ -281,7 +281,7 @@ async function main() {
 
     console.log('\n📝 Example usage:')
     console.log(`
-import { createAnalysisClient } from '@claude-nexus/shared/generated/api-client'
+import { createAnalysisClient } from '@agent-prompttrain/shared/generated/api-client'
 
 const client = createAnalysisClient({
   baseUrl: 'http://localhost:3000',

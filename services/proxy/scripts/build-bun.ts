@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-console.log('Building Claude Nexus Proxy Service with Bun...')
+console.log('Building Agent Prompt Train Service with Bun...')
 
 const distDir = join(__dirname, '..', 'dist')
 const srcDir = join(__dirname, '..', 'src')

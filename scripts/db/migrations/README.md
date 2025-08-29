@@ -1,6 +1,6 @@
 # Database Migrations
 
-This directory contains all database migration scripts for the Claude Nexus Proxy project.
+This directory contains all database migration scripts for the Agent Prompt Train project.
 
 ## Migration Naming Convention
 

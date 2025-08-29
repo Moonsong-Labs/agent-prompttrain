@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { RateLimitError } from '@claude-nexus/shared'
+import { RateLimitError } from '@agent-prompttrain/shared'
 import { getRequestLogger } from './logger'
 
 // Rate limit configuration

@@ -1,6 +1,6 @@
 # Technical Debt Register
 
-This document tracks known technical debt in the Claude Nexus Proxy project. Each item includes context, impact, and proposed remediation.
+This document tracks known technical debt in the Agent Prompt Train project. Each item includes context, impact, and proposed remediation.
 
 ## High Priority
 
@@ -44,7 +44,7 @@ setInterval(() => {
 }, 300000); // Every 5 minutes
 ```
 
-**Reference**: [PR #13 Review](https://github.com/Moonsong-Labs/claude-nexus/pull/13#review)
+**Reference**: [PR #13 Review](https://github.com/Moonsong-Labs/agent-prompttrain/pull/13#review)
 
 ### 2. ✅ N+1 Query Pattern in Conversations API [RESOLVED]
 
@@ -68,7 +68,7 @@ setInterval(() => {
 - Reduced query complexity from O(n\*m) to O(n log n)
 - Added proper indexes aligned with window function partitioning
 
-**Reference**: [PR #13 Review](https://github.com/Moonsong-Labs/claude-nexus/pull/13#review)
+**Reference**: [PR #13 Review](https://github.com/Moonsong-Labs/agent-prompttrain/pull/13#review)
 
 ## Medium Priority
 

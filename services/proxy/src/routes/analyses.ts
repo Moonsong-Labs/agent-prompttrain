@@ -6,7 +6,10 @@ import {
   rateLimitAnalysisCreation,
   rateLimitAnalysisRetrieval,
 } from '../middleware/analysis-rate-limit.js'
-import { ConversationAnalysisStatus, conversationBranchParamsSchema } from '@claude-nexus/shared'
+import {
+  ConversationAnalysisStatus,
+  conversationBranchParamsSchema,
+} from '@agent-prompttrain/shared'
 
 // Request/Response schemas
 const createAnalysisSchema = z.object({

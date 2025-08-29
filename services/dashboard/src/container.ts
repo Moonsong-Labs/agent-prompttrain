@@ -2,7 +2,7 @@ import { Pool } from 'pg'
 import { StorageReader } from './storage/reader.js'
 import { ProxyApiClient } from './services/api-client.js'
 import { logger } from './middleware/logger.js'
-import { config } from '@claude-nexus/shared/config'
+import { config } from '@agent-prompttrain/shared/config'
 
 /**
  * Dependency injection container for the dashboard service

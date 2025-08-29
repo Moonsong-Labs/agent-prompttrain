@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { getErrorMessage, config } from '@claude-nexus/shared'
+import { getErrorMessage, config } from '@agent-prompttrain/shared'
 
 export const sparkApiRoutes = new Hono()
 

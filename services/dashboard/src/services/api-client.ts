@@ -1,5 +1,5 @@
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 import { HttpError } from '../errors/HttpError.js'
 import { isReadOnly } from '../config.js'
 

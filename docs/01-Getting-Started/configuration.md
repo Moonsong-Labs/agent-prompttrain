@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This guide covers all configuration options for Claude Nexus Proxy.
+This guide covers all configuration options for Agent Prompt Train.
 
 ## Environment Variables
 

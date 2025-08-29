@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-As the Claude Nexus Proxy processes increasing volumes of conversations, users need insights into conversation patterns, quality, and outcomes. Currently, users must manually review conversations to understand:
+As the Agent Prompt Train processes increasing volumes of conversations, users need insights into conversation patterns, quality, and outcomes. Currently, users must manually review conversations to understand:
 
 - Conversation effectiveness and quality
 - Common user patterns and pain points
@@ -219,7 +219,7 @@ Key files:
 
 - [Feature Plan](../feature-plan-ai-analysis.md)
 - [Database Schema Evolution ADR](./adr-012-database-schema-evolution.md)
-- [PR #75: Database Schema Implementation](https://github.com/Moonsong-Labs/claude-nexus/pull/75)
+- [PR #75: Database Schema Implementation](https://github.com/Moonsong-Labs/agent-prompttrain/pull/75)
 
 ## Notes
 

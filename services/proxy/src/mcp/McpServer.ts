@@ -16,7 +16,7 @@ import type { PromptRegistryService } from './PromptRegistryService.js'
 
 export class McpServer {
   private readonly serverInfo = {
-    name: 'claude-nexus-mcp-server',
+    name: 'agent-prompttrain-mcp-server',
     version: '1.0.0',
   }
 

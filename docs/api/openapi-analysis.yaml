@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Claude Nexus - AI Analysis API
+  title: Agent Prompt Train - AI Analysis API
   description: |
-    API endpoints for managing AI-powered conversation analysis in the Claude Nexus Proxy.
+    API endpoints for managing AI-powered conversation analysis in the Agent Prompt Train.
 
     These endpoints allow you to request, retrieve, and regenerate AI analyses of conversations
     tracked by the proxy. The analysis provides insights including summaries, key topics,
@@ -32,8 +32,8 @@ info:
 
   version: 1.0.0
   contact:
-    name: Claude Nexus
-    url: https://github.com/Moonsong-Labs/claude-nexus
+    name: Agent Prompt Train
+    url: https://github.com/Moonsong-Labs/agent-prompttrain
 
 servers:
   - url: http://localhost:3000

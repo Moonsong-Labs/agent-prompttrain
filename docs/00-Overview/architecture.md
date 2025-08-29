@@ -1,8 +1,8 @@
-# Claude Nexus Architecture
+# Agent Prompt Train Architecture
 
 ## Overview
 
-Claude Nexus has been refactored into a microservices architecture with two separate services:
+Agent Prompt Train has been refactored into a microservices architecture with two separate services:
 
 1. **Proxy Service** - Handles API proxying, authentication, and data collection
 2. **Dashboard Service** - Provides web UI for monitoring and analytics
@@ -10,7 +10,7 @@ Claude Nexus has been refactored into a microservices architecture with two sepa
 ## Directory Structure
 
 ```
-claude-nexus/
+agent-prompttrain/
 ├── packages/
 │   └── shared/           # Shared types and configurations
 ├── services/

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { container } from './container.js'
-import { config, validateConfig } from '@claude-nexus/shared/config'
+import { config, validateConfig } from '@agent-prompttrain/shared/config'
 import { loggingMiddleware, logger } from './middleware/logger.js'
 import { requestIdMiddleware } from './middleware/request-id.js'
 import { validationMiddleware } from './middleware/validation.js'
@@ -17,7 +17,7 @@ import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
 import { domainExtractorMiddleware } from './middleware/domain-extractor.js'
 import { clientAuthMiddleware } from './middleware/client-auth.js'
-import { HonoVariables, HonoBindings } from '@claude-nexus/shared'
+import { HonoVariables, HonoBindings } from '@agent-prompttrain/shared'
 
 /**
  * Create and configure the Proxy application
@@ -173,7 +173,7 @@ export async function createProxyApp(): Promise<
       // MCP discovery endpoint (now protected by auth)
       app.get('/mcp', c => {
         return c.json({
-          name: 'claude-nexus-mcp-server',
+          name: 'agent-prompttrain-mcp-server',
           version: '1.0.0',
           capabilities: {
             prompts: {
@@ -282,7 +282,7 @@ export async function createProxyApp(): Promise<
     }
 
     return c.json({
-      service: 'claude-nexus',
+      service: 'agent-prompttrain',
       version: process.env.npm_package_version || 'unknown',
       status: 'operational',
       endpoints,

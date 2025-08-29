@@ -17,7 +17,7 @@ import { container } from './container.js'
 import { closeRateLimitStores } from './middleware/rate-limit.js'
 import { CredentialStatusService } from './services/CredentialStatusService.js'
 import { CredentialManager } from './services/CredentialManager.js'
-import { config } from '@claude-nexus/shared'
+import { config } from '@agent-prompttrain/shared'
 import { startAnalysisWorker } from './workers/ai-analysis/index.js'
 
 // Load .env file from multiple possible locations
@@ -97,9 +97,9 @@ function getPackageVersion(): string {
 }
 
 function showHelp() {
-  console.log(`Claude Nexus Proxy Service v${getPackageVersion()}
+  console.log(`Agent Prompt Train Service v${getPackageVersion()}
 
-Usage: claude-nexus-proxy [options]
+Usage: agent-prompttrain-proxy [options]
 
 Options:
   -v, --version              Show version number
@@ -118,16 +118,16 @@ Environment Variables:
   STORAGE_ENABLED             Enable request/response storage (default: false)
   SLACK_WEBHOOK_URL           Slack webhook URL for notifications (optional)
   SLACK_CHANNEL               Slack channel override (optional)
-  SLACK_USERNAME              Slack bot username (default: Claude Nexus Proxy)
+  SLACK_USERNAME              Slack bot username (default: Agent Prompt Train)
   SLACK_ICON_EMOJI            Slack bot icon (default: :robot_face:)
   SLACK_ENABLED               Enable/disable Slack notifications (default: false)
 
 Examples:
-  claude-nexus-proxy
-  claude-nexus-proxy --port 8080
-  claude-nexus-proxy --host localhost --port 3000
-  claude-nexus-proxy --env-file .env.production
-  PORT=8787 HOST=127.0.0.1 claude-nexus-proxy
+  agent-prompttrain-proxy
+  agent-prompttrain-proxy --port 8080
+  agent-prompttrain-proxy --host localhost --port 3000
+  agent-prompttrain-proxy --env-file .env.production
+  PORT=8787 HOST=127.0.0.1 agent-prompttrain-proxy
 
 Note: The proxy automatically loads .env file from the current directory.
 Use --env-file to specify a different configuration file.`)
@@ -167,7 +167,7 @@ async function main() {
 
   try {
     // Print proxy configuration
-    console.log(`Claude Nexus Proxy Service v${getPackageVersion()}`)
+    console.log(`Agent Prompt Train Service v${getPackageVersion()}`)
     console.log('Mode: passthrough (direct proxy to Claude API)')
     console.log('Target: Claude API (https://api.anthropic.com)')
 

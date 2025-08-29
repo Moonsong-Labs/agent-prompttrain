@@ -9,7 +9,7 @@ import { requestIdMiddleware } from './middleware/request-id.js'
 import { dashboardRoutes } from './routes/dashboard-api.js'
 import { conversationDetailRoutes } from './routes/conversation-detail.js'
 import { dashboardAuth, type AuthContext } from './middleware/auth.js'
-import { getErrorMessage, getStatusCode } from '@claude-nexus/shared'
+import { getErrorMessage, getStatusCode } from '@agent-prompttrain/shared'
 import { sparkProxyRoutes } from './routes/spark-proxy.js'
 import { analysisRoutes } from './routes/analysis-api.js'
 import { analysisPartialsRoutes } from './routes/partials/analysis.js'
@@ -82,7 +82,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const apiClient = container.getApiClient()
     const health: Record<string, unknown> = {
       status: 'healthy',
-      service: 'claude-nexus-dashboard',
+      service: 'agent-prompttrain-dashboard',
       version: process.env.npm_package_version || 'unknown',
       timestamp: new Date().toISOString(),
     }
@@ -228,7 +228,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   // Root API info endpoint
   app.get('/api', c => {
     return c.json({
-      service: 'claude-nexus-dashboard',
+      service: 'agent-prompttrain-dashboard',
       version: process.env.npm_package_version || 'unknown',
       endpoints: {
         dashboard: '/',

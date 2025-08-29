@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to update Claude Nexus Proxy Docker containers
+# Script to update Agent Prompt Train Docker containers
 # Usage: ./update-proxy.sh <version> [service]
 # Examples:
 #   ./update-proxy.sh v8          # Updates both containers
@@ -9,8 +9,8 @@
 
 VERSION=$1
 SERVICE=$2
-PROXY_IMAGE="moonsonglabs/claude-nexus-proxy"
-DASHBOARD_IMAGE="moonsonglabs/claude-nexus-dashboard"
+PROXY_IMAGE="moonsonglabs/agent-prompttrain-proxy"
+DASHBOARD_IMAGE="moonsonglabs/agent-prompttrain-dashboard"
 
 if [ -z "$VERSION" ]; then
     echo "Error: Version not specified"
@@ -29,11 +29,11 @@ update_proxy() {
     fi
 
     echo "Updating proxy container to $VERSION..."
-    docker stop claude-nexus-proxy 2>/dev/null
-    docker rm claude-nexus-proxy 2>/dev/null
+    docker stop agent-prompttrain-proxy 2>/dev/null
+    docker rm agent-prompttrain-proxy 2>/dev/null
 
-    docker run -d --name claude-nexus-proxy \
-        --network claude-nexus-network \
+    docker run -d --name agent-prompttrain-proxy \
+        --network agent-prompttrain-network \
         --restart unless-stopped \
         -p 3000:3000 \
         -e SERVICE=proxy \
@@ -59,11 +59,11 @@ update_dashboard() {
     fi
 
     echo "Updating dashboard container to $VERSION..."
-    docker stop claude-nexus-dashboard 2>/dev/null
-    docker rm claude-nexus-dashboard 2>/dev/null
+    docker stop agent-prompttrain-dashboard 2>/dev/null
+    docker rm agent-prompttrain-dashboard 2>/dev/null
 
-    docker run -d --name claude-nexus-dashboard \
-        --network claude-nexus-network \
+    docker run -d --name agent-prompttrain-dashboard \
+        --network agent-prompttrain-network \
         --restart unless-stopped \
         -p 3001:3001 \
         -e SERVICE=dashboard \
@@ -79,9 +79,9 @@ update_dashboard() {
 }
 
 # Check if network exists, create if it doesn't
-if ! docker network ls | grep -q claude-nexus-network; then
-    echo "Creating Docker network claude-nexus-network..."
-    docker network create claude-nexus-network
+if ! docker network ls | grep -q agent-prompttrain-network; then
+    echo "Creating Docker network agent-prompttrain-network..."
+    docker network create agent-prompttrain-network
 fi
 
 # Update based on service parameter
@@ -101,4 +101,4 @@ esac
 
 echo ""
 echo "Container status:"
-docker ps | grep -E "claude-nexus-proxy|claude-nexus-dashboard"
+docker ps | grep -E "agent-prompttrain-proxy|agent-prompttrain-dashboard"

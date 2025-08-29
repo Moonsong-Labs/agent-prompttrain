@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test'
 import { Hono } from 'hono'
-import { z } from 'zod'
 import { analysisRoutes } from '../analysis-api.js'
 import { ProxyApiClient } from '../../services/api-client.js'
-import { ConversationAnalysisStatus } from '@claude-nexus/shared'
 import type {
   CreateAnalysisResponse,
   GetAnalysisResponse,
   RegenerateAnalysisResponse,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { HttpError } from '../../errors/HttpError.js'
 
 describe('Analysis API Routes', () => {

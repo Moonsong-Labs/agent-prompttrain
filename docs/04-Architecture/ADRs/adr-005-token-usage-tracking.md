@@ -156,7 +156,7 @@ We will implement **direct storage in the api_requests table** with account-leve
 
 ## Links
 
-- [PR #20: Comprehensive token tracking](https://github.com/Moonsong-Labs/claude-nexus/pull/20)
+- [PR #20: Comprehensive token tracking](https://github.com/Moonsong-Labs/agent-prompttrain/pull/20)
 - [Monitoring Guide](../../03-Operations/monitoring.md)
 - [API Reference](../../02-User-Guide/api-reference.md#token-usage)
 

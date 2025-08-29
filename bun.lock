@@ -30,7 +30,7 @@
       },
     },
     "packages/shared": {
-      "name": "@claude-nexus/shared",
+      "name": "@agent-prompttrain/shared",
       "version": "2.0.0",
       "dependencies": {
         "@lenml/tokenizer-gemini": "^3.4.2",
@@ -43,10 +43,10 @@
       },
     },
     "services/dashboard": {
-      "name": "@claude-nexus/dashboard",
+      "name": "@agent-prompttrain/dashboard",
       "version": "2.0.0",
       "bin": {
-        "claude-nexus-dashboard": "./dist/main.js",
+        "agent-prompttrain-dashboard": "./dist/main.js",
       },
       "dependencies": {
         "@hono/node-server": "^1.13.7",
@@ -63,10 +63,10 @@
       },
     },
     "services/proxy": {
-      "name": "@claude-nexus/proxy",
+      "name": "@agent-prompttrain/proxy",
       "version": "2.0.0",
       "bin": {
-        "claude-nexus-proxy": "./dist/main.js",
+        "agent-prompttrain": "./dist/main.js",
       },
       "dependencies": {
         "@hono/node-server": "^1.13.7",
@@ -92,6 +92,12 @@
     },
   },
   "packages": {
+    "@agent-prompttrain/dashboard": ["@agent-prompttrain/dashboard@workspace:services/dashboard"],
+
+    "@agent-prompttrain/proxy": ["@agent-prompttrain/proxy@workspace:services/proxy"],
+
+    "@agent-prompttrain/shared": ["@agent-prompttrain/shared@workspace:packages/shared"],
+
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.27.1", "", {}, "sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA=="],
 
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.27.1", "", {}, "sha512-D2hP9eA+Sqx1kBZgzxZh0y1trbuU+JoDkiEwqhQ36nodYqJwyEIhPSdMNd7lOm/4io72luTPWH20Yda0xOuUow=="],
@@ -101,12 +107,6 @@
     "@babel/runtime": ["@babel/runtime@7.27.6", "", {}, "sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q=="],
 
     "@babel/types": ["@babel/types@7.28.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.27.1" } }, "sha512-jYnje+JyZG5YThjHiF28oT4SIZLnYOcSBb6+SDaFIyzDVSkXQmQQYclJ2R+YxcdmK0AX6x1E5OQNtuh3jHDrUg=="],
-
-    "@claude-nexus/dashboard": ["@claude-nexus/dashboard@workspace:services/dashboard"],
-
-    "@claude-nexus/proxy": ["@claude-nexus/proxy@workspace:services/proxy"],
-
-    "@claude-nexus/shared": ["@claude-nexus/shared@workspace:packages/shared"],
 
     "@eslint-community/eslint-utils": ["@eslint-community/eslint-utils@4.7.0", "", { "dependencies": { "eslint-visitor-keys": "^3.4.3" }, "peerDependencies": { "eslint": "^6.0.0 || ^7.0.0 || >=8.0.0" } }, "sha512-dyybb3AcajC7uha6CvhdVRJqaKyn7w2YKqKyAN37NKYgZT36w+iRb0Dymmc5qEJ549c/S31cMMSFd75bteCpCw=="],
 

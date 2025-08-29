@@ -12,7 +12,7 @@ import { config } from 'dotenv'
 import { createLoggingPool } from './utils/create-logging-pool.js'
 import { enableSqlLogging } from '../../services/proxy/src/utils/sql-logger.js'
 import { StorageAdapter } from '../../services/proxy/src/storage/StorageAdapter.js'
-import { generateConversationId } from '@claude-nexus/shared'
+import { generateConversationId } from '@agent-prompttrain/shared'
 
 // Load environment variables
 config()

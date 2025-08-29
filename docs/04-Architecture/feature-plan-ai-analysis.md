@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the implementation plan for adding an AI-powered conversation analysis feature to the Claude Nexus Proxy Dashboard. The feature will allow users to generate intelligent summaries and insights for conversations using the Gemini API, with analysis stored per conversation branch.
+This document outlines the implementation plan for adding an AI-powered conversation analysis feature to the Agent Prompt Train Dashboard. The feature will allow users to generate intelligent summaries and insights for conversations using the Gemini API, with analysis stored per conversation branch.
 
 ## Feature Overview
 

@@ -158,7 +158,7 @@ We will implement **configurable timeouts** with sensible defaults for long-runn
 
 ## Links
 
-- [PR #16: Long-running request support](https://github.com/Moonsong-Labs/claude-nexus/pull/16)
+- [PR #16: Long-running request support](https://github.com/Moonsong-Labs/agent-prompttrain/pull/16)
 - [Configuration Guide](../../01-Getting-Started/configuration.md#timeouts)
 - [Performance Guide](../../05-Troubleshooting/performance.md)
 

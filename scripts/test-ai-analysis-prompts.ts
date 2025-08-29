@@ -14,7 +14,7 @@ import {
   buildAnalysisPrompt,
   parseAnalysisResponse,
   type Message,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { fromPreTrained } from '@lenml/tokenizer-gemini'
 
 const tokenizer = fromPreTrained()

@@ -37,7 +37,7 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     exit 0
 fi
 
-echo -e "${BLUE}Building Claude Nexus Docker Images...${NC}"
+echo -e "${BLUE}Building Agent Prompt Train Docker Images...${NC}"
 if [ "$TAG" != "latest" ]; then
     echo -e "${YELLOW}Will tag images as: latest and ${TAG}${NC}"
 else
@@ -60,7 +60,7 @@ setup_buildx() {
     fi
 
     # Check if we have a builder or create one
-    BUILDER_NAME="claude-nexus-builder"
+    BUILDER_NAME="agent-prompttrain-builder"
     if ! docker buildx ls | grep -q "$BUILDER_NAME"; then
         echo -e "${YELLOW}Creating buildx builder: ${BUILDER_NAME}${NC}"
         docker buildx create --name "$BUILDER_NAME" --driver docker-container --use
@@ -112,17 +112,17 @@ fi
 
 # Build proxy image (always build as latest first)
 echo -e "\n${BLUE}Building Proxy Service...${NC}"
-BUILD_CMD=$(get_build_command "docker/proxy/Dockerfile" "moonsonglabs/claude-nexus-proxy" "latest")
+BUILD_CMD=$(get_build_command "docker/proxy/Dockerfile" "moonsonglabs/agent-prompttrain-proxy" "latest")
 $BUILD_CMD
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Proxy image built successfully${NC}"
     # Tag with specific version if provided and loaded locally
     if [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "load" ]; then
-        docker tag moonsonglabs/claude-nexus-proxy:latest moonsonglabs/claude-nexus-proxy:${TAG}
+        docker tag moonsonglabs/agent-prompttrain-proxy:latest moonsonglabs/agent-prompttrain-proxy:${TAG}
         echo -e "${GREEN}✓ Also tagged as '${TAG}'${NC}"
     elif [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "push" ]; then
         # Build and push with version tag
-        BUILD_CMD=$(get_build_command "docker/proxy/Dockerfile" "moonsonglabs/claude-nexus-proxy" "$TAG")
+        BUILD_CMD=$(get_build_command "docker/proxy/Dockerfile" "moonsonglabs/agent-prompttrain-proxy" "$TAG")
         $BUILD_CMD
         echo -e "${GREEN}✓ Also pushed as '${TAG}'${NC}"
     fi
@@ -133,17 +133,17 @@ fi
 
 # Build dashboard image (always build as latest first)
 echo -e "\n${BLUE}Building Dashboard Service...${NC}"
-BUILD_CMD=$(get_build_command "docker/dashboard/Dockerfile" "moonsonglabs/claude-nexus-dashboard" "latest")
+BUILD_CMD=$(get_build_command "docker/dashboard/Dockerfile" "moonsonglabs/agent-prompttrain-dashboard" "latest")
 $BUILD_CMD
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Dashboard image built successfully${NC}"
     # Tag with specific version if provided and loaded locally
     if [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "load" ]; then
-        docker tag moonsonglabs/claude-nexus-dashboard:latest moonsonglabs/claude-nexus-dashboard:${TAG}
+        docker tag moonsonglabs/agent-prompttrain-dashboard:latest moonsonglabs/agent-prompttrain-dashboard:${TAG}
         echo -e "${GREEN}✓ Also tagged as '${TAG}'${NC}"
     elif [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "push" ]; then
         # Build and push with version tag
-        BUILD_CMD=$(get_build_command "docker/dashboard/Dockerfile" "moonsonglabs/claude-nexus-dashboard" "$TAG")
+        BUILD_CMD=$(get_build_command "docker/dashboard/Dockerfile" "moonsonglabs/agent-prompttrain-dashboard" "$TAG")
         $BUILD_CMD
         echo -e "${GREEN}✓ Also pushed as '${TAG}'${NC}"
     fi
@@ -154,17 +154,17 @@ fi
 
 # Build all-in-one image (always build as latest first)
 echo -e "\n${BLUE}Building All-in-One Service...${NC}"
-BUILD_CMD=$(get_build_command "docker/all-in/claude-nexus-all-in.Dockerfile" "moonsonglabs/claude-nexus-all-in" "latest")
+BUILD_CMD=$(get_build_command "docker/all-in/agent-prompttrain-all-in.Dockerfile" "moonsonglabs/agent-prompttrain-all-in" "latest")
 $BUILD_CMD
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ All-in-One image built successfully${NC}"
     # Tag with specific version if provided and loaded locally
     if [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "load" ]; then
-        docker tag moonsonglabs/claude-nexus-all-in:latest moonsonglabs/claude-nexus-all-in:${TAG}
+        docker tag moonsonglabs/agent-prompttrain-all-in:latest moonsonglabs/agent-prompttrain-all-in:${TAG}
         echo -e "${GREEN}✓ Also tagged as '${TAG}'${NC}"
     elif [ "$TAG" != "latest" ] && [ "$BUILD_ACTION" = "push" ]; then
         # Build and push with version tag
-        BUILD_CMD=$(get_build_command "docker/all-in/claude-nexus-all-in.Dockerfile" "moonsonglabs/claude-nexus-all-in" "$TAG")
+        BUILD_CMD=$(get_build_command "docker/all-in/agent-prompttrain-all-in.Dockerfile" "moonsonglabs/agent-prompttrain-all-in" "$TAG")
         $BUILD_CMD
         echo -e "${GREEN}✓ Also pushed as '${TAG}'${NC}"
     fi
@@ -176,29 +176,29 @@ fi
 # Show image sizes (only if loaded locally)
 if [ "$BUILD_ACTION" = "load" ]; then
     echo -e "\n${BLUE}Image Sizes:${NC}"
-    docker images | grep -E "claude-nexus-(proxy|dashboard|all-in)|REPOSITORY" | grep -E "${TAG}|REPOSITORY" | head -7
+    docker images | grep -E "agent-prompttrain-(proxy|dashboard|all-in)|REPOSITORY" | grep -E "${TAG}|REPOSITORY" | head -7
 fi
 
 echo -e "\n${GREEN}Build completed successfully!${NC}"
 echo -e "\nImages built for platforms: ${YELLOW}${PLATFORMS}${NC}"
 echo -e "\nImages:"
-echo -e "  ${YELLOW}moonsonglabs/claude-nexus-proxy:latest${NC}"
-echo -e "  ${YELLOW}moonsonglabs/claude-nexus-dashboard:latest${NC}"
-echo -e "  ${YELLOW}moonsonglabs/claude-nexus-all-in:latest${NC}"
+echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-proxy:latest${NC}"
+echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-dashboard:latest${NC}"
+echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-all-in:latest${NC}"
 
 if [ "$TAG" != "latest" ]; then
     echo -e "\nAlso tagged as:"
-    echo -e "  ${YELLOW}moonsonglabs/claude-nexus-proxy:${TAG}${NC}"
-    echo -e "  ${YELLOW}moonsonglabs/claude-nexus-dashboard:${TAG}${NC}"
-    echo -e "  ${YELLOW}moonsonglabs/claude-nexus-all-in:${TAG}${NC}"
+    echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-proxy:${TAG}${NC}"
+    echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-dashboard:${TAG}${NC}"
+    echo -e "  ${YELLOW}moonsonglabs/agent-prompttrain-all-in:${TAG}${NC}"
 fi
 
 if [ "$BUILD_ACTION" = "push" ]; then
     echo -e "\n${GREEN}Images pushed to registry!${NC}"
     echo -e "Verify multi-platform manifests with:"
-    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/claude-nexus-proxy:latest${NC}"
-    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/claude-nexus-dashboard:latest${NC}"
-    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/claude-nexus-all-in:latest${NC}"
+    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/agent-prompttrain-proxy:latest${NC}"
+    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/agent-prompttrain-dashboard:latest${NC}"
+    echo -e "  ${BLUE}docker buildx imagetools inspect moonsonglabs/agent-prompttrain-all-in:latest${NC}"
 else
     echo -e "\nTo run the services:"
     echo -e "${YELLOW}Using Docker Compose (recommended):${NC}"
@@ -219,12 +219,12 @@ else
 
     echo -e "\n${YELLOW}Using Docker Run:${NC}"
     echo -e "  ${BLUE}# All-in-One (recommended for demos)${NC}"
-    echo -e "  ${BLUE}docker run -d -p 3000:3000 -p 3001:3001 moonsonglabs/claude-nexus-all-in:${TAG}${NC}"
+    echo -e "  ${BLUE}docker run -d -p 3000:3000 -p 3001:3001 moonsonglabs/agent-prompttrain-all-in:${TAG}${NC}"
     echo -e "  ${BLUE}# Or run services separately:${NC}"
     echo -e "  ${BLUE}# Proxy service${NC}"
-    echo -e "  ${BLUE}docker run -d -p 3000:3000 moonsonglabs/claude-nexus-proxy:${TAG}${NC}"
+    echo -e "  ${BLUE}docker run -d -p 3000:3000 moonsonglabs/agent-prompttrain-proxy:${TAG}${NC}"
     echo -e "  ${BLUE}# Dashboard service${NC}"
-    echo -e "  ${BLUE}docker run -d -p 3001:3001 -e DASHBOARD_API_KEY=your-key moonsonglabs/claude-nexus-dashboard:${TAG}${NC}"
+    echo -e "  ${BLUE}docker run -d -p 3001:3001 -e DASHBOARD_API_KEY=your-key moonsonglabs/agent-prompttrain-dashboard:${TAG}${NC}"
 
     # Add push instructions
     echo -e "\n${YELLOW}To push to Docker Hub:${NC}"

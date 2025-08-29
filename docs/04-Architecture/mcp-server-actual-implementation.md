@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the actual implementation of the Model Context Protocol (MCP) server in Claude Nexus Proxy, which differs significantly from the [original plan](./mcp-server-original-plan.md).
+This document describes the actual implementation of the Model Context Protocol (MCP) server in Agent Prompt Train, which differs significantly from the [original plan](./mcp-server-original-plan.md).
 
 **Note**: As of PR #83, the implementation supports a hybrid approach: prompts can be loaded from local YAML files (default) OR synced from a GitHub repository. When GitHub sync is enabled, it fetches prompts from the repository and writes them to the local filesystem.
 

@@ -1,4 +1,4 @@
-# Claude Nexus All-in-One Demo Image
+# Agent Prompt Train All-in-One Demo Image
 # Runs PostgreSQL, Proxy, and Dashboard in a single container
 
 # ===== Builder Stage =====

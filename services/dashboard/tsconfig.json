@@ -17,8 +17,8 @@
     "declarationMap": true,
     "baseUrl": ".",
     "paths": {
-      "@claude-nexus/shared": ["../../packages/shared/src/index.ts"],
-      "@claude-nexus/shared/*": ["../../packages/shared/src/*"]
+      "@agent-prompttrain/shared": ["../../packages/shared/src/index.ts"],
+      "@agent-prompttrain/shared/*": ["../../packages/shared/src/*"]
     },
     "types": ["node", "bun-types"]
   },

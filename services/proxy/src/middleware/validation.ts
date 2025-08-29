@@ -4,7 +4,7 @@ import {
   validateClaudeRequest,
   maskSensitiveData,
   truncateString,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 import { getRequestLogger } from './logger'
 
 // Request size limits

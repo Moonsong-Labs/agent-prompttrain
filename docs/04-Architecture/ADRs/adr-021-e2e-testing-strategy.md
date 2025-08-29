@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Claude Nexus Proxy project has been operating without comprehensive automated testing, which was identified as technical debt in ADR-011. As the application grows in complexity with features like conversation tracking, sub-task detection, and AI-powered analysis, the need for automated testing becomes critical to maintain quality and prevent regressions.
+The Agent Prompt Train project has been operating without comprehensive automated testing, which was identified as technical debt in ADR-011. As the application grows in complexity with features like conversation tracking, sub-task detection, and AI-powered analysis, the need for automated testing becomes critical to maintain quality and prevent regressions.
 
 The dashboard service, built with HTMX (ADR-009), presents unique testing challenges:
 

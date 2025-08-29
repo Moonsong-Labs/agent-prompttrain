@@ -10,7 +10,7 @@ import {
 } from '../src/workers/ai-analysis/db.js'
 import * as containerModule from '../src/container.js'
 import { logger } from '../src/middleware/logger.js'
-import { AI_WORKER_CONFIG } from '@claude-nexus/shared/config'
+import { AI_WORKER_CONFIG } from '@agent-prompttrain/shared/config'
 
 describe('AI Analysis DB Functions', () => {
   let mockPool: Partial<Pool>

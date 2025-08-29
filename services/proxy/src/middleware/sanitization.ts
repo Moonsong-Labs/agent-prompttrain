@@ -5,7 +5,7 @@ import {
   CNP_API_KEY_REGEX,
   JWT_TOKEN_REGEX,
   DATABASE_URL_PATTERNS,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 
 // Configure PII redaction with custom patterns
 const piiRedactor = new SyncRedactor({

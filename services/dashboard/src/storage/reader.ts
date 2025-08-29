@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import NodeCache from 'node-cache'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 
 interface ApiRequest {
   request_id: string

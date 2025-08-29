@@ -1,11 +1,11 @@
 {
-  "name": "@claude-nexus/dashboard",
+  "name": "@agent-prompttrain/dashboard",
   "version": "2.0.0",
-  "description": "Claude Nexus Dashboard Service - Web UI for monitoring and analytics",
+  "description": "Agent Prompt Train Dashboard Service - Web UI for monitoring and analytics",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
-    "claude-nexus-dashboard": "./dist/main.js"
+    "agent-prompttrain-dashboard": "./dist/main.js"
   },
   "scripts": {
     "dev": "bun --watch src/main.ts",

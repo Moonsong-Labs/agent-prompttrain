@@ -3,7 +3,7 @@
  */
 
 import type { GitHubSyncService } from './GitHubSyncService.js'
-import { config, getErrorMessage, getErrorStack, getErrorCode } from '@claude-nexus/shared'
+import { config, getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger.js'
 
 export class SyncScheduler {

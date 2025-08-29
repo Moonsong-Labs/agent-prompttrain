@@ -8,7 +8,7 @@ import {
   getRetryAfter,
   type RetryConfig,
   type RetryLogger,
-} from '@claude-nexus/shared'
+} from '@agent-prompttrain/shared'
 
 // Re-export all the types and functions
 export type { RetryConfig, RetryLogger }

@@ -8,7 +8,7 @@ Superseded
 
 ## Context
 
-Claude Nexus Proxy needs to implement a Model Context Protocol (MCP) server that serves prompts from a GitHub repository. The MCP server should:
+Agent Prompt Train needs to implement a Model Context Protocol (MCP) server that serves prompts from a GitHub repository. The MCP server should:
 
 - Be integrated into the existing proxy service (not a separate service)
 - Only serve prompts (no tools or resources)

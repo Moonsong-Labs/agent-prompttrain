@@ -1,6 +1,6 @@
-# Claude Nexus Proxy Tests
+# Agent Prompt Train Tests
 
-This directory contains automated tests for the Claude Nexus Proxy.
+This directory contains automated tests for the Agent Prompt Train.
 
 ## Test Structure
 

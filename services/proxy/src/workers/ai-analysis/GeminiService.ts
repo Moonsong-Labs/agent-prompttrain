@@ -2,16 +2,16 @@ import {
   buildAnalysisPrompt,
   parseAnalysisResponse,
   type GeminiContent,
-} from '@claude-nexus/shared/prompts/analysis/index.js'
-import type { ConversationAnalysis } from '@claude-nexus/shared/types/ai-analysis'
-import { GEMINI_CONFIG, AI_WORKER_CONFIG, config } from '@claude-nexus/shared/config'
+} from '@agent-prompttrain/shared/prompts/analysis/index.js'
+import type { ConversationAnalysis } from '@agent-prompttrain/shared/types/ai-analysis'
+import { GEMINI_CONFIG, AI_WORKER_CONFIG, config } from '@agent-prompttrain/shared/config'
 import { logger } from '../../middleware/logger.js'
 import {
   sanitizeForLLM,
   validateAnalysisOutput,
   enhancePromptForRetry,
 } from '../../middleware/sanitization.js'
-import { getErrorMessage } from '@claude-nexus/shared'
+import { getErrorMessage } from '@agent-prompttrain/shared'
 
 export interface GeminiApiResponse {
   candidates: Array<{

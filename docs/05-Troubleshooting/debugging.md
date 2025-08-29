@@ -1,6 +1,6 @@
 # Debugging Guide
 
-This guide provides techniques and tools for debugging issues in Claude Nexus Proxy.
+This guide provides techniques and tools for debugging issues in Agent Prompt Train.
 
 ## Debug Mode
 

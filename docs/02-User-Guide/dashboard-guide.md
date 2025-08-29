@@ -1,6 +1,6 @@
 # Dashboard Guide
 
-The Claude Nexus Proxy Dashboard provides real-time monitoring and analytics for your Claude API usage.
+The Agent Prompt Train Dashboard provides real-time monitoring and analytics for your Claude API usage.
 
 ## Accessing the Dashboard
 

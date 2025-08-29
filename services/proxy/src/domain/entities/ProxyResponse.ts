@@ -1,4 +1,4 @@
-import { ClaudeMessagesResponse, ClaudeStreamEvent, hasToolUse } from '@claude-nexus/shared'
+import { ClaudeMessagesResponse, ClaudeStreamEvent, hasToolUse } from '@agent-prompttrain/shared'
 import { logger } from '../../middleware/logger'
 
 /**

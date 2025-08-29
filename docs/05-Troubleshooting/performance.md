@@ -1,6 +1,6 @@
 # Performance Troubleshooting
 
-This guide helps identify and resolve performance issues in Claude Nexus Proxy.
+This guide helps identify and resolve performance issues in Agent Prompt Train.
 
 ## Common Performance Issues
 

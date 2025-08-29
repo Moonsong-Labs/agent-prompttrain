@@ -1,4 +1,4 @@
-# Claude Nexus Proxy - Quick Start
+# Agent Prompt Train - Quick Start
 
 ## Prerequisites
 
@@ -10,8 +10,8 @@
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/moonsong-labs/claude-nexus.git
-cd claude-nexus
+git clone https://github.com/moonsong-labs/agent-prompttrain.git
+cd agent-prompttrain
 cp .env.example .env
 
 # ⚠️ CRITICAL: Edit .env and set DASHBOARD_API_KEY!

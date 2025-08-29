@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { config } from '@claude-nexus/shared/config'
+import { config } from '@agent-prompttrain/shared/config'
 import { logger } from '../middleware/logger.js'
 import { enableSqlLogging } from '../utils/sql-logger.js'
 

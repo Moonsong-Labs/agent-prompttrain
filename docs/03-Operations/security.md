@@ -1,6 +1,6 @@
 # Security Guide
 
-This guide covers security considerations and best practices for deploying Claude Nexus Proxy.
+This guide covers security considerations and best practices for deploying Agent Prompt Train.
 
 ## ⚠️ CRITICAL SECURITY NOTICE
 

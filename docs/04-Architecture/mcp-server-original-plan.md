@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a detailed implementation plan for integrating a Model Context Protocol (MCP) server into the Claude Nexus Proxy. The MCP server will serve prompts from a GitHub repository and provide a dashboard UI for prompt management.
+This document provides a detailed implementation plan for integrating a Model Context Protocol (MCP) server into the Agent Prompt Train. The MCP server will serve prompts from a GitHub repository and provide a dashboard UI for prompt management.
 
 ## Architecture Summary
 
@@ -74,7 +74,7 @@ if (config.mcp.enabled) {
   // MCP discovery endpoint
   app.get('/mcp', c => {
     return c.json({
-      name: 'claude-nexus-mcp-server',
+      name: 'agent-prompttrain-mcp-server',
       version: '1.0.0',
       capabilities: {
         prompts: {

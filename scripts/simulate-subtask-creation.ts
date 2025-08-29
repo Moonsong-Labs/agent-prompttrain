@@ -20,7 +20,7 @@ async function simulateSubtaskCreation() {
     const subtaskTimestamp = new Date()
 
     const subtaskPrompt =
-      'Count the total lines of code in the claude-nexus-proxy repository. \n\nPlease:\n1. Use tools like `find`, `wc`, and `rg` to get accurate counts'
+      'Count the total lines of code in the agent-prompttrain-proxy repository. \n\nPlease:\n1. Use tools like `find`, `wc`, and `rg` to get accurate counts'
 
     console.log('Creating new sub-task request...')
     console.log(`Request ID: ${newSubtaskId}`)

@@ -1,6 +1,6 @@
 # Backup and Recovery Guide
 
-Protect your Claude Nexus Proxy data with comprehensive backup and disaster recovery procedures.
+Protect your Agent Prompt Train data with comprehensive backup and disaster recovery procedures.
 
 ## Overview
 
@@ -155,15 +155,15 @@ EOF
 ```bash
 #!/bin/bash
 # Upload to S3
-aws s3 cp $BACKUP_FILE s3://your-bucket/claude-nexus/backups/
-aws s3 ls s3://your-bucket/claude-nexus/backups/
+aws s3 cp $BACKUP_FILE s3://your-bucket/agent-prompttrain/backups/
+aws s3 ls s3://your-bucket/agent-prompttrain/backups/
 ```
 
 #### rsync to Remote Server
 
 ```bash
 # Sync backups to remote server
-rsync -avz --delete /backups/ user@backup-server:/remote/backups/claude-nexus/
+rsync -avz --delete /backups/ user@backup-server:/remote/backups/agent-prompttrain/
 ```
 
 ## Recovery Procedures
@@ -394,7 +394,7 @@ GROUP BY backup_type;
 if ! ./scripts/backup-daily.sh; then
     curl -X POST $SLACK_WEBHOOK_URL \
         -H 'Content-type: application/json' \
-        -d '{"text":"⚠️ Claude Nexus backup failed!"}'
+        -d '{"text":"⚠️ Agent Prompt Train backup failed!"}'
 fi
 
 # Alert on old backups

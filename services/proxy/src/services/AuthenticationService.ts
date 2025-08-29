@@ -1,5 +1,5 @@
 import { getApiKey, DomainCredentialMapping, loadCredentials, SlackConfig } from '../credentials'
-import { AuthenticationError } from '@claude-nexus/shared'
+import { AuthenticationError } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { logger } from '../middleware/logger'
 import * as path from 'path'

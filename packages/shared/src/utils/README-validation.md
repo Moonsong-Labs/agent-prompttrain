@@ -1,6 +1,6 @@
 # Validation Utilities
 
-This module provides comprehensive validation utilities for the Claude Nexus Proxy project, eliminating code duplication and ensuring consistent validation across all services.
+This module provides comprehensive validation utilities for the Agent Prompt Train project, eliminating code duplication and ensuring consistent validation across all services.
 
 ## Overview
 
@@ -18,16 +18,20 @@ The validation utilities include:
 ### Import from Shared Package
 
 ```typescript
-import { isValidUUID, uuidSchema, maskSensitiveData } from '@claude-nexus/shared/utils/validation'
+import {
+  isValidUUID,
+  uuidSchema,
+  maskSensitiveData,
+} from '@agent-prompttrain/shared/utils/validation'
 
 // Or import everything
-import * as validation from '@claude-nexus/shared/utils/validation'
+import * as validation from '@agent-prompttrain/shared/utils/validation'
 ```
 
 ### Regular Expression Patterns
 
 ```typescript
-import { UUID_REGEX, ANTHROPIC_API_KEY_REGEX } from '@claude-nexus/shared/utils/validation'
+import { UUID_REGEX, ANTHROPIC_API_KEY_REGEX } from '@agent-prompttrain/shared/utils/validation'
 
 // Use directly
 if (UUID_REGEX.test(someString)) {
@@ -45,7 +49,7 @@ import {
   isValidUUID,
   isValidEmail,
   isValidAnthropicApiKey,
-} from '@claude-nexus/shared/utils/validation'
+} from '@agent-prompttrain/shared/utils/validation'
 
 // Simple boolean checks
 if (isValidUUID(conversationId)) {
@@ -60,7 +64,11 @@ if (isValidAnthropicApiKey(apiKey)) {
 ### Zod Schemas
 
 ```typescript
-import { uuidSchema, emailSchema, paginationSchema } from '@claude-nexus/shared/utils/validation'
+import {
+  uuidSchema,
+  emailSchema,
+  paginationSchema,
+} from '@agent-prompttrain/shared/utils/validation'
 
 // Use in API endpoints
 const params = paginationSchema.parse(req.query)
@@ -76,7 +84,7 @@ const userSchema = z.object({
 ### Sanitization Functions
 
 ```typescript
-import { maskSensitiveData, truncateString } from '@claude-nexus/shared/utils/validation'
+import { maskSensitiveData, truncateString } from '@agent-prompttrain/shared/utils/validation'
 
 // Mask sensitive data for logging
 const safeMessage = maskSensitiveData('API key: sk-ant-abc123')
@@ -89,7 +97,7 @@ const shortMessage = truncateString(longErrorMessage, 500)
 ### Type Guards
 
 ```typescript
-import { isUUID, isNonEmptyString } from '@claude-nexus/shared/utils/validation'
+import { isUUID, isNonEmptyString } from '@agent-prompttrain/shared/utils/validation'
 
 function processId(value: unknown) {
   if (isUUID(value)) {
@@ -167,7 +175,7 @@ function processId(value: unknown) {
 ### API Endpoint Validation
 
 ```typescript
-import { conversationBranchParamsSchema } from '@claude-nexus/shared/utils/validation'
+import { conversationBranchParamsSchema } from '@agent-prompttrain/shared/utils/validation'
 
 app.get('/api/analyses/:conversationId/:branchId', async c => {
   try {
@@ -185,7 +193,7 @@ app.get('/api/analyses/:conversationId/:branchId', async c => {
 ### Secure Logging
 
 ```typescript
-import { maskSensitiveData, truncateString } from '@claude-nexus/shared/utils/validation'
+import { maskSensitiveData, truncateString } from '@agent-prompttrain/shared/utils/validation'
 
 function logError(error: Error) {
   const safeMessage = maskSensitiveData(error.message)
@@ -201,7 +209,7 @@ function logError(error: Error) {
 ### Custom Validation Schemas
 
 ```typescript
-import { z, uuidSchema, emailSchema } from '@claude-nexus/shared/utils/validation'
+import { z, uuidSchema, emailSchema } from '@agent-prompttrain/shared/utils/validation'
 
 const createUserSchema = z.object({
   email: emailSchema,
@@ -225,7 +233,7 @@ If you're updating existing code to use these utilities:
    if (!uuidRegex.test(id)) { ... }
 
    // After
-   import { isValidUUID } from '@claude-nexus/shared/utils/validation'
+   import { isValidUUID } from '@agent-prompttrain/shared/utils/validation'
    if (!isValidUUID(id)) { ... }
    ```
 
@@ -238,7 +246,7 @@ If you're updating existing code to use these utilities:
    })
 
    // After
-   import { uuidSchema } from '@claude-nexus/shared/utils/validation'
+   import { uuidSchema } from '@agent-prompttrain/shared/utils/validation'
    const schema = z.object({
      id: uuidSchema,
    })
@@ -251,7 +259,7 @@ If you're updating existing code to use these utilities:
    message.replace(/sk-ant-[\w-]+/g, 'sk-ant-****')
 
    // After
-   import { maskSensitiveData } from '@claude-nexus/shared/utils/validation'
+   import { maskSensitiveData } from '@agent-prompttrain/shared/utils/validation'
    const safe = maskSensitiveData(message)
    ```
 
@@ -269,7 +277,7 @@ If you're updating existing code to use these utilities:
 Use a proper JWT library like `jose` or `jsonwebtoken`:
 
 ```typescript
-import { jwtTokenSchema } from '@claude-nexus/shared/utils/validation'
+import { jwtTokenSchema } from '@agent-prompttrain/shared/utils/validation'
 import { jwtVerify } from 'jose'
 
 // First check format

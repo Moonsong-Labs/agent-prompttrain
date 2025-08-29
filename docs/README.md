@@ -1,6 +1,6 @@
-# Claude Nexus Proxy Documentation
+# Agent Prompt Train Documentation
 
-Welcome to the Claude Nexus Proxy documentation. This guide will help you understand, deploy, and operate the Claude API proxy with monitoring dashboard.
+Welcome to the Agent Prompt Train documentation. This guide will help you understand, deploy, and operate the Claude API proxy with monitoring dashboard.
 
 ## Documentation Structure
 
@@ -63,7 +63,7 @@ Welcome to the Claude Nexus Proxy documentation. This guide will help you unders
 
 ## Project Links
 
-- [GitHub Repository](https://github.com/Moonsong-Labs/claude-nexus)
+- [GitHub Repository](https://github.com/Moonsong-Labs/agent-prompttrain)
 - [Main README](../README.md)
 - [Contributing Guidelines](../CONTRIBUTING.md)
 - [License](../LICENSE)

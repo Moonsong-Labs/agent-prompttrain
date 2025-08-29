@@ -121,7 +121,7 @@ CREATE INDEX idx_message_hashes ON api_requests(parent_message_hash, current_mes
 
 ## Links
 
-- [Implementation PR #13](https://github.com/Moonsong-Labs/claude-nexus/pull/13)
+- [Implementation PR #13](https://github.com/Moonsong-Labs/agent-prompttrain/pull/13)
 - [Conversation Visualization](../../02-User-Guide/dashboard-guide.md#conversation-tracking)
 - [Database Schema](../../03-Operations/database.md)
 

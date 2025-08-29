@@ -29,7 +29,7 @@ function createMockProxyServer() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+          'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
         }
       )
     }
@@ -45,7 +45,7 @@ function createMockProxyServer() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+          'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
         }
       )
     }
@@ -62,7 +62,7 @@ function createMockProxyServer() {
         },
         401,
         {
-          'WWW-Authenticate': 'Bearer realm="Claude Nexus Proxy"',
+          'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
         }
       )
     }

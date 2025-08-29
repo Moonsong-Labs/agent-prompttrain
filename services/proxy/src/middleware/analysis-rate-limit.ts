@@ -2,7 +2,7 @@ import { Context, Next } from 'hono'
 import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible'
 import { logger } from './logger.js'
 // import { container } from '../container.js'
-import { config } from '@claude-nexus/shared/config'
+import { config } from '@agent-prompttrain/shared/config'
 
 // Different rate limiters for different operations
 let analysisCreationLimiter: RateLimiterMemory | RateLimiterRedis

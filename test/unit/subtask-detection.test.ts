@@ -17,7 +17,7 @@ describe('Sub-task Detection', () => {
       input: {
         description: 'Count code lines and folders',
         prompt: expect.stringContaining(
-          'I need you to analyze the Claude Nexus Proxy repository structure'
+          'I need you to analyze the Agent Prompt Train repository structure'
         ),
       },
     })
@@ -116,7 +116,7 @@ describe('Sub-task Detection', () => {
 
       // The extraction should skip the system reminder and find the actual user prompt
       expect(content).toBe(subtaskRequestSample.body.messages[0].content[1].text)
-      expect(content).toContain('I need you to analyze the Claude Nexus Proxy repository structure')
+      expect(content).toContain('I need you to analyze the Agent Prompt Train repository structure')
     })
 
     it('should extract user content from string format messages', () => {

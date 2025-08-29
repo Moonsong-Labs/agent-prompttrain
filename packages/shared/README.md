@@ -1,4 +1,4 @@
-# Claude Nexus Shared Package
+# Agent Prompt Train Shared Package
 
 Shared types, configurations, and utilities used by both proxy and dashboard services.
 
@@ -22,8 +22,8 @@ This package contains common code shared between services to ensure consistency 
 
 ```typescript
 // Import from other services
-import { config, validateConfig } from '@claude-nexus/shared/config'
-import { ClaudeMessagesRequest } from '@claude-nexus/shared/types'
+import { config, validateConfig } from '@agent-prompttrain/shared/config'
+import { ClaudeMessagesRequest } from '@agent-prompttrain/shared/types'
 ```
 
 ## Development

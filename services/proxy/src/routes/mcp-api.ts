@@ -7,7 +7,7 @@ import type { PromptRegistryService } from '../mcp/PromptRegistryService.js'
 import type { GitHubSyncService } from '../mcp/GitHubSyncService.js'
 import type { SyncScheduler } from '../mcp/SyncScheduler.js'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage, getErrorStack, getErrorCode } from '@claude-nexus/shared'
+import { getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
 
 export function createMcpApiRoutes(
   promptRegistry: PromptRegistryService,

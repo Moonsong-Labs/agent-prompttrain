@@ -1,5 +1,5 @@
 import { calculateSimpleLayout } from './simple-graph-layout.js'
-import { getModelContextLimit, getBatteryColor } from '@claude-nexus/shared'
+import { getModelContextLimit, getBatteryColor } from '@agent-prompttrain/shared'
 
 /**
  * Escape HTML special characters

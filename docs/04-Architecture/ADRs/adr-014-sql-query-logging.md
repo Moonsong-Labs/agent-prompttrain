@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-During development and troubleshooting of Claude Nexus, developers need visibility into SQL queries being executed by the application. This is particularly important for:
+During development and troubleshooting of Agent Prompt Train, developers need visibility into SQL queries being executed by the application. This is particularly important for:
 
 - Debugging conversation linking logic
 - Optimizing slow queries
@@ -155,7 +155,7 @@ The SQL logging feature has been successfully implemented and provides valuable 
 
 ## Links
 
-- [Implementation PR #44](https://github.com/Moonsong-Labs/claude-nexus/pull/44)
+- [Implementation PR #44](https://github.com/Moonsong-Labs/agent-prompttrain/pull/44)
 - [sql-logger.ts](../../../services/proxy/src/utils/sql-logger.ts)
 - [Database Configuration](../../../services/proxy/src/services/database.ts)
 
