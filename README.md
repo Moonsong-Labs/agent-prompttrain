@@ -4,7 +4,7 @@
 
 <img width="1128" height="191" alt="msl_banner" src="https://github.com/user-attachments/assets/efa224e5-8e8b-4761-9f09-fb2f9e2b2b93" />
 
-Moonsong Labs is a leading protocol + AI/ML engineering company that operates through two distinct strategies: building long-term engineering services partnerships and launching high-conviction venture studio projects.
+**Moonsong Labs** is a leading protocol + AI/ML engineering company that operates through two distinct strategies: building long-term engineering services partnerships and launching high-conviction venture studio projects.
 
 👉 Check out our [engineering services](https://moonsonglabs.com/services/protocol-engineering-services/) work  
 👉 Discover our [venture studio](https://moonsonglabs.com/services/web3-venture-studio/)  
