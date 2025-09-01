@@ -18,6 +18,7 @@ import { analyticsConversationPartialRoutes } from './routes/partials/analytics-
 import { csrfProtection } from './middleware/csrf.js'
 import { rateLimitForReadOnly } from './middleware/rate-limit.js'
 import { readOnlyProtection } from './middleware/read-only-protection.js'
+import { cacheHeadersMiddleware } from './middleware/cache-headers.js'
 
 /**
  * Create and configure the Dashboard application
@@ -70,6 +71,9 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   // Apply CSRF protection after auth checks
   app.use('/*', csrfProtection())
+
+  // Apply cache headers middleware to all routes
+  app.use('/*', cacheHeadersMiddleware())
 
   // Pass API client to routes instead of database pool
   app.use('/*', async (c, next) => {

@@ -236,7 +236,7 @@ export async function createProxyApp(): Promise<
 
       return c.text(content, 200, {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': config.httpCache.staticFilesCacheControl,
       })
     } catch (error) {
       logger.error('Failed to serve client setup file', {

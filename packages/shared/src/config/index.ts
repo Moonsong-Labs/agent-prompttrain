@@ -12,8 +12,12 @@ const env = {
     return process.env[key] || defaultValue
   },
   int: (key: string, defaultValue: number): number => {
-    const value = process.env[key]
-    return value ? parseInt(value, 10) : defaultValue
+    const raw = process.env[key]
+    if (raw === undefined || raw === '') {
+      return defaultValue
+    }
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : defaultValue
   },
   bool: (key: string, defaultValue: boolean): boolean => {
     const value = process.env[key]?.toLowerCase()
@@ -317,6 +321,24 @@ export const config = {
     cache: {
       ttl: env.int('MCP_CACHE_TTL', 300), // 5 minutes
       maxSize: env.int('MCP_CACHE_SIZE', 1000),
+    },
+  },
+
+  // HTTP cache configuration
+  httpCache: {
+    get dashboardApiMaxAge() {
+      return env.int('DASHBOARD_API_CACHE_MAX_AGE', 0)
+    }, // 0 = no-cache
+    get staticFilesMaxAge() {
+      return env.int('STATIC_FILES_CACHE_MAX_AGE', 3600)
+    }, // 1 hour default
+    get dashboardApiCacheControl() {
+      const maxAge = this.dashboardApiMaxAge
+      return maxAge > 0 ? `private, max-age=${maxAge}` : 'no-cache, no-store, must-revalidate'
+    },
+    get staticFilesCacheControl() {
+      const maxAge = this.staticFilesMaxAge
+      return `public, max-age=${maxAge}`
     },
   },
 }

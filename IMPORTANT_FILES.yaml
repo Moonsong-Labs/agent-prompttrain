@@ -1,0 +1,123 @@
+version: 1
+generated_by: repo-knowledge-tracker
+last_updated: '2025-09-01T00:00:00Z'
+entries:
+  - path: 'packages/shared/src/config/index.ts'
+    title: 'Centralized Configuration'
+    why_important: 'Single source of truth for all caching configurations across services'
+    topics: ['config', 'caching', 'environment', 'ttl']
+    owners: ['@backend-team']
+    linked_docs: ['docs/06-Reference/environment-vars.md']
+    related_components: ['services/dashboard/*', 'services/proxy/*']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ['new cache config', 'env var changes', 'performance tuning']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Monitor for new cache-related configs'
+    notes: 'Contains cache.messageCacheSize, cache.credentialCacheTTL, cache.credentialCacheSize, mcp.cache.ttl configs'
+
+  - path: 'services/dashboard/src/storage/reader.ts'
+    title: 'Dashboard Storage Reader with NodeCache'
+    why_important: 'Implements dashboard-side caching with DASHBOARD_CACHE_TTL configuration'
+    topics: ['caching', 'dashboard', 'performance', 'database']
+    owners: ['@dashboard-team']
+    linked_docs: ['docs/02-User-Guide/dashboard-guide.md']
+    related_components: ['services/dashboard/src/routes/*']
+    dependencies:
+      direct: ['pg', 'node-cache']
+      indirect: []
+    update_triggers: ['cache TTL changes', 'query optimization', 'new endpoints']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Consider adding cache hit/miss metrics'
+    notes: 'Uses NodeCache with configurable TTL from DASHBOARD_CACHE_TTL env var (default 30s)'
+
+  - path: 'services/proxy/src/services/CredentialManager.ts'
+    title: 'Credential Cache Manager'
+    why_important: 'Manages credential caching with TTL and cleanup for OAuth tokens'
+    topics: ['caching', 'credentials', 'oauth', 'performance']
+    owners: ['@security-team', '@backend-team']
+    linked_docs: []
+    related_components: ['services/proxy/src/credentials.ts']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ['auth changes', 'OAuth updates', 'TTL adjustments']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Review cache size limits and TTL values'
+    notes: 'Default 1hr TTL, max 100 cached credentials, periodic cleanup every 5min'
+
+  - path: 'services/proxy/src/mcp/PromptRegistryService.ts'
+    title: 'MCP Prompt Registry Cache'
+    why_important: 'In-memory prompt caching system with hot-reload capabilities'
+    topics: ['caching', 'mcp', 'prompts', 'templates']
+    owners: ['@mcp-team']
+    linked_docs: ['docs/04-Architecture/ADRs/adr-016-mcp-server-implementation.md']
+    related_components: ['services/proxy/src/routes/mcp.ts']
+    dependencies:
+      direct: ['handlebars', 'js-yaml']
+      indirect: []
+    update_triggers: ['prompt file changes', 'template updates', 'MCP config changes']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Consider implementing cache size limits'
+    notes: 'Pre-compiles Handlebars templates, watches for file changes with 500ms debounce'
+
+  - path: '.env.example'
+    title: 'Environment Configuration Template'
+    why_important: 'Documents all cache-related environment variables with defaults'
+    topics: ['config', 'environment', 'caching', 'documentation']
+    owners: ['@devops-team']
+    linked_docs:
+      ['docs/06-Reference/environment-vars.md', 'docs/01-Getting-Started/configuration.md']
+    related_components: ['packages/shared/src/config/*']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ['new env vars', 'config changes', 'deployment updates']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Keep in sync with actual env var usage'
+    notes: 'Documents DASHBOARD_CACHE_TTL, MCP_CACHE_TTL, MCP_CACHE_SIZE'
+
+  - path: 'services/proxy/src/app.ts'
+    title: 'Proxy Application Entry Point'
+    why_important: 'Sets HTTP cache headers for static content'
+    topics: ['http', 'caching', 'headers', 'api']
+    owners: ['@backend-team']
+    linked_docs: []
+    related_components: ['services/proxy/src/routes/*']
+    dependencies:
+      direct: ['hono']
+      indirect: []
+    update_triggers: ['routing changes', 'cache policy updates', 'new endpoints']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Review cache-control policies for different content types'
+    notes: "Sets 'Cache-Control: public, max-age=3600' for static content"
+
+  - path: 'services/proxy/src/services/ProxyService.ts'
+    title: 'Claude API Proxy Service'
+    why_important: 'Sets cache headers for streaming responses'
+    topics: ['streaming', 'caching', 'api', 'proxy']
+    owners: ['@backend-team']
+    linked_docs: ['docs/02-User-Guide/api-reference.md']
+    related_components: ['services/proxy/src/controllers/*']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ['API changes', 'streaming updates', 'performance optimization']
+    last_seen: '2025-09-01'
+    last_reviewed_at: '2025-09-01'
+    staleness_hints: null
+    recommended_action: 'Consider cache implications for streaming responses'
+    notes: "Sets 'Cache-Control: no-cache' for SSE streaming responses"

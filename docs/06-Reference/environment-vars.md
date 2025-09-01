@@ -43,9 +43,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Caching
 
-| Variable              | Description                   | Default |
-| --------------------- | ----------------------------- | ------- |
-| `DASHBOARD_CACHE_TTL` | Dashboard cache TTL (seconds) | `30`    |
+| Variable                      | Description                                              | Default |
+| ----------------------------- | -------------------------------------------------------- | ------- |
+| `DASHBOARD_CACHE_TTL`         | Dashboard server-side cache TTL (seconds)                | `30`    |
+| `DASHBOARD_API_CACHE_MAX_AGE` | Dashboard API HTTP cache max-age (seconds). 0 = no-cache | `0`     |
+| `STATIC_FILES_CACHE_MAX_AGE`  | Static files HTTP cache max-age (seconds)                | `3600`  |
+
+**Note:** When `DASHBOARD_API_CACHE_MAX_AGE=0` (default), dashboard API responses include `Cache-Control: no-cache, no-store, must-revalidate` headers to prevent browser caching. This ensures real-time data display.
 
 ## Service Configuration
 
