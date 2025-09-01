@@ -131,12 +131,12 @@ describe('Dark Mode CSS Variables', () => {
     expect(lightVars['--msg-user-bg']).toBe('#eff6ff')
     expect(lightVars['--msg-assistant-bg']).toBe('#ffffff')
     expect(lightVars['--msg-tool-use-bg']).toBe('#fef3c7')
-    expect(lightVars['--msg-tool-result-bg']).toBe('#dcfce7')
+    expect(lightVars['--msg-tool-result-bg']).toBe('#f3e8ff')
 
     // Dark theme message colors
     expect(darkVars['--msg-user-bg']).toBe('#1e3a8a')
     expect(darkVars['--msg-assistant-bg']).toBe('#1e293b')
     expect(darkVars['--msg-tool-use-bg']).toBe('#78350f')
-    expect(darkVars['--msg-tool-result-bg']).toBe('#14532d')
+    expect(darkVars['--msg-tool-result-bg']).toBe('#4c1d95')
   })
 })
