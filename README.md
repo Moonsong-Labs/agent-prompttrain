@@ -7,10 +7,6 @@
 Agent Prompt Train is a Claude Code management server for teams that includes comprehensive monitoring, conversation tracking, and dashboard visualizations. Agent Prompt Train allows you to understand, manage, and improve your team's Claude Code usage.
 (_Supports individial Claude Max plan_)
 
-⚠️ **In order to comply with the Anthropic Terms of Service, you need to have a Claude Max subscription for each user of Agent Prompt Train.** ⚠️
-
-_Unofficial project. This community-maintained tool interoperates with Anthropic's Claude Code. It is not affiliated with, sponsored, or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic._
-
 ### 📖 Quick Navigation
 
 - [**Getting Started**](#quick-start) - Set up Agent Prompt Train in seconds
@@ -26,6 +22,10 @@ _Unofficial project. This community-maintained tool interoperates with Anthropic
 👉 Check out our [engineering services](https://moonsonglabs.com/services/protocol-engineering-services/) work  
 👉 Discover our [venture studio](https://moonsonglabs.com/services/web3-venture-studio/)  
 👉 [Contact Us](https://moonsonglabs.com/contact-us/protocol-engineering-services/)
+
+> ⚠️ **In order to comply with the Anthropic Terms of Service, you need to have a Claude Max subscription for each user of Agent Prompt Train.** ⚠️
+>
+> _Unofficial project. This community-maintained tool interoperates with Anthropic's Claude Code. It is not affiliated with, sponsored, or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic._
 
 ## 🎯 Objectives
 
