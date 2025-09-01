@@ -1,14 +1,6 @@
 # <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 8px;"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="12" r="2"/><path d="M12 9 L12 7"/><path d="M15 12 L18 12"/><path d="M12 15 L12 18"/><path d="M9 12 L6 12"/></svg>Agent Prompt Train
 
-## Information
-
 <img width="1128" height="191" alt="msl_banner" src="https://github.com/user-attachments/assets/efa224e5-8e8b-4761-9f09-fb2f9e2b2b93" />
-
-**Moonsong Labs** is a leading protocol + AI/ML engineering company that operates through two distinct strategies: building long-term engineering services partnerships and launching high-conviction venture studio projects.
-
-👉 Check out our [engineering services](https://moonsonglabs.com/services/protocol-engineering-services/) work  
-👉 Discover our [venture studio](https://moonsonglabs.com/services/web3-venture-studio/)  
-👉 [Contact Us](https://moonsonglabs.com/contact-us/protocol-engineering-services/)
 
 ## Overview
 
@@ -17,6 +9,8 @@ Agent Prompt Train is a Claude Code management server for teams that includes co
 
 ⚠️ **In order to comply with the Anthropic Terms of Service, you need to have a Claude Max subscription for each user of Agent Prompt Train.** ⚠️
 
+_Unofficial project. This community-maintained tool interoperates with Anthropic's Claude Code. It is not affiliated with, sponsored, or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic._
+
 ### 📖 Quick Navigation
 
 - [**Getting Started**](#quick-start) - Set up Agent Prompt Train in seconds
@@ -24,6 +18,14 @@ Agent Prompt Train is a Claude Code management server for teams that includes co
 - [**Development**](#development-setup) - Build and contribute
 - [**Documentation**](#documentation) - Complete guides and references
 - [**Deployment**](#production-deployment) - Production setup guides
+
+### About Us
+
+**Moonsong Labs** is a leading protocol + AI/ML engineering company that operates through two distinct strategies: building long-term engineering services partnerships and launching high-conviction venture studio projects.
+
+👉 Check out our [engineering services](https://moonsonglabs.com/services/protocol-engineering-services/) work  
+👉 Discover our [venture studio](https://moonsonglabs.com/services/web3-venture-studio/)  
+👉 [Contact Us](https://moonsonglabs.com/contact-us/protocol-engineering-services/)
 
 ## 🎯 Objectives
 
