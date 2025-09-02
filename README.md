@@ -41,7 +41,7 @@ Agent Prompt Train empowers development teams to maximize their Claude AI usage 
 
 Experience Agent Prompt Train in action with our live demo:
 
-👉 **[https://nexus-demo.moonsonglabs.dev](https://nexus-demo.moonsonglabs.dev)**
+👉 **[https://prompttrain-demo.moonsonglabs.dev](https://prompttrain-demo.moonsonglabs.dev)**
 
 _Note: This is a read-only demo showcasing real usage data from our development team._
 
