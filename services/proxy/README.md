@@ -45,6 +45,9 @@ See `.env.example` in the root directory for all available environment variables
 - `DATABASE_URL` - PostgreSQL connection
 - `STORAGE_ENABLED` - Enable storage (default: false)
 - `SLACK_WEBHOOK_URL` - Slack notifications
+- `CNP_WILDCARD_CREDENTIALS` - Enable wildcard credential support (true/false/shadow)
+- `CNP_RESOLUTION_CACHE_TTL` - TTL for credential resolution cache in ms (default: 300000)
+- `CNP_DEBUG_RESOLUTION` - Enable debug logging for credential resolution
 
 ## API Endpoints
 
