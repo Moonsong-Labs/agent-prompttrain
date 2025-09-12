@@ -8,14 +8,18 @@ import { nexusLogo } from '../components/logo.js'
  */
 export const layout = (
   title: string,
-  content: any,
+  content: ReturnType<typeof html>,
   additionalScripts: string = '',
   context?: Context
 ) => {
   // Get CSRF token if context is provided
   const csrfToken = context?.get('csrfToken') || ''
   // Get auth state if context is provided
-  const auth = context?.get('auth') || { isAuthenticated: false, isReadOnly: false }
+  const auth = context?.get('auth') || {
+    isAuthenticated: false,
+    isReadOnly: false,
+    authType: 'none' as const,
+  }
 
   return html`
     <!DOCTYPE html>
@@ -216,9 +220,75 @@ export const layout = (
               <a href="/dashboard/prompts" class="text-sm text-blue-600">Prompts</a>
               <span class="text-sm text-gray-600" id="current-domain">All Domains</span>
               ${
-                !auth.isReadOnly
-                  ? html`<a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>`
-                  : ''
+                auth.authType === 'oauth' && auth.user
+                  ? html`
+                      <div class="user-menu" style="position: relative;">
+                        <button
+                          class="user-button"
+                          style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background: #f3f4f6; border-radius: 0.375rem; border: 1px solid #e5e7eb; cursor: pointer;"
+                          onclick="document.getElementById('user-dropdown').classList.toggle('show')"
+                        >
+                          <span class="text-sm">${auth.user.email}</span>
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                              fill-rule="evenodd"
+                              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                              clip-rule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                        <div
+                          id="user-dropdown"
+                          class="dropdown-menu"
+                          style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); min-width: 200px; z-index: 50;"
+                        >
+                          <div style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                            <div class="text-sm font-medium">
+                              ${auth.user.name || auth.user.email}
+                            </div>
+                            <div class="text-xs text-gray-500">${auth.user.email}</div>
+                          </div>
+                          <a
+                            href="/dashboard/logout"
+                            class="text-sm"
+                            style="display: block; padding: 0.5rem 0.75rem; color: #374151; text-decoration: none; hover:background-color: #f3f4f6;"
+                            onmouseover="this.style.backgroundColor='#f3f4f6'"
+                            onmouseout="this.style.backgroundColor='transparent'"
+                          >
+                            Sign out
+                          </a>
+                        </div>
+                      </div>
+                      <style>
+                        .dropdown-menu.show {
+                          display: block !important;
+                        }
+                        [data-theme='dark'] .user-button {
+                          background: #374151 !important;
+                          border-color: #4b5563 !important;
+                        }
+                        [data-theme='dark'] .dropdown-menu {
+                          background: #1f2937 !important;
+                          border-color: #374151 !important;
+                        }
+                        [data-theme='dark'] .dropdown-menu a:hover {
+                          background-color: #374151 !important;
+                        }
+                      </style>
+                      <script>
+                        // Close dropdown when clicking outside
+                        document.addEventListener('click', function (event) {
+                          const dropdown = document.getElementById('user-dropdown')
+                          const button = event.target.closest('.user-button')
+                          if (!button && !dropdown.contains(event.target)) {
+                            dropdown.classList.remove('show')
+                          }
+                        })
+                      </script>
+                    `
+                  : !auth.isReadOnly
+                    ? html`<a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>`
+                    : ''
               }
               <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
                 <svg

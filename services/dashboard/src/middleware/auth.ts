@@ -1,27 +1,33 @@
 import { Context, Next, MiddlewareHandler } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { isReadOnly, getDashboardApiKey } from '../config.js'
+import { sessionService } from '../services/SessionService.js'
+import { User } from '@agent-prompttrain/shared'
 
 export type AuthContext = {
   isAuthenticated: boolean
   isReadOnly: boolean
+  authType: 'oauth' | 'api_key' | 'none'
+  user?: User
 }
 
 /**
  * Dashboard authentication middleware
- * Protects dashboard routes with API key authentication
+ * Protects dashboard routes with OAuth or API key authentication
  * Supports read-only mode when DASHBOARD_API_KEY is not set
  */
 export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext } }> = async (
   c,
   next
 ) => {
-  // Skip auth for login page
+  // Skip auth for login page and OAuth routes
   if (
     c.req.path === '/dashboard/login' ||
     c.req.path === '/dashboard/login/' ||
     c.req.path === '/login' ||
-    c.req.path === '/login/'
+    c.req.path === '/login/' ||
+    c.req.path.startsWith('/dashboard/auth/') ||
+    c.req.path.startsWith('/auth/')
   ) {
     return next()
   }
@@ -30,10 +36,26 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
   const readOnly = isReadOnly()
   const apiKey = getDashboardApiKey()
 
-  // Set read-only mode in context
+  // Check OAuth session first
+  const sessionToken = getCookie(c, 'dashboard_session')
+  if (sessionToken) {
+    const sessionData = await sessionService.getSessionWithUser(sessionToken)
+    if (sessionData) {
+      c.set('auth', {
+        isAuthenticated: true,
+        isReadOnly: false,
+        authType: 'oauth',
+        user: sessionData.user,
+      })
+      return next()
+    }
+  }
+
+  // Set default context
   c.set('auth', {
     isAuthenticated: false,
     isReadOnly: readOnly,
+    authType: 'none',
   })
 
   // If in read-only mode, allow access without authentication
@@ -55,12 +77,13 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
     )
   }
 
-  // Check cookie authentication
+  // Check cookie authentication (API key)
   const authCookie = getCookie(c, 'dashboard_auth')
   if (authCookie === apiKey) {
     c.set('auth', {
       isAuthenticated: true,
       isReadOnly: false,
+      authType: 'api_key',
     })
     return next()
   }
@@ -71,15 +94,39 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
     c.set('auth', {
       isAuthenticated: true,
       isReadOnly: false,
+      authType: 'api_key',
     })
     return next()
   }
 
-  // For SSE endpoints, check if user has auth cookie (browsers send cookies with EventSource)
-  if (c.req.path.includes('/sse') && authCookie) {
-    // Even if cookie doesn't match, let it through if it exists
-    // The SSE handler can do additional validation
-    return next()
+  // For SSE endpoints, properly validate authentication
+  if (c.req.path.includes('/sse')) {
+    // Check OAuth session first
+    if (sessionToken) {
+      const sessionData = await sessionService.getSessionWithUser(sessionToken)
+      if (sessionData) {
+        c.set('auth', {
+          isAuthenticated: true,
+          isReadOnly: false,
+          authType: 'oauth',
+          user: sessionData.user,
+        })
+        return next()
+      }
+    }
+
+    // Check API key authentication
+    if (authCookie === apiKey || headerKey === apiKey) {
+      c.set('auth', {
+        isAuthenticated: true,
+        isReadOnly: false,
+        authType: 'api_key',
+      })
+      return next()
+    }
+
+    // No valid authentication for SSE
+    return c.json({ error: 'Unauthorized' }, 401)
   }
 
   // Redirect to login for HTML requests
