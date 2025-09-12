@@ -8,6 +8,15 @@ Each domain should have its own credential file named `<domain>.credentials.json
 
 Example: `example.com.credentials.json`
 
+### Wildcard Credentials
+
+You can create wildcard credential files to match multiple subdomains:
+
+- `_wildcard.example.com.credentials.json` - Matches all subdomains of example.com
+- `_wildcard.staging.example.com.credentials.json` - Matches all subdomains of staging.example.com
+
+**Note**: Exact matches always take precedence over wildcards. Enable with `CNP_WILDCARD_CREDENTIALS=true`.
+
 ## Credential Structure
 
 ```json

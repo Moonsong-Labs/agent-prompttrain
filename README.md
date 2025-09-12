@@ -318,6 +318,27 @@ EOF
 
 (_Use `credentials/localhost\:3000.credentials.json` for using it locally_)
 
+#### Wildcard Credentials
+
+You can use wildcard credentials to match multiple subdomains with a single credential file:
+
+```bash
+# Matches all subdomains of example.com (api.example.com, staging.example.com, etc.)
+cat > credentials/_wildcard.example.com.credentials.json << EOF
+{
+  "type": "api_key",
+  "accountId": "acc_name_to_display",
+  "api_key": "sk-ant-...",
+  "client_api_key": "cnp_live_..."
+}
+EOF
+
+# Enable wildcard support
+export CNP_WILDCARD_CREDENTIALS=true
+```
+
+Note: Exact matches take precedence over wildcards. See [ADR-023](docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md) for details.
+
 Authenticate your credential with Claude MAX Plan:
 
 ```bash
