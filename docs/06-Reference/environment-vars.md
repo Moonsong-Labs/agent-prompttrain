@@ -47,6 +47,14 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | --------------------- | ----------------------------- | ------- |
 | `DASHBOARD_CACHE_TTL` | Dashboard cache TTL (seconds) | `30`    |
 
+### Wildcard Credentials
+
+| Variable                   | Description                                           | Default  |
+| -------------------------- | ----------------------------------------------------- | -------- |
+| `CNP_WILDCARD_CREDENTIALS` | Enable wildcard subdomain support (true/false/shadow) | `false`  |
+| `CNP_RESOLUTION_CACHE_TTL` | TTL for credential resolution cache (ms)              | `300000` |
+| `CNP_DEBUG_RESOLUTION`     | Enable debug logging for credential resolution        | `false`  |
+
 ## Service Configuration
 
 ### Proxy Service
@@ -235,6 +243,11 @@ GEMINI_MODEL_NAME=gemini-2.0-flash-exp
 # Directories
 CREDENTIALS_DIR=./credentials
 TEST_SAMPLES_DIR=./test-samples
+
+# Wildcard Credentials (optional)
+# CNP_WILDCARD_CREDENTIALS=true
+# CNP_RESOLUTION_CACHE_TTL=300000
+# CNP_DEBUG_RESOLUTION=false
 
 # Production (uncomment for production)
 # NODE_ENV=production

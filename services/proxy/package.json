@@ -32,14 +32,16 @@
     "nanoid": "^5.0.8",
     "node-cache": "^5.1.2",
     "p-limit": "^6.1.0",
-    "zod": "^3.24.1",
+    "psl": "^1.15.0",
+    "rate-limiter-flexible": "^5.0.3",
     "redact-pii": "^3.4.0",
-    "rate-limiter-flexible": "^5.0.3"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.2.17",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.10",
-    "@types/js-yaml": "^4.0.9"
+    "@types/psl": "^1.11.0"
   },
   "engines": {
     "node": ">=20.0.0"

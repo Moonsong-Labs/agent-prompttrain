@@ -1,0 +1,100 @@
+version: 1
+generated_by: repo-knowledge-tracker
+last_updated: '2025-01-12T00:00:00Z'
+entries:
+  - path: '/home/crystalin/projects/claude-nexus-proxy/services/proxy/src/services/AuthenticationService.ts'
+    title: 'Authentication Service'
+    why_important: 'Core authentication logic for the proxy; handles API keys, OAuth tokens, and credential resolution for all domains'
+    topics: ['auth', 'security', 'api-keys', 'oauth', 'credentials']
+    owners: ['@backend-team']
+    linked_docs: ['docs/04-Architecture/ADRs/adr-019-dashboard-read-only-mode-security.md']
+    related_components:
+      [
+        'services/proxy/src/credentials.ts',
+        'services/proxy/src/middleware/client-auth.ts',
+        'services/proxy/src/middleware/api-auth.ts',
+      ]
+    dependencies:
+      direct: ['@agent-prompttrain/shared', 'path']
+      indirect: ['fs', 'crypto']
+    update_triggers: ['credential format changes', 'auth policy changes', 'wildcard domain support']
+    last_seen: '2025-01-12'
+    last_reviewed_at: '2025-01-12'
+    staleness_hints: 'Needs wildcard domain support implementation'
+    recommended_action: 'Add wildcard domain matching logic with proper caching'
+    notes: 'Key methods: authenticateNonPersonalDomain, authenticatePersonalDomain, getSafeCredentialPath, getSlackConfig, getClientApiKey'
+
+  - path: '/home/crystalin/projects/claude-nexus-proxy/services/proxy/src/credentials.ts'
+    title: 'Credentials Manager'
+    why_important: 'Manages credential loading, caching, OAuth token refresh, and API key retrieval; critical for authentication flow'
+    topics: ['credentials', 'oauth', 'caching', 'file-io']
+    owners: ['@backend-team']
+    linked_docs: []
+    related_components:
+      [
+        'services/proxy/src/services/CredentialManager.ts',
+        'services/proxy/src/services/AuthenticationService.ts',
+      ]
+    dependencies:
+      direct: ['fs', 'path', 'crypto']
+      indirect: []
+    update_triggers: ['credential format changes', 'OAuth flow updates', 'caching strategy changes']
+    last_seen: '2025-01-12'
+    last_reviewed_at: '2025-01-12'
+    staleness_hints: 'loadCredentials function needs wildcard matching support'
+    recommended_action: 'Implement wildcard credential loading logic'
+    notes: 'Key functions: loadCredentials, getApiKey, refreshToken, getCredentialFileForDomain'
+
+  - path: '/home/crystalin/projects/claude-nexus-proxy/services/proxy/src/services/CredentialManager.ts'
+    title: 'Credential Manager Service'
+    why_important: 'Encapsulates credential caching, refresh token lifecycle, and metrics; prevents thundering herd on OAuth refresh'
+    topics: ['caching', 'oauth', 'lifecycle', 'metrics']
+    owners: ['@backend-team']
+    linked_docs: []
+    related_components: ['services/proxy/src/credentials.ts']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers:
+      ['caching strategy changes', 'metrics requirements', 'performance optimizations']
+    last_seen: '2025-01-12'
+    last_reviewed_at: '2025-01-12'
+    staleness_hints: 'May need modification for wildcard credential caching'
+    recommended_action: 'Review caching strategy for wildcard domains'
+    notes: 'Manages credential cache TTL, concurrent refresh prevention, failed refresh cooldown'
+
+  - path: '/home/crystalin/projects/claude-nexus-proxy/packages/shared/src/types/errors.ts'
+    title: 'Shared Error Types'
+    why_important: 'Defines standard error types used across the monorepo; ensures consistent error handling and API responses'
+    topics: ['errors', 'types', 'shared', 'api']
+    owners: ['@shared-team']
+    linked_docs: []
+    related_components:
+      ['services/proxy/src/middleware/logger.ts', 'services/dashboard/src/middleware/logger.ts']
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ['new error types needed', 'API error format changes']
+    last_seen: '2025-01-12'
+    last_reviewed_at: '2025-01-12'
+    staleness_hints: 'None'
+    recommended_action: 'None'
+    notes: 'Includes AuthenticationError, AuthorizationError, ValidationError, UpstreamError'
+
+  - path: '/home/crystalin/projects/claude-nexus-proxy/services/proxy/src/middleware/logger.ts'
+    title: 'Proxy Logger Middleware'
+    why_important: 'Centralized logging for the proxy service; handles structured logging, sensitive data masking, and debug modes'
+    topics: ['logging', 'middleware', 'debugging', 'observability']
+    owners: ['@backend-team']
+    linked_docs: []
+    related_components: ['packages/shared/src/types/errors.ts']
+    dependencies:
+      direct: ['hono', '@agent-prompttrain/shared']
+      indirect: []
+    update_triggers:
+      ['logging requirements changes', 'new log fields needed', 'security requirements']
+    last_seen: '2025-01-12'
+    last_reviewed_at: '2025-01-12'
+    staleness_hints: 'None'
+    recommended_action: 'None'
+    notes: 'Supports DEBUG and DEBUG_SQL environment variables, masks sensitive data in logs'
