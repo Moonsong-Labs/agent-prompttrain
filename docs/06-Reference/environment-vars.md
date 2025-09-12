@@ -20,8 +20,30 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 | Variable             | Description                          | Default | Required |
 | -------------------- | ------------------------------------ | ------- | -------- |
-| `DASHBOARD_API_KEY`  | API key for dashboard authentication | -       | ✅       |
+| `DASHBOARD_API_KEY`  | API key for dashboard authentication | -       | ✅\*     |
 | `ENABLE_CLIENT_AUTH` | Enable client API key authentication | `true`  | ❌       |
+
+\*Required unless Google OAuth is configured
+
+### Google OAuth Authentication (Dashboard)
+
+| Variable                 | Description                                   | Default | Required for OAuth |
+| ------------------------ | --------------------------------------------- | ------- | ------------------ |
+| `GOOGLE_CLIENT_ID`       | Google OAuth 2.0 client ID                    | -       | ✅                 |
+| `GOOGLE_CLIENT_SECRET`   | Google OAuth 2.0 client secret                | -       | ✅                 |
+| `GOOGLE_REDIRECT_URI`    | OAuth callback URL                            | -       | ✅                 |
+| `GOOGLE_ALLOWED_DOMAINS` | Comma-separated list of allowed email domains | -       | ❌                 |
+| `SESSION_DURATION_DAYS`  | Session duration in days                      | `30`    | ❌                 |
+
+Example OAuth configuration:
+
+```bash
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=https://dashboard.example.com/dashboard/auth/google/callback
+GOOGLE_ALLOWED_DOMAINS=company.com,subsidiary.com
+SESSION_DURATION_DAYS=7
+```
 
 ## Feature Flags
 
