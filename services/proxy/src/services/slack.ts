@@ -10,7 +10,7 @@ export interface SlackConfig {
 
 export interface MessageInfo {
   requestId: string
-  domain?: string
+  trainId?: string
   model?: string
   role: 'user' | 'assistant' | 'conversation'
   content: string
@@ -194,7 +194,7 @@ export async function sendToSlack(info: MessageInfo, domainWebhook?: IncomingWeb
 export async function sendErrorToSlack(
   requestId: string,
   error: string,
-  domain?: string,
+  trainId?: string,
   domainWebhook?: IncomingWebhook | null
 ) {
   // Use domain-specific webhook if available, otherwise fall back to global webhook

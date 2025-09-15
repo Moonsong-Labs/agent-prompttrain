@@ -109,7 +109,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   // API endpoints for dashboard data
   app.get('/api/requests', async c => {
     const storageService = container.getStorageService()
-    const domain = c.req.query('domain')
+    const trainId = c.req.query('trainId')
     const limit = parseInt(c.req.query('limit') || '100')
 
     try {
@@ -146,11 +146,11 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   app.get('/api/storage-stats', async c => {
     const storageService = container.getStorageService()
-    const domain = c.req.query('domain')
+    const trainId = c.req.query('trainId')
     const since = c.req.query('since')
 
     try {
-      const stats = await storageService.getStats(domain, since ? new Date(since) : undefined)
+      const stats = await storageService.getStats(trainId, since ? new Date(since) : undefined)
       return c.json({
         status: 'ok',
         stats,
@@ -163,13 +163,13 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   app.get('/api/conversations', async c => {
     const storageService = container.getStorageService()
-    const domain = c.req.query('domain')
+    const trainId = c.req.query('trainId')
     const limit = parseInt(c.req.query('limit') || '50')
     const excludeSubtasks = c.req.query('excludeSubtasks') === 'true'
 
     try {
       const conversations = await storageService.getConversationsWithFilter(
-        domain,
+        trainId,
         limit,
         excludeSubtasks
       )

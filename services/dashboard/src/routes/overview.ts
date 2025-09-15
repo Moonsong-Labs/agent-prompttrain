@@ -13,7 +13,7 @@ import { layout } from '../layout/index.js'
 export const overviewRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -21,7 +21,7 @@ export const overviewRoutes = new Hono<{
  * Main dashboard page - Shows conversations overview with branches
  */
 overviewRoutes.get('/', async c => {
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const page = parseInt(c.req.query('page') || '1')
   const perPage = parseInt(c.req.query('per_page') || '50')
   const searchQuery = c.req.query('search')?.toLowerCase()
@@ -54,7 +54,7 @@ overviewRoutes.get('/', async c => {
     const [statsResult, conversationsResult] = await Promise.all([
       apiClient.getDashboardStats({ domain }),
       apiClient.getConversations({
-        domain,
+        trainId,
         limit: itemsPerPage,
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
       }),
@@ -76,7 +76,7 @@ overviewRoutes.get('/', async c => {
       tokens: number
       firstMessage: Date
       lastMessage: Date
-      domain: string
+      trainId: string
       latestRequestId?: string
       latestModel?: string
       latestContextTokens?: number
@@ -100,7 +100,7 @@ overviewRoutes.get('/', async c => {
         tokens: conv.totalTokens,
         firstMessage: new Date(conv.firstMessageTime),
         lastMessage: new Date(conv.lastMessageTime),
-        domain: conv.domain,
+        trainId: conv.trainId,
         latestRequestId: conv.latestRequestId,
         latestModel: conv.latestModel,
         latestContextTokens: conv.latestContextTokens,
@@ -157,7 +157,7 @@ overviewRoutes.get('/', async c => {
           <!-- Search Bar -->
           <form action="/dashboard" method="get" style="display: flex; gap: 0.5rem;">
             ${domain
-              ? html`<input type="hidden" name="domain" value="${escapeHtml(domain)}" />`
+              ? html`<input type="hidden" name="trainId" value="${escapeHtml(domain)}" />`
               : ''}
             <input type="hidden" name="page" value="1" />
             <input type="hidden" name="per_page" value="${itemsPerPage}" />
@@ -178,7 +178,7 @@ overviewRoutes.get('/', async c => {
           </form>
           <a
             href="/dashboard?refresh=true&page=${currentPage}&per_page=${itemsPerPage}${domain
-              ? `&domain=${encodeURIComponent(domain)}`
+              ? `&trainId =${encodeURIComponent(domain)}`
               : ''}${searchQuery
               ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
               : ''}"
@@ -194,7 +194,7 @@ overviewRoutes.get('/', async c => {
       <div style="margin-bottom: 1.5rem;">
         <label class="text-sm text-gray-600">Filter by Domain:</label>
         <select
-          onchange="window.location.href = '/dashboard' + (this.value ? '?domain=' + this.value : '?') + '&page=1&per_page=${itemsPerPage}${searchQuery
+          onchange="window.location.href = '/dashboard' + (this.value ? '?trainId =' + this.value : '?') + '&page=1&per_page=${itemsPerPage}${searchQuery
             ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
             : ''}'"
           style="margin-left: 0.5rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;"
@@ -204,7 +204,7 @@ overviewRoutes.get('/', async c => {
             uniqueDomains
               .map(
                 d =>
-                  `<option value="${escapeHtml(d)}" ${domain === d ? 'selected' : ''}>${escapeHtml(d)}</option>`
+                  `<option value="${escapeHtml(d)}" ${trainId === d ? 'selected' : ''}>${escapeHtml(d)}</option>`
               )
               .join('')
           )}
@@ -403,7 +403,7 @@ overviewRoutes.get('/', async c => {
                           ? html`
                               <a
                                 href="?page=${currentPage - 1}${domain
-                                  ? `&domain=${domain}`
+                                  ? `&trainId =${domain}`
                                   : ''}&per_page=${itemsPerPage}${searchQuery
                                   ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                   : ''}"
@@ -423,7 +423,7 @@ overviewRoutes.get('/', async c => {
                                 : html`
                                     <a
                                       href="?page=${pageNum}${domain
-                                        ? `&domain=${domain}`
+                                        ? `&trainId =${domain}`
                                         : ''}&per_page=${itemsPerPage}${searchQuery
                                         ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                         : ''}"
@@ -439,7 +439,7 @@ overviewRoutes.get('/', async c => {
                           ? html`
                               <a
                                 href="?page=${currentPage + 1}${domain
-                                  ? `&domain=${domain}`
+                                  ? `&trainId =${domain}`
                                   : ''}&per_page=${itemsPerPage}${searchQuery
                                   ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                   : ''}"
@@ -454,7 +454,7 @@ overviewRoutes.get('/', async c => {
                           Items per page:
                           <select
                             onchange="window.location.href='?page=1${domain
-                              ? `&domain=${domain}`
+                              ? `&trainId =${domain}`
                               : ''}&per_page=' + this.value + '${searchQuery
                               ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                               : ''}'"

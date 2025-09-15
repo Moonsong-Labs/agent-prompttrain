@@ -37,7 +37,7 @@ function escapeHtml(unsafe: string): string {
  */
 analyticsPartialRoutes.get('/partials/analytics', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const expanded = c.req.query('expanded') === 'true'
 
   if (!apiClient) {
@@ -105,7 +105,7 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                   ${raw(
                     accountsData.accounts
-                      .filter(account => !domain || account.domains.some(d => d.domain === domain))
+                      .filter(account => !domain || account.domains.some(d => d.trainId === domain))
                       .slice(0, 5) // Show top 5 accounts
                       .map(account => {
                         const chartId = `chart-${account.accountId.replace(/[^a-zA-Z0-9]/g, '-')}`
@@ -183,7 +183,7 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                           </div>
                           <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
                             ${account.domains
-                              .filter(d => !domain || d.domain === domain)
+                              .filter(d => !domain || d.trainId === domain)
                               .slice(0, 3)
                               .map(
                                 d => `
@@ -264,7 +264,7 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
           if (!isExpanded) {
             htmx.ajax(
               'GET',
-              '/partials/analytics?expanded=true${domain ? `&domain=${domain}` : ''}',
+              '/partials/analytics?expanded=true${domain ? `&trainId =${domain}` : ''}',
               {
                 target: '#analytics-panel',
                 swap: 'outerHTML',

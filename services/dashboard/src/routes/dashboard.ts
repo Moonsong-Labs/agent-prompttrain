@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 export const dashboardRoutes = new Hono<{
   Variables: {
     pool?: Pool
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -205,7 +205,7 @@ const layout = (title: string, content: any) => html`
  */
 dashboardRoutes.get('/', async c => {
   const pool = c.get('pool')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
   // Get stats from database
   const stats = {
@@ -217,7 +217,7 @@ dashboardRoutes.get('/', async c => {
     activeTasksWithSubtasks: 0,
     recentRequests: [] as Array<{
       request_id: string
-      domain: string
+      trainId: string
       model: string
       total_tokens: number
       input_tokens: number
@@ -243,7 +243,7 @@ dashboardRoutes.get('/', async c => {
           COUNT(DISTINCT parent_task_request_id) FILTER (WHERE parent_task_request_id IS NOT NULL) as active_tasks_with_subtasks
         FROM api_requests
         WHERE timestamp > NOW() - INTERVAL '24 hours'
-        ${domain ? 'AND domain = $1' : ''}
+        ${domain ? 'AND trainId = $1' : ''}
       `
 
       const statsResult = await pool.query(statsQuery, domain ? [domain] : [])
@@ -260,7 +260,7 @@ dashboardRoutes.get('/', async c => {
       const requestsQuery = `
         SELECT 
           r.request_id,
-          r.domain,
+          r.trainId,
           r.model,
           COALESCE(r.total_tokens, COALESCE(r.input_tokens, 0) + COALESCE(r.output_tokens, 0), 0) as total_tokens,
           r.input_tokens,
@@ -278,7 +278,7 @@ dashboardRoutes.get('/', async c => {
           WHERE parent_task_request_id IS NOT NULL
           GROUP BY parent_task_request_id
         ) st ON r.request_id = st.parent_task_request_id
-        ${domain ? 'WHERE r.domain = $1' : ''}
+        ${domain ? 'WHERE r.trainId = $1' : ''}
         ORDER BY r.timestamp DESC
         LIMIT 20
       `
@@ -297,7 +297,7 @@ dashboardRoutes.get('/', async c => {
       const domainsResult = await pool.query(
         'SELECT DISTINCT domain FROM api_requests ORDER BY domain'
       )
-      domains = domainsResult.rows.map(r => r.domain)
+      domains = domainsResult.rows.map(r => r.train_id)
     } catch (error) {
       console.error('Failed to get domains:', error)
     }
@@ -308,13 +308,13 @@ dashboardRoutes.get('/', async c => {
     <div class="mb-6">
       <label class="text-sm text-gray-600">Filter by Domain:</label>
       <select
-        onchange="window.location.href = '/dashboard' + (this.value ? '?domain=' + this.value : '')"
+        onchange="window.location.href = '/dashboard' + (this.value ? '?trainId =' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
         <option value="">All Domains</option>
         ${raw(
           domains
-            .map(d => `<option value="${d}" ${domain === d ? 'selected' : ''}>${d}</option>`)
+            .map(d => `<option value="${d}" ${trainId === d ? 'selected' : ''}>${d}</option>`)
             .join('')
         )}
       </select>
@@ -352,7 +352,7 @@ dashboardRoutes.get('/', async c => {
     <!-- Analytics Panel (loaded via HTMX) -->
     <div
       id="analytics-panel-placeholder"
-      hx-get="/partials/analytics${domain ? `?domain=${domain}` : ''}${c.req.query('analytics') ===
+      hx-get="/partials/analytics${domain ? `?trainId =${domain}` : ''}${c.req.query('analytics') ===
       'true'
         ? '&expanded=true'
         : ''}"

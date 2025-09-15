@@ -40,7 +40,7 @@ export interface ConversationSummary {
 }
 
 export interface ApiRequest extends ConversationRequest {
-  domain: string
+  trainId: string
   status_code?: number
   request_body?: any
   response_body?: any

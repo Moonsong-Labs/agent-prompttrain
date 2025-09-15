@@ -82,8 +82,8 @@ const defaultDomainConfig: RateLimitConfig = {
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const domain = c.req.header('host') || 'unknown'
-    return `domain:${domain}`
+    const trainId = c.req.header('host') || 'unknown'
+    return `trainId:${domain}`
   },
 }
 

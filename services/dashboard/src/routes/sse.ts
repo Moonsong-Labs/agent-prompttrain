@@ -11,7 +11,7 @@ const sseConnections = new Map<
  * SSE endpoint for real-time dashboard updates
  */
 export async function handleSSE(c: Context) {
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const connectionId = crypto.randomUUID()
 
   return streamSSE(c, async stream => {
@@ -75,7 +75,7 @@ export async function handleSSE(c: Context) {
 /**
  * Broadcast an event to all connected SSE clients
  */
-export function broadcastEvent(event: { type: string; domain?: string; data: any }) {
+export function broadcastEvent(event: { type: string; trainId?: string; data: any }) {
   const message = JSON.stringify({
     type: event.type,
     data: event.data,
@@ -112,14 +112,14 @@ export function broadcastEvent(event: { type: string; domain?: string; data: any
  */
 export function broadcastConversation(conversation: {
   id: string
-  domain: string
+  trainId: string
   model: string
   tokens: number
   timestamp: string
 }) {
   broadcastEvent({
     type: 'conversation',
-    domain: conversation.domain,
+    trainId: conversation.trainId,
     data: conversation,
   })
 }
@@ -128,14 +128,14 @@ export function broadcastConversation(conversation: {
  * Broadcast metrics updates
  */
 export function broadcastMetrics(metrics: {
-  domain?: string
+  trainId?: string
   requests: number
   tokens: number
   activeUsers: number
 }) {
   broadcastEvent({
     type: 'metrics',
-    domain: metrics.domain,
+    trainId: metrics.trainId,
     data: metrics,
   })
 }

@@ -7,18 +7,18 @@ import { container } from '../container.js'
 
 // Query parameter schemas
 const statsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   since: z.string().datetime().optional(),
 })
 
 const requestsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('100'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
 })
 
 const conversationsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   accountId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('50'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
@@ -43,7 +43,7 @@ interface StatsResponse {
 
 interface RequestSummary {
   requestId: string
-  domain: string
+  trainId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -108,7 +108,7 @@ apiRoutes.get('/stats', async c => {
     let paramCount = 0
 
     if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(params.domain)
     }
 
@@ -207,7 +207,7 @@ apiRoutes.get('/dashboard/stats', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.domain
     const accountId = query.accountId
 
     const conditions: string[] = []
@@ -215,7 +215,7 @@ apiRoutes.get('/dashboard/stats', async c => {
     let paramCount = 0
 
     if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(domain)
     }
 
@@ -361,7 +361,7 @@ apiRoutes.get('/requests', async c => {
     let paramCount = 0
 
     if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(params.domain)
     }
 
@@ -374,7 +374,7 @@ apiRoutes.get('/requests', async c => {
     const requestsQuery = `
       SELECT 
         request_id,
-        domain,
+        trainId,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -395,7 +395,7 @@ apiRoutes.get('/requests', async c => {
 
     const requests: RequestSummary[] = result.rows.map(row => ({
       requestId: row.request_id,
-      domain: row.domain,
+      trainId: row.trainId,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -454,7 +454,7 @@ apiRoutes.get('/requests/:id', async c => {
     const requestQuery = `
       SELECT 
         request_id,
-        domain,
+        trainId,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -492,7 +492,7 @@ apiRoutes.get('/requests/:id', async c => {
 
     const details: RequestDetails = {
       requestId: row.request_id,
-      domain: row.domain,
+      trainId: row.trainId,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -553,7 +553,7 @@ apiRoutes.get('/domains', async c => {
 
   try {
     const query = `
-      SELECT DISTINCT domain, COUNT(*) as request_count
+      SELECT DISTINCT trainId, COUNT(*) as request_count
       FROM api_requests
       WHERE timestamp > NOW() - INTERVAL '7 days'
       GROUP BY domain
@@ -562,7 +562,7 @@ apiRoutes.get('/domains', async c => {
 
     const result = await pool.query(query)
     const domains = result.rows.map(row => ({
-      domain: row.domain,
+      trainId: row.trainId,
       requestCount: parseInt(row.request_count),
     }))
 
@@ -597,7 +597,7 @@ apiRoutes.get('/conversations', async c => {
     let paramCount = 0
 
     if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(params.domain)
     }
 
@@ -639,7 +639,7 @@ apiRoutes.get('/conversations', async c => {
         SELECT 
           r.request_id,
           r.conversation_id,
-          r.domain,
+          r.trainId,
           r.account_id,
           r.timestamp,
           r.input_tokens,
@@ -658,7 +658,7 @@ apiRoutes.get('/conversations', async c => {
       conversation_summary AS (
         SELECT 
           conversation_id,
-          domain,
+          trainId,
           account_id,
           MIN(timestamp) as first_message_time,
           MAX(timestamp) as last_message_time,
@@ -678,7 +678,7 @@ apiRoutes.get('/conversations', async c => {
           (array_agg(parent_task_request_id ORDER BY subtask_rn) FILTER (WHERE is_subtask = true AND subtask_rn = 1))[1] as parent_task_request_id,
           COUNT(CASE WHEN is_subtask THEN 1 END) as subtask_message_count
         FROM relevant_requests
-        GROUP BY conversation_id, domain, account_id
+        GROUP BY conversation_id, trainId, account_id
       )
       -- STEP 4: Final select with parent conversation lookup and preserve order
       SELECT 
@@ -724,7 +724,7 @@ apiRoutes.get('/conversations', async c => {
 
       return {
         conversationId: row.conversation_id,
-        domain: row.domain,
+        trainId: row.trainId,
         accountId: row.account_id,
         firstMessageTime: row.first_message_time,
         lastMessageTime: row.last_message_time,
@@ -769,14 +769,14 @@ apiRoutes.get('/conversations', async c => {
 // Token usage query schemas
 const tokenUsageWindowSchema = z.object({
   accountId: z.string(),
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   model: z.string().optional(),
   window: z.string().regex(/^\d+$/).transform(Number).default('300'), // Default 5 hours (300 minutes)
 })
 
 const tokenUsageDailySchema = z.object({
   accountId: z.string(),
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   days: z.string().regex(/^\d+$/).transform(Number).default('30'),
   aggregate: z
     .string()
@@ -802,7 +802,7 @@ apiRoutes.get('/token-usage/current', async c => {
     const usage = await tokenUsageService.getUsageWindow(
       params.accountId,
       windowHours,
-      params.domain,
+      params.trainId,
       params.model
     )
 
@@ -961,7 +961,7 @@ apiRoutes.get('/token-usage/accounts', async c => {
       domain_usage AS (
         SELECT 
           account_id,
-          domain,
+          trainId,
           SUM(output_tokens) as domain_output_tokens,
           COUNT(*) as domain_requests
         FROM api_requests
@@ -978,7 +978,7 @@ apiRoutes.get('/token-usage/accounts', async c => {
         COALESCE(
           json_agg(
             json_build_object(
-              'domain', du.domain,
+              'trainId', du.trainId,
               'outputTokens', du.domain_output_tokens,
               'requests', du.domain_requests
             ) ORDER BY du.domain_output_tokens DESC
@@ -1093,7 +1093,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.domain
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1111,7 +1111,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
 
     // Optional domain filter
     if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(domain)
     }
 
@@ -1120,7 +1120,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     // Query to get hourly request counts grouped by domain
     const hourlyQuery = `
       SELECT
-        domain,
+        trainId,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COUNT(*) as request_count
       FROM
@@ -1128,10 +1128,10 @@ apiRoutes.get('/usage/requests/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        domain,
+        trainId,
         hour
       ORDER BY
-        domain,
+        trainId,
         hour
     `
 
@@ -1154,7 +1154,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     return c.json({
       data,
       query: {
-        domain: domain || null,
+        trainId: domain || null,
         days,
       },
     })
@@ -1182,7 +1182,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.domain
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1200,7 +1200,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
 
     // Optional domain filter
     if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
+      conditions.push(`trainId = $${++paramCount}`)
       values.push(domain)
     }
 
@@ -1209,7 +1209,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     // Query to get hourly token sums grouped by domain (output tokens only)
     const hourlyQuery = `
       SELECT
-        domain,
+        trainId,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COALESCE(SUM(output_tokens), 0) as token_count
       FROM
@@ -1217,10 +1217,10 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        domain,
+        trainId,
         hour
       ORDER BY
-        domain,
+        trainId,
         hour
     `
 
@@ -1244,7 +1244,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     return c.json({
       data,
       query: {
-        domain: domain || null,
+        trainId: domain || null,
         days,
       },
     })

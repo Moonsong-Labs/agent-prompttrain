@@ -27,7 +27,7 @@ interface StatsResponse {
 
 interface RequestSummary {
   requestId: string
-  domain: string
+  trainId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -72,14 +72,14 @@ interface RequestDetails extends RequestSummary {
 
 interface DomainsResponse {
   domains: Array<{
-    domain: string
+    trainId: string
     requestCount: number
   }>
 }
 
 interface TokenUsageWindow {
   accountId: string
-  domain: string
+  trainId: string
   model: string
   windowStart: string
   windowEnd: string
@@ -94,7 +94,7 @@ interface TokenUsageWindow {
 interface DailyUsage {
   date: string
   accountId: string
-  domain: string
+  trainId: string
   totalInputTokens: number
   totalOutputTokens: number
   totalTokens: number
@@ -104,7 +104,7 @@ interface DailyUsage {
 interface RateLimitConfig {
   id: number
   accountId?: string
-  domain?: string
+  trainId?: string
   model?: string
   windowMinutes: number
   tokenLimit: number
@@ -115,7 +115,7 @@ interface RateLimitConfig {
 
 interface ConversationSummary {
   conversationId: string
-  domain: string
+  trainId: string
   accountId?: string
   firstMessageTime: string
   lastMessageTime: string
@@ -163,11 +163,11 @@ export class ProxyApiClient {
   /**
    * Get aggregated statistics
    */
-  async getStats(params?: { domain?: string; since?: string }): Promise<StatsResponse> {
+  async getStats(params?: { trainId?: string; since?: string }): Promise<StatsResponse> {
     try {
       const url = new URL('/api/stats', this.baseUrl)
       if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params?.since) {
         url.searchParams.set('since', params.since)
@@ -194,14 +194,14 @@ export class ProxyApiClient {
    * Get recent requests
    */
   async getRequests(params?: {
-    domain?: string
+    trainId?: string
     limit?: number
     offset?: number
   }): Promise<RequestsResponse> {
     try {
       const url = new URL('/api/requests', this.baseUrl)
       if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params?.limit) {
         url.searchParams.set('limit', params.limit.toString())
@@ -285,7 +285,7 @@ export class ProxyApiClient {
   async getTokenUsageWindow(params: {
     accountId: string
     window?: number // Window in minutes (default 300 = 5 hours)
-    domain?: string
+    trainId?: string
     model?: string
   }): Promise<TokenUsageWindow> {
     try {
@@ -295,7 +295,7 @@ export class ProxyApiClient {
         url.searchParams.set('window', params.window.toString())
       }
       if (params.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params.model) {
         url.searchParams.set('model', params.model)
@@ -324,7 +324,7 @@ export class ProxyApiClient {
   async getDailyTokenUsage(params: {
     accountId: string
     days?: number
-    domain?: string
+    trainId?: string
     aggregate?: boolean
   }): Promise<{ usage: DailyUsage[] }> {
     try {
@@ -334,7 +334,7 @@ export class ProxyApiClient {
         url.searchParams.set('days', params.days.toString())
       }
       if (params.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params.aggregate !== undefined) {
         url.searchParams.set('aggregate', params.aggregate.toString())
@@ -492,7 +492,7 @@ export class ProxyApiClient {
       remainingTokens: number
       percentageUsed: number
       domains: Array<{
-        domain: string
+        trainId: string
         outputTokens: number
         requests: number
       }>
@@ -523,7 +523,7 @@ export class ProxyApiClient {
           remainingTokens: number
           percentageUsed: number
           domains: {
-            domain: string
+            trainId: string
             outputTokens: number
             requests: number
           }[]
@@ -547,7 +547,7 @@ export class ProxyApiClient {
    */
   async getRateLimitConfigs(params?: {
     accountId?: string
-    domain?: string
+    trainId?: string
     model?: string
   }): Promise<{ configs: RateLimitConfig[] }> {
     try {
@@ -556,7 +556,7 @@ export class ProxyApiClient {
         url.searchParams.set('accountId', params.accountId)
       }
       if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params?.model) {
         url.searchParams.set('model', params.model)
@@ -583,7 +583,7 @@ export class ProxyApiClient {
    * Get conversations with account information
    */
   async getConversations(params?: {
-    domain?: string
+    trainId?: string
     accountId?: string
     limit?: number
     offset?: number
@@ -603,7 +603,7 @@ export class ProxyApiClient {
     try {
       const url = new URL('/api/conversations', this.baseUrl)
       if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -646,7 +646,7 @@ export class ProxyApiClient {
   /**
    * Get aggregated dashboard statistics
    */
-  async getDashboardStats(params?: { domain?: string; accountId?: string }): Promise<{
+  async getDashboardStats(params?: { trainId?: string; accountId?: string }): Promise<{
     totalConversations: number
     activeUsers: number
     totalRequests: number
@@ -670,7 +670,7 @@ export class ProxyApiClient {
     try {
       const url = new URL('/api/dashboard/stats', this.baseUrl)
       if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+        url.searchParams.set('trainId', params.domain)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -726,7 +726,7 @@ export class ProxyApiClient {
       },
       requests: requests.map(req => ({
         request_id: req.requestId,
-        domain: req.domain,
+        trainId: req.trainId,
         model: req.model,
         total_tokens: req.totalTokens,
         input_tokens: req.inputTokens,

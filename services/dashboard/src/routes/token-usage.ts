@@ -30,7 +30,7 @@ function escapeHtml(unsafe: string): string {
 tokenUsageRoutes.get('/token-usage', async c => {
   const apiClient = c.get('apiClient')
   const accountId = c.req.query('accountId')
-  const _domain = c.req.query('domain') // Not currently used but kept for future use
+  const _domain = c.req.query('trainId') // Not currently used but kept for future use
 
   if (!apiClient) {
     return c.html(
@@ -306,7 +306,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
                               ${account.domains
                                 .map(
-                                  domain => `
+                                  trainId => `
                                 <div style="font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">
                                   <span style="color: #374151; font-weight: 500;">${escapeHtml(domain.domain)}:</span>
                                   ${formatNumber(domain.outputTokens)} tokens

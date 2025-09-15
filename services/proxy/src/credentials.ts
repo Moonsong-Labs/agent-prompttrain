@@ -48,7 +48,7 @@ export interface ClaudeCredentials {
 }
 
 export interface DomainCredentialMapping {
-  [domain: string]: string // domain -> credential file path
+  [trainId: string]: string // domain -> credential file path
 }
 
 // Default OAuth client ID - can be overridden via CLAUDE_OAUTH_CLIENT_ID env var
@@ -96,15 +96,15 @@ function generateCodeChallenge(verifier: string): string {
  * Get credential file path for a domain
  */
 export function getCredentialFileForDomain(
-  domain: string,
+  trainId: string,
   credentialsDir: string | undefined
 ): string | null {
   if (!credentialsDir) {
     credentialsDir = 'credentials' // Default to 'credentials' folder in current directory
   }
 
-  // Construct the credential filename: <domain>.credentials.json
-  const filename = `${domain}.credentials.json`
+  // Construct the credential filename: <trainId>.credentials.json
+  const filename = `${trainId}.credentials.json`
 
   // Resolve the credentials directory path
   let dirPath: string
@@ -500,36 +500,36 @@ export function getMaskedCredentialInfo(credentialPath: string | null): string {
 export function validateCredentialMapping(mapping: DomainCredentialMapping): string[] {
   const errors: string[] = []
 
-  for (const [domain, credPath] of Object.entries(mapping)) {
+  for (const [trainId, credPath] of Object.entries(mapping)) {
     const credentials = loadCredentials(credPath)
 
     if (!credentials) {
-      errors.push(`Missing or invalid credential file for domain '${domain}': ${credPath}`)
+      errors.push(`Missing or invalid credential file for train-id '${trainId}': ${credPath}`)
       continue
     }
 
     // Check for accountId (warning only for backward compatibility)
     if (!credentials.accountId) {
-      errors.push(`Warning: Missing accountId for domain '${domain}' in ${credPath}`)
+      errors.push(`Warning: Missing accountId for train-id '${trainId}' in ${credPath}`)
     }
 
     if (credentials.type === 'api_key') {
       if (!credentials.api_key) {
-        errors.push(`Invalid API key credential for domain '${domain}': missing api_key field`)
+        errors.push(`Invalid API key credential for train-id '${trainId}': missing api_key field`)
       }
     } else if (credentials.type === 'oauth') {
       if (!credentials.oauth) {
-        errors.push(`Invalid OAuth credential for domain '${domain}': missing oauth field`)
+        errors.push(`Invalid OAuth credential for train-id '${trainId}': missing oauth field`)
       } else {
         const oauth = credentials.oauth
         if (!oauth.accessToken && !oauth.refreshToken) {
           errors.push(
-            `Invalid OAuth credential for domain '${domain}': missing accessToken and refreshToken`
+            `Invalid OAuth credential for train-id '${trainId}': missing accessToken and refreshToken`
           )
         }
       }
     } else {
-      errors.push(`Invalid credential type for domain '${domain}': ${credentials.type}`)
+      errors.push(`Invalid credential type for train-id '${trainId}': ${credentials.type}`)
     }
   }
 
@@ -542,11 +542,11 @@ export function validateCredentialMapping(mapping: DomainCredentialMapping): str
 export async function getFirstAvailableCredential(
   mapping: DomainCredentialMapping,
   debug: boolean = false
-): Promise<{ domain: string; apiKey: string | null } | null> {
-  for (const [domain, credPath] of Object.entries(mapping)) {
+): Promise<{ trainId: string; apiKey: string | null } | null> {
+  for (const [trainId, credPath] of Object.entries(mapping)) {
     const apiKey = await getApiKey(credPath, debug)
     if (apiKey) {
-      return { domain, apiKey }
+      return { trainId, apiKey }
     }
   }
   return null
@@ -557,13 +557,13 @@ export async function getFirstAvailableCredential(
  */
 export async function getAuthorizationHeaderForDomain(
   mapping: DomainCredentialMapping,
-  domain: string,
+  trainId: string,
   debug: boolean = false
 ): Promise<{ [key: string]: string } | null> {
-  const credentialPath = mapping[domain]
+  const credentialPath = mapping[trainId]
   if (!credentialPath) {
     if (debug) {
-      console.log(`No credential mapping found for domain: ${domain}`)
+      console.log(`No credential mapping found for trainId: ${trainId}`)
     }
     return null
   }

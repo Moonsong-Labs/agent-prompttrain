@@ -1,0 +1,246 @@
+version: 1
+generated_by: repo-knowledge-tracker
+last_updated: "2025-01-15T00:00:00Z"
+entries:
+  # Core Documentation Files
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/README.md"
+    title: "Main Project README"
+    why_important: "Primary user-facing documentation with domain credential setup instructions"
+    topics: ["documentation", "domains", "credentials", "setup"]
+    owners: ["@project-maintainers"]
+    linked_docs: []
+    related_components: ["credentials/README.md", "docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "b7434a8"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "References domain-based auth that needs updating to train-id"
+    recommended_action: "Update all domain references to train-id, Host header to X-TRAIN-ID"
+    notes: "Lines 56, 122, 300-340 reference domains and wildcard subdomains"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/credentials/README.md"
+    title: "Credentials Directory Documentation"
+    why_important: "Explains credential file naming and wildcard patterns"
+    topics: ["credentials", "domains", "wildcards", "authentication"]
+    owners: ["@security-team"]
+    linked_docs: ["docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
+    related_components: ["services/proxy/src/services/AuthenticationService.ts"]
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Domain-based credential naming needs train-id update"
+    recommended_action: "Replace domain references with train-id throughout"
+    notes: "Critical file for explaining credential file naming convention"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"
+    title: "ADR-023: Wildcard Subdomain Support"
+    why_important: "Architecture decision record for wildcard subdomain feature"
+    topics: ["architecture", "adr", "domains", "wildcards", "psl"]
+    owners: ["@architecture-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/services/AuthenticationService.ts", "credentials/"]
+    dependencies:
+      direct: ["psl"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "b7434a8"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Entire ADR based on domain/subdomain concept"
+    recommended_action: "May need new ADR for train-id based routing or update this one"
+    notes: "Describes PSL integration and wildcard resolution logic"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/06-Reference/environment-vars.md"
+    title: "Environment Variables Reference"
+    why_important: "Documents all environment variables including wildcard credentials"
+    topics: ["configuration", "environment", "domains", "wildcards"]
+    owners: ["@ops-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/main.ts", "services/dashboard/src/app.ts"]
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["config changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "CNP_WILDCARD_CREDENTIALS references need updating"
+    recommended_action: "Update wildcard credential env vars for train-id"
+    notes: "Lines 54-55, 100, 244-248 reference domains and wildcards"
+
+  # Core Implementation Files
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/services/AuthenticationService.ts"
+    title: "Authentication Service Implementation"
+    why_important: "Core service handling domain-based authentication and wildcard resolution"
+    topics: ["authentication", "domains", "wildcards", "psl", "core-service"]
+    owners: ["@backend-team"]
+    linked_docs: ["docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
+    related_components: ["services/proxy/src/middleware/client-auth.ts", "credentials/"]
+    dependencies:
+      direct: ["psl", "fs", "path"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "b7434a8"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Entire authentication logic based on domain extraction"
+    recommended_action: "Major refactor needed to use train-id instead of domains"
+    notes: "Contains wildcard resolution, PSL integration, credential caching"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/middleware/client-auth.ts"
+    title: "Client Authentication Middleware"
+    why_important: "Middleware that extracts domain and validates client API keys"
+    topics: ["middleware", "authentication", "domains"]
+    owners: ["@backend-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/services/AuthenticationService.ts", "services/proxy/src/middleware/domain-extractor.ts"]
+    dependencies:
+      direct: ["hono"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Depends on domain from context"
+    recommended_action: "Update to use train-id from X-TRAIN-ID header"
+    notes: "Critical middleware in authentication flow"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/middleware/domain-extractor.ts"
+    title: "Domain Extractor Middleware"
+    why_important: "Extracts domain from Host header and sets in context"
+    topics: ["middleware", "domains", "host-header"]
+    owners: ["@backend-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/middleware/client-auth.ts"]
+    dependencies:
+      direct: ["hono"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "assumed"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Core functionality needs complete replacement"
+    recommended_action: "Replace with train-id extractor using X-TRAIN-ID header"
+    notes: "May need to be renamed or replaced entirely"
+
+  # Test Files
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/client-auth-enhanced.test.ts"
+    title: "Enhanced Client Auth Tests"
+    why_important: "Tests domain-based authentication logic"
+    topics: ["tests", "authentication", "domains"]
+    owners: ["@backend-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/middleware/client-auth.ts", "services/proxy/src/services/AuthenticationService.ts"]
+    dependencies:
+      direct: ["bun:test", "hono"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Tests mock domain-based auth"
+    recommended_action: "Update tests for train-id based authentication"
+    notes: "Lines 16, 24 reference domain parameters"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/client-auth.test.ts"
+    title: "Client Auth Tests"
+    why_important: "Basic client authentication tests"
+    topics: ["tests", "authentication", "domains"]
+    owners: ["@backend-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/middleware/client-auth.ts"]
+    dependencies:
+      direct: ["bun:test", "hono"]
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "assumed"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Tests domain-based auth flow"
+    recommended_action: "Update for train-id authentication"
+    notes: "Companion to enhanced test file"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/authentication-service.test.ts"
+    title: "Authentication Service Tests"
+    why_important: "Tests wildcard resolution and PSL integration"
+    topics: ["tests", "authentication", "domains", "wildcards", "psl"]
+    owners: ["@backend-team"]
+    linked_docs: []
+    related_components: ["services/proxy/src/services/AuthenticationService.ts"]
+    dependencies:
+      direct: ["bun:test"]
+      indirect: ["psl"]
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Tests wildcard domain resolution"
+    recommended_action: "Major test refactor for train-id patterns"
+    notes: "Critical test coverage for wildcard feature"
+
+  # Migration Scripts
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/scripts/complete-trainid-migration.ts"
+    title: "Train-ID Migration Completion Script"
+    why_important: "Script to complete the train-id migration"
+    topics: ["migration", "domains", "train-id"]
+    owners: ["@migration-team"]
+    linked_docs: []
+    related_components: ["scripts/replace-domain-with-trainid.sh"]
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["migration progress"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Active migration script"
+    recommended_action: "Execute to help with migration"
+    notes: "Key script for the migration effort"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/scripts/replace-domain-with-trainid.sh"
+    title: "Domain to Train-ID Replacement Script"
+    why_important: "Shell script for bulk text replacement"
+    topics: ["migration", "domains", "train-id"]
+    owners: ["@migration-team"]
+    linked_docs: []
+    related_components: ["scripts/complete-trainid-migration.ts"]
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["migration progress"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Active migration script"
+    recommended_action: "Use for bulk replacements"
+    notes: "Automated text replacement tool"
+
+  # Other Documentation
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/authentication.md"
+    title: "Authentication User Guide"
+    why_important: "User-facing authentication documentation"
+    topics: ["documentation", "authentication", "domains"]
+    owners: ["@docs-team"]
+    linked_docs: ["docs/02-User-Guide/api-reference.md"]
+    related_components: []
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["authentication changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Domain-based auth examples"
+    recommended_action: "Update all examples to use train-id"
+    notes: "User guide needs updating"
+
+  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/api-reference.md"
+    title: "API Reference Documentation"
+    why_important: "API documentation with authentication examples"
+    topics: ["documentation", "api", "authentication", "domains"]
+    owners: ["@docs-team"]
+    linked_docs: ["docs/02-User-Guide/authentication.md"]
+    related_components: []
+    dependencies:
+      direct: []
+      indirect: []
+    update_triggers: ["api changes", "train-id migration"]
+    last_seen: "current"
+    last_reviewed_at: "2025-01-15T00:00:00Z"
+    staleness_hints: "Host header references"
+    recommended_action: "Update to X-TRAIN-ID header"
+    notes: "API examples need updating"

@@ -66,7 +66,7 @@ export class RequestContext {
   toTelemetry() {
     return {
       requestId: this.requestId,
-      domain: this.host,
+      trainId: this.trainId,
       method: this.method,
       path: this.path,
       duration: this.getElapsedTime(),

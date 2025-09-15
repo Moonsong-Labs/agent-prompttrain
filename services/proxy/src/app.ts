@@ -55,7 +55,7 @@ export async function createProxyApp(): Promise<
       requestId,
       path: c.req.path,
       method: c.req.method,
-      domain: c.get('domain'),
+      trainId: c.get('trainId'),
       metadata: {},
     })
 
@@ -108,8 +108,8 @@ export async function createProxyApp(): Promise<
 
   // Token stats endpoint
   app.get('/token-stats', c => {
-    const domain = c.req.query('domain')
-    const stats = container.getMetricsService().getStats(domain)
+    const trainId = c.req.query('trainId')
+    const stats = container.getMetricsService().getStats(trainId)
     return c.json(stats)
   })
 

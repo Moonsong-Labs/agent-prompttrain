@@ -21,7 +21,7 @@ export interface StorageServiceEnhancements {
    * @returns Paginated results and total count
    */
   getConversationSummariesPaginated?(
-    domain?: string,
+    trainId?: string,
     limit?: number,
     offset?: number,
     search?: string

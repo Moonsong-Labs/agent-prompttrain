@@ -101,7 +101,7 @@ export const domainScopedAuth = async (c: Context, next: Next) => {
   const authenticatedDomain = c.get('authenticatedDomain')
 
   // Get requested domain from query params
-  const requestedDomain = c.req.query('domain')
+  const requestedDomain = c.req.query('trainId')
 
   // If a specific domain is requested, verify access
   if (requestedDomain && authenticatedDomain !== 'admin') {

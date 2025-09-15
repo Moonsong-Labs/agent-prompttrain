@@ -17,7 +17,7 @@ class TokenTracker {
    * Track token usage for a domain
    */
   track(
-    domain: string,
+    trainId: string,
     inputTokens: number = 0,
     outputTokens: number = 0,
     requestType?: 'query_evaluation' | 'inference',
@@ -33,7 +33,7 @@ class TokenTracker {
       lastUpdated: Date.now(),
     }
 
-    this.stats.set(domain, {
+    this.stats.set(trainId, {
       inputTokens: current.inputTokens + inputTokens,
       outputTokens: current.outputTokens + outputTokens,
       requestCount: current.requestCount + 1,
@@ -111,7 +111,7 @@ class TokenTracker {
     // Sort domains alphabetically
     const sortedDomains = Array.from(this.stats.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
-    for (const [domain, stats] of sortedDomains) {
+    for (const [trainId, stats] of sortedDomains) {
       const total = stats.inputTokens + stats.outputTokens
       console.log(
         domain.padEnd(25) +
@@ -177,7 +177,7 @@ class TokenTracker {
    */
   getStats(): Record<string, DomainTokenStats> {
     const result: Record<string, DomainTokenStats> = {}
-    for (const [domain, stats] of this.stats) {
+    for (const [trainId, stats] of this.stats) {
       result[domain] = { ...stats }
     }
     return result

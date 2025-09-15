@@ -9,7 +9,7 @@ import { renderSparkRecommendationInline } from '../components/spark-recommendat
 
 export const requestDetailsRoutes = new Hono<{
   Variables: {
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -38,7 +38,7 @@ requestDetailsRoutes.get('/request/:id', async c => {
     // Map from storage format to API format
     const details = {
       requestId: requestDetails.request.request_id,
-      domain: requestDetails.request.domain,
+      trainId: requestDetails.request.trainId,
       model: requestDetails.request.model,
       timestamp: requestDetails.request.timestamp,
       inputTokens: requestDetails.request.input_tokens,
@@ -948,7 +948,7 @@ requestDetailsRoutes.get('/request/:id', async c => {
         <div id="metadata-storage">
           ${JSON.stringify({
             id: details.requestId || '',
-            domain: details.domain || '',
+            trainId: details.domain || '',
             timestamp: details.timestamp || '',
             method: details.method || 'POST',
             endpoint: details.endpoint || '/v1/messages',

@@ -43,7 +43,7 @@ export function clientAuthMiddleware() {
     }
 
     const token = match[1]
-    const domain = c.get('domain')
+    const trainId = c.get('trainId')
     const requestId = c.get('requestId')
 
     if (!domain) {
@@ -65,13 +65,13 @@ export function clientAuthMiddleware() {
     try {
       // Get the authentication service from container
       const authService = container.getAuthenticationService()
-      logger.debug(`domain: ${domain}, requestId: ${requestId}`)
+      logger.debug(`trainId: ${domain}, requestId: ${requestId}`)
       const clientApiKey = await authService.getClientApiKey(domain)
 
       if (!clientApiKey) {
         logger.warn('Client auth middleware: No client API key configured', {
           requestId,
-          domain,
+          trainId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
@@ -108,7 +108,7 @@ export function clientAuthMiddleware() {
       if (!isValid) {
         logger.warn('Client auth middleware: Invalid API key', {
           requestId,
-          domain,
+          trainId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
@@ -128,7 +128,7 @@ export function clientAuthMiddleware() {
 
       logger.debug('Client auth middleware: Authentication successful', {
         requestId,
-        domain,
+        trainId,
       })
 
       // Authentication successful, proceed to next middleware
@@ -136,7 +136,7 @@ export function clientAuthMiddleware() {
     } catch (error) {
       logger.error('Client auth middleware: Error verifying token', {
         requestId,
-        domain,
+        trainId,
         error: error instanceof Error ? { message: error.message } : { message: String(error) },
       })
       return c.json(

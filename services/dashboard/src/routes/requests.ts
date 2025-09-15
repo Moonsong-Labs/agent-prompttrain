@@ -7,7 +7,7 @@ import { layout } from '../layout/index.js'
 export const requestsRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -16,7 +16,7 @@ export const requestsRoutes = new Hono<{
  */
 requestsRoutes.get('/requests', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
   if (!apiClient) {
     return c.html(
@@ -39,13 +39,13 @@ requestsRoutes.get('/requests', async c => {
     activeDomains: 0,
   }
   let recentRequests: any[] = []
-  let domains: Array<{ domain: string; requestCount: number }> = []
+  let domains: Array<{ trainId: string; requestCount: number }> = []
   let error: string | null = null
 
   // Fetch data from Proxy API with individual error handling
   const results = await Promise.allSettled([
     apiClient.getStats({ domain }),
-    apiClient.getRequests({ domain, limit: 20 }),
+    apiClient.getRequests({ trainId, limit: 20 }),
     apiClient.getDomains(),
   ])
 
@@ -93,7 +93,7 @@ requestsRoutes.get('/requests', async c => {
     <div class="mb-6">
       <label class="text-sm text-gray-600">Filter by Domain:</label>
       <select
-        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?domain=' + this.value : '')"
+        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?trainId =' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
         <option value="">All Domains</option>
@@ -101,7 +101,7 @@ requestsRoutes.get('/requests', async c => {
           domains
             .map(
               d =>
-                `<option value="${d.domain}" ${domain === d.domain ? 'selected' : ''}>${d.domain} (${d.requestCount})</option>`
+                `<option value="${d.domain}" ${trainId === d.domain ? 'selected' : ''}>${d.domain} (${d.requestCount})</option>`
             )
             .join('')
         )}
@@ -137,7 +137,7 @@ requestsRoutes.get('/requests', async c => {
       <div class="section-header">
         Recent Requests
         <a
-          href="/dashboard/requests${domain ? '?domain=' + domain : ''}"
+          href="/dashboard/requests${domain ? '?trainId =' + domain : ''}"
           class="btn btn-secondary"
           style="float: right; font-size: 0.75rem; padding: 0.25rem 0.75rem;"
           >Refresh</a

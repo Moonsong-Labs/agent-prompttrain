@@ -119,7 +119,7 @@ describe('SubtaskLinker', () => {
 
       // Simulate a new conversation with matching prompt
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -148,7 +148,7 @@ describe('SubtaskLinker', () => {
       })
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -178,7 +178,7 @@ describe('SubtaskLinker', () => {
       })
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -198,7 +198,7 @@ describe('SubtaskLinker', () => {
 
     test('should not detect subtask for multi-message conversation', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           { role: 'user', content: 'Hello' },
           { role: 'assistant', content: 'Hi!' },
@@ -273,7 +273,7 @@ describe('SubtaskLinker - JSON Fixture Tests', () => {
       const childSystemPrompt = testCase.child.body.system
 
       const request: LinkingRequest = {
-        domain: testCase.child.domain,
+        trainId: testCase.child.trainId,
         messages: childMessages,
         systemPrompt: childSystemPrompt,
         requestId: testCase.child.request_id,

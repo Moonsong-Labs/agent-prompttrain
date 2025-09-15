@@ -26,7 +26,7 @@ export function domainExtractorMiddleware() {
         400
       )
     } else {
-      let domain = host
+      let trainId = host
 
       // Check if it's localhost or an IP address
       const isLocalhost = host.startsWith('localhost')
@@ -34,13 +34,13 @@ export function domainExtractorMiddleware() {
 
       if (isLocalhost || isIPAddress) {
         // For localhost and IP addresses, keep the port
-        domain = host
+        trainId = host
       } else {
         // For other domains, remove the port first
-        domain = host.split(':')[0]
+        trainId = host.split(':')[0]
       }
 
-      c.set('domain', domain)
+      c.set('trainId', domain)
     }
 
     await next()

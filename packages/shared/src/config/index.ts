@@ -326,7 +326,7 @@ export function validateConfig(): void {
   const errors: string[] = []
 
   // Check for critical missing configuration
-  if (config.storage.enabled && !config.database.url && !config.database.host) {
+  if (config.storage.enabled && !config.database.url && !config.database.trainId) {
     errors.push('Storage is enabled but no database configuration provided')
   }
 

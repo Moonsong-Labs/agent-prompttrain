@@ -92,13 +92,13 @@ async function startServer() {
   const server = serve({
     fetch: app.fetch,
     port: config.server.port,
-    hostname: config.server.host,
+    hostname: config.server.trainId,
   })
 
   logger.info('Proxy service started', {
     metadata: {
       port: config.server.port,
-      host: config.server.host,
+      host: config.server.trainId,
       sparkApi: config.spark.enabled
         ? {
             enabled: true,

@@ -14,7 +14,7 @@ import { promptDetailRoute } from './prompt-detail.js'
 export const dashboardRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 

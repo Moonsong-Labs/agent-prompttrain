@@ -15,7 +15,7 @@ interface LogEntry {
   level: LogLevel
   requestId: string
   message: string
-  domain?: string
+  trainId?: string
   method?: string
   path?: string
   statusCode?: number
@@ -173,7 +173,7 @@ export function loggingMiddleware() {
     const startTime = Date.now()
 
     // Extract request info
-    const domain = c.req.header('host') || 'unknown'
+    const trainId = c.req.header('host') || 'unknown'
     const method = c.req.method
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
@@ -181,7 +181,7 @@ export function loggingMiddleware() {
     // Log incoming request
     logger.info('Incoming request', {
       requestId,
-      domain,
+      trainId,
       method,
       path,
       metadata: {
@@ -198,7 +198,7 @@ export function loggingMiddleware() {
       const duration = Date.now() - startTime
       logger.info('Request completed', {
         requestId,
-        domain,
+        trainId,
         method,
         path,
         statusCode: c.res.status,
@@ -212,7 +212,7 @@ export function loggingMiddleware() {
       const duration = Date.now() - startTime
       logger.error('Request failed', {
         requestId,
-        domain,
+        trainId,
         method,
         path,
         statusCode: c.res.status || 500,
@@ -237,22 +237,22 @@ export function getRequestLogger(c: Context): {
   error: (message: string, error?: Error, metadata?: Record<string, unknown>) => void
 } {
   const requestId = c.get('requestId') || 'unknown'
-  const domain = c.req.header('host') || 'unknown'
+  const trainId = c.req.header('host') || 'unknown'
 
   return {
     debug: (message: string, metadata?: Record<string, unknown>) => {
-      logger.debug(message, { requestId, domain, metadata })
+      logger.debug(message, { requestId, trainId, metadata })
     },
     info: (message: string, metadata?: Record<string, unknown>) => {
-      logger.info(message, { requestId, domain, metadata })
+      logger.info(message, { requestId, trainId, metadata })
     },
     warn: (message: string, metadata?: Record<string, unknown>) => {
-      logger.warn(message, { requestId, domain, metadata })
+      logger.warn(message, { requestId, trainId, metadata })
     },
     error: (message: string, error?: Error, metadata?: Record<string, unknown>) => {
       logger.error(message, {
         requestId,
-        domain,
+        trainId,
         error: error
           ? {
               message: error.message,

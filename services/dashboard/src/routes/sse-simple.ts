@@ -13,7 +13,7 @@ export async function handleSSE(c: Context) {
   c.header('Connection', 'keep-alive')
   c.header('X-Accel-Buffering', 'no') // Disable nginx buffering
 
-  const domain = c.req.query('domain') || 'global'
+  const trainId = c.req.query('trainId') || 'global'
 
   // Create a stream
   const encoder = new TextEncoder()
@@ -42,7 +42,7 @@ export async function handleSSE(c: Context) {
       }
 
       if (!connections.has(domain)) {
-        connections.set(domain, new Set())
+        connections.set(trainId, new Set())
       }
       connections.get(domain)!.add(send)
 
@@ -78,7 +78,7 @@ export async function handleSSE(c: Context) {
 /**
  * Broadcast event to connections
  */
-export function broadcastEvent(event: { type: string; domain?: string; data: any }) {
+export function broadcastEvent(event: { type: string; trainId?: string; data: any }) {
   const message = JSON.stringify({
     type: event.type,
     data: event.data,

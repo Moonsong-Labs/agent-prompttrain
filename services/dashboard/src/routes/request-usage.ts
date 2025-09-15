@@ -7,7 +7,7 @@ import { logger } from '../middleware/logger.js'
 
 // Type definitions
 interface DomainInfo {
-  domain: string
+  trainId: string
   requestCount: number
 }
 
@@ -19,7 +19,7 @@ interface HourlyDataPoint {
 interface HourlyUsageResponse {
   data: Record<string, HourlyDataPoint[]>
   query: {
-    domain: string | null
+    trainId: string | null
     days: number
   }
 }
@@ -40,7 +40,7 @@ function formatNumber(num: number): string {
 }
 
 // Generate consistent color from domain name
-function getDomainColor(domain: string): string {
+function getDomainColor(trainId: string): string {
   // Predefined palette of diverse, aesthetically pleasing colors
   const colorPalette = [
     '#FF6B6B', // Soft red
@@ -83,7 +83,7 @@ function getDomainColor(domain: string): string {
  */
 requestUsageRoutes.get('/usage', async c => {
   const apiClient = c.get('apiClient')
-  const selectedDomain = c.req.query('domain')
+  const selectedDomain = c.req.query('trainId')
 
   if (!apiClient) {
     return c.html(
@@ -109,7 +109,7 @@ requestUsageRoutes.get('/usage', async c => {
     // Fetch hourly usage data
     const usageParams = new URLSearchParams({ days: '7' })
     if (displayDomain) {
-      usageParams.append('domain', displayDomain)
+      usageParams.append('trainId', displayDomain)
     }
     const usageResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/requests/hourly?${usageParams}`
@@ -137,9 +137,9 @@ requestUsageRoutes.get('/usage', async c => {
         <div class="section-content">
           <select
             id="domain-selector"
-            name="domain"
+            name="trainId"
             style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 0.375rem; font-size: 14px;"
-            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?domain=' + encodeURIComponent(this.value) : '')"
+            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?trainId =' + encodeURIComponent(this.value) : '')"
           >
             <option value="" ${!selectedDomain ? 'selected' : ''}>
               All Domains (${formatNumber(domains.reduce((sum, d) => sum + d.requestCount, 0))}
@@ -152,7 +152,7 @@ requestUsageRoutes.get('/usage', async c => {
                       (d: DomainInfo) =>
                         `<option
                           value="${d.domain}"
-                          ${d.domain === displayDomain ? 'selected' : ''}
+                          ${d.trainId === displayDomain ? 'selected' : ''}
                         >
                           ${d.domain} (${formatNumber(d.requestCount)} requests)
                         </option>`
@@ -248,7 +248,7 @@ requestUsageRoutes.get('/usage', async c => {
                         const allDomains = Object.keys(chartData);
                         
                         // Build data maps for each domain
-                        allDomains.forEach(domain => {
+                        allDomains.forEach(trainId => {
                           domainDataMaps[domain] = new Map();
                           if (chartData[domain]) {
                             chartData[domain].forEach(point => {
@@ -264,7 +264,7 @@ requestUsageRoutes.get('/usage', async c => {
                           const hourKey = time.toISOString();
                           const dataPoint = { time: time, domains: {} };
                           
-                          allDomains.forEach(domain => {
+                          allDomains.forEach(trainId => {
                             dataPoint.domains[domain] = domainDataMaps[domain].get(hourKey) || 0;
                           });
                           
@@ -337,7 +337,7 @@ requestUsageRoutes.get('/usage', async c => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allDomains.forEach(domain => {
+                          allDomains.forEach(trainId => {
                             const count = point.domains[domain] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
@@ -424,7 +424,7 @@ requestUsageRoutes.get('/usage', async c => {
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.domains).forEach(([domain, count]) => {
+                              Object.entries(point.domains).forEach(([trainId, count]) => {
                                 if (count > 0) {
                                   const color = domainColors[domain];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
@@ -671,7 +671,7 @@ requestUsageRoutes.get('/usage', async c => {
                         const allDomains = Object.keys(tokenChartData);
                         
                         // Build data maps for each domain
-                        allDomains.forEach(domain => {
+                        allDomains.forEach(trainId => {
                           domainDataMaps[domain] = new Map();
                           if (tokenChartData[domain]) {
                             tokenChartData[domain].forEach(point => {
@@ -687,7 +687,7 @@ requestUsageRoutes.get('/usage', async c => {
                           const hourKey = time.toISOString();
                           const dataPoint = { time: time, domains: {} };
                           
-                          allDomains.forEach(domain => {
+                          allDomains.forEach(trainId => {
                             dataPoint.domains[domain] = domainDataMaps[domain].get(hourKey) || 0;
                           });
                           
@@ -760,7 +760,7 @@ requestUsageRoutes.get('/usage', async c => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allDomains.forEach(domain => {
+                          allDomains.forEach(trainId => {
                             const count = point.domains[domain] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
@@ -847,7 +847,7 @@ requestUsageRoutes.get('/usage', async c => {
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.domains).forEach(([domain, count]) => {
+                              Object.entries(point.domains).forEach(([trainId, count]) => {
                                 if (count > 0) {
                                   const color = tokenDomainColors[domain];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
@@ -925,7 +925,7 @@ requestUsageRoutes.get('/usage', async c => {
  */
 requestUsageRoutes.get('/usage/chart', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
   if (!apiClient || !domain) {
     return c.html(html`<div class="error-banner">Invalid request</div>`)
@@ -954,7 +954,7 @@ requestUsageRoutes.get('/usage/chart', async c => {
                 <script>
                   // Same chart rendering logic as above
                   const chartData = ${JSON.stringify(chartData)};
-                  const domain = ${JSON.stringify(domain)};
+                  const trainId = ${JSON.stringify(domain)};
                   
                   // ... (same chart drawing code as in the main route)
                 </script>
