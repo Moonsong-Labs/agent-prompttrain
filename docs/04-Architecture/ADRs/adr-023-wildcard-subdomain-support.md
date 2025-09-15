@@ -102,16 +102,42 @@ Credentials are resolved in order of specificity:
 
 ### Configuration Examples
 
-```
+```json
 # Wildcard for all staging subdomains
-_wildcard.staging.example.com.credentials.json
+# File: _wildcard.staging.example.com.credentials.json
+{
+  "type": "api_key",
+  "apiKey": "sk-...",
+  "accountId": "staging-environment"  // IMPORTANT: Required for dashboard display
+}
 
 # Wildcard for all subdomains of example.com
-_wildcard.example.com.credentials.json
+# File: _wildcard.example.com.credentials.json
+{
+  "type": "oauth",
+  "oauth": { ... },
+  "accountId": "production"  // IMPORTANT: Required for dashboard display
+}
 
-# Exact match (takes precedence)
-api.staging.example.com.credentials.json
+# Exact match (takes precedence over wildcards)
+# File: api.staging.example.com.credentials.json
+{
+  "type": "api_key",
+  "apiKey": "sk-...",
+  "accountId": "api-staging"  // IMPORTANT: Required for dashboard display
+}
 ```
+
+### Account ID Fallback Behavior
+
+When the `accountId` field is missing from a credential file, the system will:
+
+1. Derive an accountId from the credential filename
+2. Log a warning (once per file) recommending to add an explicit accountId
+3. For wildcard files: `_wildcard.example.com.credentials.json` → `accountId: "example.com"`
+4. For exact files: `api.example.com.credentials.json` → `accountId: "api.example.com"`
+
+**Best Practice**: Always include an explicit `accountId` field in credential files to ensure consistent dashboard display and avoid relying on the fallback mechanism.
 
 ### Environment Variables
 

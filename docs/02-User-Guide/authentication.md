@@ -59,7 +59,7 @@ Most common and straightforward method:
 ```json
 {
   "type": "api_key",
-  "accountId": "acc_unique_identifier",
+  "accountId": "production", // Required: Identifies account in dashboard
   "api_key": "sk-ant-api03-...",
   "client_api_key": "cnp_live_..."
 }
@@ -72,7 +72,7 @@ For enhanced security and automatic token management:
 ```json
 {
   "type": "oauth",
-  "accountId": "acc_unique_identifier",
+  "accountId": "staging-team", // Required: Identifies account in dashboard
   "client_api_key": "cnp_live_...",
   "oauth": {
     "accessToken": "...",
@@ -83,6 +83,14 @@ For enhanced security and automatic token management:
   }
 }
 ```
+
+**Important**: The `accountId` field is required and will be displayed in the dashboard to identify which account/team is making requests. Use descriptive names like:
+
+- `production`, `staging`, `development`
+- `team-frontend`, `team-backend`
+- `client-acme`, `client-globex`
+
+If `accountId` is missing, the system will derive one from the filename and log a warning.
 
 ## Setting Up Authentication
 
@@ -100,7 +108,7 @@ For API key authentication:
 cat > credentials/your-domain.com.credentials.json << EOF
 {
   "type": "api_key",
-  "accountId": "acc_$(uuidgen)",
+  "accountId": "your-project-name",
   "api_key": "sk-ant-your-claude-api-key",
   "client_api_key": "$(bun run scripts/generate-api-key.ts)"
 }

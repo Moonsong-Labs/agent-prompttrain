@@ -410,4 +410,110 @@ describe('AuthenticationService - Wildcard Support', () => {
       )
     })
   })
+
+  describe('Account ID Derivation', () => {
+    let authService: AuthenticationService
+
+    beforeEach(() => {
+      authService = new AuthenticationService('test-api-key', 'credentials')
+      mockFsAccess.mockClear()
+      mockLoadCredentials.mockClear()
+      mockGetApiKey.mockClear()
+    })
+
+    it('should derive accountId from credential filename when missing', async () => {
+      // Test the helper method directly
+      const derivedId = authService['deriveAccountIdFromPath'](
+        'credentials/subdomain.example.com.credentials.json'
+      )
+      expect(derivedId).toBe('subdomain.example.com')
+
+      const wildcardId = authService['deriveAccountIdFromPath'](
+        'credentials/_wildcard.example.com.credentials.json'
+      )
+      expect(wildcardId).toBe('example.com')
+    })
+
+    it('should use provided accountId when present', async () => {
+      const context = {
+        host: 'subdomain.example.com',
+        requestId: 'test-request',
+      } as RequestContext
+
+      mockFsAccess.mockResolvedValueOnce(undefined) // file exists
+      mockLoadCredentials.mockImplementationOnce(path => {
+        // Return credentials with accountId
+        return {
+          type: 'api_key',
+          apiKey: 'test-key',
+          accountId: 'provided-account-id',
+        }
+      })
+      mockGetApiKey.mockResolvedValueOnce('test-key')
+
+      const result = await authService['authenticateNonPersonalDomain'](context)
+
+      expect(result.accountId).toBe('provided-account-id')
+      expect(result.type).toBe('api_key')
+    })
+
+    it('should derive accountId when missing from exact match', async () => {
+      const context = {
+        host: 'api.example.com',
+        requestId: 'test-request',
+      } as RequestContext
+
+      mockFsAccess.mockResolvedValueOnce(undefined) // file exists
+      mockLoadCredentials.mockImplementationOnce(path => {
+        // Return credentials without accountId
+        // Path should be api.example.com.credentials.json
+        return {
+          type: 'api_key',
+          apiKey: 'test-key',
+          // accountId is missing
+        }
+      })
+      mockGetApiKey.mockResolvedValueOnce('test-key')
+
+      const result = await authService['authenticateNonPersonalDomain'](context)
+
+      expect(result.accountId).toBe('api.example.com')
+      expect(result.type).toBe('api_key')
+    })
+
+    it('should derive accountId from wildcard file', async () => {
+      const context = {
+        host: 'api.subdomain.example.com',
+        requestId: 'test-request',
+      } as RequestContext
+
+      // Enable wildcard feature
+      process.env.CNP_WILDCARD_CREDENTIALS = 'true'
+
+      // First check for exact match (fails)
+      mockFsAccess.mockRejectedValueOnce(new Error('ENOENT'))
+      // Then check for most specific wildcard (fails)
+      mockFsAccess.mockRejectedValueOnce(new Error('ENOENT'))
+      // Then check for less specific wildcard (exists)
+      mockFsAccess.mockResolvedValueOnce(undefined) // _wildcard.example.com exists
+
+      mockLoadCredentials.mockImplementationOnce(path => {
+        // Path should be _wildcard.example.com.credentials.json
+        return {
+          type: 'api_key',
+          apiKey: 'test-key',
+          // accountId is missing
+        }
+      })
+      mockGetApiKey.mockResolvedValueOnce('test-key')
+
+      const result = await authService['authenticateNonPersonalDomain'](context)
+
+      // Should derive from wildcard filename
+      expect(result.accountId).toBe('example.com')
+      expect(result.type).toBe('api_key')
+
+      delete process.env.CNP_WILDCARD_CREDENTIALS
+    })
+  })
 })

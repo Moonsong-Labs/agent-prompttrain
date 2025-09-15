@@ -29,6 +29,7 @@ interface CachedResolution {
 export class AuthenticationService {
   private domainMapping: DomainCredentialMapping = {}
   private warnedDomains = new Set<string>()
+  private warnedAccountFallbacks = new Set<string>()
   private resolutionCache = new Map<string, CachedResolution>()
   private cacheCleanupInterval: NodeJS.Timeout | null = null
   private readonly maxCacheSize = 10000 // Maximum number of cache entries
@@ -89,11 +90,22 @@ export class AuthenticationService {
 
       // Return auth based on credential type
       if (credentials.type === 'oauth') {
+        const derivedAccountId =
+          credentials.accountId ?? this.deriveAccountIdFromPath(credentialPath) ?? undefined
+        if (!credentials.accountId && derivedAccountId) {
+          this.maybeWarnAccountFallback(
+            credentialPath,
+            derivedAccountId,
+            context.host,
+            context.requestId
+          )
+        }
+
         logger.info(`Using OAuth credentials for non-personal domain`, {
           requestId: context.requestId,
           domain: context.host,
           metadata: {
-            accountId: credentials.accountId,
+            accountId: derivedAccountId,
           },
         })
 
@@ -105,14 +117,25 @@ export class AuthenticationService {
           },
           key: apiKey,
           betaHeader: 'oauth-2025-04-20',
-          accountId: credentials.accountId,
+          accountId: derivedAccountId,
         }
       } else {
+        const derivedAccountId =
+          credentials.accountId ?? this.deriveAccountIdFromPath(credentialPath) ?? undefined
+        if (!credentials.accountId && derivedAccountId) {
+          this.maybeWarnAccountFallback(
+            credentialPath,
+            derivedAccountId,
+            context.host,
+            context.requestId
+          )
+        }
+
         logger.info(`Using API key for non-personal domain`, {
           requestId: context.requestId,
           domain: context.host,
           metadata: {
-            accountId: credentials.accountId,
+            accountId: derivedAccountId,
           },
         })
 
@@ -122,7 +145,7 @@ export class AuthenticationService {
             'x-api-key': apiKey,
           },
           key: apiKey,
-          accountId: credentials.accountId,
+          accountId: derivedAccountId,
         }
       }
     } catch (error) {
@@ -182,6 +205,17 @@ export class AuthenticationService {
             if (apiKey) {
               // Return auth result based on credential type
               if (credentials.type === 'oauth') {
+                const derivedAccountId =
+                  credentials.accountId ?? this.deriveAccountIdFromPath(credentialPath) ?? undefined
+                if (!credentials.accountId && derivedAccountId) {
+                  this.maybeWarnAccountFallback(
+                    credentialPath,
+                    derivedAccountId,
+                    context.host,
+                    context.requestId
+                  )
+                }
+
                 logger.debug(`Using OAuth credentials from file`, {
                   requestId: context.requestId,
                   domain: context.host,
@@ -198,9 +232,20 @@ export class AuthenticationService {
                   },
                   key: apiKey,
                   betaHeader: 'oauth-2025-04-20',
-                  accountId: credentials.accountId,
+                  accountId: derivedAccountId,
                 }
               } else {
+                const derivedAccountId =
+                  credentials.accountId ?? this.deriveAccountIdFromPath(credentialPath) ?? undefined
+                if (!credentials.accountId && derivedAccountId) {
+                  this.maybeWarnAccountFallback(
+                    credentialPath,
+                    derivedAccountId,
+                    context.host,
+                    context.requestId
+                  )
+                }
+
                 logger.debug(`Using API key from credential file`, {
                   requestId: context.requestId,
                   domain: context.host,
@@ -215,7 +260,7 @@ export class AuthenticationService {
                     'x-api-key': apiKey,
                   },
                   key: apiKey,
-                  accountId: credentials.accountId,
+                  accountId: derivedAccountId,
                 }
               }
             }
@@ -431,6 +476,53 @@ export class AuthenticationService {
         this.resolutionCache.delete(key)
       }
     }
+  }
+
+  /**
+   * Derive account ID from credential file path
+   */
+  private deriveAccountIdFromPath(credentialPath: string): string | undefined {
+    try {
+      const base = path.basename(credentialPath)
+      // Match wildcard: _wildcard.<domain>.credentials.json
+      const wildcardMatch = base.match(/^_wildcard\.(.+)\.credentials\.json$/)
+      if (wildcardMatch) {
+        return wildcardMatch[1]
+      }
+
+      // Match exact: <domain>.credentials.json
+      const exactMatch = base.match(/^(.+)\.credentials\.json$/)
+      if (exactMatch) {
+        return exactMatch[1]
+      }
+
+      return undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * Warn about account ID fallback (once per credential file)
+   */
+  private maybeWarnAccountFallback(
+    credentialPath: string,
+    derived: string,
+    domain: string,
+    requestId?: string
+  ) {
+    if (this.warnedAccountFallbacks.has(credentialPath)) {
+      return
+    }
+    this.warnedAccountFallbacks.add(credentialPath)
+    logger.warn('Using filename-derived accountId for credentials missing accountId', {
+      requestId,
+      domain,
+      metadata: {
+        credentialPath,
+        derivedAccountId: derived,
+      },
+    })
   }
 
   /**
