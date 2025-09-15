@@ -16,6 +16,17 @@ import {
 } from '../utils/conversation-metrics.js'
 import type { ConversationRequest } from '../types/conversation.js'
 
+// Type definition for Task tool invocations
+interface TaskToolInvocation {
+  name?: string
+  input?: {
+    subagent_type?: string
+    prompt?: string
+    description?: string
+  }
+  linked_conversation_id?: string
+}
+
 export const conversationDetailRoutes = new Hono<{
   Variables: {
     csrfToken?: string
@@ -204,9 +215,26 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         toolResultStatus = undefined
       }
 
+      // Extract subagent_type from task_tool_invocation if available
+      // Look for the first task invocation that has a valid subagent_type
+      let displayName: string | undefined
+      if (req.task_tool_invocation && Array.isArray(req.task_tool_invocation)) {
+        const invocations = req.task_tool_invocation as TaskToolInvocation[]
+        const taskWithSubagent = invocations.find(
+          invocation =>
+            invocation?.input?.subagent_type &&
+            typeof invocation.input.subagent_type === 'string' &&
+            invocation.input.subagent_type.trim() !== ''
+        )
+        if (taskWithSubagent?.input?.subagent_type) {
+          displayName = taskWithSubagent.input.subagent_type.trim()
+        }
+      }
+
       graphNodes.push({
         id: req.request_id,
         label: `${req.model}`,
+        displayName: displayName,
         timestamp: new Date(req.timestamp),
         branchId: req.branch_id || 'main',
         parentId: parentId,
