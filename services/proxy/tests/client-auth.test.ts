@@ -11,6 +11,8 @@ class MockAuthenticationService extends AuthenticationService {
 
   constructor() {
     super(undefined, '/tmp/test-credentials')
+    // Mock service is already initialized, skip file loading
+    ;(this as any).initialized = true
   }
 
   setMockKey(domain: string, key: string | null) {
@@ -219,7 +221,7 @@ describe('Client Authentication Middleware', () => {
 
 describe('Path Traversal Protection', () => {
   it('should prevent path traversal attacks', async () => {
-    const authService = new AuthenticationService()
+    const authService = new MockAuthenticationService()
 
     // Test various path traversal attempts
     const maliciousDomains = [
@@ -239,7 +241,7 @@ describe('Path Traversal Protection', () => {
   })
 
   it('should allow valid domain names', async () => {
-    const authService = new AuthenticationService()
+    const authService = new MockAuthenticationService()
 
     // These should be allowed (though they won't have keys in tests)
     const validDomains = [

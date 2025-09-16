@@ -19,13 +19,17 @@ Include your client API key in the Authorization header:
 Authorization: Bearer cnp_live_YOUR_KEY
 ```
 
-### Domain-Based Routing
+### Train-ID Based Routing
 
-The proxy uses the `Host` header to determine which credentials to use:
+The proxy uses the `X-TRAIN-ID` header to determine which credentials to use:
 
 ```bash
-Host: example.com
+X-TRAIN-ID: my-project
 ```
+
+If no `X-TRAIN-ID` header is provided, the system uses `"default"` as the train-id.
+
+**Migration Note**: The old domain-based system using `Host` headers has been replaced with the train-id system. See the [Migration Guide](migration-guide.md) for upgrade instructions.
 
 ## Endpoints
 
@@ -38,6 +42,14 @@ POST /v1/messages
 ```
 
 Creates a new message with Claude.
+
+**Headers:**
+
+```bash
+X-TRAIN-ID: my-project
+Authorization: Bearer cnp_live_YOUR_KEY
+Content-Type: application/json
+```
 
 **Request:**
 
@@ -171,7 +183,7 @@ GET /api/requests?limit=50&offset=0&domain=example.com
 
 - `limit` - Number of results (default: 50, max: 100)
 - `offset` - Pagination offset
-- `domain` - Filter by domain
+- `train_id` - Filter by train-id
 - `model` - Filter by model
 - `from` - Start date (ISO 8601)
 - `to` - End date (ISO 8601)
@@ -184,7 +196,7 @@ GET /api/requests?limit=50&offset=0&domain=example.com
     {
       "request_id": "uuid",
       "timestamp": "2024-01-15T10:00:00Z",
-      "domain": "example.com",
+      "train_id": "my-project",
       "model": "claude-3-opus-20240229",
       "input_tokens": 100,
       "output_tokens": 200,
@@ -211,7 +223,7 @@ GET /api/requests/:id
 {
   "request_id": "uuid",
   "timestamp": "2024-01-15T10:00:00Z",
-  "domain": "example.com",
+  "train_id": "my-project",
   "request": {
     "messages": [...],
     "model": "claude-3-opus-20240229"
@@ -236,7 +248,7 @@ GET /api/conversations?domain=example.com&accountId=acc_123&limit=50&offset=0&da
 
 **Query Parameters:**
 
-- `domain` - Filter by domain (optional)
+- `train_id` - Filter by train-id (optional)
 - `accountId` - Filter by account (optional)
 - `limit` - Number of conversations per page (default: 50)
 - `offset` - Number of conversations to skip for pagination (default: 0)
@@ -250,7 +262,7 @@ GET /api/conversations?domain=example.com&accountId=acc_123&limit=50&offset=0&da
   "conversations": [
     {
       "conversationId": "uuid",
-      "domain": "example.com",
+      "train_id": "my-project",
       "accountId": "acc_123",
       "firstMessageTime": "2024-01-15T09:00:00Z",
       "lastMessageTime": "2024-01-15T10:00:00Z",
@@ -289,7 +301,7 @@ Optimized endpoint for dashboard overview page that returns aggregated statistic
 
 **Query Parameters:**
 
-- `domain` - Filter by domain (optional)
+- `train_id` - Filter by train-id (optional)
 - `accountId` - Filter by account (optional)
 
 **Response:**
@@ -480,7 +492,7 @@ Get token usage for the current sliding window (default 5 hours).
 
 - `accountId` - Account identifier (required)
 - `window` - Window size in minutes (default: 300)
-- `domain` - Filter by domain (optional)
+- `train_id` - Filter by train-id (optional)
 - `model` - Filter by model (optional)
 
 **Response:**
@@ -488,7 +500,7 @@ Get token usage for the current sliding window (default 5 hours).
 ```json
 {
   "accountId": "acc_123",
-  "domain": "example.com",
+  "train_id": "my-project",
   "model": "claude-3-opus-20240229",
   "windowStart": "2024-01-15T05:00:00Z",
   "windowEnd": "2024-01-15T10:00:00Z",
@@ -513,7 +525,7 @@ Get daily token usage statistics.
 
 - `accountId` - Account identifier (required)
 - `days` - Number of days to retrieve (default: 30)
-- `domain` - Filter by domain (optional)
+- `train_id` - Filter by train-id (optional)
 - `aggregate` - Aggregate across models (default: false)
 
 **Response:**
@@ -524,7 +536,7 @@ Get daily token usage statistics.
     {
       "date": "2024-01-15",
       "accountId": "acc_123",
-      "domain": "example.com",
+      "train_id": "my-project",
       "totalInputTokens": 100000,
       "totalOutputTokens": 150000,
       "totalTokens": 250000,
@@ -545,7 +557,7 @@ Get rate limit configurations.
 **Query Parameters:**
 
 - `accountId` - Filter by account
-- `domain` - Filter by domain
+- `train_id` - Filter by train-id
 - `model` - Filter by model
 
 **Response:**
@@ -556,7 +568,7 @@ Get rate limit configurations.
     {
       "id": 1,
       "accountId": "acc_123",
-      "domain": null,
+      "train_id": null,
       "model": "claude-3-opus-20240229",
       "windowMinutes": 300,
       "tokenLimit": 140000,
@@ -670,6 +682,33 @@ Branches are named using timestamps:
 
 ## Best Practices
 
+### Using Train-IDs
+
+Always include the `X-TRAIN-ID` header to identify your project:
+
+```javascript
+const response = await fetch('/v1/messages', {
+  method: 'POST',
+  headers: {
+    'X-TRAIN-ID': 'my-project',
+    'Authorization': 'Bearer YOUR_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    messages: [...],
+    stream: false
+  })
+})
+```
+
+**Train-ID Guidelines:**
+
+- Use descriptive names: `production-api`, `staging-tests`, `dev-john`
+- Keep it consistent across your application
+- Use different train-ids for different environments
+- Only alphanumeric characters, underscores, and hyphens allowed
+- 1-255 characters in length
+
 ### Streaming Responses
 
 For long responses, use streaming:
@@ -678,6 +717,7 @@ For long responses, use streaming:
 const response = await fetch('/v1/messages', {
   method: 'POST',
   headers: {
+    'X-TRAIN-ID': 'my-project',
     'Authorization': 'Bearer YOUR_KEY',
     'Content-Type': 'application/json'
   },

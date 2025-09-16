@@ -4,16 +4,9 @@
  */
 
 import { serve } from '@hono/node-server'
-import { Pool } from 'pg'
 import { config, createLogger } from '@agent-prompttrain/shared'
 import { createProxyApp } from './app.js'
-import { ProxyService } from './services/ProxyService.js'
-import { AuthenticationService } from './services/AuthenticationService.js'
-import { ClaudeApiClient } from './services/ClaudeApiClient.js'
-import { MetricsService } from './services/MetricsService.js'
-import { NotificationService } from './services/NotificationService.js'
-import { StorageAdapter } from './storage/StorageAdapter.js'
-import { MessageController } from './controllers/MessageController.js'
+import { container } from './container.js'
 import { tokenTracker } from './services/tokenTracker.js'
 import { startAnalysisWorker } from './workers/ai-analysis/index.js'
 
@@ -34,49 +27,8 @@ async function startServer() {
   })
 
   // === COMPOSITION ROOT START ===
-
-  // 1. Create foundational dependencies (no dependencies)
-  const dbPool = config.database.url
-    ? new Pool({
-        connectionString: config.database.url,
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
-      })
-    : undefined
-
-  // 2. Create services with their dependencies
-  const authService = new AuthenticationService(undefined, config.auth.credentialsDir)
-
-  const apiClient = new ClaudeApiClient({
-    baseUrl: config.api.claudeBaseUrl,
-    timeout: config.api.claudeTimeout,
-  })
-  const notificationService = new NotificationService()
-
-  // Wire up auth service to notification service
-  notificationService.setAuthService(authService)
-
-  // Create storage service if database is configured
-  const storageService = dbPool && config.storage.enabled ? new StorageAdapter(dbPool) : undefined
-
-  // Create metrics service with its dependencies
-  const metricsService = new MetricsService(
-    {
-      enableTokenTracking: true,
-      enableStorage: config.storage.enabled,
-      enableTelemetry: config.telemetry.enabled,
-    },
-    storageService,
-    config.telemetry.endpoint
-  )
-
-  // 3. Create the main proxy service with all its dependencies
-  const proxyService = new ProxyService(authService, apiClient, notificationService, metricsService)
-
-  // 4. Create the controller (created but not used here - app.ts will use it)
-  new MessageController(proxyService)
-
+  // Services are now initialized in the container via createProxyApp()
+  // This ensures proper async initialization of all services including AuthenticationService
   // === COMPOSITION ROOT END ===
 
   // Create the Hono app with all dependencies
@@ -92,13 +44,13 @@ async function startServer() {
   const server = serve({
     fetch: app.fetch,
     port: config.server.port,
-    hostname: config.server.trainId,
+    hostname: config.server.host,
   })
 
   logger.info('Proxy service started', {
     metadata: {
       port: config.server.port,
-      host: config.server.trainId,
+      host: config.server.host,
       sparkApi: config.spark.enabled
         ? {
             enabled: true,
@@ -125,14 +77,8 @@ async function startServer() {
       await analysisWorker.stop()
     }
 
-    // Close storage service
-    // Note: StorageAdapter doesn't have a close method,
-    // the pool will be closed separately
-
-    // Close database pool
-    if (dbPool) {
-      await dbPool.end()
-    }
+    // Clean up container resources (including database pool)
+    await container.cleanup()
 
     // Close server
     server.close()

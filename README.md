@@ -12,6 +12,7 @@ Agent Prompt Train is a Claude Code management server for teams that includes co
 ### 📖 Quick Navigation
 
 - [**Getting Started**](#quick-start) - Set up Agent Prompt Train in seconds
+- [**Migration Guide**](#-migration-guide) - Upgrade from domain-based to train-id system
 - [**Features**](#-features) - Explore capabilities and functionality
 - [**Development**](#development-setup) - Build and contribute
 - [**Documentation**](#documentation) - Complete guides and references
@@ -47,13 +48,73 @@ _Note: This is a read-only demo showcasing real usage data from our development 
 
 <img src="https://github.com/user-attachments/assets/aebffb8c-9535-4073-aa76-be31ee05a402" alt="Agent Prompt Train Dashboard" width="800">
 
+## 🔄 Migration Guide
+
+**⚠️ BREAKING CHANGE**: Agent Prompt Train has migrated from domain-based authentication to a train-id system using the `X-TRAIN-ID` header.
+
+### Quick Migration Summary
+
+**Before (Domain-Based):**
+
+```bash
+# Different domains for different projects
+curl https://api.example.com/v1/messages \
+  -H "Authorization: Bearer YOUR_KEY"
+```
+
+**After (Train-ID Based):**
+
+```bash
+# Single domain with train-id header
+curl https://your-proxy.com/v1/messages \
+  -H "X-TRAIN-ID: api-example-com" \
+  -H "Authorization: Bearer YOUR_KEY"
+```
+
+### For Claude CLI Users
+
+**Before:**
+
+```bash
+ANTHROPIC_BASE_URL=https://api.example.com claude "Hello"
+```
+
+**After:**
+
+```bash
+export ANTHROPIC_BASE_URL=https://your-proxy.com
+export ANTHROPIC_CUSTOM_HEADERS="train-id:api-example-com"
+claude "Hello"
+```
+
+### Migration Steps
+
+1. **Run Database Migration**: `bun run scripts/db/migrations/012-migrate-to-train-id.ts`
+2. **Migrate Credential Files**: `bun run scripts/migrate-credentials.ts`
+3. **Update Client Code**: Replace domain URLs with train-id headers
+4. **Test Migration**: Verify everything works correctly
+
+### Backward Compatibility
+
+Enable temporary backward compatibility during migration:
+
+```bash
+export ENABLE_HOST_HEADER_FALLBACK=true
+```
+
+This allows the system to automatically convert `Host` headers to train-ids while you migrate your clients.
+
+### Complete Migration Documentation
+
+📖 **[Full Migration Guide](docs/02-User-Guide/migration-guide.md)** - Complete step-by-step migration instructions with examples for all languages and frameworks.
+
 ## ✨ Features
 
 - 🚀 **High-Performance Proxy** - Built with Bun and Hono for minimal latency
 - 🔀 **Conversation Tracking** - Automatic message threading with branch, sub-agent & compact support
 - 📊 **Real-time Dashboard** - Monitor usage, view conversations, and analyze patterns
 - 🔐 **Multi-Auth Support** - API keys and OAuth with auto-refresh
-- 📈 **Token Tracking** - Detailed usage statistics per domain and account
+- 📈 **Token Tracking** - Detailed usage statistics per train-id and account
 - 🔄 **Streaming Support** - Full SSE streaming with chunk storage
 - 🐳 **Docker Ready** - Separate optimized images for each service
 - 🤖 **Claude CLI Integration** - Run Claude CLI connected to the proxy
@@ -119,7 +180,7 @@ For developers who need complete visibility, access the raw JSON view of any req
 
 For administrators or heavy users, you can follow the token usage and see when approaching the rate limits.
 
-</kbd><img width="400" alt="Token usage graph line per domain" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
+</kbd><img width="400" alt="Token usage graph line per train-id" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
 
 ## Quick Start
 
@@ -297,16 +358,16 @@ DEBUG=false
 
 See the [Documentation](docs/README.md) for complete configuration options.
 
-### Domain Credentials
+### Train-ID Credentials
 
-Create domain-specific credentials:
+Create train-id specific credentials:
 
 ```bash
 # Generate secure API key
 bun run auth:generate-key
 
-# Create credential file
-cat > credentials/example.com.credentials.json << EOF
+# Create credential file for an account
+cat > credentials/account-001.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_name_to_display",
@@ -316,33 +377,14 @@ cat > credentials/example.com.credentials.json << EOF
 EOF
 ```
 
-(_Use `credentials/localhost\:3000.credentials.json` for using it locally_)
+Credentials are now mapped to accounts using consistent hashing of train-ids. Multiple train-ids can share the same account credentials for load distribution.
 
-#### Wildcard Credentials
-
-You can use wildcard credentials to match multiple subdomains with a single credential file:
-
-```bash
-# Matches all subdomains of example.com (api.example.com, staging.example.com, etc.)
-cat > credentials/_wildcard.example.com.credentials.json << EOF
-{
-  "type": "api_key",
-  "accountId": "acc_name_to_display",
-  "api_key": "sk-ant-...",
-  "client_api_key": "cnp_live_..."
-}
-EOF
-
-# Enable wildcard support
-export CNP_WILDCARD_CREDENTIALS=true
-```
-
-Note: Exact matches take precedence over wildcards. See [ADR-023](docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md) for details.
+See the [Migration Guide](docs/02-User-Guide/migration-guide.md) for details on migrating from domain-based credential files.
 
 Authenticate your credential with Claude MAX Plan:
 
 ```bash
-./scripts/auth/oauth-login.ts credentials/example.com.credentials.json
+./scripts/auth/oauth-login.ts credentials/account-001.credentials.json
 ```
 
 ## Usage
@@ -353,6 +395,7 @@ Use the proxy exactly like Claude's API:
 
 ```bash
 curl -X POST http://localhost:3000/v1/messages \
+  -H "X-TRAIN-ID: my-project" \
   -H "Authorization: Bearer YOUR_CLIENT_KEY" \
   -H "Content-Type: application/json" \
   -d '{

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Deprecated - Superseded by [ADR-024: Train-ID Based Authentication](adr-024-train-id-authentication.md)
+
+**Deprecation Notice**: This feature has been removed as part of the migration to train-id based authentication. The complexity of wildcard subdomain matching is no longer needed with the simpler train-id approach.
 
 ## Context
 

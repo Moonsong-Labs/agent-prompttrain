@@ -5,7 +5,7 @@ import { config, validateConfig } from '@agent-prompttrain/shared/config'
 import { loggingMiddleware, logger } from './middleware/logger.js'
 import { requestIdMiddleware } from './middleware/request-id.js'
 import { validationMiddleware } from './middleware/validation.js'
-import { createRateLimiter, createDomainRateLimiter } from './middleware/rate-limit.js'
+import { createRateLimiter, createTrainIdRateLimiter } from './middleware/rate-limit.js'
 import { createHealthRoutes } from './routes/health.js'
 import { apiRoutes } from './routes/api.js'
 import { sparkApiRoutes } from './routes/spark-api.js'
@@ -15,7 +15,7 @@ import { createMcpApiRoutes } from './routes/mcp-api.js'
 import { initializeSlack } from './services/slack.js'
 import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
-import { domainExtractorMiddleware } from './middleware/domain-extractor.js'
+import { trainIdExtractor } from './middleware/train-id-extractor.js'
 import { clientAuthMiddleware } from './middleware/client-auth.js'
 import { HonoVariables, HonoBindings } from '@agent-prompttrain/shared'
 
@@ -27,6 +27,10 @@ export async function createProxyApp(): Promise<
 > {
   // Validate configuration
   validateConfig()
+
+  // Initialize container with async services
+  await container.ensureInitialized()
+  logger.info('Container fully initialized')
 
   // Initialize external services
   await initializeExternalServices()
@@ -79,8 +83,8 @@ export async function createProxyApp(): Promise<
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Domain extraction for all routes
-  app.use('*', domainExtractorMiddleware())
+  // Train ID extraction for all routes
+  app.use('*', trainIdExtractor)
 
   // Client authentication for proxy routes
   // Apply before rate limiting to protect against unauthenticated requests
@@ -91,7 +95,7 @@ export async function createProxyApp(): Promise<
   // Rate limiting
   if (config.features.enableMetrics) {
     app.use('/v1/*', createRateLimiter())
-    app.use('/v1/*', createDomainRateLimiter())
+    app.use('/v1/*', createTrainIdRateLimiter())
   }
 
   // Validation for API routes
@@ -158,7 +162,7 @@ export async function createProxyApp(): Promise<
     // Apply rate limiting to MCP routes
     if (config.features.enableMetrics) {
       app.use('/mcp/*', createRateLimiter())
-      app.use('/mcp/*', createDomainRateLimiter())
+      app.use('/mcp/*', createTrainIdRateLimiter())
     }
 
     const mcpHandler = container.getMcpHandler()

@@ -33,12 +33,34 @@ class Container {
   private githubSyncService?: GitHubSyncService
   private syncScheduler?: SyncScheduler
   private jsonRpcHandler?: JsonRpcHandler
+  private initialized = false
 
   constructor() {
-    this.initializeServices()
+    // Initialize synchronous services only
+    this.initializeSyncServices()
   }
 
-  private initializeServices(): void {
+  /**
+   * Initialize all services asynchronously
+   * This should be called after construction
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return
+    }
+
+    await this.initializeAsyncServices()
+    this.initialized = true
+  }
+
+  /**
+   * Check if container has been fully initialized
+   */
+  isInitialized(): boolean {
+    return this.initialized
+  }
+
+  private initializeSyncServices(): void {
     // Initialize database pool if configured
     logger.info('Container initialization', {
       metadata: {
@@ -82,7 +104,7 @@ class Container {
       })
     }
 
-    // Initialize services
+    // Initialize basic services that don't require async operations
     this.metricsService = new MetricsService(
       {
         enableTokenTracking: true,
@@ -94,23 +116,33 @@ class Container {
       this.tokenUsageService
     )
     this.notificationService = new NotificationService()
-    this.authenticationService = new AuthenticationService(
-      undefined, // No default API key
-      config.auth.credentialsDir
-    )
     this.claudeApiClient = new ClaudeApiClient({
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,
     })
+  }
+
+  /**
+   * Initialize services that require async operations
+   */
+  private async initializeAsyncServices(): Promise<void> {
+    // Initialize AuthenticationService and load accounts
+    this.authenticationService = new AuthenticationService(
+      undefined, // No default API key
+      config.auth.credentialsDir
+    )
+
+    // Initialize the authentication service
+    await this.authenticationService.initialize()
 
     // Wire up dependencies
-    this.notificationService.setAuthService(this.authenticationService)
+    this.notificationService!.setAuthService(this.authenticationService)
 
     this.proxyService = new ProxyService(
       this.authenticationService,
-      this.claudeApiClient,
-      this.notificationService,
-      this.metricsService,
+      this.claudeApiClient!,
+      this.notificationService!,
+      this.metricsService!,
       this.storageService
     )
 
@@ -121,16 +153,17 @@ class Container {
       this.promptRegistry = new PromptRegistryService()
 
       // Initialize the registry
-      this.promptRegistry
-        .initialize()
-        .then(() => {
-          logger.info('MCP Prompt Registry initialized')
+      try {
+        await this.promptRegistry.initialize()
+        logger.info('MCP Prompt Registry initialized')
+      } catch (err) {
+        logger.error('Failed to initialize MCP Prompt Registry', {
+          error: {
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+          },
         })
-        .catch(err => {
-          logger.error('Failed to initialize MCP Prompt Registry', {
-            error: { message: err.message, stack: err.stack },
-          })
-        })
+      }
 
       this.mcpServer = new McpServer(this.promptRegistry)
       this.jsonRpcHandler = new JsonRpcHandler(this.mcpServer)
@@ -177,6 +210,9 @@ class Container {
   getAuthenticationService(): AuthenticationService {
     if (!this.authenticationService) {
       throw new Error('AuthenticationService not initialized')
+    }
+    if (!this.authenticationService.isInitialized()) {
+      throw new Error('AuthenticationService not fully initialized - call initialize() first')
     }
     return this.authenticationService
   }
@@ -237,12 +273,30 @@ class Container {
 // Create singleton instance with lazy initialization
 class LazyContainer {
   private instance?: Container
+  private initPromise?: Promise<void>
 
   private ensureInstance(): Container {
     if (!this.instance) {
       this.instance = new Container()
     }
     return this.instance
+  }
+
+  /**
+   * Ensure container is fully initialized (async services loaded)
+   */
+  async ensureInitialized(): Promise<Container> {
+    const instance = this.ensureInstance()
+
+    if (!this.initPromise && !instance.isInitialized()) {
+      this.initPromise = instance.initialize()
+    }
+
+    if (this.initPromise) {
+      await this.initPromise
+    }
+
+    return instance
   }
 
   getDbPool(): Pool | undefined {
@@ -267,6 +321,14 @@ class LazyContainer {
 
   getAuthenticationService(): AuthenticationService {
     return this.ensureInstance().getAuthenticationService()
+  }
+
+  /**
+   * Get authentication service after ensuring full initialization
+   */
+  async getAuthenticationServiceAsync(): Promise<AuthenticationService> {
+    const instance = await this.ensureInitialized()
+    return instance.getAuthenticationService()
   }
 
   getClaudeApiClient(): ClaudeApiClient {

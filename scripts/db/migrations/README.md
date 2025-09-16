@@ -151,16 +151,19 @@ Creates infrastructure for AI-powered conversation analysis:
 - Optimized indexes for pending analyses and conversation lookups
 - Supports multiple AI models and comprehensive token tracking
 
-### 012-add-analysis-audit-log.ts
+### 012-migrate-to-train-id.ts
 
-Creates audit logging infrastructure for AI analysis security:
+Migrates from domain-based identification to train_id system:
 
-- `analysis_audit_log` table for tracking all analysis-related events
-- Event types: ANALYSIS_REQUEST, ANALYSIS_REGENERATION_REQUEST, etc.
-- Outcome tracking: SUCCESS, FAILURE_AUTH, FAILURE_RATE_LIMIT, etc.
-- Comprehensive metadata storage with JSONB fields
-- Indexes for efficient querying by conversation, domain, and timestamp
-- Supports security monitoring and compliance requirements
+- Adds `train_id` column to `api_requests` table with NOT NULL constraint
+- Migrates all existing `domain` values to `train_id`
+- Creates optimized indexes for `train_id` queries
+- Removes old domain-based indexes to avoid performance overhead
+- Marks `domain` column as DEPRECATED (nullable for backward compatibility)
+- Updates `conversation_analyses` table with `train_id` column
+- Includes comprehensive safety checks and verification
+- Fully transactional with automatic rollback on errors
+- Idempotent - safe to run multiple times
 
 ## Future Migrations
 

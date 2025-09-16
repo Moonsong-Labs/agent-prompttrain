@@ -45,6 +45,7 @@ export interface ClaudeCredentials {
   oauth?: OAuthCredentials
   slack?: SlackConfig
   client_api_key?: string
+  betaHeader?: string // Optional beta header for API requests
 }
 
 export interface DomainCredentialMapping {

@@ -61,7 +61,7 @@ class RateLimitStore {
 
 // Global rate limit stores
 const apiKeyStore = new RateLimitStore()
-const domainStore = new RateLimitStore()
+const trainIdStore = new RateLimitStore()
 
 // Default configurations
 const defaultApiKeyConfig: RateLimitConfig = {
@@ -77,13 +77,13 @@ const defaultApiKeyConfig: RateLimitConfig = {
   },
 }
 
-const defaultDomainConfig: RateLimitConfig = {
+const defaultTrainIdConfig: RateLimitConfig = {
   windowMs: 3600000, // 1 hour
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const trainId = c.req.header('host') || 'unknown'
-    return `trainId:${domain}`
+    const trainId = c.get('trainId') || 'default'
+    return `trainId:${trainId}`
   },
 }
 
@@ -193,16 +193,16 @@ export function createRateLimiter(config: Partial<RateLimitConfig> = {}) {
   }
 }
 
-// Domain-based rate limiter
-export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
-  const finalConfig = { ...defaultDomainConfig, ...config }
+// Train-ID-based rate limiter
+export function createTrainIdRateLimiter(config: Partial<RateLimitConfig> = {}) {
+  const finalConfig = { ...defaultTrainIdConfig, ...config }
 
   return async (c: Context, next: Next) => {
     const logger = getRequestLogger(c)
     const key = finalConfig.keyGenerator(c)
     const now = Date.now()
 
-    let entry = domainStore.get(key)
+    let entry = trainIdStore.get(key)
 
     if (!entry || now - entry.windowStart >= finalConfig.windowMs) {
       entry = {
@@ -211,17 +211,17 @@ export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
         windowStart: now,
         blocked: false,
       }
-      domainStore.set(key, entry)
+      trainIdStore.set(key, entry)
     }
 
     if (entry.blocked && entry.blockExpiry && now < entry.blockExpiry) {
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Domain rate limit exceeded', {
+      logger.warn('Train ID rate limit exceeded', {
         key,
         retryAfter,
       })
 
-      throw new RateLimitError('Domain rate limit exceeded', retryAfter)
+      throw new RateLimitError('Train ID rate limit exceeded', retryAfter)
     }
 
     if (entry.requests >= finalConfig.maxRequests) {
@@ -229,13 +229,13 @@ export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
       entry.blockExpiry = entry.windowStart + finalConfig.windowMs
 
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Domain rate limit exceeded', {
+      logger.warn('Train ID rate limit exceeded', {
         key,
         requests: entry.requests,
         maxRequests: finalConfig.maxRequests,
       })
 
-      throw new RateLimitError('Domain rate limit exceeded', retryAfter)
+      throw new RateLimitError('Train ID rate limit exceeded', retryAfter)
     }
 
     entry.requests++
@@ -279,5 +279,5 @@ export function getRateLimitStatus(c: Context): {
 // Cleanup function for graceful shutdown
 export function closeRateLimitStores(): void {
   apiKeyStore.close()
-  domainStore.close()
+  trainIdStore.close()
 }

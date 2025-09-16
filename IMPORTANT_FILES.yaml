@@ -1,246 +1,233 @@
 version: 1
 generated_by: repo-knowledge-tracker
-last_updated: "2025-01-15T00:00:00Z"
+last_updated: '2025-01-16T00:00:00Z'
+migration_context: 'Domain to Train-ID Authentication Migration'
+
 entries:
-  # Core Documentation Files
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/README.md"
-    title: "Main Project README"
-    why_important: "Primary user-facing documentation with domain credential setup instructions"
-    topics: ["documentation", "domains", "credentials", "setup"]
-    owners: ["@project-maintainers"]
-    linked_docs: []
-    related_components: ["credentials/README.md", "docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "b7434a8"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "References domain-based auth that needs updating to train-id"
-    recommended_action: "Update all domain references to train-id, Host header to X-TRAIN-ID"
-    notes: "Lines 56, 122, 300-340 reference domains and wildcard subdomains"
+  # Priority 1: User-Facing Documentation (Critical)
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/README.md'
+    title: 'Main README - Project Entry Point'
+    why_important: 'Primary documentation users see; contains extensive domain references and migration guide'
+    topics: ['documentation', 'migration', 'user-guide', 'authentication']
+    owners: ['@documentation-team']
+    linked_docs: ['docs/02-User-Guide/migration-guide.md']
+    update_triggers: ['authentication changes', 'API changes', 'feature updates']
+    domain_references:
+      - lines: [15, 53-101]
+        content: 'Migration guide section with domain-based examples'
+      - lines: [113, 179]
+        content: 'Token tracking per domain reference'
+      - lines: [199-206]
+        content: 'ANTHROPIC_BASE_URL examples'
+      - lines: [357-403]
+        content: 'Domain credentials section with wildcard support'
+      - lines: [412-423]
+        content: 'API call examples with localhost references'
+    recommended_action: 'Update all domain references to train-id, update examples, remove wildcard section'
+    priority: 'critical'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/credentials/README.md"
-    title: "Credentials Directory Documentation"
-    why_important: "Explains credential file naming and wildcard patterns"
-    topics: ["credentials", "domains", "wildcards", "authentication"]
-    owners: ["@security-team"]
-    linked_docs: ["docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
-    related_components: ["services/proxy/src/services/AuthenticationService.ts"]
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Domain-based credential naming needs train-id update"
-    recommended_action: "Replace domain references with train-id throughout"
-    notes: "Critical file for explaining credential file naming convention"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/api-reference.md'
+    title: 'API Reference Documentation'
+    why_important: 'Core API documentation used by developers; contains domain-specific endpoints and parameters'
+    topics: ['api', 'documentation', 'endpoints', 'authentication']
+    owners: ['@api-team']
+    update_triggers: ['API changes', 'endpoint modifications']
+    domain_references:
+      - lines: [8-10]
+        content: 'Base URL examples with domains'
+      - lines: [115-122]
+        content: 'Token stats per domain endpoint'
+      - lines: [162-164, 179-180, 186]
+        content: 'Dashboard URLs and domain filtering'
+      - lines: [199-200, 226-227]
+        content: 'Domain fields in response schemas'
+      - lines: [246-247, 251-252, 297-298, 304-305]
+        content: 'Query parameters for domain filtering'
+      - lines: [265, 470-472, 503-504, 539-540]
+        content: 'Domain fields in various API responses'
+      - lines: [560-561, 571-572, 626]
+        content: 'Domain filtering and SSE events'
+    recommended_action: 'Replace all domain parameters with train_id, update schemas and examples'
+    priority: 'critical'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"
-    title: "ADR-023: Wildcard Subdomain Support"
-    why_important: "Architecture decision record for wildcard subdomain feature"
-    topics: ["architecture", "adr", "domains", "wildcards", "psl"]
-    owners: ["@architecture-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/services/AuthenticationService.ts", "credentials/"]
-    dependencies:
-      direct: ["psl"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "b7434a8"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Entire ADR based on domain/subdomain concept"
-    recommended_action: "May need new ADR for train-id based routing or update this one"
-    notes: "Describes PSL integration and wildcard resolution logic"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/authentication.md'
+    title: 'Authentication Guide'
+    why_important: 'Primary authentication documentation; entirely based on domain-based auth'
+    topics: ['authentication', 'security', 'oauth', 'credentials']
+    owners: ['@security-team']
+    update_triggers: ['auth changes', 'security updates']
+    domain_references:
+      - lines: [19-30]
+        content: 'Domain credential file examples'
+      - lines: [95-123]
+        content: 'Domain credential setup instructions'
+      - lines: [138-157]
+        content: 'OAuth management per domain'
+      - lines: [161-205]
+        content: 'Domain-specific OAuth scripts'
+      - lines: [251-253]
+        content: 'Security practices for domains'
+      - lines: [277-286]
+        content: 'Multi-domain setup section'
+      - lines: [330-337]
+        content: 'Per-domain authentication references'
+    recommended_action: 'Complete rewrite to train-id based authentication'
+    priority: 'critical'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/06-Reference/environment-vars.md"
-    title: "Environment Variables Reference"
-    why_important: "Documents all environment variables including wildcard credentials"
-    topics: ["configuration", "environment", "domains", "wildcards"]
-    owners: ["@ops-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/main.ts", "services/dashboard/src/app.ts"]
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["config changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "CNP_WILDCARD_CREDENTIALS references need updating"
-    recommended_action: "Update wildcard credential env vars for train-id"
-    notes: "Lines 54-55, 100, 244-248 reference domains and wildcards"
+  # Priority 2: Environment and Configuration
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/06-Reference/environment-vars.md'
+    title: 'Environment Variables Reference'
+    why_important: 'Configuration reference for deployment and development'
+    topics: ['configuration', 'environment', 'deployment']
+    owners: ['@operations-team']
+    update_triggers: ['config changes', 'new env vars']
+    domain_references:
+      - lines: [25-28]
+        content: 'ENABLE_HOST_HEADER_FALLBACK documentation'
+      - lines: [53-58]
+        content: 'Wildcard credentials configuration'
+      - lines: [186-187]
+        content: 'DATABASE_HOST reference'
+      - lines: [250-252]
+        content: 'Wildcard config in example'
+    recommended_action: 'Update fallback documentation, remove wildcard section, add train-id vars'
+    priority: 'high'
 
-  # Core Implementation Files
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/services/AuthenticationService.ts"
-    title: "Authentication Service Implementation"
-    why_important: "Core service handling domain-based authentication and wildcard resolution"
-    topics: ["authentication", "domains", "wildcards", "psl", "core-service"]
-    owners: ["@backend-team"]
-    linked_docs: ["docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md"]
-    related_components: ["services/proxy/src/middleware/client-auth.ts", "credentials/"]
-    dependencies:
-      direct: ["psl", "fs", "path"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "b7434a8"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Entire authentication logic based on domain extraction"
-    recommended_action: "Major refactor needed to use train-id instead of domains"
-    notes: "Contains wildcard resolution, PSL integration, credential caching"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/credentials/README.md'
+    title: 'Credentials Directory Documentation'
+    why_important: 'Explains credential file structure and naming conventions'
+    topics: ['credentials', 'security', 'configuration']
+    owners: ['@security-team']
+    update_triggers: ['credential format changes', 'auth updates']
+    domain_references:
+      - lines: [1-91]
+        content: 'Entire file is domain-based'
+    recommended_action: 'Complete rewrite for train-id based credentials'
+    priority: 'high'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/middleware/client-auth.ts"
-    title: "Client Authentication Middleware"
-    why_important: "Middleware that extracts domain and validates client API keys"
-    topics: ["middleware", "authentication", "domains"]
-    owners: ["@backend-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/services/AuthenticationService.ts", "services/proxy/src/middleware/domain-extractor.ts"]
-    dependencies:
-      direct: ["hono"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Depends on domain from context"
-    recommended_action: "Update to use train-id from X-TRAIN-ID header"
-    notes: "Critical middleware in authentication flow"
+  # Priority 3: Architecture Decision Records
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/04-Architecture/ADRs/adr-004-proxy-authentication.md'
+    title: 'ADR-004: Proxy Authentication'
+    why_important: 'Core authentication architecture decision; describes domain-based system'
+    topics: ['architecture', 'authentication', 'security', 'adr']
+    owners: ['@architecture-team']
+    update_triggers: ['authentication architecture changes']
+    domain_references:
+      - lines: [1, 9-10, 25, 56-57, 64-66, 82-84, 96-98, 106-108, 114-115, 119-120, 132]
+        content: 'Domain-based authentication architecture'
+    recommended_action: 'Create new ADR for train-id migration or update with deprecated status'
+    priority: 'high'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/src/middleware/domain-extractor.ts"
-    title: "Domain Extractor Middleware"
-    why_important: "Extracts domain from Host header and sets in context"
-    topics: ["middleware", "domains", "host-header"]
-    owners: ["@backend-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/middleware/client-auth.ts"]
-    dependencies:
-      direct: ["hono"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "assumed"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Core functionality needs complete replacement"
-    recommended_action: "Replace with train-id extractor using X-TRAIN-ID header"
-    notes: "May need to be renamed or replaced entirely"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md'
+    title: 'ADR-023: Wildcard Subdomain Support'
+    why_important: 'Entire ADR about wildcard domain support - now obsolete'
+    topics: ['architecture', 'wildcard', 'domains', 'adr']
+    owners: ['@architecture-team']
+    update_triggers: ['domain architecture changes']
+    domain_references:
+      - lines: [1-127]
+        content: 'Entire ADR about wildcard domains'
+    recommended_action: 'Mark as DEPRECATED, add note about train-id migration'
+    priority: 'medium'
 
-  # Test Files
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/client-auth-enhanced.test.ts"
-    title: "Enhanced Client Auth Tests"
-    why_important: "Tests domain-based authentication logic"
-    topics: ["tests", "authentication", "domains"]
-    owners: ["@backend-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/middleware/client-auth.ts", "services/proxy/src/services/AuthenticationService.ts"]
-    dependencies:
-      direct: ["bun:test", "hono"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Tests mock domain-based auth"
-    recommended_action: "Update tests for train-id based authentication"
-    notes: "Lines 16, 24 reference domain parameters"
+  # Priority 4: Service Documentation
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/README.md'
+    title: 'Proxy Service Documentation'
+    why_important: 'Service-specific documentation for the proxy'
+    topics: ['proxy', 'service', 'api', 'documentation']
+    owners: ['@proxy-team']
+    update_triggers: ['proxy service changes']
+    recommended_action: 'Check for domain references and update to train-id'
+    priority: 'medium'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/client-auth.test.ts"
-    title: "Client Auth Tests"
-    why_important: "Basic client authentication tests"
-    topics: ["tests", "authentication", "domains"]
-    owners: ["@backend-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/middleware/client-auth.ts"]
-    dependencies:
-      direct: ["bun:test", "hono"]
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "assumed"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Tests domain-based auth flow"
-    recommended_action: "Update for train-id authentication"
-    notes: "Companion to enhanced test file"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/services/dashboard/README.md'
+    title: 'Dashboard Service Documentation'
+    why_important: 'Service-specific documentation for the dashboard'
+    topics: ['dashboard', 'service', 'ui', 'documentation']
+    owners: ['@dashboard-team']
+    update_triggers: ['dashboard service changes']
+    recommended_action: 'Check for domain filtering references and update'
+    priority: 'medium'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/services/proxy/tests/authentication-service.test.ts"
-    title: "Authentication Service Tests"
-    why_important: "Tests wildcard resolution and PSL integration"
-    topics: ["tests", "authentication", "domains", "wildcards", "psl"]
-    owners: ["@backend-team"]
-    linked_docs: []
-    related_components: ["services/proxy/src/services/AuthenticationService.ts"]
-    dependencies:
-      direct: ["bun:test"]
-      indirect: ["psl"]
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Tests wildcard domain resolution"
-    recommended_action: "Major test refactor for train-id patterns"
-    notes: "Critical test coverage for wildcard feature"
+  # Priority 5: Quick Start and Installation
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/00-Overview/quickstart.md'
+    title: 'Quick Start Guide'
+    why_important: 'First-time user guide with setup instructions'
+    topics: ['quickstart', 'setup', 'getting-started']
+    owners: ['@documentation-team']
+    update_triggers: ['setup process changes']
+    domain_references:
+      - lines: [23-28, 43-44, 70-71]
+        content: 'Domain-based setup examples'
+    recommended_action: 'Update examples to use train-id'
+    priority: 'high'
 
-  # Migration Scripts
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/scripts/complete-trainid-migration.ts"
-    title: "Train-ID Migration Completion Script"
-    why_important: "Script to complete the train-id migration"
-    topics: ["migration", "domains", "train-id"]
-    owners: ["@migration-team"]
-    linked_docs: []
-    related_components: ["scripts/replace-domain-with-trainid.sh"]
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["migration progress"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Active migration script"
-    recommended_action: "Execute to help with migration"
-    notes: "Key script for the migration effort"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/01-Getting-Started/configuration.md'
+    title: 'Configuration Guide'
+    why_important: 'Detailed configuration instructions'
+    topics: ['configuration', 'setup', 'deployment']
+    owners: ['@documentation-team']
+    update_triggers: ['configuration changes']
+    recommended_action: 'Update all domain-based configuration to train-id'
+    priority: 'high'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/scripts/replace-domain-with-trainid.sh"
-    title: "Domain to Train-ID Replacement Script"
-    why_important: "Shell script for bulk text replacement"
-    topics: ["migration", "domains", "train-id"]
-    owners: ["@migration-team"]
-    linked_docs: []
-    related_components: ["scripts/complete-trainid-migration.ts"]
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["migration progress"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Active migration script"
-    recommended_action: "Use for bulk replacements"
-    notes: "Automated text replacement tool"
+  # Priority 6: Migration Documentation
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/migration-guide.md'
+    title: 'Domain to Train-ID Migration Guide'
+    why_important: 'Central migration documentation - should be accurate and complete'
+    topics: ['migration', 'upgrade', 'breaking-changes']
+    owners: ['@migration-team']
+    update_triggers: ['migration process updates']
+    recommended_action: 'Ensure completeness and accuracy'
+    priority: 'critical'
 
-  # Other Documentation
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/authentication.md"
-    title: "Authentication User Guide"
-    why_important: "User-facing authentication documentation"
-    topics: ["documentation", "authentication", "domains"]
-    owners: ["@docs-team"]
-    linked_docs: ["docs/02-User-Guide/api-reference.md"]
-    related_components: []
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["authentication changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Domain-based auth examples"
-    recommended_action: "Update all examples to use train-id"
-    notes: "User guide needs updating"
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/scripts/db/migrations/README.md'
+    title: 'Database Migrations Documentation'
+    why_important: 'Documents migration scripts including domain→train_id'
+    topics: ['database', 'migrations', 'schema']
+    owners: ['@database-team']
+    update_triggers: ['new migrations', 'schema changes']
+    recommended_action: 'Ensure migration 012 is properly documented'
+    priority: 'medium'
 
-  - path: "/home/crystalin/projects/claude-nexus-proxy-3/docs/02-User-Guide/api-reference.md"
-    title: "API Reference Documentation"
-    why_important: "API documentation with authentication examples"
-    topics: ["documentation", "api", "authentication", "domains"]
-    owners: ["@docs-team"]
-    linked_docs: ["docs/02-User-Guide/authentication.md"]
-    related_components: []
-    dependencies:
-      direct: []
-      indirect: []
-    update_triggers: ["api changes", "train-id migration"]
-    last_seen: "current"
-    last_reviewed_at: "2025-01-15T00:00:00Z"
-    staleness_hints: "Host header references"
-    recommended_action: "Update to X-TRAIN-ID header"
-    notes: "API examples need updating"
+  # Priority 7: Scripts and Utilities
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/scripts/README.md'
+    title: 'Scripts Directory Documentation'
+    why_important: 'Documents utility scripts that may reference domains'
+    topics: ['scripts', 'utilities', 'tools']
+    owners: ['@tools-team']
+    update_triggers: ['script additions or changes']
+    recommended_action: 'Update script documentation for train-id'
+    priority: 'low'
+
+  # Files to Monitor for Consistency
+  - path: '/home/crystalin/projects/claude-nexus-proxy-3/CLAUDE.md'
+    title: 'AI Agent Instructions'
+    why_important: 'Instructions for AI agents working on the project'
+    topics: ['ai', 'contributing', 'guidelines']
+    owners: ['@ai-team']
+    update_triggers: ['project structure changes']
+    domain_references:
+      - lines: [282-286, 336, 357-403]
+        content: 'References to credentials directory structure'
+    recommended_action: 'Update credential directory structure references'
+    priority: 'low'
+
+summary: |
+  Documentation Update Requirements for Domain → Train-ID Migration
+
+  Total files identified: 59 files contain domain-related references
+  Critical files requiring immediate updates: 6
+  High priority files: 5
+  Medium priority files: 4
+
+  The migration from domain-based to train-id authentication affects nearly all user-facing 
+  documentation, API references, configuration guides, and architecture decision records.
+
+  Key areas requiring updates:
+  1. All API documentation needs domain parameters replaced with train_id
+  2. Authentication documentation needs complete rewrite
+  3. Configuration and credential documentation needs updating
+  4. ADRs need deprecation notices or new records
+  5. Examples and code snippets throughout need updating
+  6. Wildcard subdomain support documentation becomes obsolete

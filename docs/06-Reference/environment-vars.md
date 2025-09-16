@@ -18,10 +18,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Authentication
 
-| Variable             | Description                          | Default | Required |
-| -------------------- | ------------------------------------ | ------- | -------- |
-| `DASHBOARD_API_KEY`  | API key for dashboard authentication | -       | ✅       |
-| `ENABLE_CLIENT_AUTH` | Enable client API key authentication | `true`  | ❌       |
+| Variable                      | Description                                    | Default | Required |
+| ----------------------------- | ---------------------------------------------- | ------- | -------- |
+| `DASHBOARD_API_KEY`           | API key for dashboard authentication           | -       | ✅       |
+| `ENABLE_CLIENT_AUTH`          | Enable client API key authentication           | `true`  | ❌       |
+| `ENABLE_HOST_HEADER_FALLBACK` | Enable backward compatibility for Host headers | `false` | ❌       |
+
+**Migration Note**: `ENABLE_HOST_HEADER_FALLBACK` provides temporary backward compatibility during migration from domain-based to train-id system. When enabled, the system will automatically convert `Host` headers to train-ids if no `X-TRAIN-ID` header is present. This should only be enabled during migration and disabled once all clients are updated.
 
 ## Feature Flags
 

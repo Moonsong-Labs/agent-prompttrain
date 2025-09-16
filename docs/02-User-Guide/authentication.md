@@ -1,13 +1,15 @@
-# Authentication Guide
+# Train-ID Authentication Guide
 
-Agent Prompt Train supports multiple authentication methods to secure access to both the proxy itself and the Claude API.
+⚠️ **IMPORTANT**: This system has migrated from domain-based to train-id based authentication. See the [Migration Guide](migration-guide.md) for upgrade instructions.
+
+Agent Prompt Train uses train-id based authentication to identify and route requests to the appropriate credentials.
 
 ## Overview
 
 The proxy uses a two-layer authentication system:
 
-1. **Client Authentication**: Authenticates requests to the proxy
-2. **Claude API Authentication**: Authenticates requests from the proxy to Claude
+1. **Client Authentication**: Authenticates requests to the proxy using API keys
+2. **Train-ID Routing**: Routes requests to appropriate Claude credentials based on train-id
 
 ## Client Authentication
 
@@ -16,7 +18,7 @@ The proxy uses a two-layer authentication system:
 The proxy can require clients to authenticate using a client API key:
 
 ```bash
-# In your domain credential file
+# In your account credential file
 {
   "client_api_key": "cnp_live_your_generated_key"
 }
@@ -26,7 +28,7 @@ Client requests must include this key:
 
 ```bash
 curl -X POST http://proxy:3000/v1/messages \
-  -H "Host: your-domain.com" \
+  -H "X-TRAIN-ID: my-project" \
   -H "Authorization: Bearer cnp_live_your_generated_key" \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
@@ -92,12 +94,12 @@ For enhanced security and automatic token management:
 mkdir -p credentials
 ```
 
-### Step 2: Create Domain Credential File
+### Step 2: Create Account Credential File
 
 For API key authentication:
 
 ```bash
-cat > credentials/your-domain.com.credentials.json << EOF
+cat > credentials/account-001.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_$(uuidgen)",
@@ -110,17 +112,23 @@ EOF
 For OAuth authentication:
 
 ```bash
-bun run scripts/oauth-login.ts credentials/your-domain.com.credentials.json
+bun run scripts/oauth-login.ts credentials/account-001.credentials.json
 ```
 
 ### Step 3: Configure Request Headers
 
-Requests must include the correct Host header:
+Requests must include the X-TRAIN-ID header:
 
 ```bash
-# The Host header determines which credential file to use
-curl -H "Host: your-domain.com" http://localhost:3000/v1/messages
+# The X-TRAIN-ID header identifies your project/application
+curl -H "X-TRAIN-ID: my-project" http://localhost:3000/v1/messages
 ```
+
+**How it works:**
+
+- Train-ids are consistently hashed to map to available accounts
+- Multiple train-ids can share the same account credentials
+- Default train-id is "default" if header is not provided
 
 ## OAuth Management
 
@@ -136,7 +144,7 @@ The proxy automatically refreshes OAuth tokens:
 ### Check OAuth Status
 
 ```bash
-bun run scripts/check-oauth-status.ts credentials/your-domain.credentials.json
+bun run scripts/check-oauth-status.ts credentials/account-001.credentials.json
 ```
 
 Output shows:
@@ -150,16 +158,16 @@ Output shows:
 
 ```bash
 # Refresh if expiring soon
-bun run scripts/oauth-refresh.ts credentials/your-domain.credentials.json
+bun run scripts/oauth-refresh.ts credentials/account-001.credentials.json
 
 # Force refresh
-bun run scripts/oauth-refresh.ts credentials/your-domain.credentials.json --force
+bun run scripts/oauth-refresh.ts credentials/account-001.credentials.json --force
 ```
 
 ### Refresh All Tokens
 
 ```bash
-# Check all domains
+# Check all accounts
 bun run scripts/oauth-refresh-all.ts credentials --dry-run
 
 # Actually refresh
@@ -181,7 +189,7 @@ bun run scripts/oauth-refresh-all.ts credentials
 **Solution:**
 
 ```bash
-bun run scripts/oauth-login.ts credentials/your-domain.credentials.json
+bun run scripts/oauth-login.ts credentials/account-001.credentials.json
 ```
 
 #### "No refresh token available"
@@ -195,7 +203,7 @@ bun run scripts/oauth-login.ts credentials/your-domain.credentials.json
 1. **Check credential file**:
 
    ```bash
-   cat credentials/your-domain.credentials.json | jq .
+   cat credentials/account-001.credentials.json | jq .
    ```
 
 2. **Verify OAuth status**:

@@ -11,6 +11,8 @@ class MockAuthenticationService extends AuthenticationService {
 
   constructor() {
     super(undefined, '/tmp/test-credentials')
+    // Mock service is already initialized, skip file loading
+    ;(this as any).initialized = true
   }
 
   setMockKey(domain: string, key: string | null) {
@@ -238,7 +240,7 @@ describe('Enhanced Client Authentication Tests', () => {
 
 describe('Path Traversal Edge Cases', () => {
   it('should allow valid domain names that contain dot sequences', async () => {
-    const authService = new AuthenticationService()
+    const authService = new MockAuthenticationService()
     // This domain contains '..' but is a valid subdomain structure
     const validDomainsWithDots = ['sub..domain.com', 'a..b.com', 'example..com', 'test...com']
 
@@ -250,7 +252,7 @@ describe('Path Traversal Edge Cases', () => {
   })
 
   it('should reject domains with null bytes', async () => {
-    const authService = new AuthenticationService()
+    const authService = new MockAuthenticationService()
     const maliciousDomains = ['example.com\x00.malicious', 'example.com\0', '\x00example.com']
 
     for (const domain of maliciousDomains) {
@@ -260,7 +262,7 @@ describe('Path Traversal Edge Cases', () => {
   })
 
   it('should handle domains with URL encoding attempts', async () => {
-    const authService = new AuthenticationService()
+    const authService = new MockAuthenticationService()
     const encodedDomains = ['example%2Ecom', 'example%2e%2e%2fcom', '%2e%2e%2fetc%2fpasswd']
 
     for (const domain of encodedDomains) {

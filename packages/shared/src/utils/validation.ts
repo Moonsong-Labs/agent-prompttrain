@@ -71,6 +71,13 @@ export const BEARER_TOKEN_REGEX =
 export const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /**
+ * Train ID pattern for request tracking
+ * Matches: alphanumeric characters, underscores, and hyphens (1-255 chars)
+ * Used for X-TRAIN-ID header validation to prevent injection attacks
+ */
+export const TRAIN_ID_REGEX = /^[a-zA-Z0-9_-]{1,255}$/
+
+/**
  * Common Content-Type patterns
  */
 export const CONTENT_TYPE_PATTERNS = {
@@ -179,6 +186,14 @@ export function isValidContentType(
  */
 export function isValidSemver(value: string): boolean {
   return SEMVER_REGEX.test(value)
+}
+
+/**
+ * Validates if a string is a valid train ID
+ * Train IDs must be 1-255 characters containing only alphanumeric characters, underscores, and hyphens
+ */
+export function isValidTrainId(value: string): boolean {
+  return TRAIN_ID_REGEX.test(value)
 }
 
 // ============================================================================
@@ -307,6 +322,19 @@ export const contentTypeSchema = z
 export const semverSchema = z
   .string()
   .regex(SEMVER_REGEX, 'Must be a valid semantic version (e.g., 1.0.0, 2.1.0-beta.1)')
+
+/**
+ * Train ID schema for request tracking
+ * Validates alphanumeric characters, underscores, and hyphens (1-255 chars)
+ */
+export const trainIdSchema = z
+  .string()
+  .regex(
+    TRAIN_ID_REGEX,
+    'Train ID must contain only alphanumeric characters, underscores, and hyphens'
+  )
+  .min(1, 'Train ID cannot be empty')
+  .max(255, 'Train ID cannot exceed 255 characters')
 
 // ============================================================================
 // Sanitization Functions

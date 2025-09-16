@@ -203,7 +203,7 @@ export function loggingMiddleware() {
     const startTime = Date.now()
 
     // Extract request info
-    const trainId = c.req.header('host') || 'unknown'
+    const trainId = c.get('trainId') || 'default'
     const method = c.req.method
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
@@ -267,7 +267,7 @@ export function getRequestLogger(c: Context): {
   error: (message: string, error?: Error, metadata?: Record<string, any>) => void
 } {
   const requestId = c.get('requestId') || 'unknown'
-  const trainId = c.req.header('host') || 'unknown'
+  const trainId = c.get('trainId') || 'default'
 
   return {
     debug: (message: string, metadata?: Record<string, any>) => {

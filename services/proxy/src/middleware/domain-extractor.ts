@@ -40,7 +40,7 @@ export function domainExtractorMiddleware() {
         trainId = host.split(':')[0]
       }
 
-      c.set('trainId', domain)
+      c.set('trainId', trainId)
     }
 
     await next()
