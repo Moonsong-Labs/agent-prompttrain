@@ -159,7 +159,7 @@ async function migrate() {
         outcome VARCHAR(50) NOT NULL,
         conversation_id UUID NOT NULL,
         branch_id VARCHAR(255) NOT NULL,
-        train_id VARCHAR(255) NOT NULL,
+        domain VARCHAR(255) NOT NULL,
         request_id VARCHAR(255) NOT NULL,
         user_context JSONB DEFAULT '{}',
         metadata JSONB DEFAULT '{}',
@@ -172,7 +172,7 @@ async function migrate() {
     console.log('\n8. Creating indexes for analysis_audit_log...')
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_audit_conversation ON analysis_audit_log (conversation_id, branch_id);
-      CREATE INDEX IF NOT EXISTS idx_audit_train ON analysis_audit_log (train_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_domain ON analysis_audit_log (domain);
       CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON analysis_audit_log (timestamp);
       CREATE INDEX IF NOT EXISTS idx_audit_event_type ON analysis_audit_log (event_type);
     `)

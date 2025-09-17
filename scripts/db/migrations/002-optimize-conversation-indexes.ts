@@ -31,7 +31,7 @@ async function optimizeConversationIndexes() {
     console.log('Creating covering index for conversation details...')
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_requests_conversation_detail
-      ON api_requests(conversation_id, timestamp, request_id, train_id, model, total_tokens, branch_id) 
+      ON api_requests(conversation_id, timestamp, request_id, domain, model, total_tokens, branch_id) 
       WHERE conversation_id IS NOT NULL
     `)
 

@@ -25,7 +25,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS api_requests (
         request_id UUID PRIMARY KEY,
         timestamp TIMESTAMPTZ NOT NULL,
-        train_id VARCHAR(255) NOT NULL,
+        domain VARCHAR(255) NOT NULL,
         method VARCHAR(10) NOT NULL,
         path VARCHAR(1024) NOT NULL,
         headers JSONB NOT NULL,
@@ -53,7 +53,7 @@ async function initDatabase() {
 
     // Create indexes for api_requests
     console.log('Creating indexes for api_requests...')
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_requests_train_id ON api_requests(train_id)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_requests_domain ON api_requests(domain)`)
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_api_requests_timestamp ON api_requests(timestamp)`
     )
@@ -88,7 +88,7 @@ async function initDatabase() {
       CREATE MATERIALIZED VIEW IF NOT EXISTS hourly_stats AS
       SELECT 
         DATE_TRUNC('hour', timestamp) as hour,
-        train_id,
+        domain,
         model,
         COUNT(*) as request_count,
         SUM(input_tokens) as total_input_tokens,
@@ -99,12 +99,12 @@ async function initDatabase() {
         SUM(tool_call_count) as total_tool_calls
       FROM api_requests
       WHERE timestamp > NOW() - INTERVAL '7 days'
-      GROUP BY DATE_TRUNC('hour', timestamp), train_id, model
+      GROUP BY DATE_TRUNC('hour', timestamp), domain, model
     `)
 
     // Create index on materialized view
     await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_hourly_stats_hour_train ON hourly_stats(hour DESC, train_id)`
+      `CREATE INDEX IF NOT EXISTS idx_hourly_stats_hour_domain ON hourly_stats(hour DESC, domain)`
     )
 
     // Create function to refresh stats

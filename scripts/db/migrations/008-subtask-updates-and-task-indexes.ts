@@ -122,11 +122,11 @@ async function migrate() {
       WHERE response_body IS NOT NULL;
     `)
 
-    // Create a composite index for train + timestamp queries
-    console.log('Creating composite index for train and timestamp...')
+    // Create a composite index for domain + timestamp queries
+    console.log('Creating composite index for domain and timestamp...')
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_api_requests_train_timestamp_response
-      ON api_requests(train_id, timestamp DESC)
+      CREATE INDEX IF NOT EXISTS idx_api_requests_domain_timestamp_response
+      ON api_requests(domain, timestamp DESC)
       WHERE response_body IS NOT NULL;
     `)
 
@@ -172,7 +172,7 @@ async function migrate() {
       WHERE tablename = 'api_requests'
         AND indexname IN (
           'idx_api_requests_response_body_task',
-          'idx_api_requests_train_timestamp_response',
+          'idx_api_requests_domain_timestamp_response',
           'idx_api_requests_task_name'
         )
       ORDER BY indexname;
@@ -203,7 +203,7 @@ async function rollback() {
     // Drop indexes first
     console.log('Dropping Task invocation indexes...')
     await client.query('DROP INDEX IF EXISTS idx_api_requests_task_name;')
-    await client.query('DROP INDEX IF EXISTS idx_api_requests_train_timestamp_response;')
+    await client.query('DROP INDEX IF EXISTS idx_api_requests_domain_timestamp_response;')
     await client.query('DROP INDEX IF EXISTS idx_api_requests_response_body_task;')
 
     // Reset subtask conversation_ids and branch_ids to their original state

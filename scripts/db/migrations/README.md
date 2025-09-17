@@ -90,9 +90,9 @@ Performance optimizations for conversation queries using window functions:
 
 ### 005-populate-account-ids.ts
 
-Populates the account_id column based on known train-to-account mappings:
+Populates the account_id column based on known domain-to-account mappings:
 
-- Maps trains to their respective account IDs
+- Maps domains to their respective account IDs
 - Only updates rows where account_id is NULL
 - Creates performance index on (account_id, timestamp)
 - Safe to run multiple times (idempotent)
@@ -159,7 +159,7 @@ Creates audit logging infrastructure for AI analysis security:
 - Event types: ANALYSIS_REQUEST, ANALYSIS_REGENERATION_REQUEST, etc.
 - Outcome tracking: SUCCESS, FAILURE_AUTH, FAILURE_RATE_LIMIT, etc.
 - Comprehensive metadata storage with JSONB fields
-- Indexes for efficient querying by conversation, train, and timestamp
+- Indexes for efficient querying by conversation, domain, and timestamp
 - Supports security monitoring and compliance requirements
 
 ## Future Migrations
