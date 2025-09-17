@@ -34,7 +34,7 @@ Account files live under `credentials/accounts/` and are named `<account-name>.c
 }
 ```
 
-Requests select an account by setting the `MSL-Account` header. When the header is omitted, the proxy randomly chooses one of the configured accounts.
+Requests select an account by setting the `MSL-Account` header. When the header is omitted, the proxy deterministically assigns an account based on the train ID and falls back only if the preferred account is unavailable.
 
 ## Train Client Keys
 
@@ -54,7 +54,7 @@ The `client-auth` middleware accepts any token listed in the file for the given 
 ## Request Headers
 
 - `MSL-Train-Id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_project"` ensures outgoing Anthropic calls stay tagged.
-- `MSL-Account`: optional; selects a specific account credential file. If omitted, the proxy randomly picks a valid account.
+- `MSL-Account`: optional; selects a specific account credential file. If omitted, the proxy deterministically maps the train to one of the configured accounts.
 
 Neither header is forwarded to Anthropic.
 

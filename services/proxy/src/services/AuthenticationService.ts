@@ -1,4 +1,4 @@
-import { randomInt } from 'crypto'
+import { createHash } from 'crypto'
 import { promises as fsp } from 'fs'
 import * as path from 'path'
 import { homedir } from 'os'
@@ -72,7 +72,7 @@ export class AuthenticationService {
       return this.loadAccount(requestedAccount, context)
     }
 
-    return this.loadRandomAccount(availableAccounts, context)
+    return this.loadDeterministicAccount(availableAccounts, context)
   }
 
   /**
@@ -161,26 +161,36 @@ export class AuthenticationService {
     return this.buildAuthResult(sanitized, credentials, apiKey, context)
   }
 
-  private async loadRandomAccount(
+  private async loadDeterministicAccount(
     accounts: string[],
     context: RequestContext
   ): Promise<AuthResult> {
+    if (!accounts.length) {
+      throw new AuthenticationError('No valid accounts available for authentication', {
+        requestId: context.requestId,
+      })
+    }
+
     if (accounts.length === 1) {
       return this.loadAccount(accounts[0], context)
     }
 
-    // Randomize starting point to spread load while retrying in order
-    const startIndex = randomInt(accounts.length)
-    for (let offset = 0; offset < accounts.length; offset++) {
-      const index = (startIndex + offset) % accounts.length
-      const candidate = accounts[index]
+    const orderedAccounts = this.rankAccounts(context.trainId, accounts)
+
+    logger.debug('Deterministic account selection computed', {
+      requestId: context.requestId,
+      trainId: context.trainId,
+      metadata: { preferredAccount: orderedAccounts[0] },
+    })
+
+    for (const accountName of orderedAccounts) {
       try {
-        return await this.loadAccount(candidate, context)
+        return await this.loadAccount(accountName, context)
       } catch (error) {
         logger.warn('Skipping account due to credential load failure', {
           requestId: context.requestId,
           metadata: {
-            accountName: candidate,
+            accountName,
             error: error instanceof Error ? error.message : String(error),
           },
         })
@@ -190,6 +200,31 @@ export class AuthenticationService {
     throw new AuthenticationError('No valid accounts available for authentication', {
       requestId: context.requestId,
     })
+  }
+
+  private rankAccounts(trainId: string | undefined, accounts: string[]): string[] {
+    if (!accounts.length) {
+      return []
+    }
+
+    const trainKey = this.sanitizeIdentifier(trainId) || trainId?.trim() || 'default'
+    const sortedAccounts = [...new Set(accounts)].sort()
+
+    const scored = sortedAccounts.map(accountName => {
+      const hashInput = `${trainKey}::${accountName}`
+      const digest = createHash('sha256').update(hashInput).digest()
+      const score = digest.readBigUInt64BE(0)
+      return { accountName, score }
+    })
+
+    scored.sort((a, b) => {
+      if (a.score === b.score) {
+        return a.accountName.localeCompare(b.accountName)
+      }
+      return a.score > b.score ? -1 : 1
+    })
+
+    return scored.map(entry => entry.accountName)
   }
 
   private buildAuthResult(

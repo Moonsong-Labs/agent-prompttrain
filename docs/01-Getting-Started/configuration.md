@@ -73,7 +73,7 @@ Proxy access tokens live under `credentials/train-client-keys/<train-id>.client-
 ```
 
 - `MSL-Train-Id` header selects the train and unlocks analytics.
-- `MSL-Account` chooses the account credential file; the proxy randomizes when omitted.
+- `MSL-Account` chooses the account credential file; when omitted, the proxy deterministically maps the train to an account using a stable hash.
 
 ## Database Configuration
 

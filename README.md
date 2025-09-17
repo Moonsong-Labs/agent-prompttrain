@@ -338,7 +338,7 @@ See the [Documentation](docs/README.md) for complete configuration options.
      -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
    ```
 
-If `MSL-Account` is omitted, the proxy randomly selects from the available account credential files.
+If `MSL-Account` is omitted, the proxy deterministically maps each train to an available account (hash-based), falling back to others only if the primary account is unavailable.
 
 ## Usage
 

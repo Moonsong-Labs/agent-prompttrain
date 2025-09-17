@@ -114,7 +114,7 @@ bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.
 ### Step 3: Configure Request Headers
 
 Requests must include the correct `MSL-Train-Id` header. Add `MSL-Account` to pin a
-specific account credential (otherwise the proxy randomly selects an account):
+specific account credential (otherwise the proxy deterministically assigns an account based on the train ID):
 
 ```bash
 # Train identification header (required)

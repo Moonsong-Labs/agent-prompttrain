@@ -76,14 +76,14 @@ We will provide **Docker-based Claude CLI integration** with pre-configured cont
    ```
 
    - CLI uses standard Bearer authentication
-   - Proxy maps to localhost.credentials.json
-   - Token tracked under localhost train
+   - Proxy maps to the configured train credentials (defaults to the `default` train)
+   - Token tracked under the `default` train unless an explicit `MSL-Train-Id` is provided
 
 3. **Usage Monitoring**:
 
    ```typescript
    // Additional monitoring for CLI usage
-   if (train === 'localhost' && userAgent.includes('claude-cli')) {
+   if (train === 'default' && userAgent.includes('claude-cli')) {
      metrics.trackCliUsage(request)
    }
    ```

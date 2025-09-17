@@ -23,8 +23,9 @@ credentials** are used to fulfil it (account).
 
 1. **Explicit Headers**
    - `MSL-Train-Id` remains mandatory for analytics but now defaults to `DEFAULT_TRAIN_ID` when absent.
-   - `MSL-Account` selects the Anthropic account credential file. When omitted the proxy randomly
-     chooses a valid account.
+   - `MSL-Account` selects the Anthropic account credential file. When omitted the proxy chooses a
+     deterministic account based on the train identifier, falling back to other accounts only when the
+     preferred one fails to load.
    - Neither header is forwarded to Anthropic; only configured custom headers (e.g. via
      `ANTHROPIC_CUSTOM_HEADERS`) are propagated.
 
@@ -43,16 +44,15 @@ credentials** are used to fulfil it (account).
 
 ### Positive
 
--
 - Clear separation between trains (analytics) and accounts (credentials).
 - Simpler operational model: new trains require only a header; new accounts require only a credential
   file.
 - Eliminates wildcard precedence edge cases and large path traversal surface area.
-- Random account selection enables effortless load spreading across multiple keys.
+- Deterministic hashing provides consistent per-train account selection while still distributing load
+  across multiple keys.
 
 ### Negative
 
--
 - Existing wildcard configurations must be migrated to explicit account files and header usage.
 - Requests that previously relied on implicit domain defaults must now supply the `MSL-Train-Id` header or
   accept the configured fallback.

@@ -64,7 +64,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
    Proxy: Extract train ID and optional account headers
    Proxy: Load credentials/train-client-keys/<train>.client-keys.json
    Proxy: Compare tokens using timing-safe SHA-256
-   Proxy: Select account credential (header or random)
+   Proxy: Select account credential (header or deterministic hash of train)
    Proxy → Claude: Forward if authenticated
    ```
 
