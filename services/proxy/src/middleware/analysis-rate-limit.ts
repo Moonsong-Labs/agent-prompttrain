@@ -3,6 +3,7 @@ import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible'
 import { logger } from './logger.js'
 // import { container } from '../container.js'
 import { config } from '@agent-prompttrain/shared/config'
+import { MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 // Different rate limiters for different operations
 let analysisCreationLimiter: RateLimiterMemory | RateLimiterRedis
@@ -41,7 +42,7 @@ export function initializeAnalysisRateLimiters() {
 export function rateLimitAnalysisCreation() {
   return async (c: Context, next: Next) => {
     const requestId = c.get('requestId')
-    const trainId = c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id')
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
 
     if (!analysisCreationLimiter) {
       initializeAnalysisRateLimiters()
@@ -106,7 +107,7 @@ export function rateLimitAnalysisCreation() {
 export function rateLimitAnalysisRetrieval() {
   return async (c: Context, next: Next) => {
     const requestId = c.get('requestId')
-    const trainId = c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id')
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
 
     if (!analysisRetrievalLimiter) {
       initializeAnalysisRateLimiters()

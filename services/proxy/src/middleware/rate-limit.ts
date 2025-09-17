@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { RateLimitError } from '@agent-prompttrain/shared'
+import { RateLimitError, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 import { getRequestLogger } from './logger'
 
 // Rate limit configuration
@@ -82,8 +82,7 @@ const defaultTrainConfig: RateLimitConfig = {
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const trainId =
-      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
     return `train:${trainId}`
   },
 }

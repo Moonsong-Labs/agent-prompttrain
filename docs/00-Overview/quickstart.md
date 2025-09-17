@@ -46,7 +46,7 @@ cp credentials/train-alpha.credentials.json client-setup/.credentials.json
 ln -sf ../client-setup/.credentials.json credentials/proxy.credentials.json
 
 # Configure outgoing requests to tag the train ID
-echo 'ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"' >> .env
+echo 'ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"' >> .env
 ```
 
 ### 3. Start services

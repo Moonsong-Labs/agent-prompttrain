@@ -301,7 +301,7 @@ Enable JSON logging:
 // Structured log format
 logger.info({
   event: 'api_request',
-  trainId: req.get('train-id'),
+  trainId: req.get('msl-train-id'),
   method: req.method,
   path: req.path,
   status: res.statusCode,

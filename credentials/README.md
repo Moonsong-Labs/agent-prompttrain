@@ -34,7 +34,7 @@ Account files live under `credentials/accounts/` and are named `<account-name>.c
 }
 ```
 
-Requests select an account by setting the `X-Train-Account` header. When the header is omitted, the proxy randomly chooses one of the configured accounts.
+Requests select an account by setting the `MSL-Account` header. When the header is omitted, the proxy randomly chooses one of the configured accounts.
 
 ## Train Client Keys
 
@@ -53,8 +53,8 @@ The `client-auth` middleware accepts any token listed in the file for the given 
 
 ## Request Headers
 
-- `train-id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="train-id:my_project"` ensures outgoing Anthropic calls stay tagged.
-- `X-Train-Account`: optional; selects a specific account credential file. If omitted, the proxy randomly picks a valid account.
+- `MSL-Train-Id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_project"` ensures outgoing Anthropic calls stay tagged.
+- `MSL-Account`: optional; selects a specific account credential file. If omitted, the proxy randomly picks a valid account.
 
 Neither header is forwarded to Anthropic.
 
@@ -82,14 +82,14 @@ Neither header is forwarded to Anthropic.
 
 3. Tag outbound Anthropic calls:
    ```bash
-   export ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"
    ```
 
 4. Choose an account per request when needed:
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
-     -H "train-id: train-alpha" \
-     -H "X-Train-Account: account-primary" \
+     -H "MSL-Train-Id: train-alpha" \
+     -H "MSL-Account: account-primary" \
      -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \
      -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'

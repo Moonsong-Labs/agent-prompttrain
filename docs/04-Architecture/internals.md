@@ -56,7 +56,7 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 // Simplified request flow
 async function handleRequest(c: Context) {
   // 1. Extract train ID from header
-  const trainId = c.get('trainId') ?? c.req.header('train-id')
+  const trainId = c.get('trainId') ?? c.req.header('msl-train-id')
 
   // 2. Load credentials
   const credentials = await loadCredentials(trainId)

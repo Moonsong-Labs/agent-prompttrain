@@ -22,8 +22,8 @@ credentials** are used to fulfil it (account).
 ## Decision
 
 1. **Explicit Headers**
-   - `train-id` remains mandatory for analytics but now defaults to `DEFAULT_TRAIN_ID` when absent.
-   - `X-Train-Account` selects the Anthropic account credential file. When omitted the proxy randomly
+   - `MSL-Train-Id` remains mandatory for analytics but now defaults to `DEFAULT_TRAIN_ID` when absent.
+   - `MSL-Account` selects the Anthropic account credential file. When omitted the proxy randomly
      chooses a valid account.
    - Neither header is forwarded to Anthropic; only configured custom headers (e.g. via
      `ANTHROPIC_CUSTOM_HEADERS`) are propagated.
@@ -54,7 +54,7 @@ credentials** are used to fulfil it (account).
 
 -
 - Existing wildcard configurations must be migrated to explicit account files and header usage.
-- Requests that previously relied on implicit domain defaults must now supply the `train-id` header or
+- Requests that previously relied on implicit domain defaults must now supply the `MSL-Train-Id` header or
   accept the configured fallback.
 
 ### Neutral
@@ -68,7 +68,7 @@ credentials** are used to fulfil it (account).
    `credentials/accounts/` and rename the file to the desired account name.
 2. Create per-train client key files under `credentials/train-client-keys/` if proxy authentication is
    enabled.
-3. Update clients to send `train-id` (and optionally `X-Train-Account`) headers.
+3. Update clients to send `MSL-Train-Id` (and optionally `MSL-Account`) headers.
 4. Remove any `CNP_WILDCARD_*` environment variables; they are no longer used.
 
 ## References

@@ -1,5 +1,6 @@
 import { Context } from 'hono'
 import { config } from '@agent-prompttrain/shared/config'
+import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Value object containing request context information
@@ -29,9 +30,8 @@ export class RequestContext {
       )
     }
     const fallbackTrainId = config.auth.defaultTrainId || 'default'
-    const trainId =
-      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || fallbackTrainId
-    const rawTrainAccount = c.get('trainAccount') || c.req.header('x-train-account')
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || fallbackTrainId
+    const rawTrainAccount = c.get('trainAccount') || c.req.header(MSL_ACCOUNT_HEADER_LOWER)
     const trainAccount =
       rawTrainAccount && rawTrainAccount.trim() ? rawTrainAccount.trim() : undefined
     // Only accept Bearer tokens from Authorization header (not x-api-key)

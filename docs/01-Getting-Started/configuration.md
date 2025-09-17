@@ -72,8 +72,8 @@ Proxy access tokens live under `credentials/train-client-keys/<train-id>.client-
 { "keys": ["cnp_live_service_a", "cnp_live_ci_runner"] }
 ```
 
-- `train-id` header selects the train and unlocks analytics.
-- `X-Train-Account` chooses the account credential file; the proxy randomizes when omitted.
+- `MSL-Train-Id` header selects the train and unlocks analytics.
+- `MSL-Account` chooses the account credential file; the proxy randomizes when omitted.
 
 ## Database Configuration
 
@@ -141,10 +141,10 @@ bun run scripts/auth/oauth-refresh.ts team-alpha
 Set the custom header once via environment variable so the proxy tags outgoing requests correctly:
 
 ```bash
-export ANTHROPIC_CUSTOM_HEADERS="train-id:my_product"
+export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_product"
 ```
 
-Clients must forward the same `train-id` header on every request; the proxy no longer infers identity from the `Host` header.
+Clients must forward the same `MSL-Train-Id` header on every request; the proxy no longer infers identity from the `Host` header.
 
 ## Performance Tuning
 

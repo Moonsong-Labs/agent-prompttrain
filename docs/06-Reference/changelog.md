@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reorganized scripts into categorized subdirectories
 - Consolidated documentation into organized docs/ folder
 - Updated request information display for better density
+- Renamed client headers to `MSL-Train-Id` and `MSL-Account`, removing legacy `train-id`/`X-Train-Account`
 
 ### Fixed
 

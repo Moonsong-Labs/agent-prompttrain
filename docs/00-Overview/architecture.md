@@ -157,7 +157,7 @@ See [DATABASE.md](./DATABASE.md) for complete schema documentation.
 ## Security
 
 - Dashboard requires API key authentication
-- Proxy resolves credentials via the `train-id` header and selects Anthropic accounts using `X-Train-Account`
+- Proxy resolves credentials via the `MSL-Train-Id` header and selects Anthropic accounts using `MSL-Account`
 - Database credentials are isolated per service
 - Sensitive headers are removed before storage
 

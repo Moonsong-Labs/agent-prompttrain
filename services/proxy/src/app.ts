@@ -17,7 +17,7 @@ import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
 import { trainIdExtractorMiddleware } from './middleware/train-id-extractor.js'
 import { clientAuthMiddleware } from './middleware/client-auth.js'
-import { HonoVariables, HonoBindings } from '@agent-prompttrain/shared'
+import { HonoVariables, HonoBindings, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Create and configure the Proxy application
@@ -55,7 +55,7 @@ export async function createProxyApp(): Promise<
       requestId,
       path: c.req.path,
       method: c.req.method,
-      trainId: c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id'),
+      trainId: c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER),
       metadata: {},
     })
 

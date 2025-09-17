@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import type { Server } from 'node:http'
+const TRAIN_HEADER = 'MSL-Train-Id'
+const TRAIN_HEADER_LOWER = TRAIN_HEADER.toLowerCase()
 
 // Mock proxy server that mimics the authentication behavior
 function createMockProxyServer() {
@@ -70,9 +72,9 @@ function createMockProxyServer() {
     return null // Auth passed
   }
 
-  // Mock middleware that derives a train ID from the train-id header for tests
+  // Mock middleware that derives a train ID from the MSL-Train-Id header for tests
   app.use('*', async (c, next) => {
-    const trainId = c.req.header('train-id') || 'unknown'
+    const trainId = c.req.header(TRAIN_HEADER_LOWER) || 'unknown'
     c.set('trainId', trainId)
     await next()
   })
@@ -186,7 +188,7 @@ describe('Proxy Authentication Integration', () => {
         headers: {
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01',
-          'train-id': 'train-alpha',
+          [TRAIN_HEADER]: 'train-alpha',
         },
         body: JSON.stringify({
           model: 'claude-3-opus-20240229',
@@ -207,7 +209,7 @@ describe('Proxy Authentication Integration', () => {
           'Content-Type': 'application/json',
           'x-api-key': 'sk-ant-test-key',
           'anthropic-version': '2023-06-01',
-          'train-id': 'train-alpha',
+          [TRAIN_HEADER]: 'train-alpha',
           Authorization: 'Bearer cnp_test_key', // Add client auth
         },
         body: JSON.stringify({
@@ -231,7 +233,7 @@ describe('Proxy Authentication Integration', () => {
           Authorization: 'Bearer cnp_test_key', // Client auth
           'x-api-key': 'sk-ant-test-key', // Claude API key in x-api-key header
           'anthropic-version': '2023-06-01',
-          'train-id': 'train-alpha',
+          [TRAIN_HEADER]: 'train-alpha',
         },
         body: JSON.stringify({
           model: 'claude-3-opus-20240229',
@@ -260,7 +262,7 @@ describe('Proxy Authentication Integration', () => {
           'Content-Type': 'application/json',
           'x-api-key': 'sk-ant-test-key',
           'anthropic-version': '2023-06-01',
-          'train-id': 'train-alpha',
+          [TRAIN_HEADER]: 'train-alpha',
           // Missing Authorization header for client auth
         },
         body: JSON.stringify({
@@ -282,7 +284,7 @@ describe('Proxy Authentication Integration', () => {
         'Content-Type': 'application/json',
         'x-api-key': 'sk-ant-test-key',
         'anthropic-version': '2023-06-01',
-        'train-id': 'train-alpha',
+        [TRAIN_HEADER]: 'train-alpha',
       }
 
       // Only add client auth header if client auth is enabled
@@ -312,7 +314,7 @@ describe('Proxy Authentication Integration', () => {
         'Content-Type': 'application/json',
         'x-api-key': 'oauth-access-token', // Claude OAuth token
         'anthropic-version': '2023-06-01',
-        'train-id': 'train-alpha',
+        [TRAIN_HEADER]: 'train-alpha',
       }
 
       // Only add client auth header if client auth is enabled

@@ -1,5 +1,10 @@
 import { Context, Next } from 'hono'
-import { getErrorMessage, getErrorStack, getErrorCode } from '@agent-prompttrain/shared'
+import {
+  getErrorMessage,
+  getErrorStack,
+  getErrorCode,
+  MSL_TRAIN_ID_HEADER_LOWER,
+} from '@agent-prompttrain/shared'
 
 // Log levels
 export enum LogLevel {
@@ -203,8 +208,7 @@ export function loggingMiddleware() {
     const startTime = Date.now()
 
     // Extract request info
-    const trainId =
-      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
     const method = c.req.method
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
@@ -268,8 +272,7 @@ export function getRequestLogger(c: Context): {
   error: (message: string, error?: Error, metadata?: Record<string, any>) => void
 } {
   const requestId = c.get('requestId') || 'unknown'
-  const trainId =
-    c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
 
   return {
     debug: (message: string, metadata?: Record<string, any>) => {

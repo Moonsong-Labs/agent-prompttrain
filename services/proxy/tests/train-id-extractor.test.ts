@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import { Hono } from 'hono'
 import { trainIdExtractorMiddleware } from '../src/middleware/train-id-extractor'
 
+const TRAIN_HEADER = 'MSL-Train-Id'
+const TRAIN_HEADER_LOWER = TRAIN_HEADER.toLowerCase()
+
 describe('trainIdExtractorMiddleware', () => {
   let app: Hono
 
@@ -23,10 +26,10 @@ describe('trainIdExtractorMiddleware', () => {
     expect(body.trainId).toBe('default')
   })
 
-  it('extracts trainId from train-id header', async () => {
+  it('extracts trainId from MSL-Train-Id header', async () => {
     const res = await app.request('/test', {
       headers: {
-        'train-id': 'team-alpha',
+        [TRAIN_HEADER]: 'team-alpha',
       },
     })
 
@@ -38,7 +41,7 @@ describe('trainIdExtractorMiddleware', () => {
   it('trims whitespace from header value', async () => {
     const res = await app.request('/test', {
       headers: {
-        'train-id': '  team-beta  ',
+        [TRAIN_HEADER]: '  team-beta  ',
       },
     })
 
@@ -47,15 +50,15 @@ describe('trainIdExtractorMiddleware', () => {
     expect(body.trainId).toBe('team-beta')
   })
 
-  it('accepts legacy x-train-id header for backward compatibility', async () => {
+  it('treats header names case-insensitively', async () => {
     const res = await app.request('/test', {
       headers: {
-        'x-train-id': 'legacy-train',
+        [TRAIN_HEADER_LOWER]: 'alpha-lowercase',
       },
     })
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.trainId).toBe('legacy-train')
+    expect(body.trainId).toBe('alpha-lowercase')
   })
 })

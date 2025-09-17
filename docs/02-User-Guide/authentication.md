@@ -26,7 +26,7 @@ Client requests must include this key:
 
 ```bash
 curl -X POST http://proxy:3000/v1/messages \
-  -H "train-id: your-train-id" \
+  -H "MSL-Train-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_generated_key" \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
@@ -113,13 +113,13 @@ bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.
 
 ### Step 3: Configure Request Headers
 
-Requests must include the correct `train-id` header. Add `X-Train-Account` to pin a
+Requests must include the correct `MSL-Train-Id` header. Add `MSL-Account` to pin a
 specific account credential (otherwise the proxy randomly selects an account):
 
 ```bash
 # Train identification header (required)
-curl -H "train-id: your-train-id" \
-     -H "X-Train-Account: account-primary" \
+curl -H "MSL-Train-Id: your-train-id" \
+     -H "MSL-Account: account-primary" \
      http://localhost:3000/v1/messages
 ```
 

@@ -221,7 +221,7 @@ Open http://localhost:3001 in your browser. You should see the login page.
 ```bash
 # Replace with your train ID and client API key
 curl -X POST http://localhost:3000/v1/messages \
-  -H "train-id: your-train-id" \
+  -H "MSL-Train-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_client_key" \
   -H "Content-Type: application/json" \
   -d '{

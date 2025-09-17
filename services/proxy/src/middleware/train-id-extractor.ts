@@ -1,10 +1,7 @@
 import { Context, Next } from 'hono'
 import { logger } from './logger.js'
 import { config } from '@agent-prompttrain/shared/config'
-
-const PRIMARY_TRAIN_ID_HEADER = 'train-id'
-const LEGACY_TRAIN_ID_HEADER = 'x-train-id'
-const TRAIN_ACCOUNT_HEADER = 'x-train-account'
+import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Train ID extractor middleware
@@ -12,11 +9,11 @@ const TRAIN_ACCOUNT_HEADER = 'x-train-account'
  */
 export function trainIdExtractorMiddleware() {
   return async (c: Context, next: Next) => {
-    const rawHeader = c.req.header(PRIMARY_TRAIN_ID_HEADER) || c.req.header(LEGACY_TRAIN_ID_HEADER)
+    const rawHeader = c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
     const fallbackTrainId = config.auth.defaultTrainId || 'default'
 
     if (!rawHeader || !rawHeader.trim()) {
-      logger.warn('Missing train-id header; applying fallback', {
+      logger.warn('Missing MSL-Train-Id header; applying fallback', {
         path: c.req.path,
         method: c.req.method,
         ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
@@ -27,7 +24,7 @@ export function trainIdExtractorMiddleware() {
       c.set('trainId', rawHeader.trim())
     }
 
-    const rawAccount = c.req.header(TRAIN_ACCOUNT_HEADER)
+    const rawAccount = c.req.header(MSL_ACCOUNT_HEADER_LOWER)
     if (rawAccount && rawAccount.trim()) {
       c.set('trainAccount', rawAccount.trim())
     }

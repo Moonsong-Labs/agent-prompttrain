@@ -62,7 +62,7 @@ describe('Client Authentication Middleware', () => {
 
     const res = await app.request('/test', {
       headers: {
-        'train-id': 'team-alpha',
+        'MSL-Train-Id': 'team-alpha',
         Authorization: `Bearer ${token}`,
       },
     })
@@ -76,7 +76,7 @@ describe('Client Authentication Middleware', () => {
 
     const res = await app.request('/test', {
       headers: {
-        'train-id': 'team-alpha',
+        'MSL-Train-Id': 'team-alpha',
         Authorization: 'Bearer cnp_live_invalid',
       },
     })
@@ -87,7 +87,7 @@ describe('Client Authentication Middleware', () => {
   it('rejects when no keys are configured for train', async () => {
     const res = await app.request('/test', {
       headers: {
-        'train-id': 'team-alpha',
+        'MSL-Train-Id': 'team-alpha',
         Authorization: 'Bearer any',
       },
     })

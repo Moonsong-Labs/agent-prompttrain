@@ -9,6 +9,7 @@ import {
 import {
   ConversationAnalysisStatus,
   conversationBranchParamsSchema,
+  MSL_TRAIN_ID_HEADER_LOWER,
 } from '@agent-prompttrain/shared'
 
 // Request/Response schemas
@@ -68,8 +69,7 @@ export const analysisRoutes = new Hono<{
  */
 analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
   const pool = c.get('pool')
-  const trainId =
-    c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
   const requestId = c.get('requestId') || 'unknown'
 
   if (!pool) {
@@ -183,8 +183,7 @@ analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
  */
 analysisRoutes.get('/:conversationId/:branchId', rateLimitAnalysisRetrieval(), async c => {
   const pool = c.get('pool')
-  const trainId =
-    c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
   const requestId = c.get('requestId') || 'unknown'
 
   if (!pool) {
@@ -292,8 +291,7 @@ analysisRoutes.post(
   rateLimitAnalysisCreation(),
   async c => {
     const pool = c.get('pool')
-    const trainId =
-      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
     const requestId = c.get('requestId') || 'unknown'
 
     if (!pool) {

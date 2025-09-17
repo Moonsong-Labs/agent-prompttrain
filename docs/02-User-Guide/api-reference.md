@@ -21,12 +21,12 @@ Authorization: Bearer cnp_live_YOUR_KEY
 
 ### Train & Account Headers
 
-Use the `train-id` header to associate requests with a project/train, and optionally
-`X-Train-Account` to select a specific Anthropic account credential:
+Use the `MSL-Train-Id` header to associate requests with a project/train, and optionally
+`MSL-Account` to select a specific Anthropic account credential:
 
 ```bash
-train-id: train-alpha
-X-Train-Account: account-primary  # optional
+MSL-Train-Id: train-alpha
+MSL-Account: account-primary  # optional
 ```
 
 ## Endpoints
