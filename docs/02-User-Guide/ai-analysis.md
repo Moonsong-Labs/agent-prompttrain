@@ -168,8 +168,8 @@ SELECT * FROM analysis_audit_log ORDER BY timestamp DESC LIMIT 10;
 
 The API has built-in rate limits:
 
-- Create analysis: 15 requests/minute per domain
-- Get analysis: 100 requests/minute per domain
+- Create analysis: 15 requests/minute per train ID
+- Get analysis: 100 requests/minute per train ID
 
 ## Cost Considerations
 

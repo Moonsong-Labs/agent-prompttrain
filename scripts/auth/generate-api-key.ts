@@ -82,7 +82,7 @@ Examples:
   if (count === 1) {
     console.log('\nGenerated API Key:')
     console.log(keys[0])
-    console.log('\nAdd this to your domain credential file as:')
+    console.log('\nAdd this to your train credential file as:')
     console.log('"client_api_key": "' + keys[0] + '"')
   } else {
     console.log(`\nGenerated ${count} API Keys:`)

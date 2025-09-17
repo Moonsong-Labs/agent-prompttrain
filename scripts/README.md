@@ -40,7 +40,7 @@ bun run scripts/db/rebuild-conversations.ts
 
 # Options:
 #   --dry-run                    Run without making changes
-#   --domain <domain>            Filter by specific domain
+#   --train-id <id>              Filter by specific train (legacy: --domain <id>)
 #   --limit <number>             Limit number of requests
 #   --debug-conversation-changes Debug log conversation ID changes
 #   --only-orphan-conversations  Process only orphan conversations
@@ -96,7 +96,7 @@ bun run scripts/auth/generate-api-key.ts
 
 ### oauth-login.ts
 
-Initiates OAuth login flow for a domain.
+Initiates OAuth login flow for a train.
 
 ```bash
 bun run scripts/auth/oauth-login.ts example.com
@@ -104,7 +104,7 @@ bun run scripts/auth/oauth-login.ts example.com
 
 ### oauth-refresh.ts
 
-Manually refreshes OAuth token for a specific domain.
+Manually refreshes OAuth token for a specific train.
 
 ```bash
 bun run scripts/auth/oauth-refresh.ts example.com
@@ -112,7 +112,7 @@ bun run scripts/auth/oauth-refresh.ts example.com
 
 ### oauth-refresh-all.ts
 
-Refreshes all OAuth tokens across all configured domains.
+Refreshes all OAuth tokens across all configured trains.
 
 ```bash
 bun run scripts/auth/oauth-refresh-all.ts
@@ -120,7 +120,7 @@ bun run scripts/auth/oauth-refresh-all.ts
 
 ### check-oauth-status.ts
 
-Displays OAuth status and token information for all domains.
+Displays OAuth status and token information for all trains.
 
 ```bash
 bun run scripts/auth/check-oauth-status.ts
@@ -237,7 +237,7 @@ Most scripts require these environment variables:
 
 - `DATABASE_URL` - PostgreSQL connection string
 - `DASHBOARD_API_KEY` - Dashboard authentication key
-- `CREDENTIALS_DIR` - Directory for domain credentials
+- `CREDENTIALS_DIR` - Directory for train credentials
 
 ## Best Practices
 

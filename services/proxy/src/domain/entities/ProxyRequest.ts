@@ -11,7 +11,7 @@ export class ProxyRequest {
 
   constructor(
     public readonly raw: ClaudeMessagesRequest,
-    public readonly host: string,
+    public readonly trainId: string,
     public readonly requestId: string,
     public readonly apiKey?: string
   ) {}

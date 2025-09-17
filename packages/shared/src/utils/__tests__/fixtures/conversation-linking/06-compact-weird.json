@@ -4,7 +4,7 @@
   "expectedLink": true,
   "parent": {
     "request_id": "57413f14-0408-4e9a-b92e-6711b8deb2d5",
-    "domain": "claude-1.msldev.io",
+    "trainId": "claude-1.msldev.io",
     "conversation_id": "bb9997eb-1036-4b14-8dad-290c30626d3f",
     "branch_id": "compact_152550",
     "current_message_hash": "eb83c7aa955ad43f25ec41c2b38c04813329a7afd9d6fe58034941f4f1db8ade",
@@ -3087,7 +3087,7 @@
   },
   "child": {
     "request_id": "be29cb5e-61e4-449b-b91c-271d338a514b",
-    "domain": "claude-1.msldev.io",
+    "trainId": "claude-1.msldev.io",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

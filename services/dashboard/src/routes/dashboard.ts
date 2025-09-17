@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 export const dashboardRoutes = new Hono<{
   Variables: {
     pool?: Pool
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -190,7 +190,7 @@ const layout = (title: string, content: any) => html`
         <div class="container">
           <h1>Agent Prompt Train Dashboard</h1>
           <div class="space-x-4">
-            <span class="text-sm text-gray-600" id="current-domain">All Domains</span>
+            <span class="text-sm text-gray-600" id="current-train">All Train IDs</span>
             <a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>
           </div>
         </div>
@@ -205,19 +205,19 @@ const layout = (title: string, content: any) => html`
  */
 dashboardRoutes.get('/', async c => {
   const pool = c.get('pool')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
   // Get stats from database
   const stats = {
     totalRequests: 0,
     totalTokens: 0,
     estimatedCost: 0,
-    activeDomains: 0,
+    activeTrainIds: 0,
     totalSubtasks: 0,
     activeTasksWithSubtasks: 0,
     recentRequests: [] as Array<{
       request_id: string
-      domain: string
+      train_id: string
       model: string
       total_tokens: number
       input_tokens: number
@@ -238,20 +238,20 @@ dashboardRoutes.get('/', async c => {
         SELECT 
           COUNT(*) as total_requests,
           SUM(COALESCE(total_tokens, COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0), 0)) as total_tokens,
-          COUNT(DISTINCT domain) as active_domains,
+          COUNT(DISTINCT train_id) as active_train_ids,
           COUNT(*) FILTER (WHERE is_subtask = true) as total_subtasks,
           COUNT(DISTINCT parent_task_request_id) FILTER (WHERE parent_task_request_id IS NOT NULL) as active_tasks_with_subtasks
         FROM api_requests
         WHERE timestamp > NOW() - INTERVAL '24 hours'
-        ${domain ? 'AND domain = $1' : ''}
+        ${trainId ? 'AND train_id = $1' : ''}
       `
 
-      const statsResult = await pool.query(statsQuery, domain ? [domain] : [])
+      const statsResult = await pool.query(statsQuery, trainId ? [trainId] : [])
       const row = statsResult.rows[0]
 
       stats.totalRequests = parseInt(row.total_requests) || 0
       stats.totalTokens = parseInt(row.total_tokens) || 0
-      stats.activeDomains = parseInt(row.active_domains) || 0
+      stats.activeTrainIds = parseInt(row.active_train_ids) || 0
       stats.totalSubtasks = parseInt(row.total_subtasks) || 0
       stats.activeTasksWithSubtasks = parseInt(row.active_tasks_with_subtasks) || 0
       stats.estimatedCost = (stats.totalTokens / 1000) * 0.002 // Rough estimate
@@ -260,7 +260,7 @@ dashboardRoutes.get('/', async c => {
       const requestsQuery = `
         SELECT 
           r.request_id,
-          r.domain,
+          r.train_id,
           r.model,
           COALESCE(r.total_tokens, COALESCE(r.input_tokens, 0) + COALESCE(r.output_tokens, 0), 0) as total_tokens,
           r.input_tokens,
@@ -278,43 +278,43 @@ dashboardRoutes.get('/', async c => {
           WHERE parent_task_request_id IS NOT NULL
           GROUP BY parent_task_request_id
         ) st ON r.request_id = st.parent_task_request_id
-        ${domain ? 'WHERE r.domain = $1' : ''}
+        ${trainId ? 'WHERE r.train_id = $1' : ''}
         ORDER BY r.timestamp DESC
         LIMIT 20
       `
 
-      const requestsResult = await pool.query(requestsQuery, domain ? [domain] : [])
+      const requestsResult = await pool.query(requestsQuery, trainId ? [trainId] : [])
       stats.recentRequests = requestsResult.rows
     } catch (error) {
       console.error('Failed to get stats:', error)
     }
   }
 
-  // Get list of domains for filter
-  let domains: string[] = []
+  // Get list of train IDs for filter
+  let trainIds: string[] = []
   if (pool) {
     try {
-      const domainsResult = await pool.query(
-        'SELECT DISTINCT domain FROM api_requests ORDER BY domain'
+      const trainIdResult = await pool.query(
+        'SELECT DISTINCT train_id FROM api_requests ORDER BY train_id'
       )
-      domains = domainsResult.rows.map(r => r.domain)
+      trainIds = trainIdResult.rows.map(r => r.train_id)
     } catch (error) {
-      console.error('Failed to get domains:', error)
+      console.error('Failed to get train IDs:', error)
     }
   }
 
   const content = html`
-    <!-- Domain Filter -->
+    <!-- Train Filter -->
     <div class="mb-6">
-      <label class="text-sm text-gray-600">Filter by Domain:</label>
+      <label class="text-sm text-gray-600">Filter by Train ID:</label>
       <select
-        onchange="window.location.href = '/dashboard' + (this.value ? '?domain=' + this.value : '')"
+        onchange="window.location.href = '/dashboard' + (this.value ? '?trainId=' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
-        <option value="">All Domains</option>
+        <option value="">All Train IDs</option>
         ${raw(
-          domains
-            .map(d => `<option value="${d}" ${domain === d ? 'selected' : ''}>${d}</option>`)
+          trainIds
+            .map(id => `<option value="${id}" ${trainId === id ? 'selected' : ''}>${id}</option>`)
             .join('')
         )}
       </select>
@@ -338,9 +338,9 @@ dashboardRoutes.get('/', async c => {
         <div class="stat-meta">Based on token usage</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Domains</div>
-        <div class="stat-value">${stats.activeDomains}</div>
-        <div class="stat-meta">Unique domains</div>
+        <div class="stat-label">Active Train IDs</div>
+        <div class="stat-value">${stats.activeTrainIds}</div>
+        <div class="stat-meta">Unique train identifiers</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Sub-Task Calls</div>
@@ -352,7 +352,7 @@ dashboardRoutes.get('/', async c => {
     <!-- Analytics Panel (loaded via HTMX) -->
     <div
       id="analytics-panel-placeholder"
-      hx-get="/partials/analytics${domain ? `?domain=${domain}` : ''}${c.req.query('analytics') ===
+      hx-get="/partials/analytics${trainId ? `?trainId=${trainId}` : ''}${c.req.query('analytics') ===
       'true'
         ? '&expanded=true'
         : ''}"
@@ -404,7 +404,7 @@ dashboardRoutes.get('/', async c => {
                 <thead>
                   <tr>
                     <th>Time</th>
-                    <th>Domain</th>
+                    <th>Train ID</th>
                     <th>Model</th>
                     <th>Tokens</th>
                     <th>Status</th>
@@ -418,7 +418,7 @@ dashboardRoutes.get('/', async c => {
                         req => `
                 <tr>
                   <td class="text-sm">${formatTimestamp(req.timestamp)}</td>
-                  <td class="text-sm">${req.domain}</td>
+                  <td class="text-sm">${req.train_id ?? 'unknown'}</td>
                   <td class="text-sm">${req.model || 'N/A'}</td>
                   <td class="text-sm">${formatNumber(req.total_tokens || 0)}</td>
                   <td class="text-sm">${req.response_status || 'N/A'}</td>

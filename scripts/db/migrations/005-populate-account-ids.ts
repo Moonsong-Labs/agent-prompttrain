@@ -2,8 +2,8 @@
 import { Pool } from 'pg'
 
 /**
- * Migration: Populate account_id based on domain mappings
- * This migration populates the account_id column in api_requests table based on known domain-to-account mappings
+ * Migration: Populate account_id based on train ID mappings
+ * This migration populates the account_id column in api_requests table based on known train-to-account mappings
  */
 async function populateAccountIds() {
   const databaseUrl = process.env.DATABASE_URL
@@ -27,45 +27,45 @@ async function populateAccountIds() {
       ADD COLUMN IF NOT EXISTS account_id VARCHAR(255)
     `)
 
-    // Domain to account ID mappings
-    const domainMappings = [
+    // Train ID to account ID mappings
+    const trainMappings = [
       {
         accountId: 'claude-1',
-        domains: ['claude-1.msldev.io', 'localhost:3000', 'localhost:3001'],
+        trains: ['claude-1.msldev.io', 'localhost:3000', 'localhost:3001'],
       },
       {
         accountId: 'claude-2',
-        domains: ['claude-prividium.msldev.io', 'claude-ai-nexus.msldev.io', 'claude-2.msldev.io'],
+        trains: ['claude-prividium.msldev.io', 'claude-ai-nexus.msldev.io', 'claude-2.msldev.io'],
       },
       {
         accountId: 'claude-3',
-        domains: ['claude-kluster.msldev.io', 'claude-reviews.msldev.io', 'claude-3.msldev.io'],
+        trains: ['claude-kluster.msldev.io', 'claude-reviews.msldev.io', 'claude-3.msldev.io'],
       },
       {
         accountId: 'claude-4',
-        domains: ['claude-tanssi.msldev.io', 'claude-datahaven.msldev.io', 'claude-4.msldev.io'],
+        trains: ['claude-tanssi.msldev.io', 'claude-datahaven.msldev.io', 'claude-4.msldev.io'],
       },
       {
         accountId: 'claude-5',
-        domains: ['claude-moonbeam.msldev.io', 'claude-5.msldev.io'],
+        trains: ['claude-moonbeam.msldev.io', 'claude-5.msldev.io'],
       },
     ]
 
-    // Populate account_id based on domain mappings
-    console.log('Populating account IDs based on domain mappings...')
-    for (const mapping of domainMappings) {
+    // Populate account_id based on train mappings
+    console.log('Populating account IDs based on train mappings...')
+    for (const mapping of trainMappings) {
       const result = await pool.query(
         `
         UPDATE api_requests 
         SET account_id = $1 
-        WHERE domain = ANY($2::text[])
+        WHERE train_id = ANY($2::text[])
           AND account_id IS NULL
       `,
-        [mapping.accountId, mapping.domains]
+        [mapping.accountId, mapping.trains]
       )
 
       console.log(
-        `Updated ${result.rowCount} rows for ${mapping.accountId} (domains: ${mapping.domains.join(', ')})`
+        `Updated ${result.rowCount} rows for ${mapping.accountId} (trains: ${mapping.trains.join(', ')})`
       )
     }
 

@@ -43,10 +43,10 @@ export const JWT_TOKEN_REGEX = /^eyJ[a-zA-Z0-9-_]+\.eyJ[a-zA-Z0-9-_]+\.[a-zA-Z0-
 export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 
 /**
- * Domain name pattern (simplified for safety against ReDoS)
- * Matches: example.com, subdomain.example.com
+ * Train identifier pattern
+ * Matches: letters, numbers, dots, dashes, underscores, and colons
  */
-export const DOMAIN_REGEX = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/
+export const TRAIN_ID_REGEX = /^[a-zA-Z0-9._:-]+$/
 
 /**
  * Database URL patterns
@@ -127,10 +127,10 @@ export function isValidEmail(value: string): boolean {
 }
 
 /**
- * Validates if a string is a valid domain name
+ * Validates if a string is a valid train identifier
  */
-export function isValidDomain(value: string): boolean {
-  return DOMAIN_REGEX.test(value)
+export function isValidTrainId(value: string): boolean {
+  return TRAIN_ID_REGEX.test(value)
 }
 
 /**
@@ -228,7 +228,7 @@ export const emailSchema = z.string().email()
 /**
  * Domain schema
  */
-export const domainSchema = z.string().regex(DOMAIN_REGEX, 'Must be a valid domain name')
+export const trainIdSchema = z.string().regex(TRAIN_ID_REGEX, 'Must be a valid train identifier')
 
 /**
  * Database URL schema

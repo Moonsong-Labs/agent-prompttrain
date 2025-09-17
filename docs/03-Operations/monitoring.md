@@ -46,7 +46,7 @@ Response:
     "output": 45000,
     "total": 95000
   },
-  "by_domain": {
+  "by_train_id": {
     "example.com": {
       "requests": 500,
       "tokens": {...}
@@ -192,7 +192,7 @@ SELECT
   status_code,
   error_type,
   COUNT(*) as count,
-  ARRAY_AGG(DISTINCT domain) as affected_domains
+  ARRAY_AGG(DISTINCT train_id) as affected_trains
 FROM api_requests
 WHERE status_code >= 400
   AND created_at > NOW() - INTERVAL '24 hours'
@@ -220,7 +220,7 @@ app.get('/metrics', (req, res) => {
   const metrics = `
 # HELP claude_proxy_requests_total Total number of requests
 # TYPE claude_proxy_requests_total counter
-claude_proxy_requests_total{domain="${domain}"} ${requestCount}
+claude_proxy_requests_total{train_id="${trainId}"} ${requestCount}
 
 # HELP claude_proxy_tokens_total Total tokens used
 # TYPE claude_proxy_tokens_total counter
@@ -301,7 +301,7 @@ Enable JSON logging:
 // Structured log format
 logger.info({
   event: 'api_request',
-  domain: req.hostname,
+  trainId: req.get('train-id'),
   method: req.method,
   path: req.path,
   status: res.statusCode,

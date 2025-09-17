@@ -6,7 +6,7 @@
   "expectedBranchPattern": "^subtask_\\d+$",
   "parent": {
     "request_id": "caff5888-89bc-40a3-af8f-b5e899e4ac96",
-    "domain": "localhost:3000",
+    "trainId": "localhost:3000",
     "conversation_id": "fea68778-ba10-4b00-a0fc-1506f5136faf",
     "branch_id": "main",
     "current_message_hash": "d95ddb9abe3d7b16fbab0e50260754d3f503b26914a4ef465515f619b9d4ca25",
@@ -52,7 +52,7 @@
   },
   "child": {
     "request_id": "f87a8483-00df-496a-90e4-967fea9c3b11",
-    "domain": "localhost:3000",
+    "trainId": "localhost:3000",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

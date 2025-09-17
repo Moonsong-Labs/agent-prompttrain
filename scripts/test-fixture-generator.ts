@@ -51,7 +51,7 @@ const fixture = {
   expectedLink: true,
   parent: {
     request_id: 'parent-test',
-    domain: 'test.com',
+    trainId: 'train-test',
     conversation_id: 'conv-test',
     branch_id: 'main',
     current_message_hash: parentHash,
@@ -67,7 +67,7 @@ const fixture = {
   },
   child: {
     request_id: 'child-test',
-    domain: 'test.com',
+    trainId: 'train-test',
     body: {
       messages: childMessages,
       system: system,

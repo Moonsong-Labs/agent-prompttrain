@@ -14,14 +14,14 @@ export interface StorageServiceEnhancements {
 
   /**
    * Get paginated conversation summaries with filtering
-   * @param domain Optional domain filter
+   * @param trainId Optional train filter
    * @param limit Number of items per page
    * @param offset Offset for pagination
    * @param search Optional search query
    * @returns Paginated results and total count
    */
   getConversationSummariesPaginated?(
-    domain?: string,
+    trainId?: string,
     limit?: number,
     offset?: number,
     search?: string

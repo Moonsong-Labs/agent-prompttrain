@@ -42,8 +42,8 @@ mkdir -p credentials
 # Generate client API key
 bun run scripts/generate-api-key.ts
 
-# Create domain credentials
-cat > credentials/your-domain.com.credentials.json << EOF
+# Create train credentials
+cat > credentials/your-train-id.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_$(uuidgen)",

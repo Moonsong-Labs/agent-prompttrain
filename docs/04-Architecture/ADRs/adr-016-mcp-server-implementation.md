@@ -89,7 +89,7 @@ CREATE TABLE mcp_sync_status (
 CREATE TABLE mcp_prompt_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     prompt_id VARCHAR(255) NOT NULL,
-    domain VARCHAR(255),
+    train_id VARCHAR(255),
     account_id VARCHAR(255),
     request_id UUID REFERENCES api_requests(request_id),
     used_at TIMESTAMPTZ DEFAULT NOW(),

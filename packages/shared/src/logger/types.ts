@@ -10,6 +10,7 @@ export interface BaseLogEntry {
   message: string
   requestId?: string
   domain?: string
+  trainId?: string
 }
 
 // HTTP request logging

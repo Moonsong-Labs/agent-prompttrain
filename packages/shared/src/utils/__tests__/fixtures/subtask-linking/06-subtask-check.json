@@ -6,7 +6,7 @@
   "expectedParentTaskRequestId": "fc1f2c5f-5a6f-4004-895b-a19e49de0601",
   "parent": {
     "request_id": "fc1f2c5f-5a6f-4004-895b-a19e49de0601",
-    "domain": "claude-1.msldev.io",
+    "trainId": "claude-1.msldev.io",
     "conversation_id": "79e42d1e-fe6e-4056-9d63-bb9e60227cf5",
     "branch_id": "main",
     "current_message_hash": "27ad1ffb8548e4a5c77969eaa264511bb817dde225ebbe6db62a5b4b0590e25b",
@@ -469,7 +469,7 @@
   },
   "child": {
     "request_id": "e220d92b-b4e3-423c-8e1f-ebdde7910515",
-    "domain": "claude-1.msldev.io",
+    "trainId": "claude-1.msldev.io",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

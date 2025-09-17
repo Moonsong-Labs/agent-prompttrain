@@ -110,7 +110,7 @@ We will implement **configurable timeouts** with sensible defaults for long-runn
 ### Risks and Mitigations
 
 - **Risk**: Resource exhaustion from many long connections
-  - **Mitigation**: Connection limits per domain
+  - **Mitigation**: Connection limits per train_id
   - **Mitigation**: Monitor active connection count
 
 - **Risk**: Genuinely stuck requests waste resources

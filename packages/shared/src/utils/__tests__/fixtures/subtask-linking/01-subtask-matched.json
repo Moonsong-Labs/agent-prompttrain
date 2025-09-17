@@ -16,7 +16,7 @@
   },
   "child": {
     "request_id": "subtask-test-001",
-    "domain": "test.com",
+    "trainId": "test.com",
     "timestamp": "2024-01-01T10:00:05Z",
     "body": {
       "model": "claude-3-opus-20240229",

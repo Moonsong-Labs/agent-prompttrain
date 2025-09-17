@@ -1,102 +1,93 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
 import { Hono } from 'hono'
 import { clientAuthMiddleware } from '../src/middleware/client-auth'
-import { domainExtractorMiddleware } from '../src/middleware/domain-extractor'
+import { trainIdExtractorMiddleware } from '../src/middleware/train-id-extractor'
 import { container } from '../src/container'
 import { AuthenticationService } from '../src/services/AuthenticationService'
 
-// Mock authentication service
+// Mock authentication service that allows us to control train credentials
 class MockAuthenticationService extends AuthenticationService {
-  private mockKeys: Map<string, string> = new Map()
+  private readonly mockKeys = new Map<string, string>()
 
   constructor() {
     super(undefined, '/tmp/test-credentials')
   }
 
-  setMockKey(domain: string, key: string | null) {
+  setMockKey(trainId: string, key: string | null) {
     if (key) {
-      this.mockKeys.set(domain, key)
+      this.mockKeys.set(trainId, key)
     } else {
-      this.mockKeys.delete(domain)
+      this.mockKeys.delete(trainId)
     }
   }
 
-  async getClientApiKey(domain: string): Promise<string | null> {
-    return this.mockKeys.get(domain) || null
+  async getClientApiKey(trainId: string): Promise<string | null> {
+    return this.mockKeys.get(trainId) ?? null
   }
 }
 
 describe('Client Authentication Middleware', () => {
   let app: Hono
   let mockAuthService: MockAuthenticationService
+  let originalGetAuthService: typeof container.getAuthenticationService
 
   beforeEach(() => {
-    app = new Hono()
     mockAuthService = new MockAuthenticationService()
-
-    // Override the container to use our mock
-    const originalGetAuthService = container.getAuthenticationService
+    originalGetAuthService = container.getAuthenticationService
     container.getAuthenticationService = () => mockAuthService
 
-    // Apply middlewares
-    app.use('*', domainExtractorMiddleware())
+    app = new Hono()
+    app.use('*', trainIdExtractorMiddleware())
     app.use('*', clientAuthMiddleware())
-
-    // Test endpoint
     app.get('/test', c => c.json({ success: true }))
+  })
 
-    // Restore after each test
-    afterEach(() => {
-      container.getAuthenticationService = originalGetAuthService
-    })
+  afterEach(() => {
+    container.getAuthenticationService = originalGetAuthService
   })
 
   describe('Valid Authentication', () => {
-    it('should allow requests with valid API key', async () => {
+    it('allows requests with valid API key', async () => {
       const testKey = 'cnp_live_validtestkey123'
-      mockAuthService.setMockKey('example.com', testKey)
+      mockAuthService.setMockKey('team-alpha', testKey)
 
       const res = await app.request('/test', {
         headers: {
-          Host: 'example.com',
+          'train-id': 'team-alpha',
           Authorization: `Bearer ${testKey}`,
         },
       })
 
       expect(res.status).toBe(200)
-      const body = await res.json()
-      expect(body).toEqual({ success: true })
+      expect(await res.json()).toEqual({ success: true })
     })
 
-    it('should handle different domains correctly', async () => {
-      const key1 = 'cnp_live_domain1key'
-      const key2 = 'cnp_live_domain2key'
+    it('isolates keys per train ID', async () => {
+      const key1 = 'cnp_live_train1'
+      const key2 = 'cnp_live_train2'
 
-      mockAuthService.setMockKey('domain1.com', key1)
-      mockAuthService.setMockKey('domain2.com', key2)
+      mockAuthService.setMockKey('train-one', key1)
+      mockAuthService.setMockKey('train-two', key2)
 
-      // Test domain1
       const res1 = await app.request('/test', {
         headers: {
-          Host: 'domain1.com',
+          'train-id': 'train-one',
           Authorization: `Bearer ${key1}`,
         },
       })
       expect(res1.status).toBe(200)
 
-      // Test domain2
       const res2 = await app.request('/test', {
         headers: {
-          Host: 'domain2.com',
+          'train-id': 'train-two',
           Authorization: `Bearer ${key2}`,
         },
       })
       expect(res2.status).toBe(200)
 
-      // Test wrong key for domain1
       const res3 = await app.request('/test', {
         headers: {
-          Host: 'domain1.com',
+          'train-id': 'train-one',
           Authorization: `Bearer ${key2}`,
         },
       })
@@ -105,12 +96,12 @@ describe('Client Authentication Middleware', () => {
   })
 
   describe('Invalid Authentication', () => {
-    it('should reject requests without Authorization header', async () => {
-      mockAuthService.setMockKey('example.com', 'cnp_live_testkey')
+    it('rejects requests without Authorization header', async () => {
+      mockAuthService.setMockKey('team-alpha', 'cnp_live_testkey')
 
       const res = await app.request('/test', {
         headers: {
-          Host: 'example.com',
+          'train-id': 'team-alpha',
         },
       })
 
@@ -118,12 +109,12 @@ describe('Client Authentication Middleware', () => {
       expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Agent Prompt Train"')
     })
 
-    it('should reject requests with invalid API key', async () => {
-      mockAuthService.setMockKey('example.com', 'cnp_live_validkey')
+    it('rejects requests with invalid API key', async () => {
+      mockAuthService.setMockKey('team-alpha', 'cnp_live_validkey')
 
       const res = await app.request('/test', {
         headers: {
-          Host: 'example.com',
+          'train-id': 'team-alpha',
           Authorization: 'Bearer cnp_live_wrongkey',
         },
       })
@@ -131,12 +122,10 @@ describe('Client Authentication Middleware', () => {
       expect(res.status).toBe(401)
     })
 
-    it('should reject requests when no API key is configured', async () => {
-      // No key set for domain
-
+    it('rejects requests when no API key is configured', async () => {
       const res = await app.request('/test', {
         headers: {
-          Host: 'example.com',
+          'train-id': 'team-alpha',
           Authorization: 'Bearer cnp_live_somekey',
         },
       })
@@ -144,7 +133,7 @@ describe('Client Authentication Middleware', () => {
       expect(res.status).toBe(401)
     })
 
-    it('should reject requests without Host header', async () => {
+    it('rejects requests without train-id header', async () => {
       const res = await app.request('/test', {
         headers: {
           Authorization: 'Bearer cnp_live_testkey',
@@ -153,61 +142,43 @@ describe('Client Authentication Middleware', () => {
 
       expect(res.status).toBe(400)
       const body = await res.json()
-      expect(body.error.message).toBe('Host header is required')
+      expect(body.error.message).toBe('train-id header is required')
     })
   })
 
   describe('Security Features', () => {
-    it('should use timing-safe comparison', async () => {
-      // This test verifies that the implementation uses SHA-256 hashing
-      // We can't directly test timing, but we can verify the behavior
+    it('uses timing-safe comparison for credentials', async () => {
       const testKey = 'cnp_live_securekey123'
-      mockAuthService.setMockKey('example.com', testKey)
+      mockAuthService.setMockKey('team-alpha', testKey)
 
-      // Multiple requests with wrong keys of different lengths
       const wrongKeys = [
         'a',
         'cnp_live_wrong',
         'cnp_live_wrongkeythatisverylongandshouldbedifferent',
-        testKey.slice(0, -1), // Almost correct
+        testKey.slice(0, -1),
       ]
 
       for (const wrongKey of wrongKeys) {
         const res = await app.request('/test', {
           headers: {
-            Host: 'example.com',
+            'train-id': 'team-alpha',
             Authorization: `Bearer ${wrongKey}`,
           },
         })
         expect(res.status).toBe(401)
       }
     })
-
-    it('should handle domains with ports correctly', async () => {
-      const testKey = 'cnp_live_porttest'
-      mockAuthService.setMockKey('example.com', testKey)
-
-      const res = await app.request('/test', {
-        headers: {
-          Host: 'example.com:8080',
-          Authorization: `Bearer ${testKey}`,
-        },
-      })
-
-      expect(res.status).toBe(200)
-    })
   })
 
   describe('Error Handling', () => {
-    it('should handle authentication service errors gracefully', async () => {
-      // Override getClientApiKey to throw an error
+    it('returns 500 when authentication service throws', async () => {
       mockAuthService.getClientApiKey = async () => {
         throw new Error('Database connection failed')
       }
 
       const res = await app.request('/test', {
         headers: {
-          Host: 'example.com',
+          'train-id': 'team-alpha',
           Authorization: 'Bearer cnp_live_anykey',
         },
       })
@@ -217,42 +188,39 @@ describe('Client Authentication Middleware', () => {
   })
 })
 
-describe('Path Traversal Protection', () => {
-  it('should prevent path traversal attacks', async () => {
+describe('Train ID validation', () => {
+  it('prevents path traversal attempts', async () => {
     const authService = new AuthenticationService()
 
-    // Test various path traversal attempts
-    const maliciousDomains = [
+    const maliciousIds = [
       '../../../etc/passwd',
       '..\\..\\..\\windows\\system32',
-      'example.com/../../secrets',
-      'example.com%2F..%2F..%2Fsecrets',
+      'team-alpha/../../secrets',
+      'team-alpha%2F..%2F..%2Fsecrets',
       '..',
       '.',
       '',
     ]
 
-    for (const domain of maliciousDomains) {
-      const result = await authService.getClientApiKey(domain)
+    for (const trainId of maliciousIds) {
+      const result = await authService.getClientApiKey(trainId)
       expect(result).toBeNull()
     }
   })
 
-  it('should allow valid domain names', async () => {
+  it('allows valid train identifiers', async () => {
     const authService = new AuthenticationService()
 
-    // These should be allowed (though they won't have keys in tests)
-    const validDomains = [
-      'example.com',
-      'sub.example.com',
-      'example-with-dash.com',
-      'example123.com',
-      'localhost',
+    const validTrainIds = [
+      'team-alpha',
+      'team-beta',
+      'team.alpha',
+      'team_alpha',
+      'team-alpha:preview',
     ]
 
-    // Just verify they don't throw errors
-    for (const domain of validDomains) {
-      await expect(authService.getClientApiKey(domain)).resolves.toBeDefined()
+    for (const trainId of validTrainIds) {
+      await expect(authService.getClientApiKey(trainId)).resolves.toBeDefined()
     }
   })
 })

@@ -395,7 +395,7 @@ describe('MCP Flow', () => {
 
 ### 1. Metrics
 
-- Prompt usage by domain/account
+- Prompt usage by train/account
 - Sync success/failure rates
 - Cache hit/miss ratios
 - Response times

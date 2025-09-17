@@ -4,7 +4,7 @@ export const testData = {
     id: 'test-request-001',
     request_type: 'inference',
     model: 'claude-3-opus',
-    domain: 'test.example.com',
+    trainId: 'train-e2e',
     status_code: 200,
     created_at: new Date().toISOString(),
     response_time_ms: 1234,

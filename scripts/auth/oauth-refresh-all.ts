@@ -45,9 +45,9 @@ async function refreshAllOAuthTokens() {
 
     for (const file of files) {
       const filePath = join(fullDir, file)
-      const domain = file.replace('.credentials.json', '')
+      const trainId = file.replace('.credentials.json', '')
 
-      console.log(`\n[${domain}]`)
+      console.log(`\n[${trainId}]`)
 
       try {
         const credentials = loadCredentials(filePath)

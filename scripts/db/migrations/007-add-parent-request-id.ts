@@ -51,7 +51,7 @@ async function migrate() {
           parent.request_id AS parent_id
         FROM api_requests child
         INNER JOIN api_requests parent ON 
-          child.domain = parent.domain 
+          child.train_id = parent.train_id 
           AND child.parent_message_hash = parent.current_message_hash
           AND child.conversation_id = parent.conversation_id
           AND child.request_id != parent.request_id

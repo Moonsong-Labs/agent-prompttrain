@@ -15,8 +15,8 @@ info:
 
     ## Rate Limiting
 
-    - **Analysis Creation**: 15 requests per minute per domain
-    - **Analysis Retrieval**: 100 requests per minute per domain
+    - **Analysis Creation**: 15 requests per minute per train ID
+    - **Analysis Retrieval**: 100 requests per minute per train ID
     - **Analysis Regeneration**: Counts towards creation limit (15 requests per minute)
 
     Rate limit headers are included in 429 responses:

@@ -6,7 +6,7 @@ import { logger } from '../middleware/logger.js'
 
 interface StorageRequest {
   requestId: string
-  domain: string
+  trainId: string
   accountId?: string // Account identifier from credentials
   timestamp: Date
   method: string
@@ -129,7 +129,7 @@ export class StorageWriter {
 
       const query = `
         INSERT INTO api_requests (
-          request_id, domain, account_id, timestamp, method, path, headers, body, 
+          request_id, train_id, account_id, timestamp, method, path, headers, body, 
           api_key_hash, model, request_type, current_message_hash, 
           parent_message_hash, conversation_id, branch_id, system_hash, message_count,
           parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id
@@ -139,7 +139,7 @@ export class StorageWriter {
 
       const values = [
         request.requestId,
-        request.domain,
+        request.trainId,
         request.accountId || null,
         request.timestamp,
         request.method,
@@ -295,7 +295,7 @@ export class StorageWriter {
    * Used by ConversationLinker
    */
   async findParentRequests(criteria: {
-    domain: string
+    trainId: string
     messageCount?: number
     parentMessageHash?: string
     currentMessageHash?: string
@@ -313,8 +313,8 @@ export class StorageWriter {
     }>
   > {
     try {
-      const conditions: string[] = ['domain = $1']
-      const values: any[] = [criteria.domain]
+      const conditions: string[] = ['train_id = $1']
+      const values: any[] = [criteria.trainId]
       let paramCount = 1
 
       if (criteria.currentMessageHash) {
@@ -390,7 +390,7 @@ export class StorageWriter {
    * Used for compact conversation detection
    */
   async findParentByResponseContent(
-    domain: string,
+    trainId: string,
     summaryContent: string,
     afterTimestamp: Date,
     beforeTimestamp?: Date
@@ -418,7 +418,7 @@ export class StorageWriter {
           system_hash,
           response_body
         FROM api_requests
-        WHERE domain = $1
+        WHERE train_id = $1
           AND timestamp >= $2
           ${beforeTimestamp ? 'AND timestamp < $4' : ''}
           AND request_type = 'inference'
@@ -431,7 +431,7 @@ export class StorageWriter {
         LIMIT 1
       `
 
-      const params = [domain, afterTimestamp, cleanSummary]
+      const params = [trainId, afterTimestamp, cleanSummary]
 
       if (beforeTimestamp) {
         params.push(beforeTimestamp)
@@ -442,7 +442,7 @@ export class StorageWriter {
       if (result.rows.length > 0) {
         logger.info('Found parent conversation by response content match', {
           metadata: {
-            domain,
+            trainId,
             parentRequestId: result.rows[0].request_id,
             conversationId: result.rows[0].conversation_id,
           },
@@ -453,7 +453,7 @@ export class StorageWriter {
     } catch (error) {
       logger.error('Failed to find parent by response content', {
         metadata: {
-          domain,
+          trainId,
           error: error instanceof Error ? error.message : String(error),
         },
       })

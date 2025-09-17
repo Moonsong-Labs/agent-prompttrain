@@ -16,7 +16,7 @@ Each JSON file should contain:
   "expectedSummaryContent": "content to match in compact search (optional)",
   "parent": {
     "request_id": "uuid",
-    "domain": "domain.com",
+    "trainId": "trainId.com",
     "conversation_id": "uuid",
     "branch_id": "main|branch_*",
     "current_message_hash": "hash",
@@ -32,7 +32,7 @@ Each JSON file should contain:
   },
   "child": {
     "request_id": "uuid",
-    "domain": "domain.com",
+    "trainId": "trainId.com",
     "body": {
       "messages": [...],
       "system": "..."

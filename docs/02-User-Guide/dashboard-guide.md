@@ -30,7 +30,7 @@ The main dashboard displays:
 
 - **Total Requests**: Cumulative request count
 - **Total Tokens**: Combined input/output token usage
-- **Active Domains**: Number of domains using the proxy
+- **Active Trains**: Number of trains using the proxy
 - **Total Sub-tasks**: Count of Task tool invocations
 - **Success Rate**: Percentage of successful requests
 - **Average Latency**: Mean response time
@@ -59,7 +59,7 @@ Monitor Claude API rate limits:
 
 View daily token usage:
 
-- Daily breakdown by account/domain
+- Daily breakdown by account/train
 - Cost estimation
 - Usage patterns and trends
 - Export data for analysis
@@ -123,8 +123,8 @@ View per-account statistics:
 Many dashboard views support URL parameters:
 
 ```
-# Filter by domain
-/requests?domain=example.com
+# Filter by train ID
+/requests?trainId=train-alpha
 
 # Filter by account
 /token-usage?accountId=acc_12345
@@ -148,7 +148,7 @@ Many dashboard views support URL parameters:
 ### Token Usage Chart
 
 - Line chart showing usage over time
-- Stacked by domain or account
+- Stacked by train ID or account
 - Zoom and pan capabilities
 - Export as PNG/SVG
 

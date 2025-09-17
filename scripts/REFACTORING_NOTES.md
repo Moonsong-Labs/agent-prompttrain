@@ -49,7 +49,7 @@ interface ApiRequest {
   conversation_id: string
   timestamp: Date
   model?: string
-  domain?: string
+  trainId?: string
   [key: string]: any
 }
 ```

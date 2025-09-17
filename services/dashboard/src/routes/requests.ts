@@ -7,7 +7,7 @@ import { layout } from '../layout/index.js'
 export const requestsRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -16,7 +16,7 @@ export const requestsRoutes = new Hono<{
  */
 requestsRoutes.get('/requests', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
   if (!apiClient) {
     return c.html(
@@ -36,17 +36,17 @@ requestsRoutes.get('/requests', async c => {
     totalRequests: 0,
     totalTokens: 0,
     estimatedCost: 0,
-    activeDomains: 0,
+    activeTrainIds: 0,
   }
   let recentRequests: any[] = []
-  let domains: Array<{ domain: string; requestCount: number }> = []
+  let trainIds: Array<{ trainId: string; requestCount: number }> = []
   let error: string | null = null
 
   // Fetch data from Proxy API with individual error handling
   const results = await Promise.allSettled([
-    apiClient.getStats({ domain }),
-    apiClient.getRequests({ domain, limit: 20 }),
-    apiClient.getDomains(),
+    apiClient.getStats({ trainId }),
+    apiClient.getRequests({ trainId, limit: 20 }),
+    apiClient.getTrainIds(),
   ])
 
   // Handle stats result
@@ -56,7 +56,7 @@ requestsRoutes.get('/requests', async c => {
       totalRequests: statsResponse.totalRequests,
       totalTokens: statsResponse.totalTokens,
       estimatedCost: (statsResponse.totalTokens / 1000) * 0.002,
-      activeDomains: statsResponse.activeDomains,
+      activeTrainIds: statsResponse.activeTrainIds,
     }
   } else {
     console.error('Failed to fetch stats:', results[0].reason)
@@ -69,12 +69,13 @@ requestsRoutes.get('/requests', async c => {
     console.error('Failed to fetch requests:', results[1].reason)
   }
 
-  // Handle domains result
+  // Handle train ID result
   if (results[2].status === 'fulfilled') {
-    domains = results[2].value.domains
+    const value = results[2].value
+    trainIds = value.trainIds ?? []
   } else {
-    console.error('Failed to fetch domains:', results[2].reason)
-    // Don't show error banner for domains failure since it's not critical
+    console.error('Failed to fetch train IDs:', results[2].reason)
+    // Don't show error banner for train ID failure since it's not critical
   }
 
   // Only show error if critical data (stats or requests) failed
@@ -89,19 +90,19 @@ requestsRoutes.get('/requests', async c => {
       <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
     </div>
 
-    <!-- Domain Filter -->
+    <!-- Train Filter -->
     <div class="mb-6">
-      <label class="text-sm text-gray-600">Filter by Domain:</label>
+      <label class="text-sm text-gray-600">Filter by Train ID:</label>
       <select
-        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?domain=' + this.value : '')"
+        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?trainId=' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
-        <option value="">All Domains</option>
+        <option value="">All Train IDs</option>
         ${raw(
-          domains
+          trainIds
             .map(
               d =>
-                `<option value="${d.domain}" ${domain === d.domain ? 'selected' : ''}>${d.domain} (${d.requestCount})</option>`
+                `<option value="${d.trainId}" ${trainId === d.trainId ? 'selected' : ''}>${d.trainId} (${d.requestCount})</option>`
             )
             .join('')
         )}
@@ -126,9 +127,9 @@ requestsRoutes.get('/requests', async c => {
         <div class="stat-meta">Based on token usage</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Domains</div>
-        <div class="stat-value">${stats.activeDomains}</div>
-        <div class="stat-meta">Unique domains</div>
+        <div class="stat-label">Active Train IDs</div>
+        <div class="stat-value">${stats.activeTrainIds}</div>
+        <div class="stat-meta">Unique train identifiers</div>
       </div>
     </div>
 
@@ -137,7 +138,7 @@ requestsRoutes.get('/requests', async c => {
       <div class="section-header">
         Recent Requests
         <a
-          href="/dashboard/requests${domain ? '?domain=' + domain : ''}"
+          href="/dashboard/requests${trainId ? '?trainId=' + trainId : ''}"
           class="btn btn-secondary"
           style="float: right; font-size: 0.75rem; padding: 0.25rem 0.75rem;"
           >Refresh</a
@@ -151,7 +152,7 @@ requestsRoutes.get('/requests', async c => {
                 <thead>
                   <tr>
                     <th>Time</th>
-                    <th>Domain</th>
+                    <th>Train ID</th>
                     <th>Model</th>
                     <th>Tokens</th>
                     <th>Status</th>
@@ -165,7 +166,7 @@ requestsRoutes.get('/requests', async c => {
                         req => `
                 <tr>
                   <td class="text-sm">${formatRelativeTime(req.timestamp)}</td>
-                  <td class="text-sm">${escapeHtml(req.domain)}</td>
+                  <td class="text-sm">${escapeHtml(req.trainId || 'unknown')}</td>
                   <td class="text-sm">${req.model || 'N/A'}</td>
                   <td class="text-sm">${formatNumber(req.totalTokens || 0)}</td>
                   <td class="text-sm">${req.responseStatus || 'N/A'}</td>

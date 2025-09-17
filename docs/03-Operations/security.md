@@ -27,7 +27,7 @@ The proxy supports multiple authentication layers:
 bun run auth:generate-key
 # Output: cnp_live_1a2b3c4d5e6f...
 
-# Add to domain credentials
+# Add to train credentials
 {
   "client_api_key": "cnp_live_1a2b3c4d5e6f..."
 }
@@ -92,7 +92,7 @@ Best practices for key rotation:
 
 ```bash
 # Update credential file - proxy reloads automatically
-echo '{"client_api_key": "new_key"}' > credentials/domain.json
+echo '{"client_api_key": "new_key"}' > credentials/train-id.json
 ```
 
 3. Monitor old key usage before removal
@@ -175,7 +175,7 @@ location / {
 The proxy logs all requests with:
 
 - Timestamp
-- Domain
+- Train ID
 - Request ID
 - IP address
 - Response status
@@ -185,10 +185,10 @@ The proxy logs all requests with:
 1. **Failed Authentication Attempts**:
 
 ```sql
-SELECT COUNT(*), ip_address, domain
+SELECT COUNT(*), ip_address, train_id
 FROM api_requests
 WHERE response_status = 401
-GROUP BY ip_address, domain
+GROUP BY ip_address, train_id
 HAVING COUNT(*) > 10;
 ```
 
@@ -196,9 +196,9 @@ HAVING COUNT(*) > 10;
 
 ```sql
 -- Detect token usage spikes
-SELECT domain, DATE(timestamp), SUM(total_tokens)
+SELECT train_id, DATE(timestamp), SUM(total_tokens)
 FROM api_requests
-GROUP BY domain, DATE(timestamp)
+GROUP BY train_id, DATE(timestamp)
 HAVING SUM(total_tokens) > average_daily_usage * 2;
 ```
 

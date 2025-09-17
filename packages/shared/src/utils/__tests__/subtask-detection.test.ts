@@ -31,7 +31,7 @@ describe('ConversationLinker - Subtask Detection', () => {
 
   // Mock subtask query executor
   const mockSubtaskQueryExecutor = async (
-    domain: string,
+    trainId: string,
     timestamp: Date,
     debugMode?: boolean,
     subtaskPrompt?: string
@@ -92,7 +92,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -126,7 +126,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -154,7 +154,7 @@ describe('ConversationLinker - Subtask Detection', () => {
 
     it('should not detect subtask when no task context provided', async () => {
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -196,7 +196,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -229,7 +229,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -260,7 +260,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'user',
@@ -296,7 +296,7 @@ describe('ConversationLinker - Subtask Detection', () => {
       ]
 
       const request: LinkingRequest = {
-        domain: 'example.com',
+        trainId: 'example.com',
         messages: [
           {
             role: 'assistant',

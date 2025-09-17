@@ -20,11 +20,11 @@ cp .env.example .env
 
 ### 2. Create credentials
 
-Create credential files for your domain:
+Create credential files for your train identifier:
 
 ```bash
 # For OAuth (Claude Code)
-cat > credentials/localhost:3000.credentials.json << 'EOF'
+cat > credentials/train-alpha.credentials.json << 'EOF'
 {
   "type": "oauth",
   "accountId": "acc_unique_identifier",
@@ -40,10 +40,13 @@ EOF
 
 # Create single source of credentials
 mkdir -p client-setup
-cp credentials/localhost:3000.credentials.json client-setup/.credentials.json
+cp credentials/train-alpha.credentials.json client-setup/.credentials.json
 
 # Link for proxy service (avoids duplication)
-ln -sf ../client-setup/.credentials.json credentials/proxy:3000.credentials.json
+ln -sf ../client-setup/.credentials.json credentials/proxy.credentials.json
+
+# Configure outgoing requests to tag the train ID
+echo 'ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"' >> .env
 ```
 
 ### 3. Start services

@@ -7,18 +7,18 @@ import { container } from '../container.js'
 
 // Query parameter schemas
 const statsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   since: z.string().datetime().optional(),
 })
 
 const requestsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('100'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
 })
 
 const conversationsQuerySchema = z.object({
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   accountId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('50'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
@@ -36,14 +36,14 @@ interface StatsResponse {
   totalCacheReadTokens: number
   averageResponseTime: number
   errorCount: number
-  activeDomains: number
+  activeTrains: number
   requestsByModel: Record<string, number>
   requestsByType: Record<string, number>
 }
 
 interface RequestSummary {
   requestId: string
-  domain: string
+  trainId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -107,9 +107,9 @@ apiRoutes.get('/stats', async c => {
     const values = []
     let paramCount = 0
 
-    if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(params.domain)
+    if (params.trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(params.trainId)
     }
 
     if (params.since) {
@@ -133,7 +133,7 @@ apiRoutes.get('/stats', async c => {
         COALESCE(SUM(cache_read_input_tokens), 0) as total_cache_read_tokens,
         COALESCE(AVG(duration_ms), 0) as avg_response_time,
         COUNT(*) FILTER (WHERE error IS NOT NULL) as error_count,
-        COUNT(DISTINCT domain) as active_domains
+        COUNT(DISTINCT train_id) as active_trains
       FROM api_requests
       ${whereClause}
     `
@@ -177,7 +177,7 @@ apiRoutes.get('/stats', async c => {
       totalCacheReadTokens: parseInt(stats.total_cache_read_tokens) || 0,
       averageResponseTime: parseFloat(stats.avg_response_time) || 0,
       errorCount: parseInt(stats.error_count) || 0,
-      activeDomains: parseInt(stats.active_domains) || 0,
+      activeTrains: parseInt(stats.active_trains) || 0,
       requestsByModel,
       requestsByType,
     }
@@ -207,16 +207,16 @@ apiRoutes.get('/dashboard/stats', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.trainId
     const accountId = query.accountId
 
     const conditions: string[] = []
     const values: any[] = []
     let paramCount = 0
 
-    if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(domain)
+    if (trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(trainId)
     }
 
     if (accountId) {
@@ -360,9 +360,9 @@ apiRoutes.get('/requests', async c => {
     const values = []
     let paramCount = 0
 
-    if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(params.domain)
+    if (params.trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(params.trainId)
     }
 
     // Add limit and offset
@@ -374,7 +374,7 @@ apiRoutes.get('/requests', async c => {
     const requestsQuery = `
       SELECT 
         request_id,
-        domain,
+        train_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -395,7 +395,7 @@ apiRoutes.get('/requests', async c => {
 
     const requests: RequestSummary[] = result.rows.map(row => ({
       requestId: row.request_id,
-      domain: row.domain,
+      trainId: row.train_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -454,7 +454,7 @@ apiRoutes.get('/requests/:id', async c => {
     const requestQuery = `
       SELECT 
         request_id,
-        domain,
+        train_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -492,7 +492,7 @@ apiRoutes.get('/requests/:id', async c => {
 
     const details: RequestDetails = {
       requestId: row.request_id,
-      domain: row.domain,
+      trainId: row.train_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -534,9 +534,9 @@ apiRoutes.get('/requests/:id', async c => {
 })
 
 /**
- * GET /api/domains - Get list of active domains
+ * GET /api/train-ids - Get list of active train identifiers
  */
-apiRoutes.get('/domains', async c => {
+apiRoutes.get('/train-ids', async c => {
   let pool = c.get('pool')
 
   // Fallback: try to get pool from container if not in context
@@ -545,31 +545,31 @@ apiRoutes.get('/domains', async c => {
     pool = container.getDbPool()
 
     if (!pool) {
-      // Return empty domains list when database is not configured
-      logger.debug('Domains API called but database not configured')
-      return c.json({ domains: [] })
+      // Return empty list when database is not configured
+      logger.debug('Train IDs API called but database not configured')
+      return c.json({ trainIds: [] })
     }
   }
 
   try {
     const query = `
-      SELECT DISTINCT domain, COUNT(*) as request_count
+      SELECT DISTINCT train_id, COUNT(*) as request_count
       FROM api_requests
       WHERE timestamp > NOW() - INTERVAL '7 days'
-      GROUP BY domain
+      GROUP BY train_id
       ORDER BY request_count DESC
     `
 
     const result = await pool.query(query)
-    const domains = result.rows.map(row => ({
-      domain: row.domain,
+    const trainIds = result.rows.map(row => ({
+      trainId: row.train_id,
       requestCount: parseInt(row.request_count),
     }))
 
-    return c.json({ domains })
+    return c.json({ trainIds })
   } catch (error) {
-    logger.error('Failed to get domains', { error: getErrorMessage(error) })
-    return c.json({ error: 'Failed to retrieve domains' }, 500)
+    logger.error('Failed to get train IDs', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to retrieve train IDs' }, 500)
   }
 })
 
@@ -596,9 +596,9 @@ apiRoutes.get('/conversations', async c => {
     const values: any[] = []
     let paramCount = 0
 
-    if (params.domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(params.domain)
+    if (params.trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(params.trainId)
     }
 
     if (params.accountId) {
@@ -639,7 +639,7 @@ apiRoutes.get('/conversations', async c => {
         SELECT 
           r.request_id,
           r.conversation_id,
-          r.domain,
+          r.train_id,
           r.account_id,
           r.timestamp,
           r.input_tokens,
@@ -658,7 +658,7 @@ apiRoutes.get('/conversations', async c => {
       conversation_summary AS (
         SELECT 
           conversation_id,
-          domain,
+          train_id,
           account_id,
           MIN(timestamp) as first_message_time,
           MAX(timestamp) as last_message_time,
@@ -678,7 +678,7 @@ apiRoutes.get('/conversations', async c => {
           (array_agg(parent_task_request_id ORDER BY subtask_rn) FILTER (WHERE is_subtask = true AND subtask_rn = 1))[1] as parent_task_request_id,
           COUNT(CASE WHEN is_subtask THEN 1 END) as subtask_message_count
         FROM relevant_requests
-        GROUP BY conversation_id, domain, account_id
+        GROUP BY conversation_id, train_id, account_id
       )
       -- STEP 4: Final select with parent conversation lookup and preserve order
       SELECT 
@@ -724,7 +724,7 @@ apiRoutes.get('/conversations', async c => {
 
       return {
         conversationId: row.conversation_id,
-        domain: row.domain,
+        trainId: row.train_id,
         accountId: row.account_id,
         firstMessageTime: row.first_message_time,
         lastMessageTime: row.last_message_time,
@@ -769,14 +769,14 @@ apiRoutes.get('/conversations', async c => {
 // Token usage query schemas
 const tokenUsageWindowSchema = z.object({
   accountId: z.string(),
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   model: z.string().optional(),
   window: z.string().regex(/^\d+$/).transform(Number).default('300'), // Default 5 hours (300 minutes)
 })
 
 const tokenUsageDailySchema = z.object({
   accountId: z.string(),
-  domain: z.string().optional(),
+  trainId: z.string().optional(),
   days: z.string().regex(/^\d+$/).transform(Number).default('30'),
   aggregate: z
     .string()
@@ -802,7 +802,7 @@ apiRoutes.get('/token-usage/current', async c => {
     const usage = await tokenUsageService.getUsageWindow(
       params.accountId,
       windowHours,
-      params.domain,
+      params.trainId,
       params.model
     )
 
@@ -830,13 +830,13 @@ apiRoutes.get('/token-usage/daily', async c => {
     const query = c.req.query()
     const params = tokenUsageDailySchema.parse(query)
 
-    const usage = params.aggregate
-      ? await tokenUsageService.getAggregatedDailyUsage(
-          params.accountId,
-          params.days,
-          params.domain
-        )
-      : await tokenUsageService.getDailyUsage(params.accountId, params.days, params.domain)
+  const usage = params.aggregate
+    ? await tokenUsageService.getAggregatedDailyUsage(
+        params.accountId,
+        params.days,
+        params.trainId
+      )
+      : await tokenUsageService.getDailyUsage(params.accountId, params.days, params.trainId)
 
     return c.json({ usage })
   } catch (error) {
@@ -958,16 +958,16 @@ apiRoutes.get('/token-usage/accounts', async c => {
           AND timestamp >= NOW() - INTERVAL '5 hours'
         GROUP BY account_id
       ),
-      domain_usage AS (
+      train_usage AS (
         SELECT 
           account_id,
-          domain,
-          SUM(output_tokens) as domain_output_tokens,
-          COUNT(*) as domain_requests
+          train_id,
+          SUM(output_tokens) as train_output_tokens,
+          COUNT(*) as train_requests
         FROM api_requests
         WHERE account_id IS NOT NULL
           AND timestamp >= NOW() - INTERVAL '5 hours'
-        GROUP BY account_id, domain
+        GROUP BY account_id, train_id
       )
       SELECT 
         au.account_id,
@@ -978,15 +978,15 @@ apiRoutes.get('/token-usage/accounts', async c => {
         COALESCE(
           json_agg(
             json_build_object(
-              'domain', du.domain,
-              'outputTokens', du.domain_output_tokens,
-              'requests', du.domain_requests
-            ) ORDER BY du.domain_output_tokens DESC
-          ) FILTER (WHERE du.domain IS NOT NULL),
+              'trainId', tu.train_id,
+              'outputTokens', tu.train_output_tokens,
+              'requests', tu.train_requests
+            ) ORDER BY tu.train_output_tokens DESC
+          ) FILTER (WHERE tu.train_id IS NOT NULL),
           '[]'::json
-        ) as domains
+        ) as train_ids
       FROM account_usage au
-      LEFT JOIN domain_usage du ON au.account_id = du.account_id
+      LEFT JOIN train_usage tu ON au.account_id = tu.account_id
       GROUP BY au.account_id, au.total_output_tokens, au.total_input_tokens, 
                au.request_count, au.last_request_time
       ORDER BY au.total_output_tokens DESC
@@ -1004,7 +1004,7 @@ apiRoutes.get('/token-usage/accounts', async c => {
       lastRequestTime: row.last_request_time,
       remainingTokens: Math.max(0, tokenLimit - (parseInt(row.total_output_tokens) || 0)),
       percentageUsed: ((parseInt(row.total_output_tokens) || 0) / tokenLimit) * 100,
-      domains: row.domains || [],
+      trainIds: row.train_ids || [],
     }))
 
     // Fetch time series data for all accounts in a single query
@@ -1079,7 +1079,7 @@ apiRoutes.get('/token-usage/accounts', async c => {
 })
 
 /**
- * GET /api/usage/requests/hourly - Get hourly request counts by domain
+ * GET /api/usage/requests/hourly - Get hourly request counts by train ID
  */
 apiRoutes.get('/usage/requests/hourly', async c => {
   let pool = c.get('pool')
@@ -1093,7 +1093,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.trainId
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1109,18 +1109,18 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     conditions.push(`timestamp >= NOW() - ($${++paramCount} * INTERVAL '1 day')`)
     values.push(days)
 
-    // Optional domain filter
-    if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(domain)
+    // Optional train filter
+    if (trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(trainId)
     }
 
     const whereClause = conditions.join(' AND ')
 
-    // Query to get hourly request counts grouped by domain
+    // Query to get hourly request counts grouped by train ID
     const hourlyQuery = `
       SELECT
-        domain,
+        train_id,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COUNT(*) as request_count
       FROM
@@ -1128,24 +1128,24 @@ apiRoutes.get('/usage/requests/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        domain,
+        train_id,
         hour
       ORDER BY
-        domain,
+        train_id,
         hour
     `
 
     const result = await pool.query(hourlyQuery, values)
 
-    // Transform the flat result into nested structure by domain
+    // Transform the flat result into nested structure by train ID
     const data: Record<string, Array<{ hour: string; count: number }>> = {}
 
     result.rows.forEach(row => {
-      const domainKey = row.domain || 'unknown'
-      if (!data[domainKey]) {
-        data[domainKey] = []
+      const trainKey = row.train_id || 'unknown'
+      if (!data[trainKey]) {
+        data[trainKey] = []
       }
-      data[domainKey].push({
+      data[trainKey].push({
         hour: row.hour,
         count: parseInt(row.request_count),
       })
@@ -1154,7 +1154,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     return c.json({
       data,
       query: {
-        domain: domain || null,
+        trainId: trainId || null,
         days,
       },
     })
@@ -1168,7 +1168,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
 })
 
 /**
- * GET /api/usage/tokens/hourly - Get hourly token counts by domain (output tokens only)
+ * GET /api/usage/tokens/hourly - Get hourly token counts by train ID (output tokens only)
  */
 apiRoutes.get('/usage/tokens/hourly', async c => {
   let pool = c.get('pool')
@@ -1182,7 +1182,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const domain = query.domain
+    const trainId = query.trainId
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1198,18 +1198,18 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     conditions.push(`timestamp >= NOW() - ($${++paramCount} * INTERVAL '1 day')`)
     values.push(days)
 
-    // Optional domain filter
-    if (domain) {
-      conditions.push(`domain = $${++paramCount}`)
-      values.push(domain)
+    // Optional train filter
+    if (trainId) {
+      conditions.push(`train_id = $${++paramCount}`)
+      values.push(trainId)
     }
 
     const whereClause = conditions.join(' AND ')
 
-    // Query to get hourly token sums grouped by domain (output tokens only)
+    // Query to get hourly token sums grouped by train ID (output tokens only)
     const hourlyQuery = `
       SELECT
-        domain,
+        train_id,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COALESCE(SUM(output_tokens), 0) as token_count
       FROM
@@ -1217,25 +1217,25 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        domain,
+        train_id,
         hour
       ORDER BY
-        domain,
+        train_id,
         hour
     `
 
     const { rows } = await pool.query(hourlyQuery, values)
 
-    // Group results by domain
+    // Group results by train ID
     const data: Record<string, Array<{ hour: string; count: number }>> = {}
 
     for (const row of rows) {
-      const domainName = row.domain || 'unknown'
-      if (!data[domainName]) {
-        data[domainName] = []
+      const trainName = row.train_id || 'unknown'
+      if (!data[trainName]) {
+        data[trainName] = []
       }
 
-      data[domainName].push({
+      data[trainName].push({
         hour: row.hour.toISOString(),
         count: parseInt(row.token_count),
       })
@@ -1244,7 +1244,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     return c.json({
       data,
       query: {
-        domain: domain || null,
+        trainId: trainId || null,
         days,
       },
     })

@@ -227,7 +227,7 @@ bun run typecheck     # See all errors
 
 ### Using Test Credentials
 
-Create test domain credentials:
+Create test train credentials:
 
 ```bash
 cat > credentials/test.local.credentials.json << EOF

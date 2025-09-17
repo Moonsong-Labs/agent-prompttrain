@@ -12,7 +12,7 @@ describe('ProxyRequest - Request Type Identification', () => {
     it('should identify quota request when user content is exactly "quota"', () => {
       const request = new ProxyRequest(
         quotaSample.body as ClaudeMessagesRequest,
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -26,7 +26,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: 'QUOTA' }],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -40,7 +40,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: '  quota  ' }],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -52,7 +52,7 @@ describe('ProxyRequest - Request Type Identification', () => {
     it('should identify query_evaluation with 1 system message in field', () => {
       const request = new ProxyRequest(
         queryEvaluationSample.body as ClaudeMessagesRequest,
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -66,7 +66,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: 'What is 2+2?' }],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -83,7 +83,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           ],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -95,7 +95,7 @@ describe('ProxyRequest - Request Type Identification', () => {
     it('should identify inference with multiple system messages', () => {
       const request = new ProxyRequest(
         inferenceSample.body as ClaudeMessagesRequest,
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -113,7 +113,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -131,7 +131,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -148,7 +148,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -167,7 +167,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -188,7 +188,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -204,7 +204,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           messages: [],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -223,7 +223,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           ],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -248,7 +248,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 

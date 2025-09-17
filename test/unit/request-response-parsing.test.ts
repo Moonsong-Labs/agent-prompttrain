@@ -12,7 +12,7 @@ describe('ProxyRequest - Parsing', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -29,7 +29,7 @@ describe('ProxyRequest - Parsing', () => {
           max_tokens: 100,
           stream: true,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -43,7 +43,7 @@ describe('ProxyRequest - Parsing', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -72,7 +72,7 @@ describe('ProxyRequest - Parsing', () => {
             },
           ],
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -87,7 +87,7 @@ describe('ProxyRequest - Parsing', () => {
           messages: [{ role: 'user', content: 'Hello' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -102,7 +102,7 @@ describe('ProxyRequest - Parsing', () => {
           max_tokens: 100,
           tools: [],
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -119,7 +119,7 @@ describe('ProxyRequest - Parsing', () => {
           messages: [{ role: 'user', content: 'What is the weather?' }],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -141,7 +141,7 @@ describe('ProxyRequest - Parsing', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -167,7 +167,7 @@ describe('ProxyRequest - Parsing', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 

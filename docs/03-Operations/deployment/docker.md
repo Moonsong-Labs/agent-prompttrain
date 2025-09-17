@@ -329,7 +329,7 @@ curl http://localhost:3001/health
 
 1. **Application Metrics**:
    - Token usage: `/token-stats`
-   - Request counts by domain
+   - Request counts by train ID
    - Response times
 
 2. **System Metrics**:

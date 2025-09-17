@@ -15,7 +15,7 @@ The AI Analysis API provides endpoints for managing AI-powered conversation anal
 ### Key Features
 
 - **Asynchronous Processing**: Analysis requests are processed in the background
-- **Rate Limiting**: 15 creation requests/minute, 100 retrieval requests/minute per domain
+- **Rate Limiting**: 15 creation requests/minute, 100 retrieval requests/minute per train ID
 - **Authentication**: Requires `X-Dashboard-Key` header
 - **Structured Analysis**: Returns both markdown content and structured JSON data
 

@@ -5,7 +5,7 @@
   "expectedBranchId": "main",
   "parent": {
     "request_id": "8705f3ad-a4ee-4e2f-ba21-0d51d0c6077a",
-    "domain": "claude-datahaven.msldev.io",
+    "trainId": "claude-datahaven.msldev.io",
     "conversation_id": "cad9288f-e9b8-4b37-b00f-ccf3de69ca8e",
     "branch_id": "main",
     "current_message_hash": "94f3b1ebe11bef07b142b59b82c651b5ae3716d7158c0085523890c7e99645a8",
@@ -171,7 +171,7 @@
   },
   "child": {
     "request_id": "3412bdc6-c2dc-4d4f-8541-ee2ab4db268a",
-    "domain": "claude-datahaven.msldev.io",
+    "trainId": "claude-datahaven.msldev.io",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

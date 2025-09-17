@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Agent Prompt Train initially operated as an open relay, forwarding any request to the Claude API as long as the domain had valid Claude credentials. This created security risks:
+The Agent Prompt Train initially operated as an open relay, forwarding any request to the Claude API as long as the train (inferred from the Host header) had valid Claude credentials. This created security risks:
 
 - Anyone knowing the proxy endpoint could use it
 - No way to revoke access without changing Claude API keys
@@ -22,7 +22,7 @@ We needed a way to authenticate clients at the proxy level while maintaining bac
 - **Simplicity**: Easy to implement and understand
 - **Standards Compliance**: Use established authentication patterns
 - **Performance**: Minimal overhead on request processing
-- **Flexibility**: Support different authentication needs per domain
+- **Flexibility**: Support different authentication needs per train
 
 ## Considered Options
 
@@ -53,7 +53,7 @@ We needed a way to authenticate clients at the proxy level while maintaining bac
 
 ## Decision
 
-We will implement **Bearer Token Authentication** with domain-specific API keys stored in credential files.
+We will implement **Bearer Token Authentication** with train-specific API keys stored in credential files.
 
 ### Implementation Details
 
@@ -61,8 +61,8 @@ We will implement **Bearer Token Authentication** with domain-specific API keys 
 
    ```
    Client → Proxy: Authorization: Bearer cnp_live_xxx...
-   Proxy: Extract domain from Host header
-   Proxy: Load credentials/<domain>.credentials.json
+   Proxy: Extract train ID from `train-id` header
+   Proxy: Load credentials/<train-id>.credentials.json
    Proxy: Compare tokens using timing-safe SHA-256
    Proxy → Claude: Forward if authenticated
    ```
@@ -94,7 +94,7 @@ We will implement **Bearer Token Authentication** with domain-specific API keys 
 ### Positive
 
 - **Enhanced Security**: Only authorized clients can use the proxy
-- **Per-Domain Control**: Each domain has independent authentication
+- **Per-Train Control**: Each train has independent authentication
 - **Standards Compliance**: Uses OAuth 2.0 Bearer token standard
 - **Audit Trail**: All authentication attempts are logged
 - **Backward Compatible**: Can be disabled via `ENABLE_CLIENT_AUTH=false`
@@ -104,14 +104,14 @@ We will implement **Bearer Token Authentication** with domain-specific API keys 
 
 - **Key Management**: Additional keys to generate and distribute
 - **No Built-in Rotation**: Manual process to rotate keys
-- **Single Key per Domain**: No support for multiple keys per domain
+- **Single Key per Train**: No support for multiple keys per train
 - **No Rate Limiting**: Authentication doesn't include rate limiting
 
 ### Risks and Mitigations
 
 - **Risk**: Leaked client API keys
   - **Mitigation**: Keys can be revoked by updating credential files
-  - **Mitigation**: Keys are domain-specific, limiting blast radius
+  - **Mitigation**: Keys are train-specific, limiting blast radius
 
 - **Risk**: Timing attacks on key comparison
   - **Mitigation**: SHA-256 hashing ensures constant-time comparison
@@ -122,14 +122,14 @@ We will implement **Bearer Token Authentication** with domain-specific API keys 
 ## Implementation Notes
 
 - Introduced in PR #2
-- Two new middleware components: `domainExtractorMiddleware` and `clientAuthMiddleware`
+- Two new middleware components: `trainIdExtractorMiddleware` and `clientAuthMiddleware`
 - 11 test cases with 91.53% code coverage
 - Script provided for key generation: `scripts/generate-api-key.ts`
 
 ## Future Enhancements
 
 1. **Key Rotation**: Automated key rotation with grace period
-2. **Multiple Keys**: Support multiple valid keys per domain
+2. **Multiple Keys**: Support multiple valid keys per train
 3. **Key Expiration**: Time-limited keys
 4. **Rate Limiting**: Per-key rate limiting
 5. **API Key Management**: API endpoints for key management

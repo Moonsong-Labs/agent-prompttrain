@@ -11,7 +11,7 @@ import { csrfProtection } from '../middleware/csrf.js'
 const promptsRoute = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
     csrfToken?: string
   }
 }>()
@@ -21,7 +21,7 @@ promptsRoute.use('*', csrfProtection())
 
 promptsRoute.get('/', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain') || undefined
+  const trainId = c.req.query('trainId') || undefined
   const page = parseInt(c.req.query('page') || '1')
   const search = c.req.query('search') || undefined
 
@@ -41,7 +41,7 @@ promptsRoute.get('/', async c => {
   try {
     // Fetch prompts
     const { prompts, total } = await apiClient.get<{ prompts: any[]; total: number }>(
-      `/api/mcp/prompts?page=${page}&limit=20${search ? `&search=${encodeURIComponent(search)}` : ''}${domain ? `&domain=${domain}` : ''}`
+      `/api/mcp/prompts?page=${page}&limit=20${search ? `&search=${encodeURIComponent(search)}` : ''}${trainId ? `&trainId=${trainId}` : ''}`
     )
 
     // Fetch sync status

@@ -23,6 +23,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | `DASHBOARD_API_KEY`  | API key for dashboard authentication | -       | ✅       |
 | `ENABLE_CLIENT_AUTH` | Enable client API key authentication | `true`  | ❌       |
 
+
+### Train Identification
+
+| Variable | Description | Default | Required |
+| -------- | ----------- | ------- | -------- |
+| `ANTHROPIC_CUSTOM_HEADERS` | Custom headers forwarded to the Anthropic API. Set to `\"X-Train-Id:<your_train>\"` so the proxy tags outgoing requests with the correct train identifier. | - | ❌ |
+
 ## Feature Flags
 
 | Variable               | Description                         | Default |
@@ -46,14 +53,6 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | Variable              | Description                   | Default |
 | --------------------- | ----------------------------- | ------- |
 | `DASHBOARD_CACHE_TTL` | Dashboard cache TTL (seconds) | `30`    |
-
-### Wildcard Credentials
-
-| Variable                   | Description                                           | Default  |
-| -------------------------- | ----------------------------------------------------- | -------- |
-| `CNP_WILDCARD_CREDENTIALS` | Enable wildcard subdomain support (true/false/shadow) | `false`  |
-| `CNP_RESOLUTION_CACHE_TTL` | TTL for credential resolution cache (ms)              | `300000` |
-| `CNP_DEBUG_RESOLUTION`     | Enable debug logging for credential resolution        | `false`  |
 
 ## Service Configuration
 
@@ -97,7 +96,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 | Variable           | Description                    | Default          |
 | ------------------ | ------------------------------ | ---------------- |
-| `CREDENTIALS_DIR`  | Directory for credential files | `./credentials`  |
+| `CREDENTIALS_DIR`  | Directory for train credential files | `./credentials`  |
 | `TEST_SAMPLES_DIR` | Directory for test samples     | `./test-samples` |
 
 ## AI Analysis Configuration

@@ -13,7 +13,7 @@ export async function handleSSE(c: Context) {
   c.header('Connection', 'keep-alive')
   c.header('X-Accel-Buffering', 'no') // Disable nginx buffering
 
-  const domain = c.req.query('domain') || 'global'
+  const trainId = c.req.query('trainId') || 'global'
 
   // Create a stream
   const encoder = new TextEncoder()
@@ -41,10 +41,10 @@ export async function handleSSE(c: Context) {
         }
       }
 
-      if (!connections.has(domain)) {
-        connections.set(domain, new Set())
+      if (!connections.has(trainId)) {
+        connections.set(trainId, new Set())
       }
-      connections.get(domain)!.add(send)
+      connections.get(trainId)!.add(send)
 
       // Heartbeat to keep connection alive
       intervalId = setInterval(() => {
@@ -59,11 +59,11 @@ export async function handleSSE(c: Context) {
     cancel() {
       // Clean up on disconnect
       clearInterval(intervalId)
-      const domainConnections = connections.get(domain)
-      if (domainConnections && send) {
-        domainConnections.forEach(conn => {
+      const trainIdConnections = connections.get(trainId)
+      if (trainIdConnections && send) {
+        trainIdConnections.forEach(conn => {
           if (conn === send) {
-            domainConnections.delete(conn)
+            trainIdConnections.delete(conn)
           }
         })
       }
@@ -78,21 +78,21 @@ export async function handleSSE(c: Context) {
 /**
  * Broadcast event to connections
  */
-export function broadcastEvent(event: { type: string; domain?: string; data: any }) {
+export function broadcastEvent(event: { type: string; trainId?: string; data: any }) {
   const message = JSON.stringify({
     type: event.type,
     data: event.data,
     timestamp: new Date().toISOString(),
   })
 
-  // Send to domain-specific connections
-  if (event.domain && connections.has(event.domain)) {
-    connections.get(event.domain)!.forEach(send => {
+  // Send to trainId-specific connections
+  if (event.trainId && connections.has(event.trainId)) {
+    connections.get(event.trainId)!.forEach(send => {
       try {
         send(message)
       } catch (_e) {
         // Remove dead connection
-        connections.get(event.domain!)!.delete(send)
+        connections.get(event.trainId!)!.delete(send)
       }
     })
   }

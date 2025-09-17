@@ -249,7 +249,7 @@ In January 2025, we completed a major architectural evolution to consolidate all
 **Implementation Details**:
 
 1. **SQL-based Task Retrieval** (StorageAdapter.loadTaskContext):
-   - Queries last 24 hours of Task invocations per domain
+   - Queries last 24 hours of Task invocations per train_id
    - Filters to 30-second window for actual matching
    - Optimized with GIN indexes on JSONB response_body
    - No memory overhead from caching
@@ -277,7 +277,7 @@ In January 2025, we completed a major architectural evolution to consolidate all
 
 ## Future Enhancements
 
-1. **Configurable Time Window**: Per-domain task matching windows
+1. **Configurable Time Window**: Per-train_id task matching windows
 2. **Task Status Tracking**: Monitor running/completed/failed states
 3. **Recursive Task Trees**: Support sub-tasks spawning sub-tasks
 4. **Task Templates**: Recognize common task patterns

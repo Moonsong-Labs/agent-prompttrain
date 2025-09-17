@@ -8,7 +8,7 @@ import type { Pool } from 'pg'
 export interface DashboardEnv {
   Variables: {
     apiClient?: any // ProxyApiClient from dashboard service
-    domain?: string
+    trainId?: string
   }
 }
 
@@ -16,6 +16,6 @@ export interface DashboardEnv {
 export interface ProxyEnv {
   Variables: {
     pool?: Pool
-    domain?: string
+    trainId?: string
   }
 }

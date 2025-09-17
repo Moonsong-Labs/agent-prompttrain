@@ -31,9 +31,9 @@ Each EC2 instance should have the following structure in the ubuntu user's home 
 ├── .env                          # Environment configuration
 ├── agent-prompttrain/                 # Git repository
 │   └── scripts/ops/              # Operational scripts
-├── credentials/                  # Domain credential files
-│   ├── domain1.com.credentials.json
-│   └── domain2.com.credentials.json
+├── credentials/                  # Train credential files
+│   ├── train-alpha.credentials.json
+│   └── train-beta.credentials.json
 ```
 
 ### Required AWS Tags

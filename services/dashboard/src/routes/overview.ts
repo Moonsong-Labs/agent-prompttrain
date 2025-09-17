@@ -13,7 +13,7 @@ import { layout } from '../layout/index.js'
 export const overviewRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 
@@ -21,7 +21,7 @@ export const overviewRoutes = new Hono<{
  * Main dashboard page - Shows conversations overview with branches
  */
 overviewRoutes.get('/', async c => {
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const page = parseInt(c.req.query('page') || '1')
   const perPage = parseInt(c.req.query('per_page') || '50')
   const searchQuery = c.req.query('search')?.toLowerCase()
@@ -52,9 +52,9 @@ overviewRoutes.get('/', async c => {
 
     // Fetch dashboard stats and the requested page of conversations in parallel
     const [statsResult, conversationsResult] = await Promise.all([
-      apiClient.getDashboardStats({ domain }),
+      apiClient.getDashboardStats({ trainId }),
       apiClient.getConversations({
-        domain,
+        trainId,
         limit: itemsPerPage,
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
       }),
@@ -76,7 +76,7 @@ overviewRoutes.get('/', async c => {
       tokens: number
       firstMessage: Date
       lastMessage: Date
-      domain: string
+      trainId: string
       latestRequestId?: string
       latestModel?: string
       latestContextTokens?: number
@@ -100,7 +100,7 @@ overviewRoutes.get('/', async c => {
         tokens: conv.totalTokens,
         firstMessage: new Date(conv.firstMessageTime),
         lastMessage: new Date(conv.lastMessageTime),
-        domain: conv.domain,
+        trainId: conv.trainId ,
         latestRequestId: conv.latestRequestId,
         latestModel: conv.latestModel,
         latestContextTokens: conv.latestContextTokens,
@@ -118,7 +118,7 @@ overviewRoutes.get('/', async c => {
         return (
           branch.conversationId.toLowerCase().includes(searchQuery) ||
           branch.branch.toLowerCase().includes(searchQuery) ||
-          branch.domain.toLowerCase().includes(searchQuery)
+          branch.trainId.toLowerCase().includes(searchQuery)
         )
       })
     }
@@ -129,8 +129,8 @@ overviewRoutes.get('/', async c => {
     // No longer filter subtasks - display all conversations at the same level
     const groupedConversations = filteredBranches
 
-    // Get unique domains for the dropdown
-    const uniqueDomains = [...new Set(conversationBranches.map(branch => branch.domain))].sort()
+    // Get unique train IDs for the dropdown
+    const uniqueTrainIds = [...new Set(conversationBranches.map(branch => branch.trainId))].sort()
 
     // Use pre-computed stats from the API instead of calculating client-side
     const totalRequests = dashboardStats.totalRequests
@@ -156,8 +156,8 @@ overviewRoutes.get('/', async c => {
         <div style="display: flex; gap: 1rem; align-items: center;">
           <!-- Search Bar -->
           <form action="/dashboard" method="get" style="display: flex; gap: 0.5rem;">
-            ${domain
-              ? html`<input type="hidden" name="domain" value="${escapeHtml(domain)}" />`
+            ${trainId
+              ? html`<input type="hidden" name="trainId" value="${escapeHtml(trainId)}" />`
               : ''}
             <input type="hidden" name="page" value="1" />
             <input type="hidden" name="per_page" value="${itemsPerPage}" />
@@ -177,8 +177,8 @@ overviewRoutes.get('/', async c => {
             </button>
           </form>
           <a
-            href="/dashboard?refresh=true&page=${currentPage}&per_page=${itemsPerPage}${domain
-              ? `&domain=${encodeURIComponent(domain)}`
+            href="/dashboard?refresh=true&page=${currentPage}&per_page=${itemsPerPage}${trainId
+              ? `&trainId=${encodeURIComponent(trainId)}`
               : ''}${searchQuery
               ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
               : ''}"
@@ -190,21 +190,21 @@ overviewRoutes.get('/', async c => {
         </div>
       </div>
 
-      <!-- Domain Filter -->
+      <!-- Train Filter -->
       <div style="margin-bottom: 1.5rem;">
-        <label class="text-sm text-gray-600">Filter by Domain:</label>
+        <label class="text-sm text-gray-600">Filter by Train ID:</label>
         <select
-          onchange="window.location.href = '/dashboard' + (this.value ? '?domain=' + this.value : '?') + '&page=1&per_page=${itemsPerPage}${searchQuery
+          onchange="window.location.href = '/dashboard' + (this.value ? '?trainId=' + this.value : '?') + '&page=1&per_page=${itemsPerPage}${searchQuery
             ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
             : ''}'"
           style="margin-left: 0.5rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;"
         >
-          <option value="">All Domains</option>
+          <option value="">All Train IDs</option>
           ${raw(
-            uniqueDomains
+            uniqueTrainIds
               .map(
-                d =>
-                  `<option value="${escapeHtml(d)}" ${domain === d ? 'selected' : ''}>${escapeHtml(d)}</option>`
+                id =>
+                  `<option value="${escapeHtml(id)}" ${trainId === id ? 'selected' : ''}>${escapeHtml(id)}</option>`
               )
               .join('')
           )}
@@ -254,7 +254,7 @@ overviewRoutes.get('/', async c => {
                       <th>Conversation</th>
                       <th>Branches</th>
                       <th>Account</th>
-                      <th>Domain</th>
+                      <th>Train ID</th>
                       <th>Requests</th>
                       <th>Tokens</th>
                       <th>Context</th>
@@ -339,7 +339,7 @@ overviewRoutes.get('/', async c => {
                                     : '<span class="text-gray-400">N/A</span>'
                                 }
                               </td>
-                              <td class="text-sm">${escapeHtml(branch.domain)}</td>
+                              <td class="text-sm">${escapeHtml(branch.trainId)}</td>
                               <td class="text-sm">${branch.messageCount}</td>
                               <td class="text-sm">${formatNumber(branch.tokens)}</td>
                               <td class="text-sm">${
@@ -402,8 +402,8 @@ overviewRoutes.get('/', async c => {
                         ${currentPage > 1
                           ? html`
                               <a
-                                href="?page=${currentPage - 1}${domain
-                                  ? `&domain=${domain}`
+                                href="?page=${currentPage - 1}${trainId
+                                  ? `&trainId=${trainId}`
                                   : ''}&per_page=${itemsPerPage}${searchQuery
                                   ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                   : ''}"
@@ -422,8 +422,8 @@ overviewRoutes.get('/', async c => {
                                 ? html`<span class="pagination-current">${pageNum}</span>`
                                 : html`
                                     <a
-                                      href="?page=${pageNum}${domain
-                                        ? `&domain=${domain}`
+                                      href="?page=${pageNum}${trainId
+                                        ? `&trainId=${trainId}`
                                         : ''}&per_page=${itemsPerPage}${searchQuery
                                         ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                         : ''}"
@@ -438,8 +438,8 @@ overviewRoutes.get('/', async c => {
                         ${currentPage < totalPages
                           ? html`
                               <a
-                                href="?page=${currentPage + 1}${domain
-                                  ? `&domain=${domain}`
+                                href="?page=${currentPage + 1}${trainId
+                                  ? `&trainId=${trainId}`
                                   : ''}&per_page=${itemsPerPage}${searchQuery
                                   ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                                   : ''}"
@@ -453,8 +453,8 @@ overviewRoutes.get('/', async c => {
                         <div style="margin-left: 2rem; color: #6b7280; font-size: 0.875rem;">
                           Items per page:
                           <select
-                            onchange="window.location.href='?page=1${domain
-                              ? `&domain=${domain}`
+                            onchange="window.location.href='?page=1${trainId
+                              ? `&trainId=${trainId}`
                               : ''}&per_page=' + this.value + '${searchQuery
                               ? `&search=${encodeURIComponent(c.req.query('search') || '')}`
                               : ''}'"

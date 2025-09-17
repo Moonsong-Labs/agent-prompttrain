@@ -7,7 +7,7 @@ import { Context } from 'hono'
 export class RequestContext {
   constructor(
     public readonly requestId: string,
-    public readonly host: string,
+    public readonly trainId: string,
     public readonly method: string,
     public readonly path: string,
     public readonly startTime: number,
@@ -26,7 +26,11 @@ export class RequestContext {
         'RequestContext: requestId not found in context. Ensure request-id middleware is applied.'
       )
     }
-    const host = c.req.header('host') || 'unknown'
+    const trainId =
+      c.get('trainId') ||
+      c.req.header('train-id') ||
+      c.req.header('x-train-id') ||
+      'unknown'
     // Only accept Bearer tokens from Authorization header (not x-api-key)
     const apiKey = c.req.header('authorization')
 
@@ -43,7 +47,7 @@ export class RequestContext {
 
     return new RequestContext(
       requestId,
-      host,
+      trainId,
       c.req.method,
       c.req.path,
       Date.now(),
@@ -66,7 +70,7 @@ export class RequestContext {
   toTelemetry() {
     return {
       requestId: this.requestId,
-      domain: this.host,
+      trainId: this.trainId,
       method: this.method,
       path: this.path,
       duration: this.getElapsedTime(),

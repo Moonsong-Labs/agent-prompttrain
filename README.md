@@ -53,7 +53,7 @@ _Note: This is a read-only demo showcasing real usage data from our development 
 - 🔀 **Conversation Tracking** - Automatic message threading with branch, sub-agent & compact support
 - 📊 **Real-time Dashboard** - Monitor usage, view conversations, and analyze patterns
 - 🔐 **Multi-Auth Support** - API keys and OAuth with auto-refresh
-- 📈 **Token Tracking** - Detailed usage statistics per domain and account
+- 📈 **Token Tracking** - Detailed usage statistics per train and account
 - 🔄 **Streaming Support** - Full SSE streaming with chunk storage
 - 🐳 **Docker Ready** - Separate optimized images for each service
 - 🤖 **Claude CLI Integration** - Run Claude CLI connected to the proxy
@@ -119,7 +119,7 @@ For developers who need complete visibility, access the raw JSON view of any req
 
 For administrators or heavy users, you can follow the token usage and see when approaching the rate limits.
 
-</kbd><img width="400" alt="Token usage graph line per domain" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
+</kbd><img width="400" alt="Token usage graph line per train" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
 
 ## Quick Start
 
@@ -297,16 +297,16 @@ DEBUG=false
 
 See the [Documentation](docs/README.md) for complete configuration options.
 
-### Domain Credentials
+### Train Credentials
 
-Create domain-specific credentials:
+Create train-specific credentials:
 
 ```bash
 # Generate secure API key
 bun run auth:generate-key
 
 # Create credential file
-cat > credentials/example.com.credentials.json << EOF
+cat > credentials/train-alpha.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_name_to_display",
@@ -316,15 +316,16 @@ cat > credentials/example.com.credentials.json << EOF
 EOF
 ```
 
-(_Use `credentials/localhost\:3000.credentials.json` for using it locally_)
+(_Use `credentials/train-local.credentials.json` for using it locally_)
 
 #### Wildcard Credentials
 
-You can use wildcard credentials to match multiple subdomains with a single credential file:
+You can use wildcard credentials to match multiple trains with a single credential file:
 
 ```bash
-# Matches all subdomains of example.com (api.example.com, staging.example.com, etc.)
-cat > credentials/_wildcard.example.com.credentials.json << EOF
+# Matches train IDs matching pattern (train-beta-preview, etc.)
+# Matches all trains sharing prefix (train-beta-*)
+cat > credentials/_wildcard.train-beta.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_name_to_display",
@@ -337,12 +338,18 @@ EOF
 export CNP_WILDCARD_CREDENTIALS=true
 ```
 
-Note: Exact matches take precedence over wildcards. See [ADR-023](docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md) for details.
+Note: Exact matches take precedence over wildcards.
+
+Configure outbound requests to include the train header:
+
+```bash
+export ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"
+```
 
 Authenticate your credential with Claude MAX Plan:
 
 ```bash
-./scripts/auth/oauth-login.ts credentials/example.com.credentials.json
+./scripts/auth/oauth-login.ts credentials/train-alpha.credentials.json
 ```
 
 ## Usage

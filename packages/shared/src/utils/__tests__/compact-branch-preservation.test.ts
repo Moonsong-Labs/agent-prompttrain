@@ -76,7 +76,7 @@ describe('Compact branch preservation', () => {
     ]
 
     const result = await linker.linkConversation({
-      domain: 'test.com',
+      trainId: 'test.com',
       messages: followUpMessages,
       systemPrompt: 'System prompt',
       requestId: 'follow-up-request-id',
@@ -150,7 +150,7 @@ describe('Compact branch preservation', () => {
     ]
 
     const result = await linker.linkConversation({
-      domain: 'test.com',
+      trainId: 'test.com',
       messages: branchMessages,
       systemPrompt: 'System prompt',
       requestId: 'new-branch-request-id',

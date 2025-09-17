@@ -157,7 +157,7 @@ See [DATABASE.md](./DATABASE.md) for complete schema documentation.
 ## Security
 
 - Dashboard requires API key authentication
-- Proxy supports domain-based credential mapping
+- Proxy resolves credentials via train identifiers supplied in the `train-id` header
 - Database credentials are isolated per service
 - Sensitive headers are removed before storage
 

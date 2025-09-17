@@ -10,7 +10,7 @@ export interface SlackConfig {
 
 export interface MessageInfo {
   requestId: string
-  domain?: string
+  trainId?: string
   model?: string
   role: 'user' | 'assistant' | 'conversation'
   content: string
@@ -97,9 +97,9 @@ function formatMessageContent(content: any): string {
 }
 
 /**
- * Initialize domain-specific Slack webhook
+ * Initialize train-specific Slack webhook
  */
-export function initializeDomainSlack(
+export function initializeTrainSlack(
   slackConfig: Partial<SlackConfig> | undefined
 ): IncomingWebhook | null {
   if (!slackConfig) {
@@ -132,9 +132,9 @@ export function initializeDomainSlack(
 /**
  * Send message to Slack
  */
-export async function sendToSlack(info: MessageInfo, domainWebhook?: IncomingWebhook | null) {
-  // Use domain-specific webhook if available, otherwise fall back to global webhook
-  const webhookToUse = domainWebhook || webhook
+export async function sendToSlack(info: MessageInfo, trainWebhook?: IncomingWebhook | null) {
+  // Use trainId-specific webhook if available, otherwise fall back to global webhook
+  const webhookToUse = trainWebhook || webhook
 
   // Check if webhook is properly configured and is an instance of IncomingWebhook
   if (!webhookToUse || !(webhookToUse instanceof IncomingWebhook)) {
@@ -142,12 +142,12 @@ export async function sendToSlack(info: MessageInfo, domainWebhook?: IncomingWeb
   }
 
   // Additional check for global webhook configuration
-  if (!domainWebhook && !slackConfig?.enabled) {
+  if (!trainWebhook && !slackConfig?.enabled) {
     return
   }
 
-  // Skip Slack notifications for personal domains (privacy protection)
-  if (info.domain && info.domain.toLowerCase().includes('personal')) {
+  // Skip Slack notifications for personal trainIds (privacy protection)
+  if (info.trainId && info.trainId.toLowerCase().includes('personal')) {
     return
   }
 
@@ -163,7 +163,7 @@ export async function sendToSlack(info: MessageInfo, domainWebhook?: IncomingWeb
     const text = content
 
     // Create footer with metadata
-    const metadata = [info.domain || 'Unknown', info.model || 'Unknown', info.apiKey || '']
+    const metadata = [info.trainId || 'Unknown', info.model || 'Unknown', info.apiKey || '']
       .filter(Boolean)
       .join(' | ')
 
@@ -194,11 +194,11 @@ export async function sendToSlack(info: MessageInfo, domainWebhook?: IncomingWeb
 export async function sendErrorToSlack(
   requestId: string,
   error: string,
-  domain?: string,
-  domainWebhook?: IncomingWebhook | null
+  trainId?: string,
+  trainWebhook?: IncomingWebhook | null
 ) {
-  // Use domain-specific webhook if available, otherwise fall back to global webhook
-  const webhookToUse = domainWebhook || webhook
+  // Use trainId-specific webhook if available, otherwise fall back to global webhook
+  const webhookToUse = trainWebhook || webhook
 
   // Check if webhook is properly configured and is an instance of IncomingWebhook
   if (!webhookToUse || !(webhookToUse instanceof IncomingWebhook)) {
@@ -206,12 +206,12 @@ export async function sendErrorToSlack(
   }
 
   // Additional check for global webhook configuration
-  if (!domainWebhook && !slackConfig?.enabled) {
+  if (!trainWebhook && !slackConfig?.enabled) {
     return
   }
 
-  // Skip Slack notifications for personal domains (privacy protection)
-  if (domain && domain.toLowerCase().includes('personal')) {
+  // Skip Slack notifications for personal trainIds (privacy protection)
+  if (trainId && trainId.toLowerCase().includes('personal')) {
     return
   }
 
@@ -225,8 +225,8 @@ export async function sendErrorToSlack(
           text: error,
           fields: [
             {
-              title: 'Domain',
-              value: domain || 'Unknown',
+              title: 'Train ID',
+              value: trainId || 'Unknown',
               short: true,
             },
             {

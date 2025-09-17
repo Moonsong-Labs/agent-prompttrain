@@ -16,7 +16,7 @@ describe('NotificationService - Request Type Filtering', () => {
           ],
           max_tokens: 100,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-123'
       )
 
@@ -29,7 +29,7 @@ describe('NotificationService - Request Type Filtering', () => {
           messages: [{ role: 'user', content: 'What is 2+2?' }],
           max_tokens: 10,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-456'
       )
 
@@ -42,7 +42,7 @@ describe('NotificationService - Request Type Filtering', () => {
           messages: [{ role: 'user', content: 'quota' }],
           max_tokens: 1,
         },
-        'test.domain.com',
+        'train-alpha',
         'test-789'
       )
 
@@ -59,7 +59,7 @@ describe('NotificationService - Request Type Filtering', () => {
       expect(service2['config'].enabled).toBe(false)
     })
 
-    it('should respect domain-specific slack configuration', () => {
+    it('should respect train-specific slack configuration', () => {
       const authWithSlack = {
         credentials: {
           slack: {
@@ -103,11 +103,11 @@ describe('NotificationService - Request Type Filtering', () => {
       expect(cache.size).toBe(0)
 
       // Add some messages
-      cache.set('domain1', 'message1')
-      cache.set('domain2', 'message2')
+      cache.set('train-one', 'message1')
+      cache.set('train-two', 'message2')
 
-      expect(cache.get('domain1')).toBe('message1')
-      expect(cache.get('domain2')).toBe('message2')
+      expect(cache.get('train-one')).toBe('message1')
+      expect(cache.get('train-two')).toBe('message2')
       expect(cache.size).toBe(2)
     })
 

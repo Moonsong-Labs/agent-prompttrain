@@ -85,7 +85,7 @@ describe('Feature Name', () => {
 import { createTestRequest } from '../helpers/test-factories'
 
 const request = createTestRequest({
-  domain: 'test.com',
+  trainId: 'train-test',
   model: 'claude-3-opus-20240229',
 })
 ```

@@ -10,7 +10,7 @@ function createMockProxyServer() {
   // Helper function to check client auth
   const checkClientAuth = (c: any) => {
     const authorization = c.req.header('Authorization')
-    const domain = c.get('domain')
+    const trainId = c.get('trainId')
     // Client auth is enabled by default unless explicitly set to 'false'
     const clientAuthEnabled =
       !process.env.ENABLE_CLIENT_AUTH || process.env.ENABLE_CLIENT_AUTH !== 'false'
@@ -57,7 +57,7 @@ function createMockProxyServer() {
         {
           error: {
             type: 'authentication_error',
-            message: `No client API key configured for domain "${domain}". Please add "client_api_key" to your credential file or disable client authentication.`,
+            message: `No client API key configured for train "${trainId}". Please add "client_api_key" to your credential file or disable client authentication.`,
           },
         },
         401,
@@ -70,10 +70,10 @@ function createMockProxyServer() {
     return null // Auth passed
   }
 
-  // Mock middleware that extracts domain from Host header
+  // Mock middleware that derives a train ID from the train-id header for tests
   app.use('*', async (c, next) => {
-    const host = c.req.header('Host') || 'unknown'
-    c.set('domain', host)
+    const trainId = c.req.header('train-id') || 'unknown'
+    c.set('trainId', trainId)
     await next()
   })
 
@@ -186,7 +186,7 @@ describe('Proxy Authentication Integration', () => {
         headers: {
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01',
-          Host: 'test.example.com',
+          'train-id': 'train-alpha',
         },
         body: JSON.stringify({
           model: 'claude-3-opus-20240229',
@@ -207,7 +207,7 @@ describe('Proxy Authentication Integration', () => {
           'Content-Type': 'application/json',
           'x-api-key': 'sk-ant-test-key',
           'anthropic-version': '2023-06-01',
-          Host: 'test.example.com',
+          'train-id': 'train-alpha',
           Authorization: 'Bearer cnp_test_key', // Add client auth
         },
         body: JSON.stringify({
@@ -231,7 +231,7 @@ describe('Proxy Authentication Integration', () => {
           Authorization: 'Bearer cnp_test_key', // Client auth
           'x-api-key': 'sk-ant-test-key', // Claude API key in x-api-key header
           'anthropic-version': '2023-06-01',
-          Host: 'test.example.com',
+          'train-id': 'train-alpha',
         },
         body: JSON.stringify({
           model: 'claude-3-opus-20240229',
@@ -260,7 +260,7 @@ describe('Proxy Authentication Integration', () => {
           'Content-Type': 'application/json',
           'x-api-key': 'sk-ant-test-key',
           'anthropic-version': '2023-06-01',
-          Host: 'test.example.com',
+          'train-id': 'train-alpha',
           // Missing Authorization header for client auth
         },
         body: JSON.stringify({
@@ -282,7 +282,7 @@ describe('Proxy Authentication Integration', () => {
         'Content-Type': 'application/json',
         'x-api-key': 'sk-ant-test-key',
         'anthropic-version': '2023-06-01',
-        Host: 'test.example.com',
+        'train-id': 'train-alpha',
       }
 
       // Only add client auth header if client auth is enabled
@@ -312,7 +312,7 @@ describe('Proxy Authentication Integration', () => {
         'Content-Type': 'application/json',
         'x-api-key': 'oauth-access-token', // Claude OAuth token
         'anthropic-version': '2023-06-01',
-        Host: 'test.example.com',
+        'train-id': 'train-alpha',
       }
 
       // Only add client auth header if client auth is enabled

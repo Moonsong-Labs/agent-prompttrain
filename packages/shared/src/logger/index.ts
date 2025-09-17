@@ -13,7 +13,7 @@ export interface LoggerOptions {
 
 export interface LogContext {
   requestId?: string
-  domain?: string
+  trainId?: string
   metadata?: Record<string, any>
   error?: {
     message: string

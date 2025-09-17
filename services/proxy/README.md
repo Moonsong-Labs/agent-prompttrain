@@ -41,7 +41,7 @@ See `.env.example` in the root directory for all available environment variables
 
 ### Key Environment Variables
 
-- `CREDENTIALS_DIR` - Directory for domain credentials
+- `CREDENTIALS_DIR` - Directory for train credentials
 - `DATABASE_URL` - PostgreSQL connection
 - `STORAGE_ENABLED` - Enable storage (default: false)
 - `SLACK_WEBHOOK_URL` - Slack notifications

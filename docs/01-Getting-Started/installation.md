@@ -72,8 +72,8 @@ mkdir -p credentials
 # Generate a secure client API key
 bun run scripts/generate-api-key.ts
 
-# Create your first domain credential file
-cat > credentials/your-domain.com.credentials.json << EOF
+# Create your first train credential file
+cat > credentials/your-train-id.credentials.json << EOF
 {
   "type": "api_key",
   "accountId": "acc_unique_id",
@@ -214,9 +214,9 @@ Open http://localhost:3001 in your browser. You should see the login page.
 ### 3. Test API Call
 
 ```bash
-# Replace with your domain and client API key
+# Replace with your train ID and client API key
 curl -X POST http://localhost:3000/v1/messages \
-  -H "Host: your-domain.com" \
+  -H "train-id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_client_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -262,7 +262,7 @@ curl -X POST http://localhost:3000/v1/messages \
 
 ## Next Steps
 
-- [Configure your domains](./configuration.md)
+- [Configure train credentials](./configuration.md)
 - [Set up authentication](../02-User-Guide/authentication.md)
 - [Deploy to production](../03-Operations/deployment/docker.md)
 - [Monitor usage](../02-User-Guide/dashboard-guide.md)
