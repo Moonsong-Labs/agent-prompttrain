@@ -100,7 +100,7 @@ overviewRoutes.get('/', async c => {
         tokens: conv.totalTokens,
         firstMessage: new Date(conv.firstMessageTime),
         lastMessage: new Date(conv.lastMessageTime),
-        trainId: conv.trainId ,
+        trainId: conv.trainId,
         latestRequestId: conv.latestRequestId,
         latestModel: conv.latestModel,
         latestContextTokens: conv.latestContextTokens,

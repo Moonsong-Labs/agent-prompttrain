@@ -61,9 +61,10 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 
    ```
    Client → Proxy: Authorization: Bearer cnp_live_xxx...
-   Proxy: Extract train ID from `train-id` header
-   Proxy: Load credentials/<train-id>.credentials.json
+   Proxy: Extract train ID and optional account headers
+   Proxy: Load credentials/train-client-keys/<train>.client-keys.json
    Proxy: Compare tokens using timing-safe SHA-256
+   Proxy: Select account credential (header or random)
    Proxy → Claude: Forward if authenticated
    ```
 
@@ -73,15 +74,14 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
    {
      "type": "api_key",
      "accountId": "acc_unique_id",
-     "api_key": "sk-ant-...", // Claude API key
-     "client_api_key": "cnp_live_..." // Proxy auth key
+     "api_key": "sk-ant-..." // Claude API key
    }
    ```
 
 3. **Security Measures**:
    - SHA-256 hashing before comparison (timing-safe)
-   - Domain validation to prevent path traversal
-   - No fallback to default credentials
+   - Account credential files guarded against path traversal
+   - No fallback credentials when no account files exist
    - WWW-Authenticate header on 401 responses
 
 4. **Key Format**:

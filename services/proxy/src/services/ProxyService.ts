@@ -156,12 +156,10 @@ export class ProxyService {
           },
           key: context.apiKey.replace('Bearer ', ''),
           betaHeader: 'oauth-2025-04-20',
+          accountName: 'passthrough',
         }
       } else {
-        // Existing domain-based routing
-        auth = context.trainId.toLowerCase().includes('personal')
-          ? await this.authService.authenticatePersonalDomain(context)
-          : await this.authService.authenticateNonPersonalDomain(context)
+        auth = await this.authService.authenticate(context)
       }
 
       // Forward to Claude
@@ -169,7 +167,10 @@ export class ProxyService {
         model: request.model,
         streaming: request.isStreaming,
         requestType: request.requestType,
-        authSource: context.apiKey ? 'passthrough from request' : 'train credential file',
+        authSource:
+          context.apiKey && config.features.enableClientAuth === false
+            ? 'passthrough from request'
+            : `account:${auth.accountName}`,
       })
 
       const claudeResponse = await this.apiClient.forward(request, auth)
@@ -227,7 +228,7 @@ export class ProxyService {
     request: ProxyRequest,
     response: ProxyResponse,
     context: RequestContext,
-    auth: any,
+    auth: AuthResult,
     conversationData?: {
       currentMessageHash: string
       parentMessageHash: string | null
@@ -332,7 +333,7 @@ export class ProxyService {
     request: ProxyRequest,
     response: ProxyResponse,
     context: RequestContext,
-    auth: any,
+    auth: AuthResult,
     conversationData?: {
       currentMessageHash: string
       parentMessageHash: string | null

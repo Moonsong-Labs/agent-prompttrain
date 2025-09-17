@@ -15,13 +15,12 @@ describe('trainIdExtractorMiddleware', () => {
     })
   })
 
-  it('rejects requests without train-id header', async () => {
+  it('falls back to default train when header missing', async () => {
     const res = await app.request('/test')
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.error.code).toBe('bad_request')
-    expect(body.error.message).toBe('train-id header is required')
+    expect(body.trainId).toBe('default')
   })
 
   it('extracts trainId from train-id header', async () => {

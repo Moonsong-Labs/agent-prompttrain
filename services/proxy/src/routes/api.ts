@@ -830,12 +830,12 @@ apiRoutes.get('/token-usage/daily', async c => {
     const query = c.req.query()
     const params = tokenUsageDailySchema.parse(query)
 
-  const usage = params.aggregate
-    ? await tokenUsageService.getAggregatedDailyUsage(
-        params.accountId,
-        params.days,
-        params.trainId
-      )
+    const usage = params.aggregate
+      ? await tokenUsageService.getAggregatedDailyUsage(
+          params.accountId,
+          params.days,
+          params.trainId
+        )
       : await tokenUsageService.getDailyUsage(params.accountId, params.days, params.trainId)
 
     return c.json({ usage })

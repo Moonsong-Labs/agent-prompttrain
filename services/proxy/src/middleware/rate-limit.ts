@@ -82,7 +82,8 @@ const defaultTrainConfig: RateLimitConfig = {
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const trainId = c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
+    const trainId =
+      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || 'unknown'
     return `train:${trainId}`
   },
 }

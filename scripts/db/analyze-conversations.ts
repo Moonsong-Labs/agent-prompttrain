@@ -204,9 +204,9 @@ class ConversationAnalyzer {
       } else {
         // Count how many requests have this as parent
         const parentRequests = this.requestsByHash.get(request.parent_message_hash) || []
-    const sameTrainParents = parentRequests.filter(p => p.trainId === trainId)
+        const sameTrainParents = parentRequests.filter(p => p.trainId === trainId)
 
-    if (sameTrainParents.length === 0) {
+        if (sameTrainParents.length === 0) {
           analysis.orphanedRequests++
         }
       }

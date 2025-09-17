@@ -65,13 +65,17 @@ describe('MetricsService', () => {
         },
       })
 
-      const context = new RequestContext({
-        method: 'POST',
-        path: '/v1/messages',
-        headers: {},
-        host: 'example.com',
-        requestId: 'test-request-id',
-      })
+      const context = new RequestContext(
+        'test-request-id',
+        'example.com',
+        'POST',
+        '/v1/messages',
+        Date.now(),
+        {},
+        undefined,
+        undefined,
+        undefined
+      )
 
       await metricsService.trackRequest(request, response, context)
 
@@ -115,13 +119,17 @@ describe('MetricsService', () => {
         },
       })
 
-      const context = new RequestContext({
-        method: 'POST',
-        path: '/v1/messages',
-        headers: {},
-        host: 'example.com',
-        requestId: 'test-request-id',
-      })
+      const context = new RequestContext(
+        'test-request-id',
+        'example.com',
+        'POST',
+        '/v1/messages',
+        Date.now(),
+        {},
+        undefined,
+        undefined,
+        undefined
+      )
 
       await metricsService.trackRequest(request, response, context)
 
@@ -159,13 +167,17 @@ describe('MetricsService', () => {
         },
       })
 
-      const context = new RequestContext({
-        method: 'POST',
-        path: '/v1/messages',
-        headers: {},
-        host: 'example.com',
-        requestId: 'test-request-id',
-      })
+      const context = new RequestContext(
+        'test-request-id',
+        'example.com',
+        'POST',
+        '/v1/messages',
+        Date.now(),
+        {},
+        undefined,
+        undefined,
+        undefined
+      )
 
       await metricsService.trackRequest(request, response, context)
 

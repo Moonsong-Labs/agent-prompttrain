@@ -105,7 +105,9 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                   ${raw(
                     accountsData.accounts
-                      .filter(account => !trainId || account.trainIds.some(d => d.trainId === trainId))
+                      .filter(
+                        account => !trainId || account.trainIds.some(d => d.trainId === trainId)
+                      )
                       .slice(0, 5) // Show top 5 accounts
                       .map(account => {
                         const chartId = `chart-${account.accountId.replace(/[^a-zA-Z0-9]/g, '-')}`

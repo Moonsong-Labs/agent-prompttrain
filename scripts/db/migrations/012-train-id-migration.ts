@@ -64,7 +64,10 @@ async function migrate() {
     const indexRenames: Array<{ from: string; to: string }> = [
       { from: 'idx_api_requests_domain', to: 'idx_api_requests_train_id' },
       { from: 'idx_hourly_stats_hour_domain', to: 'idx_hourly_stats_hour_train' },
-      { from: 'idx_api_requests_domain_timestamp_response', to: 'idx_api_requests_train_timestamp_response' },
+      {
+        from: 'idx_api_requests_domain_timestamp_response',
+        to: 'idx_api_requests_train_timestamp_response',
+      },
       { from: 'idx_audit_domain', to: 'idx_audit_train' },
     ]
 

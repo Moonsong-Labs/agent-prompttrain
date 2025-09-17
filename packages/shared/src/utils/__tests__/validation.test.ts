@@ -141,7 +141,13 @@ describe('Validation Utilities', () => {
 
   describe('Train ID Validation', () => {
     it('should validate train identifiers', () => {
-      const validTrainIds = ['train-alpha', 'train.alpha', 'train_alpha', 'train-beta:preview', 'alpha123']
+      const validTrainIds = [
+        'train-alpha',
+        'train.alpha',
+        'train_alpha',
+        'train-beta:preview',
+        'alpha123',
+      ]
 
       validTrainIds.forEach(trainId => {
         expect(isValidTrainId(trainId)).toBe(true)
@@ -150,7 +156,14 @@ describe('Validation Utilities', () => {
     })
 
     it('should reject invalid train identifiers', () => {
-      const invalidTrainIds = ['../secrets', 'train/alpha', 'train alpha', '', 'alpha@beta', '-leadingdash']
+      const invalidTrainIds = [
+        '../secrets',
+        'train/alpha',
+        'train alpha',
+        '',
+        'alpha@beta',
+        '-leadingdash',
+      ]
 
       invalidTrainIds.forEach(trainId => {
         expect(isValidTrainId(trainId)).toBe(false)

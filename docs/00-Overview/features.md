@@ -25,7 +25,7 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
   - API key authentication
   - OAuth 2.0 with automatic token refresh
   - Client API key authentication for proxy access
-- **Train-based credential management** via `train-id` header
+- **Train & account routing** via `train-id` and optional `X-Train-Account` headers
 - **Timing-safe credential verification**
 - **Secure credential storage** with separate files per train ID
 
@@ -143,6 +143,6 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
 | Conversation Tracking | ✅ Automatic          | ❌ Manual         |
 | Multi-Domain Support  | ✅ Native             | ❌ Manual         |
 | Request Storage       | ✅ Automatic          | ❌ None           |
-| Cost Analysis         | ✅ Per-account/train | ❌ Account-only   |
+| Cost Analysis         | ✅ Per-account/train  | ❌ Account-only   |
 | Debug Capabilities    | ✅ Enhanced           | ❌ Basic          |
 | Deployment Options    | ✅ Multiple           | ❌ N/A            |

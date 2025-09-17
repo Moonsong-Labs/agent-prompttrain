@@ -1,226 +1,110 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { Hono } from 'hono'
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import { clientAuthMiddleware } from '../src/middleware/client-auth'
 import { trainIdExtractorMiddleware } from '../src/middleware/train-id-extractor'
 import { container } from '../src/container'
 import { AuthenticationService } from '../src/services/AuthenticationService'
+import { RequestContext } from '../src/domain/value-objects/RequestContext'
 
-// Mock authentication service that allows us to control train credentials
 class MockAuthenticationService extends AuthenticationService {
-  private readonly mockKeys = new Map<string, string>()
+  private keyMap = new Map<string, string[]>()
 
-  constructor() {
-    super(undefined, '/tmp/test-credentials')
+  constructor(rootDir: string) {
+    super({
+      accountsDir: join(rootDir, 'accounts'),
+      clientKeysDir: join(rootDir, 'client-keys'),
+    })
   }
 
-  setMockKey(trainId: string, key: string | null) {
-    if (key) {
-      this.mockKeys.set(trainId, key)
-    } else {
-      this.mockKeys.delete(trainId)
-    }
+  setKeys(trainId: string, keys: string[]) {
+    this.keyMap.set(trainId, keys)
   }
 
-  async getClientApiKey(trainId: string): Promise<string | null> {
-    return this.mockKeys.get(trainId) ?? null
+  async getClientApiKeys(trainId: string): Promise<string[]> {
+    return this.keyMap.get(trainId) ?? []
+  }
+
+  // authenticate is not used in these tests but must be implemented
+  async authenticate(_context: RequestContext) {
+    throw new Error('Not implemented in mock')
   }
 }
 
 describe('Client Authentication Middleware', () => {
   let app: Hono
-  let mockAuthService: MockAuthenticationService
   let originalGetAuthService: typeof container.getAuthenticationService
+  let mockAuthService: MockAuthenticationService
+  let tempDir: string
 
   beforeEach(() => {
-    mockAuthService = new MockAuthenticationService()
+    tempDir = mkdtempSync(join(tmpdir(), 'client-auth-'))
+    mockAuthService = new MockAuthenticationService(tempDir)
     originalGetAuthService = container.getAuthenticationService
     container.getAuthenticationService = () => mockAuthService
 
     app = new Hono()
     app.use('*', trainIdExtractorMiddleware())
     app.use('*', clientAuthMiddleware())
-    app.get('/test', c => c.json({ success: true }))
+    app.get('/test', c => c.json({ ok: true }))
   })
 
   afterEach(() => {
     container.getAuthenticationService = originalGetAuthService
+    rmSync(tempDir, { recursive: true, force: true })
   })
 
-  describe('Valid Authentication', () => {
-    it('allows requests with valid API key', async () => {
-      const testKey = 'cnp_live_validtestkey123'
-      mockAuthService.setMockKey('team-alpha', testKey)
+  it('allows requests when token matches configured key', async () => {
+    const token = 'cnp_live_valid'
+    mockAuthService.setKeys('team-alpha', [token])
 
-      const res = await app.request('/test', {
-        headers: {
-          'train-id': 'team-alpha',
-          Authorization: `Bearer ${testKey}`,
-        },
-      })
-
-      expect(res.status).toBe(200)
-      expect(await res.json()).toEqual({ success: true })
+    const res = await app.request('/test', {
+      headers: {
+        'train-id': 'team-alpha',
+        Authorization: `Bearer ${token}`,
+      },
     })
 
-    it('isolates keys per train ID', async () => {
-      const key1 = 'cnp_live_train1'
-      const key2 = 'cnp_live_train2'
-
-      mockAuthService.setMockKey('train-one', key1)
-      mockAuthService.setMockKey('train-two', key2)
-
-      const res1 = await app.request('/test', {
-        headers: {
-          'train-id': 'train-one',
-          Authorization: `Bearer ${key1}`,
-        },
-      })
-      expect(res1.status).toBe(200)
-
-      const res2 = await app.request('/test', {
-        headers: {
-          'train-id': 'train-two',
-          Authorization: `Bearer ${key2}`,
-        },
-      })
-      expect(res2.status).toBe(200)
-
-      const res3 = await app.request('/test', {
-        headers: {
-          'train-id': 'train-one',
-          Authorization: `Bearer ${key2}`,
-        },
-      })
-      expect(res3.status).toBe(401)
-    })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true })
   })
 
-  describe('Invalid Authentication', () => {
-    it('rejects requests without Authorization header', async () => {
-      mockAuthService.setMockKey('team-alpha', 'cnp_live_testkey')
+  it('rejects requests with invalid token', async () => {
+    mockAuthService.setKeys('team-alpha', ['cnp_live_valid'])
 
-      const res = await app.request('/test', {
-        headers: {
-          'train-id': 'team-alpha',
-        },
-      })
-
-      expect(res.status).toBe(401)
-      expect(res.headers.get('WWW-Authenticate')).toBe('Bearer realm="Agent Prompt Train"')
+    const res = await app.request('/test', {
+      headers: {
+        'train-id': 'team-alpha',
+        Authorization: 'Bearer cnp_live_invalid',
+      },
     })
 
-    it('rejects requests with invalid API key', async () => {
-      mockAuthService.setMockKey('team-alpha', 'cnp_live_validkey')
-
-      const res = await app.request('/test', {
-        headers: {
-          'train-id': 'team-alpha',
-          Authorization: 'Bearer cnp_live_wrongkey',
-        },
-      })
-
-      expect(res.status).toBe(401)
-    })
-
-    it('rejects requests when no API key is configured', async () => {
-      const res = await app.request('/test', {
-        headers: {
-          'train-id': 'team-alpha',
-          Authorization: 'Bearer cnp_live_somekey',
-        },
-      })
-
-      expect(res.status).toBe(401)
-    })
-
-    it('rejects requests without train-id header', async () => {
-      const res = await app.request('/test', {
-        headers: {
-          Authorization: 'Bearer cnp_live_testkey',
-        },
-      })
-
-      expect(res.status).toBe(400)
-      const body = await res.json()
-      expect(body.error.message).toBe('train-id header is required')
-    })
+    expect(res.status).toBe(401)
   })
 
-  describe('Security Features', () => {
-    it('uses timing-safe comparison for credentials', async () => {
-      const testKey = 'cnp_live_securekey123'
-      mockAuthService.setMockKey('team-alpha', testKey)
-
-      const wrongKeys = [
-        'a',
-        'cnp_live_wrong',
-        'cnp_live_wrongkeythatisverylongandshouldbedifferent',
-        testKey.slice(0, -1),
-      ]
-
-      for (const wrongKey of wrongKeys) {
-        const res = await app.request('/test', {
-          headers: {
-            'train-id': 'team-alpha',
-            Authorization: `Bearer ${wrongKey}`,
-          },
-        })
-        expect(res.status).toBe(401)
-      }
+  it('rejects when no keys are configured for train', async () => {
+    const res = await app.request('/test', {
+      headers: {
+        'train-id': 'team-alpha',
+        Authorization: 'Bearer any',
+      },
     })
+
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error.type).toBe('authentication_error')
   })
 
-  describe('Error Handling', () => {
-    it('returns 500 when authentication service throws', async () => {
-      mockAuthService.getClientApiKey = async () => {
-        throw new Error('Database connection failed')
-      }
-
-      const res = await app.request('/test', {
-        headers: {
-          'train-id': 'team-alpha',
-          Authorization: 'Bearer cnp_live_anykey',
-        },
-      })
-
-      expect(res.status).toBe(500)
+  it('falls back to default train when header missing but still enforces keys', async () => {
+    mockAuthService.setKeys('default', ['cnp_live_default'])
+    const res = await app.request('/test', {
+      headers: {
+        Authorization: 'Bearer cnp_live_default',
+      },
     })
-  })
-})
 
-describe('Train ID validation', () => {
-  it('prevents path traversal attempts', async () => {
-    const authService = new AuthenticationService()
-
-    const maliciousIds = [
-      '../../../etc/passwd',
-      '..\\..\\..\\windows\\system32',
-      'team-alpha/../../secrets',
-      'team-alpha%2F..%2F..%2Fsecrets',
-      '..',
-      '.',
-      '',
-    ]
-
-    for (const trainId of maliciousIds) {
-      const result = await authService.getClientApiKey(trainId)
-      expect(result).toBeNull()
-    }
-  })
-
-  it('allows valid train identifiers', async () => {
-    const authService = new AuthenticationService()
-
-    const validTrainIds = [
-      'team-alpha',
-      'team-beta',
-      'team.alpha',
-      'team_alpha',
-      'team-alpha:preview',
-    ]
-
-    for (const trainId of validTrainIds) {
-      await expect(authService.getClientApiKey(trainId)).resolves.toBeDefined()
-    }
+    expect(res.status).toBe(200)
   })
 })

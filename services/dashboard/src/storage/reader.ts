@@ -113,7 +113,7 @@ export class StorageReader {
   /**
    * Get requests by train identifier
    */
-async getRequestsByTrainId(trainId: string, limit: number = 100): Promise<ApiRequest[]> {
+  async getRequestsByTrainId(trainId: string, limit: number = 100): Promise<ApiRequest[]> {
     const cacheKey = `requests:${trainId}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 

@@ -94,18 +94,17 @@ class Container {
       this.tokenUsageService
     )
     this.notificationService = new NotificationService()
-    this.authenticationService = new AuthenticationService(
-      undefined, // No default API key
-      config.auth.credentialsDir
-    )
+    this.authenticationService = new AuthenticationService({
+      defaultApiKey: undefined,
+      accountsDir: config.auth.accountsDir,
+      clientKeysDir: config.auth.clientKeysDir,
+    })
     this.claudeApiClient = new ClaudeApiClient({
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,
     })
 
     // Wire up dependencies
-    this.notificationService.setAuthService(this.authenticationService)
-
     this.proxyService = new ProxyService(
       this.authenticationService,
       this.claudeApiClient,

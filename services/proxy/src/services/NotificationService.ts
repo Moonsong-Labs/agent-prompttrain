@@ -1,7 +1,7 @@
 import { ProxyRequest } from '../domain/entities/ProxyRequest'
 import { ProxyResponse } from '../domain/entities/ProxyResponse'
 import { RequestContext } from '../domain/value-objects/RequestContext'
-import { AuthResult, AuthenticationService } from './AuthenticationService'
+import { AuthResult } from './AuthenticationService'
 import { sendToSlack, initializeTrainSlack, MessageInfo } from './slack.js'
 import { logger } from '../middleware/logger'
 
@@ -18,7 +18,6 @@ export interface NotificationConfig {
 export class NotificationService {
   private previousMessages = new Map<string, string>()
   private readonly maxCacheSize = 1000
-  private authService?: AuthenticationService
 
   constructor(
     private config: NotificationConfig = {
@@ -27,10 +26,6 @@ export class NotificationService {
       maxLength: 3000,
     }
   ) {}
-
-  setAuthService(authService: AuthenticationService) {
-    this.authService = authService
-  }
 
   /**
    * Send notification for a request/response pair
@@ -51,13 +46,8 @@ export class NotificationService {
     }
 
     try {
-      // Get Slack config for the train
-      const slackConfig = this.authService
-        ? await this.authService.getSlackConfig(context.trainId)
-        : undefined
-
-      // Initialize Slack for the train
-      const domainWebhook = slackConfig ? initializeTrainSlack(slackConfig) : null
+      const slackConfig = auth.slackConfig
+      const accountWebhook = slackConfig ? initializeTrainSlack(slackConfig) : null
 
       // Check if user message changed
       const userContent = request.getUserContentForNotification()
@@ -229,11 +219,11 @@ export class NotificationService {
           role: 'conversation',
           content: conversationMessage,
           timestamp: new Date().toISOString(),
-          apiKey: this.authService ? this.authService.getMaskedCredentialInfo(auth) : undefined,
+          apiKey: this.getMaskedCredentialInfo(auth),
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
         },
-        domainWebhook
+        accountWebhook
       )
     } catch (error) {
       // Don't fail the request if notification fails
@@ -255,10 +245,7 @@ export class NotificationService {
 
     try {
       // Get Slack config for the train
-      const slackConfig = this.authService
-        ? await this.authService.getSlackConfig(context.trainId)
-        : undefined
-      const domainWebhook = slackConfig ? initializeTrainSlack(slackConfig) : null
+      const accountWebhook = null
 
       await sendToSlack(
         {
@@ -272,7 +259,7 @@ export class NotificationService {
             path: context.path,
           },
         } as MessageInfo,
-        domainWebhook
+        accountWebhook
       )
     } catch (notifyError) {
       logger.error('Failed to send error notification', {
@@ -308,6 +295,7 @@ export class NotificationService {
       toolCalls: metrics.toolCallCount,
       requestType: request.requestType,
       apiKeyInfo: auth.type === 'api_key' ? auth.key.substring(0, 10) + '****' : 'OAuth',
+      accountName: auth.accountName,
       processingTime: `${context.getElapsedTime()}ms`,
     }
 
@@ -324,6 +312,14 @@ export class NotificationService {
       assistantContent,
       metadata,
     }
+  }
+
+  private getMaskedCredentialInfo(auth: AuthResult): string | undefined {
+    if (!auth.key) {
+      return undefined
+    }
+    const maskedKey = auth.key.length > 10 ? `${auth.key.slice(0, 10)}****` : '****'
+    return `${auth.type}:${maskedKey}`
   }
 
   /**

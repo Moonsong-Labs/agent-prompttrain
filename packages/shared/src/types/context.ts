@@ -26,6 +26,7 @@ export type HonoVariables = {
 
   // Request metadata
   trainId?: string
+  trainAccount?: string
   requestType?: 'query_evaluation' | 'inference'
   model?: string
 

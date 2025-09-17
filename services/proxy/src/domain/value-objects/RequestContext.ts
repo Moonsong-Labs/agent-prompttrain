@@ -1,4 +1,5 @@
 import { Context } from 'hono'
+import { config } from '@agent-prompttrain/shared/config'
 
 /**
  * Value object containing request context information
@@ -13,7 +14,8 @@ export class RequestContext {
     public readonly startTime: number,
     public readonly headers: Record<string, string>,
     public readonly apiKey?: string,
-    public readonly honoContext?: Context
+    public readonly honoContext?: Context,
+    public readonly account?: string
   ) {}
 
   /**
@@ -26,11 +28,12 @@ export class RequestContext {
         'RequestContext: requestId not found in context. Ensure request-id middleware is applied.'
       )
     }
+    const fallbackTrainId = config.auth.defaultTrainId || 'default'
     const trainId =
-      c.get('trainId') ||
-      c.req.header('train-id') ||
-      c.req.header('x-train-id') ||
-      'unknown'
+      c.get('trainId') || c.req.header('train-id') || c.req.header('x-train-id') || fallbackTrainId
+    const rawTrainAccount = c.get('trainAccount') || c.req.header('x-train-account')
+    const trainAccount =
+      rawTrainAccount && rawTrainAccount.trim() ? rawTrainAccount.trim() : undefined
     // Only accept Bearer tokens from Authorization header (not x-api-key)
     const apiKey = c.req.header('authorization')
 
@@ -53,7 +56,8 @@ export class RequestContext {
       Date.now(),
       headers,
       apiKey,
-      c
+      c,
+      trainAccount
     )
   }
 

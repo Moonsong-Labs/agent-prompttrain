@@ -109,9 +109,7 @@ class TokenTracker {
     let totalToolCalls = 0
 
     // Sort trainIds alphabetically
-    const sortedTrainIds = Array.from(this.stats.entries()).sort((a, b) =>
-      a[0].localeCompare(b[0])
-    )
+    const sortedTrainIds = Array.from(this.stats.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
     for (const [trainId, stats] of sortedTrainIds) {
       const total = stats.inputTokens + stats.outputTokens

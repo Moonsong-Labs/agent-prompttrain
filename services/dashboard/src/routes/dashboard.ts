@@ -352,8 +352,9 @@ dashboardRoutes.get('/', async c => {
     <!-- Analytics Panel (loaded via HTMX) -->
     <div
       id="analytics-panel-placeholder"
-      hx-get="/partials/analytics${trainId ? `?trainId=${trainId}` : ''}${c.req.query('analytics') ===
-      'true'
+      hx-get="/partials/analytics${trainId ? `?trainId=${trainId}` : ''}${c.req.query(
+        'analytics'
+      ) === 'true'
         ? '&expanded=true'
         : ''}"
       hx-trigger="load"

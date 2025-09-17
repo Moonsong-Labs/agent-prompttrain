@@ -48,8 +48,8 @@ export function rateLimitAnalysisCreation() {
     }
 
     try {
-      // Use domain as the key for rate limiting
-      // This ensures rate limits are per-domain (tenant)
+      // Use train identifier as the key for rate limiting
+      // This ensures rate limits are per-train (tenant)
       const key = trainId || 'unknown'
 
       await analysisCreationLimiter.consume(key)
@@ -113,7 +113,7 @@ export function rateLimitAnalysisRetrieval() {
     }
 
     try {
-      // Use domain as the key for rate limiting
+      // Use train identifier as the key for rate limiting
       const key = trainId || 'unknown'
 
       await analysisRetrievalLimiter.consume(key)

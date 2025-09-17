@@ -19,12 +19,14 @@ Include your client API key in the Authorization header:
 Authorization: Bearer cnp_live_YOUR_KEY
 ```
 
-### Train-Based Routing
+### Train & Account Headers
 
-The proxy uses the `Host` header to determine which credentials to use:
+Use the `train-id` header to associate requests with a project/train, and optionally
+`X-Train-Account` to select a specific Anthropic account credential:
 
 ```bash
-Host: train-alpha
+train-id: train-alpha
+X-Train-Account: account-primary  # optional
 ```
 
 ## Endpoints

@@ -46,16 +46,17 @@ async function startServer() {
     : undefined
 
   // 2. Create services with their dependencies
-  const authService = new AuthenticationService(undefined, config.auth.credentialsDir)
+  const authService = new AuthenticationService({
+    defaultApiKey: undefined,
+    accountsDir: config.auth.accountsDir,
+    clientKeysDir: config.auth.clientKeysDir,
+  })
 
   const apiClient = new ClaudeApiClient({
     baseUrl: config.api.claudeBaseUrl,
     timeout: config.api.claudeTimeout,
   })
   const notificationService = new NotificationService()
-
-  // Wire up auth service to notification service
-  notificationService.setAuthService(authService)
 
   // Create storage service if database is configured
   const storageService = dbPool && config.storage.enabled ? new StorageAdapter(dbPool) : undefined

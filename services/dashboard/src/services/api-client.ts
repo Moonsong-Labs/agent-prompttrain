@@ -589,7 +589,7 @@ export class ProxyApiClient {
         lastRequestTime: account.lastRequestTime,
         remainingTokens: account.remainingTokens,
         percentageUsed: account.percentageUsed,
-        trainIds: (account.trainIds  || []).map((item: any) => ({
+        trainIds: (account.trainIds || []).map((item: any) => ({
           trainId: item.trainId,
           outputTokens: item.outputTokens,
           requests: item.requests,

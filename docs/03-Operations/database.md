@@ -13,7 +13,7 @@ The main table storing all API requests and responses.
 | Column                      | Type         | Description                                  |
 | --------------------------- | ------------ | -------------------------------------------- |
 | request_id                  | UUID         | Primary key, unique request identifier       |
-| train_id                    | VARCHAR(255) | Train identifier from `train-id` header     |
+| train_id                    | VARCHAR(255) | Train identifier from `train-id` header      |
 | account_id                  | VARCHAR(255) | Account identifier from credential file      |
 | timestamp                   | TIMESTAMPTZ  | Request timestamp                            |
 | method                      | VARCHAR(10)  | HTTP method (always POST for Claude)         |

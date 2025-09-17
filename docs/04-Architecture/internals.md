@@ -326,25 +326,33 @@ $$ LANGUAGE plpgsql;
 
 ```typescript
 class AuthManager {
+  constructor(
+    private readonly clientKeyStore: ClientKeyStore,
+    private readonly accountStore: AccountCredentialStore
+  ) {}
+
   // Layer 1: Client authentication
-  async validateClient(request: Request, credentials: DomainCredentials): Promise<boolean> {
-    if (!credentials.client_api_key) {
+  async validateClient(request: Request, trainId: string): Promise<boolean> {
+    const allowedKeys = await this.clientKeyStore.getKeys(trainId)
+    if (!allowedKeys.length) {
       return true // No client auth required
     }
 
     const providedKey = extractBearerToken(request)
-    return timingSafeEqual(Buffer.from(providedKey), Buffer.from(credentials.client_api_key))
+    return allowedKeys.some(key => timingSafeEqual(hash(key), hash(providedKey)))
   }
 
   // Layer 2: Claude API authentication
-  async enhanceRequest(request: Request, credentials: DomainCredentials): Promise<Request> {
-    switch (credentials.type) {
+  async enhanceRequest(request: Request, context: RequestContext): Promise<Request> {
+    const account = await this.accountStore.pickAccount(context.account)
+
+    switch (account.type) {
       case 'api_key':
-        request.headers.set('x-api-key', credentials.api_key)
+        request.headers.set('x-api-key', account.api_key)
         break
 
       case 'oauth':
-        const token = await this.getValidToken(credentials)
+        const token = await this.getValidToken(account)
         request.headers.set('Authorization', `Bearer ${token}`)
         request.headers.set('anthropic-beta', 'oauth-2025-04-20')
         break
@@ -354,8 +362,8 @@ class AuthManager {
   }
 
   // OAuth token management
-  private async getValidToken(credentials: OAuthCredentials): Promise<string> {
-    const expiresIn = credentials.oauth.expiresAt - Date.now()
+  private async getValidToken(account: OAuthAccountCredential): Promise<string> {
+    const expiresIn = account.oauth.expiresAt - Date.now()
 
     if (expiresIn < 60000) {
       // Less than 1 minute

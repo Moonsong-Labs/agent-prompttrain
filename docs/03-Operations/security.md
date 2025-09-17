@@ -27,10 +27,10 @@ The proxy supports multiple authentication layers:
 bun run auth:generate-key
 # Output: cnp_live_1a2b3c4d5e6f...
 
-# Add to train credentials
-{
-  "client_api_key": "cnp_live_1a2b3c4d5e6f..."
-}
+# Add it to the train client key list
+cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+{ "keys": ["cnp_live_1a2b3c4d5e6f..."] }
+JSON
 ```
 
 Clients must include this key in requests:
@@ -91,8 +91,12 @@ Best practices for key rotation:
 2. Update credentials without downtime:
 
 ```bash
-# Update credential file - proxy reloads automatically
-echo '{"client_api_key": "new_key"}' > credentials/train-id.json
+# Update client key list - proxy reloads automatically
+jq '.keys = ["cnp_live_new_key"]' \
+  credentials/train-client-keys/your-train-id.client-keys.json \
+  > credentials/train-client-keys/your-train-id.client-keys.json.tmp
+mv credentials/train-client-keys/your-train-id.client-keys.json.tmp \
+   credentials/train-client-keys/your-train-id.client-keys.json
 ```
 
 3. Monitor old key usage before removal

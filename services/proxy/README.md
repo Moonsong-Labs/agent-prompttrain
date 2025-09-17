@@ -12,7 +12,7 @@ The proxy service handles all API proxying functionality for Claude API with aut
 
 - Direct API proxying to Claude
 - Multi-subscription support (API keys and OAuth)
-- Domain-based credential mapping
+- Account-based credential pooling with per-request selection
 - Token usage tracking
 - Slack notifications
 - Request/response storage
@@ -41,13 +41,13 @@ See `.env.example` in the root directory for all available environment variables
 
 ### Key Environment Variables
 
-- `CREDENTIALS_DIR` - Directory for train credentials
+- `CREDENTIALS_DIR` - Base directory for credentials (default: `credentials`)
+- `ACCOUNTS_DIR` - Directory for account credential files (default: `<CREDENTIALS_DIR>/accounts`)
+- `TRAIN_CLIENT_KEYS_DIR` - Directory for per-train client API keys (default: `<CREDENTIALS_DIR>/train-client-keys`)
+- `DEFAULT_TRAIN_ID` - Fallback train identifier when header missing (default: `default`)
 - `DATABASE_URL` - PostgreSQL connection
 - `STORAGE_ENABLED` - Enable storage (default: false)
 - `SLACK_WEBHOOK_URL` - Slack notifications
-- `CNP_WILDCARD_CREDENTIALS` - Enable wildcard credential support (true/false/shadow)
-- `CNP_RESOLUTION_CACHE_TTL` - TTL for credential resolution cache in ms (default: 300000)
-- `CNP_DEBUG_RESOLUTION` - Enable debug logging for credential resolution
 
 ## API Endpoints
 

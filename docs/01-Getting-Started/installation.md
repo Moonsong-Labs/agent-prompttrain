@@ -67,20 +67,25 @@ bun run db:migrate:token-usage
 
 ```bash
 # Create credentials directory
-mkdir -p credentials
+mkdir -p credentials/accounts
+mkdir -p credentials/train-client-keys
 
-# Generate a secure client API key
+# Generate a secure client API key (for proxy authentication)
 bun run scripts/generate-api-key.ts
 
-# Create your first train credential file
-cat > credentials/your-train-id.credentials.json << EOF
+# Create your first account credential file
+cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 {
   "type": "api_key",
   "accountId": "acc_unique_id",
-  "api_key": "sk-ant-your-claude-api-key",
-  "client_api_key": "cnp_live_generated_key"
+  "api_key": "sk-ant-your-claude-api-key"
 }
-EOF
+JSON
+
+# Allow clients for a train identifier
+cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+{ "keys": ["cnp_live_generated_key"] }
+JSON
 ```
 
 #### 6. Start the Services

@@ -46,7 +46,7 @@ export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
  * Train identifier pattern
  * Matches: letters, numbers, dots, dashes, underscores, and colons
  */
-export const TRAIN_ID_REGEX = /^[a-zA-Z0-9._:-]+$/
+export const TRAIN_ID_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/
 
 /**
  * Database URL patterns

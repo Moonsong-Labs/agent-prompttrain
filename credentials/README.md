@@ -1,78 +1,103 @@
-# Train Credentials
+# Credentials Directory
 
-This directory contains credential files keyed by train identifiers. Each credential file is named `<train-id>.credentials.json` so the proxy can look up credentials using the `train-id` header on incoming requests.
+The proxy now separates **accounts** (Anthropic credential sources) from **trains** (analytics & client access identifiers).
 
-## File Format
+```
+credentials/
+├── accounts/                # Anthropic account credentials
+│   ├── account-primary.credentials.json
+│   └── account-secondary.credentials.json
+└── train-client-keys/       # Proxy client API keys per train
+    ├── train-alpha.client-keys.json
+    └── train-beta.client-keys.json
+```
+
+## Account Credential Files
+
+Account files live under `credentials/accounts/` and are named `<account-name>.credentials.json`.
 
 ```json
 {
-  "type": "api_key" | "oauth",
-  "accountId": "acc_unique_id",
-  "api_key": "sk-ant-...",          // Required for type: api_key
-  "oauth": { ... },                   // Required for type: oauth
-  "client_api_key": "cnp_live_...",  // Optional client auth token
-  "slack": {                          // Optional Slack configuration
+  "type": "api_key",              // or "oauth"
+  "accountId": "acc_team_alpha",
+  "api_key": "sk-ant-...",        // Required when type === "api_key"
+  "oauth": {                       // Required when type === "oauth"
+    "accessToken": "...",
+    "refreshToken": "...",
+    "expiresAt": 1737072000000,
+    "scopes": ["user:inference"]
+  },
+  "slack": {
     "enabled": true,
-    "webhook_url": "https://hooks.slack.com/..."
+    "webhook_url": "https://hooks.slack.com/services/..."
   }
 }
 ```
 
-## Usage
+Requests select an account by setting the `X-Train-Account` header. When the header is omitted, the proxy randomly chooses one of the configured accounts.
 
-1. Generate a client API key (if using proxy auth):
-   ```bash
-   bun run ../scripts/generate-api-key.ts
-   ```
+## Train Client Keys
 
-2. Create a new credential file:
+Train-level API keys that gate proxy access are stored in `credentials/train-client-keys/<train-id>.client-keys.json`.
+
+```json
+{
+  "keys": [
+    "cnp_live_internal_service",
+    "cnp_live_ci_runner"
+  ]
+}
+```
+
+The `client-auth` middleware accepts any token listed in the file for the given train. If no file exists (or the list is empty) the proxy returns `401` unless client authentication is disabled.
+
+## Request Headers
+
+- `train-id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="train-id:my_project"` ensures outgoing Anthropic calls stay tagged.
+- `X-Train-Account`: optional; selects a specific account credential file. If omitted, the proxy randomly picks a valid account.
+
+Neither header is forwarded to Anthropic.
+
+## Quick Setup
+
+1. Create an account credential file:
    ```bash
-   cat > credentials/train-alpha.credentials.json <<'JSON'
+   mkdir -p credentials/accounts
+   cat > credentials/accounts/account-primary.credentials.json <<'JSON'
    {
      "type": "api_key",
      "accountId": "acc_team_alpha",
-     "api_key": "sk-ant-your-claude-api-key",
-     "client_api_key": "cnp_live_generated_key"
+     "api_key": "sk-ant-your-claude-api-key"
    }
    JSON
    ```
 
-3. Configure outbound requests to tag the train:
+2. Define allowed client tokens for a train:
+   ```bash
+   mkdir -p credentials/train-client-keys
+   cat > credentials/train-client-keys/train-alpha.client-keys.json <<'JSON'
+   { "keys": ["cnp_live_team_alpha"] }
+   JSON
+   ```
+
+3. Tag outbound Anthropic calls:
    ```bash
    export ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"
    ```
 
-4. Test the proxy:
+4. Choose an account per request when needed:
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
      -H "train-id: train-alpha" \
-     -H "Authorization: Bearer cnp_live_generated_key" \
+     -H "X-Train-Account: account-primary" \
+     -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \
      -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
    ```
 
-## Wildcard Credentials (Optional)
+## Security Tips
 
-You can create wildcard credential files to match multiple train IDs using a prefix:
-
-```bash
-cat > credentials/_wildcard.train-beta.credentials.json <<'JSON'
-{
-  "type": "api_key",
-  "accountId": "acc_shared_beta",
-  "api_key": "sk-ant-shared",
-  "client_api_key": "cnp_live_generated_key"
-}
-JSON
-
-export CNP_WILDCARD_CREDENTIALS=true
-```
-
-Exact matches take precedence over wildcards for safety.
-
-## Security Best Practices
-
-- `chmod 600 credentials/*.json`
-- Never commit real credentials to version control
-- Rotate API keys regularly
-- Keep separate credential files per environment
+- Restrict filesystem permissions: `chmod 600 credentials/**/*.json`
+- Keep production secrets out of version control
+- Rotate Anthropic keys and client tokens regularly
+- Separate credentials per environment (development, staging, production)

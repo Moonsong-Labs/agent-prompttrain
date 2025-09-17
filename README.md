@@ -297,60 +297,48 @@ DEBUG=false
 
 See the [Documentation](docs/README.md) for complete configuration options.
 
-### Train Credentials
+### Accounts & Trains
 
-Create train-specific credentials:
+1. **Create an account credential** under `credentials/accounts/`:
 
-```bash
-# Generate secure API key
-bun run auth:generate-key
+   ```bash
+   mkdir -p credentials/accounts
+   cat > credentials/accounts/account-primary.credentials.json <<'JSON'
+   {
+     "type": "api_key",
+     "accountId": "acc_team_alpha",
+     "api_key": "sk-ant-your-claude-api-key"
+   }
+   JSON
+   ```
 
-# Create credential file
-cat > credentials/train-alpha.credentials.json << EOF
-{
-  "type": "api_key",
-  "accountId": "acc_name_to_display",
-  "api_key": "sk-ant-...",
-  "client_api_key": "cnp_live_..."
-}
-EOF
-```
+2. **Allow proxy clients** by listing Bearer tokens per train in `credentials/train-client-keys/`:
 
-(_Use `credentials/train-local.credentials.json` for using it locally_)
+   ```bash
+   mkdir -p credentials/train-client-keys
+   cat > credentials/train-client-keys/train-alpha.client-keys.json <<'JSON'
+   { "keys": ["cnp_live_team_alpha"] }
+   JSON
+   ```
 
-#### Wildcard Credentials
+3. **Tag outgoing Anthropic calls** so responses stay mapped to the right train:
 
-You can use wildcard credentials to match multiple trains with a single credential file:
+   ```bash
+   export ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"
+   ```
 
-```bash
-# Matches train IDs matching pattern (train-beta-preview, etc.)
-# Matches all trains sharing prefix (train-beta-*)
-cat > credentials/_wildcard.train-beta.credentials.json << EOF
-{
-  "type": "api_key",
-  "accountId": "acc_name_to_display",
-  "api_key": "sk-ant-...",
-  "client_api_key": "cnp_live_..."
-}
-EOF
+4. **Select a specific account at runtime** (optional):
 
-# Enable wildcard support
-export CNP_WILDCARD_CREDENTIALS=true
-```
+   ```bash
+   curl -X POST http://localhost:3000/v1/messages \
+     -H "train-id: train-alpha" \
+     -H "X-Train-Account: account-primary" \
+     -H "Authorization: Bearer cnp_live_team_alpha" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
+   ```
 
-Note: Exact matches take precedence over wildcards.
-
-Configure outbound requests to include the train header:
-
-```bash
-export ANTHROPIC_CUSTOM_HEADERS="train-id:train-alpha"
-```
-
-Authenticate your credential with Claude MAX Plan:
-
-```bash
-./scripts/auth/oauth-login.ts credentials/train-alpha.credentials.json
-```
+If `X-Train-Account` is omitted, the proxy randomly selects from the available account credential files.
 
 ## Usage
 
