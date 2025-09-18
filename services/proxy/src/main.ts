@@ -13,12 +13,13 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { config as dotenvConfig } from 'dotenv'
 import { tokenTracker } from './services/tokenTracker.js'
-import { container } from './container.js'
+import { initializeContainer, disposeContainer } from './container.js'
 import { closeRateLimitStores } from './middleware/rate-limit.js'
 import { CredentialStatusService } from './services/CredentialStatusService.js'
 import { CredentialManager } from './services/CredentialManager.js'
 import { config } from '@agent-prompttrain/shared'
 import { startAnalysisWorker } from './workers/ai-analysis/index.js'
+import type { AnalysisWorker } from './workers/ai-analysis/AnalysisWorker.js'
 
 // Load .env file from multiple possible locations
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -163,9 +164,11 @@ if (hostIndex !== -1 && args[hostIndex + 1]) {
 
 // Main function
 async function main() {
-  let analysisWorker: any = null
+  let analysisWorker: AnalysisWorker | null = null
 
   try {
+    await initializeContainer()
+
     // Print proxy configuration
     console.log(`Agent Prompt Train Service v${getPackageVersion()}`)
     console.log('Mode: passthrough (direct proxy to Claude API)')
@@ -259,8 +262,9 @@ async function main() {
     try {
       analysisWorker = startAnalysisWorker()
       console.log('✓ AI Analysis Worker started')
-    } catch (error: any) {
-      console.log('✗ AI Analysis Worker not started:', error.message || error)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.log('✗ AI Analysis Worker not started:', message)
       console.log('  GEMINI_CONFIG.API_KEY:', process.env.GEMINI_API_KEY ? 'SET' : 'NOT SET')
       // Non-fatal - continue without analysis worker
     }
@@ -366,7 +370,7 @@ async function main() {
         }
 
         // Clean up container resources
-        await container.cleanup()
+        await disposeContainer()
 
         clearTimeout(forceExitTimeout)
         process.exit(0)
@@ -380,8 +384,14 @@ async function main() {
     process.on('SIGINT', () => shutdown('SIGINT'))
     process.on('SIGTERM', () => shutdown('SIGTERM'))
     process.on('SIGQUIT', () => shutdown('SIGQUIT'))
-  } catch (error: any) {
-    console.error('❌ Failed to start server:', error.message)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('❌ Failed to start server:', message)
+    try {
+      await disposeContainer()
+    } catch {
+      // ignore cleanup errors during failed startup
+    }
     process.exit(1)
   }
 }
