@@ -218,6 +218,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/...
 
 - [ ] Generate strong client API keys
 - [ ] Set secure `DASHBOARD_API_KEY`
+- [ ] Configure OAuth2 Proxy + `DASHBOARD_SSO_ENABLED=true` for shared dashboards
 - [ ] Configure TLS/SSL
 - [ ] Set appropriate file permissions
 - [ ] Enable database SSL

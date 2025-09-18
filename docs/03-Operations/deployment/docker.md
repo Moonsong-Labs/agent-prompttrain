@@ -227,11 +227,38 @@ server {
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
 
+    # Require Google SSO via OAuth2 Proxy
     location / {
+        auth_request /oauth2/auth;
+        error_page 401 = @oauth2_sign_in;
+
         proxy_pass http://dashboard_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Auth-Request-Email $upstream_http_x_auth_request_email;
+        proxy_set_header X-Forwarded-User $upstream_http_x_auth_request_email;
+    }
+
+    # Allow automation clients to bypass SSO when presenting valid API key
+    location /api/ {
+        proxy_pass http://dashboard_backend/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://127.0.0.1:4180;
+        proxy_set_header Host $host;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_intercept_errors on;
+    }
+
+    location @oauth2_sign_in {
+        return 302 https://$host/oauth2/start?rd=$scheme://$http_host$request_uri;
     }
 
     # SSE endpoint

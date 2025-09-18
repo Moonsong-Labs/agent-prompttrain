@@ -48,6 +48,75 @@ ENABLE_CLIENT_AUTH=false
 
 ⚠️ **Warning**: Only disable client authentication in secure, internal environments.
 
+## Dashboard Authentication
+
+The dashboard now supports two production-grade authentication approaches:
+
+1. **API Key Authentication** (existing behavior)
+2. **Google SSO via OAuth2 Proxy** (recommended for shared deployments)
+
+### Google SSO via OAuth2 Proxy
+
+For environments running Nginx in front of the dashboard, deploy [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) as an auth middleware. Nginx uses the `auth_request` directive to require Google sign-in before requests reach the dashboard. When SSO is enabled, the dashboard trusts identity headers forwarded by OAuth2 Proxy and no longer needs the dashboard login page.
+
+#### 1. Enable Dashboard SSO
+
+Set the following environment variables (see `.env.example` for the full list):
+
+```
+DASHBOARD_SSO_ENABLED=true
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+DASHBOARD_API_KEY=cnp_live_automation_only   # keep for API clients and local bypass
+```
+
+`DASHBOARD_SSO_HEADERS` defaults to `X-Authenticated-User,X-Auth-Request-Email,X-Forwarded-Email`. Specify a comma-separated list if you use custom header names. Use `DASHBOARD_SSO_ALLOWED_DOMAINS` to restrict sign-ins to approved Google Workspace domains.
+
+#### 2. Run OAuth2 Proxy
+
+Example Docker Compose service:
+
+```yaml
+oauth2-proxy:
+  image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+  environment:
+    OAUTH2_PROXY_PROVIDER: google
+    OAUTH2_PROXY_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    OAUTH2_PROXY_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH_PROXY_COOKIE_SECRET} # 32 byte base64 string
+    OAUTH2_PROXY_EMAIL_DOMAINS: example.com
+    OAUTH2_PROXY_SET_XAUTHREQUEST: 'true'
+    OAUTH2_PROXY_UPSTREAMS: 'http://dashboard:3001'
+    OAUTH2_PROXY_REDIRECT_URL: https://dashboard.example.com/oauth2/callback
+  ports:
+    - '4180:4180'
+```
+
+#### 3. Update Nginx
+
+```nginx
+location /dashboard/ {
+  auth_request /oauth2/auth;
+  error_page 401 = @oauth2_sign_in;
+
+  auth_request_set $email $upstream_http_x_auth_request_email;
+  proxy_set_header X-Auth-Request-Email $email;
+  proxy_set_header X-Forwarded-User $email;
+  proxy_pass http://dashboard:3001;
+}
+
+location = /oauth2/auth {
+  internal;
+  proxy_pass http://127.0.0.1:4180;
+}
+
+location @oauth2_sign_in {
+  return 302 https://$host/oauth2/start?rd=$scheme://$http_host$request_uri;
+}
+```
+
+Retain API key support by allowing automation clients to route through a dedicated path (e.g., `/dashboard/api/`) with the `X-Dashboard-Key` header. See [ADR-025](../04-Architecture/ADRs/adr-025-dashboard-sso-proxy.md) for architectural context.
+
 ## Claude API Authentication
 
 The proxy supports two methods for authenticating with the Claude API:

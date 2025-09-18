@@ -1,10 +1,18 @@
 import { Context, Next, MiddlewareHandler } from 'hono'
 import { getCookie } from 'hono/cookie'
-import { isReadOnly, getDashboardApiKey } from '../config.js'
+import {
+  isReadOnly,
+  getDashboardApiKey,
+  isSsoEnabled,
+  getSsoHeaderNames,
+  getSsoAllowedDomains,
+} from '../config.js'
 
 export type AuthContext = {
   isAuthenticated: boolean
   isReadOnly: boolean
+  principal?: string
+  source?: 'api-key' | 'sso'
 }
 
 /**
@@ -29,6 +37,9 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
   // Check read-only mode dynamically
   const readOnly = isReadOnly()
   const apiKey = getDashboardApiKey()
+  const ssoEnabled = isSsoEnabled()
+  const ssoHeaderNames = getSsoHeaderNames()
+  const allowedDomains = getSsoAllowedDomains()
 
   // Set read-only mode in context
   c.set('auth', {
@@ -61,6 +72,8 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
     c.set('auth', {
       isAuthenticated: true,
       isReadOnly: false,
+      principal: 'api-key-cookie',
+      source: 'api-key',
     })
     return next()
   }
@@ -71,8 +84,37 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
     c.set('auth', {
       isAuthenticated: true,
       isReadOnly: false,
+      principal: 'api-key-header',
+      source: 'api-key',
     })
     return next()
+  }
+
+  if (ssoEnabled) {
+    const forwardedIdentity = ssoHeaderNames
+      .map(headerName => c.req.header(headerName))
+      .find((value): value is string => Boolean(value))
+
+    if (forwardedIdentity) {
+      const normalizedIdentity = forwardedIdentity.trim()
+
+      // If allow list is configured enforce it for email-style principals
+      if (allowedDomains.length > 0 && normalizedIdentity.includes('@')) {
+        const domain = normalizedIdentity.split('@').pop()?.toLowerCase()
+        if (!domain || !allowedDomains.includes(domain)) {
+          return c.json({ error: 'Forbidden' }, 403)
+        }
+      }
+
+      c.set('auth', {
+        isAuthenticated: true,
+        isReadOnly: false,
+        principal: normalizedIdentity,
+        source: 'sso',
+      })
+
+      return next()
+    }
   }
 
   // For SSE endpoints, check if user has auth cookie (browsers send cookies with EventSource)
