@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { container } from './container.js'
+import { container, initializeContainer } from './container.js'
 import { config, validateConfig } from '@agent-prompttrain/shared/config'
 import { loggingMiddleware, logger } from './middleware/logger.js'
 import { requestIdMiddleware } from './middleware/request-id.js'
@@ -27,6 +27,9 @@ export async function createProxyApp(): Promise<
 > {
   // Validate configuration
   validateConfig()
+
+  // Ensure container dependencies are ready
+  await initializeContainer()
 
   // Initialize external services
   await initializeExternalServices()
@@ -256,7 +259,7 @@ export async function createProxyApp(): Promise<
 
   // Root endpoint
   app.get('/', c => {
-    const endpoints: any = {
+    const endpoints: Record<string, unknown> = {
       api: '/v1/messages',
       health: '/health',
       stats: '/token-stats',

@@ -33,12 +33,35 @@ class Container {
   private githubSyncService?: GitHubSyncService
   private syncScheduler?: SyncScheduler
   private jsonRpcHandler?: JsonRpcHandler
+  private initialized = false
+  private initializationPromise?: Promise<void>
 
-  constructor() {
-    this.initializeServices()
+  constructor() {}
+
+  async init(): Promise<void> {
+    if (this.initialized) {
+      return
+    }
+
+    if (this.initializationPromise) {
+      await this.initializationPromise
+      return
+    }
+
+    this.initializationPromise = this.initializeServices()
+
+    try {
+      await this.initializationPromise
+      this.initialized = true
+    } catch (error) {
+      this.initialized = false
+      throw error
+    } finally {
+      this.initializationPromise = undefined
+    }
   }
 
-  private initializeServices(): void {
+  private async initializeServices(): Promise<void> {
     // Initialize database pool if configured
     logger.info('Container initialization', {
       metadata: {
@@ -75,11 +98,14 @@ class Container {
       this.tokenUsageService = new TokenUsageService(this.pool)
 
       // Ensure partitions exist
-      this.tokenUsageService.ensurePartitions().catch(err => {
+      try {
+        await this.tokenUsageService.ensurePartitions()
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err))
         logger.error('Failed to ensure token usage partitions', {
-          error: { message: err.message, stack: err.stack },
+          error: { message: error.message, stack: error.stack },
         })
-      })
+      }
     }
 
     // Initialize services
@@ -120,16 +146,16 @@ class Container {
       this.promptRegistry = new PromptRegistryService()
 
       // Initialize the registry
-      this.promptRegistry
-        .initialize()
-        .then(() => {
-          logger.info('MCP Prompt Registry initialized')
+      try {
+        await this.promptRegistry.initialize()
+        logger.info('MCP Prompt Registry initialized')
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err))
+        logger.error('Failed to initialize MCP Prompt Registry', {
+          error: { message: error.message, stack: error.stack },
         })
-        .catch(err => {
-          logger.error('Failed to initialize MCP Prompt Registry', {
-            error: { message: err.message, stack: err.stack },
-          })
-        })
+        throw error
+      }
 
       this.mcpServer = new McpServer(this.promptRegistry)
       this.jsonRpcHandler = new JsonRpcHandler(this.mcpServer)
@@ -218,18 +244,35 @@ class Container {
   }
 
   async cleanup(): Promise<void> {
+    this.initialized = false
+
     if (this.syncScheduler) {
       this.syncScheduler.stop()
+      this.syncScheduler = undefined
     }
     if (this.promptRegistry) {
       await this.promptRegistry.stop()
+      this.promptRegistry = undefined
     }
     if (this.storageService) {
       await this.storageService.close()
+      this.storageService = undefined
     }
     if (this.pool) {
       await this.pool.end()
+      this.pool = undefined
     }
+
+    this.tokenUsageService = undefined
+    this.metricsService = undefined
+    this.notificationService = undefined
+    this.authenticationService = undefined
+    this.claudeApiClient = undefined
+    this.proxyService = undefined
+    this.messageController = undefined
+    this.mcpServer = undefined
+    this.githubSyncService = undefined
+    this.jsonRpcHandler = undefined
   }
 }
 
@@ -242,6 +285,11 @@ class LazyContainer {
       this.instance = new Container()
     }
     return this.instance
+  }
+
+  async init(): Promise<void> {
+    const instance = this.ensureInstance()
+    await instance.init()
   }
 
   getDbPool(): Pool | undefined {
@@ -299,8 +347,17 @@ class LazyContainer {
   async cleanup(): Promise<void> {
     if (this.instance) {
       await this.instance.cleanup()
+      this.instance = undefined
     }
   }
 }
 
 export const container = new LazyContainer()
+
+export async function initializeContainer(): Promise<void> {
+  await container.init()
+}
+
+export async function disposeContainer(): Promise<void> {
+  await container.cleanup()
+}
