@@ -116,8 +116,28 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_nexus
       DASHBOARD_API_KEY: ${DASHBOARD_API_KEY}
+      DASHBOARD_SSO_ENABLED: ${DASHBOARD_SSO_ENABLED}
+      DASHBOARD_SSO_HEADERS: ${DASHBOARD_SSO_HEADERS}
+      DASHBOARD_SSO_ALLOWED_DOMAINS: ${DASHBOARD_SSO_ALLOWED_DOMAINS}
     ports:
       - '3001:3001'
+    restart: unless-stopped
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+    depends_on:
+      - dashboard
+    environment:
+      OAUTH2_PROXY_PROVIDER: google
+      OAUTH2_PROXY_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH_PROXY_COOKIE_SECRET}
+      OAUTH2_PROXY_EMAIL_DOMAINS: ${DASHBOARD_SSO_ALLOWED_DOMAINS}
+      OAUTH2_PROXY_SET_XAUTHREQUEST: 'true'
+      OAUTH2_PROXY_UPSTREAMS: 'http://dashboard:3001'
+      OAUTH2_PROXY_REDIRECT_URL: https://dashboard.yourdomain.com/oauth2/callback
+    ports:
+      - '4180:4180'
     restart: unless-stopped
 
 volumes:
@@ -132,6 +152,12 @@ volumes:
 # .env file
 # Dashboard authentication
 DASHBOARD_API_KEY=your-secure-dashboard-key
+DASHBOARD_SSO_ENABLED=true
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+OAUTH_PROXY_COOKIE_SECRET=base64-encoded-32-byte-secret
 
 # Optional configurations
 DEBUG=false
@@ -156,6 +182,9 @@ dashboard:
   environment:
     - DASHBOARD_CACHE_TTL=30
     - TZ=UTC
+    - DASHBOARD_SSO_ENABLED=${DASHBOARD_SSO_ENABLED}
+    - DASHBOARD_SSO_HEADERS=${DASHBOARD_SSO_HEADERS}
+    - DASHBOARD_SSO_ALLOWED_DOMAINS=${DASHBOARD_SSO_ALLOWED_DOMAINS}
 ```
 
 ## Advanced Deployment
