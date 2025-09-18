@@ -30,7 +30,7 @@ Debug mode enables:
   level: "debug",
   service: "proxy",
   event: "api_request",
-  domain: "example.com",
+  trainId: "train-alpha",
   method: "POST",
   path: "/v1/messages",
   headers: {
@@ -60,12 +60,12 @@ Common auth debug patterns:
 
 ```javascript
 // Successful auth
-DEBUG: Checking client auth for domain: example.com
+DEBUG: Checking client auth for train: train-alpha
 DEBUG: Client API key found in credentials
 DEBUG: Client auth successful
 
 // Failed auth
-DEBUG: Checking client auth for domain: example.com
+DEBUG: Checking client auth for train: train-alpha
 DEBUG: Client API key mismatch
 DEBUG: Expected: cnp_live_abc123...
 DEBUG: Received: cnp_live_xyz789...
@@ -255,7 +255,7 @@ docker compose logs proxy | jq -r 'select(.level == "error") | .error' | sort | 
 -- Check request details
 SELECT
   id,
-  domain,
+  trainId,
   method,
   path,
   status_code,
@@ -359,7 +359,7 @@ async function replayRequest(requestId: string) {
     throw new Error('Request not found')
   }
 
-  const { domain, request_body, headers } = original.rows[0]
+  const { trainId, request_body, headers } = original.rows[0]
 
   // Replay with debug enabled
   const response = await fetch(`http://localhost:3000${path}`, {
@@ -385,11 +385,11 @@ async function replayRequest(requestId: string) {
 ### Safe Debug Mode
 
 ```typescript
-// Enable debug for specific domains only
-const debugDomains = process.env.DEBUG_DOMAINS?.split(',') || []
+// Enable debug for specific trains only
+const debugTrains = process.env.DEBUG_TRAINS?.split(',') || []
 
-if (debugDomains.includes(domain)) {
-  console.log('Debug enabled for domain:', domain)
+if (debugTrains.includes(trainId)) {
+  console.log('Debug enabled for train:', trainId)
   // Add debug headers, logging, etc.
 }
 ```

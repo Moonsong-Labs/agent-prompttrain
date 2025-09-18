@@ -1,6 +1,10 @@
 import { promises as fs } from 'fs'
 import path from 'path'
-import { ClaudeMessagesRequest } from '@agent-prompttrain/shared'
+import {
+  ClaudeMessagesRequest,
+  MSL_TRAIN_ID_HEADER_LOWER,
+  MSL_ACCOUNT_HEADER_LOWER,
+} from '@agent-prompttrain/shared'
 import { Context } from 'hono'
 import { config } from '@agent-prompttrain/shared/config'
 import { getRequestLogger } from '../middleware/logger'
@@ -224,7 +228,8 @@ export class TestSampleCollector {
       'user-agent',
       'accept',
       'accept-encoding',
-      'host',
+      MSL_TRAIN_ID_HEADER_LOWER,
+      MSL_ACCOUNT_HEADER_LOWER,
       'content-length',
       'anthropic-version',
       'anthropic-beta',

@@ -32,18 +32,30 @@ export class ProxyService {
   ): Promise<Response> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.debug(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.info(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.warn(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           error: error
             ? {
                 message: error.message,
@@ -57,7 +69,7 @@ export class ProxyService {
     }
 
     // Create domain entities
-    const request = new ProxyRequest(rawRequest, context.host, context.requestId, context.apiKey)
+    const request = new ProxyRequest(rawRequest, context.trainId, context.requestId, context.apiKey)
 
     const response = new ProxyResponse(context.requestId, request.isStreaming)
 
@@ -89,7 +101,7 @@ export class ProxyService {
       try {
         // Use the new ConversationLinker through StorageAdapter
         const linkingResult = await this.storageAdapter.linkConversation(
-          context.host,
+          context.trainId,
           rawRequest.messages,
           rawRequest.system,
           context.requestId,
@@ -132,7 +144,7 @@ export class ProxyService {
       // Passthrough mode when client auth disabled and Bearer token present
       if (config.features.enableClientAuth === false && context.apiKey?.startsWith('Bearer ')) {
         log.debug('Using passthrough authentication (client auth disabled)', {
-          domain: context.host,
+          trainId: context.trainId,
           hasToken: true,
         })
 
@@ -144,12 +156,10 @@ export class ProxyService {
           },
           key: context.apiKey.replace('Bearer ', ''),
           betaHeader: 'oauth-2025-04-20',
+          accountName: 'passthrough',
         }
       } else {
-        // Existing domain-based routing
-        auth = context.host.toLowerCase().includes('personal')
-          ? await this.authService.authenticatePersonalDomain(context)
-          : await this.authService.authenticateNonPersonalDomain(context)
+        auth = await this.authService.authenticate(context)
       }
 
       // Forward to Claude
@@ -157,7 +167,10 @@ export class ProxyService {
         model: request.model,
         streaming: request.isStreaming,
         requestType: request.requestType,
-        authSource: context.apiKey ? 'passthrough from request' : 'domain credential file',
+        authSource:
+          context.apiKey && config.features.enableClientAuth === false
+            ? 'passthrough from request'
+            : `account:${auth.accountName}`,
       })
 
       const claudeResponse = await this.apiClient.forward(request, auth)
@@ -215,7 +228,7 @@ export class ProxyService {
     request: ProxyRequest,
     response: ProxyResponse,
     context: RequestContext,
-    auth: any,
+    auth: AuthResult,
     conversationData?: {
       currentMessageHash: string
       parentMessageHash: string | null
@@ -230,18 +243,30 @@ export class ProxyService {
   ): Promise<Response> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.debug(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.info(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.warn(message, {
+          requestId: context.requestId,
+          trainId: context.trainId,
+          metadata,
+        })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           error: error
             ? {
                 message: error.message,
@@ -308,7 +333,7 @@ export class ProxyService {
     request: ProxyRequest,
     response: ProxyResponse,
     context: RequestContext,
-    auth: any,
+    auth: AuthResult,
     conversationData?: {
       currentMessageHash: string
       parentMessageHash: string | null
@@ -323,18 +348,18 @@ export class ProxyService {
   ): Promise<Response> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.debug(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.info(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.warn(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           error: error
             ? {
                 message: error.message,
@@ -422,18 +447,18 @@ export class ProxyService {
   ): Promise<void> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.debug(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.info(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, domain: context.host, metadata })
+        logger.warn(message, { requestId: context.requestId, trainId: context.trainId, metadata })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           error: error
             ? {
                 message: error.message,

@@ -9,6 +9,7 @@ import {
 import {
   ConversationAnalysisStatus,
   conversationBranchParamsSchema,
+  MSL_TRAIN_ID_HEADER_LOWER,
 } from '@agent-prompttrain/shared'
 
 // Request/Response schemas
@@ -28,7 +29,7 @@ async function auditLog(
     outcome: string
     conversation_id: string
     branch_id: string
-    domain: string
+    trainId: string
     request_id: string
     user_context?: Record<string, unknown>
     metadata?: Record<string, unknown>
@@ -37,14 +38,14 @@ async function auditLog(
   try {
     await pool.query(
       `INSERT INTO analysis_audit_log 
-       (event_type, outcome, conversation_id, branch_id, domain, request_id, user_context, metadata, timestamp)
+       (event_type, outcome, conversation_id, branch_id, train_id, request_id, user_context, metadata, timestamp)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
       [
         data.event_type,
         data.outcome,
         data.conversation_id,
         data.branch_id,
-        data.domain,
+        data.trainId,
         data.request_id,
         JSON.stringify(data.user_context || {}),
         JSON.stringify(data.metadata || {}),
@@ -58,7 +59,7 @@ async function auditLog(
 export const analysisRoutes = new Hono<{
   Variables: {
     pool?: Pool
-    domain?: string
+    trainId?: string
     requestId?: string
   }
 }>()
@@ -68,7 +69,7 @@ export const analysisRoutes = new Hono<{
  */
 analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
   const pool = c.get('pool')
-  const domain = c.get('domain') || 'unknown'
+  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
   const requestId = c.get('requestId') || 'unknown'
 
   if (!pool) {
@@ -86,7 +87,7 @@ analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
       outcome: 'INITIATED',
       conversation_id: conversationId,
       branch_id: branchId,
-      domain,
+      trainId,
       request_id: requestId,
     })
 
@@ -138,7 +139,7 @@ analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
       outcome: 'SUCCESS',
       conversation_id: conversationId,
       branch_id: branchId,
-      domain,
+      trainId,
       request_id: requestId,
       metadata: { analysis_id: analysisId },
     })
@@ -182,7 +183,7 @@ analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
  */
 analysisRoutes.get('/:conversationId/:branchId', rateLimitAnalysisRetrieval(), async c => {
   const pool = c.get('pool')
-  const domain = c.get('domain') || 'unknown'
+  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
   const requestId = c.get('requestId') || 'unknown'
 
   if (!pool) {
@@ -228,7 +229,7 @@ analysisRoutes.get('/:conversationId/:branchId', rateLimitAnalysisRetrieval(), a
       outcome: 'SUCCESS',
       conversation_id: conversationId,
       branch_id: branchId,
-      domain,
+      trainId,
       request_id: requestId,
       metadata: {
         analysis_id: analysis.id,
@@ -290,7 +291,7 @@ analysisRoutes.post(
   rateLimitAnalysisCreation(),
   async c => {
     const pool = c.get('pool')
-    const domain = c.get('domain') || 'unknown'
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
     const requestId = c.get('requestId') || 'unknown'
 
     if (!pool) {
@@ -316,7 +317,7 @@ analysisRoutes.post(
         outcome: 'INITIATED',
         conversation_id: conversationId,
         branch_id: branchId,
-        domain,
+        trainId,
         request_id: requestId,
       })
 
@@ -355,7 +356,7 @@ analysisRoutes.post(
         outcome: 'SUCCESS',
         conversation_id: conversationId,
         branch_id: branchId,
-        domain,
+        trainId,
         request_id: requestId,
         metadata: { analysis_id: analysisId },
       })

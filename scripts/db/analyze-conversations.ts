@@ -13,7 +13,7 @@ config()
 
 interface Request {
   request_id: string
-  domain: string
+  trainId: string
   timestamp: Date
   current_message_hash: string | null
   parent_message_hash: string | null
@@ -24,7 +24,7 @@ interface Request {
 }
 
 interface ConversationAnalysis {
-  domain: string
+  trainId: string
   rootRequests: number
   totalRequests: number
   conversationChains: Array<{
@@ -59,16 +59,16 @@ class ConversationAnalyzer {
       // Build indices
       this.buildIndices(requests)
 
-      // Analyze by domain
-      console.log('\n2. Analyzing conversations by domain...')
-      const domainAnalyses = this.analyzeByDomain(requests)
+      // Analyze by trainId
+      console.log('\n2. Analyzing conversations by train ID...')
+      const trainIdAnalyses = this.analyzeByTrainId(requests)
 
       // Show results
       console.log('\n3. Analysis Results:')
       console.log('='.repeat(80))
 
-      for (const [domain, analysis] of Array.from(domainAnalyses.entries())) {
-        console.log(`\nDomain: ${domain}`)
+      for (const [trainId, analysis] of Array.from(trainIdAnalyses.entries())) {
+        console.log(`\nTrain ID: ${trainId}`)
         console.log('-'.repeat(40))
         console.log(`Total requests: ${analysis.totalRequests}`)
         console.log(`Root requests (no parent): ${analysis.rootRequests}`)
@@ -129,7 +129,7 @@ class ConversationAnalyzer {
     const query = `
       SELECT 
         request_id,
-        domain,
+        train_id AS "trainId",
         timestamp,
         current_message_hash,
         parent_message_hash,
@@ -160,30 +160,30 @@ class ConversationAnalyzer {
     }
   }
 
-  private analyzeByDomain(requests: Request[]): Map<string, ConversationAnalysis> {
-    const domainMap = new Map<string, Request[]>()
+  private analyzeByTrainId(requests: Request[]): Map<string, ConversationAnalysis> {
+    const trainIdMap = new Map<string, Request[]>()
 
-    // Group by domain
+    // Group by trainId
     for (const request of requests) {
-      if (!domainMap.has(request.domain)) {
-        domainMap.set(request.domain, [])
+      if (!trainIdMap.has(request.trainId)) {
+        trainIdMap.set(request.trainId, [])
       }
-      domainMap.get(request.domain)!.push(request)
+      trainIdMap.get(request.trainId)!.push(request)
     }
 
-    // Analyze each domain
+    // Analyze each trainId
     const analyses = new Map<string, ConversationAnalysis>()
 
-    for (const [domain, domainRequests] of Array.from(domainMap.entries())) {
-      analyses.set(domain, this.analyzeDomain(domain, domainRequests))
+    for (const [trainId, trainIdRequests] of Array.from(trainIdMap.entries())) {
+      analyses.set(trainId, this.analyzeTrain(trainId, trainIdRequests))
     }
 
     return analyses
   }
 
-  private analyzeDomain(domain: string, requests: Request[]): ConversationAnalysis {
+  private analyzeTrain(trainId: string, requests: Request[]): ConversationAnalysis {
     const analysis: ConversationAnalysis = {
-      domain,
+      trainId,
       rootRequests: 0,
       totalRequests: requests.length,
       conversationChains: [],
@@ -204,9 +204,9 @@ class ConversationAnalyzer {
       } else {
         // Count how many requests have this as parent
         const parentRequests = this.requestsByHash.get(request.parent_message_hash) || []
-        const samedomainParents = parentRequests.filter(p => p.domain === domain)
+        const sameTrainParents = parentRequests.filter(p => p.trainId === trainId)
 
-        if (samedomainParents.length === 0) {
+        if (sameTrainParents.length === 0) {
           analysis.orphanedRequests++
         }
       }
@@ -240,7 +240,7 @@ class ConversationAnalyzer {
 
   private analyzeChain(
     root: Request,
-    domainRequests: Request[],
+    trainIdRequests: Request[],
     processed: Set<string>
   ): {
     rootRequestId: string
@@ -266,7 +266,7 @@ class ConversationAnalyzer {
       totalTokens += current.total_tokens || 0
 
       // Find children
-      const children = domainRequests.filter(
+      const children = trainIdRequests.filter(
         r => r.parent_message_hash === current.current_message_hash && !seen.has(r.request_id)
       )
 

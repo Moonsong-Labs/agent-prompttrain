@@ -124,8 +124,8 @@ interface TokenStatsResponse {
     output: number
     total: number
   }
-  by_domain: {
-    [domain: string]: {
+  by_train: {
+    [trainId: string]: {
       requests: number
       tokens: {
         input: number
@@ -170,7 +170,7 @@ interface HealthResponse {
 interface StatsResponse {
   total_requests: number
   total_tokens: number
-  active_domains: number
+  active_trains: number
   total_subtasks: number
   success_rate: number // Percentage (0-100)
   average_latency: number // Milliseconds
@@ -254,7 +254,7 @@ interface ConversationsResponse {
 interface Conversation {
   conversation_id: string
   account_id: string
-  domain: string
+  trainId: string
   first_message_at: string // ISO 8601
   last_message_at: string // ISO 8601
   message_count: number
@@ -285,7 +285,7 @@ interface RequestSummary {
 ```typescript
 interface RequestDetailsResponse {
   id: string
-  domain: string
+  trainId: string
   account_id: string
   method: string
   path: string
@@ -399,7 +399,7 @@ interface SlackAttachment {
 ```sql
 CREATE TABLE api_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  domain VARCHAR(255) NOT NULL,
+  train_id VARCHAR(255) NOT NULL,
   account_id VARCHAR(255),
   method VARCHAR(10) NOT NULL,
   path VARCHAR(255) NOT NULL,
@@ -478,10 +478,10 @@ function isValidUUID(id: string): boolean {
   return uuidRegex.test(id)
 }
 
-// Validate domain
-function isValidDomain(domain: string): boolean {
-  const domainRegex = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i
-  return domainRegex.test(domain)
+// Validate train identifier
+function isValidTrainId(trainId: string): boolean {
+  const trainIdRegex = /^[a-zA-Z0-9._:-]+$/
+  return trainIdRegex.test(trainId)
 }
 
 // Validate model

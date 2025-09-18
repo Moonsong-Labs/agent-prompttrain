@@ -39,7 +39,7 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 
 1. **Client Request** → Proxy Service
 2. **Authentication** → Validate client API key
-3. **Domain Resolution** → Load credentials for domain
+3. **Train Resolution** → Load credentials for train
 4. **Request Enhancement** → Add auth headers, tracking
 5. **Claude API Call** → Forward to Anthropic
 6. **Response Processing** → Stream or JSON response
@@ -55,11 +55,11 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 ```typescript
 // Simplified request flow
 async function handleRequest(c: Context) {
-  // 1. Extract domain from Host header
-  const domain = extractDomain(c.req.header('Host'))
+  // 1. Extract train ID from header
+  const trainId = c.get('trainId') ?? c.req.header('msl-train-id')
 
   // 2. Load credentials
-  const credentials = await loadCredentials(domain)
+  const credentials = await loadCredentials(trainId)
 
   // 3. Validate client auth
   if (!validateClientAuth(c, credentials)) {
@@ -326,25 +326,33 @@ $$ LANGUAGE plpgsql;
 
 ```typescript
 class AuthManager {
+  constructor(
+    private readonly clientKeyStore: ClientKeyStore,
+    private readonly accountStore: AccountCredentialStore
+  ) {}
+
   // Layer 1: Client authentication
-  async validateClient(request: Request, credentials: DomainCredentials): Promise<boolean> {
-    if (!credentials.client_api_key) {
+  async validateClient(request: Request, trainId: string): Promise<boolean> {
+    const allowedKeys = await this.clientKeyStore.getKeys(trainId)
+    if (!allowedKeys.length) {
       return true // No client auth required
     }
 
     const providedKey = extractBearerToken(request)
-    return timingSafeEqual(Buffer.from(providedKey), Buffer.from(credentials.client_api_key))
+    return allowedKeys.some(key => timingSafeEqual(hash(key), hash(providedKey)))
   }
 
   // Layer 2: Claude API authentication
-  async enhanceRequest(request: Request, credentials: DomainCredentials): Promise<Request> {
-    switch (credentials.type) {
+  async enhanceRequest(request: Request, context: RequestContext): Promise<Request> {
+    const account = await this.accountStore.pickAccount(context.account)
+
+    switch (account.type) {
       case 'api_key':
-        request.headers.set('x-api-key', credentials.api_key)
+        request.headers.set('x-api-key', account.api_key)
         break
 
       case 'oauth':
-        const token = await this.getValidToken(credentials)
+        const token = await this.getValidToken(account)
         request.headers.set('Authorization', `Bearer ${token}`)
         request.headers.set('anthropic-beta', 'oauth-2025-04-20')
         break
@@ -354,8 +362,8 @@ class AuthManager {
   }
 
   // OAuth token management
-  private async getValidToken(credentials: OAuthCredentials): Promise<string> {
-    const expiresIn = credentials.oauth.expiresAt - Date.now()
+  private async getValidToken(account: OAuthAccountCredential): Promise<string> {
+    const expiresIn = account.oauth.expiresAt - Date.now()
 
     if (expiresIn < 60000) {
       // Less than 1 minute
@@ -456,12 +464,12 @@ class CacheManager {
 ### 1. Credential Isolation
 
 ```typescript
-// Each domain has isolated credentials
-const credentialPath = path.join(CREDENTIALS_DIR, `${domain}.credentials.json`)
+// Each train has isolated credentials
+const credentialPath = path.join(CREDENTIALS_DIR, `${trainId}.credentials.json`)
 
-// Validate domain format to prevent path traversal
-if (!isValidDomain(domain)) {
-  throw new Error('Invalid domain')
+// Validate train ID format to prevent path traversal
+if (!isValidTrainId(trainId)) {
+  throw new Error('Invalid train ID')
 }
 
 // Read with restricted permissions
@@ -492,12 +500,12 @@ function sanitizeRequest(request: any): any {
 ### 3. Rate Limiting
 
 ```typescript
-// Per-domain rate limiting (future implementation)
+// Per-train rate limiting (future implementation)
 class RateLimiter {
   private limits = new Map<string, RateLimit>()
 
-  async checkLimit(domain: string): Promise<boolean> {
-    const limit = this.limits.get(domain) || this.createLimit(domain)
+  async checkLimit(trainId: string): Promise<boolean> {
+    const limit = this.limits.get(trainId) || this.createLimit(trainId)
 
     if (limit.tokens <= 0) {
       return false
@@ -507,13 +515,13 @@ class RateLimiter {
     return true
   }
 
-  private createLimit(domain: string): RateLimit {
+  private createLimit(trainId: string): RateLimit {
     const limit = {
       tokens: 100,
       resetAt: Date.now() + 60000,
     }
 
-    this.limits.set(domain, limit)
+    this.limits.set(trainId, limit)
 
     // Reset tokens periodically
     setTimeout(() => {

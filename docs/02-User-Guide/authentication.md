@@ -13,20 +13,20 @@ The proxy uses a two-layer authentication system:
 
 ### API Key Authentication
 
-The proxy can require clients to authenticate using a client API key:
+The proxy can require clients to authenticate using per-train Bearer tokens stored under
+`credentials/train-client-keys/<train-id>.client-keys.json`:
 
 ```bash
-# In your domain credential file
-{
-  "client_api_key": "cnp_live_your_generated_key"
-}
+cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+{ "keys": ["cnp_live_your_generated_key"] }
+JSON
 ```
 
 Client requests must include this key:
 
 ```bash
 curl -X POST http://proxy:3000/v1/messages \
-  -H "Host: your-domain.com" \
+  -H "MSL-Train-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_generated_key" \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Hello"}]}'
@@ -60,8 +60,7 @@ Most common and straightforward method:
 {
   "type": "api_key",
   "accountId": "acc_unique_identifier",
-  "api_key": "sk-ant-api03-...",
-  "client_api_key": "cnp_live_..."
+  "api_key": "sk-ant-api03-..."
 }
 ```
 
@@ -73,7 +72,6 @@ For enhanced security and automatic token management:
 {
   "type": "oauth",
   "accountId": "acc_unique_identifier",
-  "client_api_key": "cnp_live_...",
   "oauth": {
     "accessToken": "...",
     "refreshToken": "...",
@@ -89,37 +87,40 @@ For enhanced security and automatic token management:
 ### Step 1: Create Credentials Directory
 
 ```bash
-mkdir -p credentials
+mkdir -p credentials/accounts
+mkdir -p credentials/train-client-keys
 ```
 
-### Step 2: Create Domain Credential File
+### Step 2: Create Account Credential File
 
 For API key authentication:
 
 ```bash
-cat > credentials/your-domain.com.credentials.json << EOF
+cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 {
   "type": "api_key",
   "accountId": "acc_$(uuidgen)",
-  "api_key": "sk-ant-your-claude-api-key",
-  "client_api_key": "$(bun run scripts/generate-api-key.ts)"
+  "api_key": "sk-ant-your-claude-api-key"
 }
-EOF
+JSON
 ```
 
 For OAuth authentication:
 
 ```bash
-bun run scripts/oauth-login.ts credentials/your-domain.com.credentials.json
+bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.json
 ```
 
 ### Step 3: Configure Request Headers
 
-Requests must include the correct Host header:
+Requests must include the correct `MSL-Train-Id` header. Add `MSL-Account` to pin a
+specific account credential (otherwise the proxy deterministically assigns an account based on the train ID):
 
 ```bash
-# The Host header determines which credential file to use
-curl -H "Host: your-domain.com" http://localhost:3000/v1/messages
+# Train identification header (required)
+curl -H "MSL-Train-Id: your-train-id" \
+     -H "MSL-Account: account-primary" \
+     http://localhost:3000/v1/messages
 ```
 
 ## OAuth Management
@@ -136,7 +137,7 @@ The proxy automatically refreshes OAuth tokens:
 ### Check OAuth Status
 
 ```bash
-bun run scripts/check-oauth-status.ts credentials/your-domain.credentials.json
+bun run scripts/check-oauth-status.ts credentials/accounts/account-primary.credentials.json
 ```
 
 Output shows:
@@ -150,16 +151,16 @@ Output shows:
 
 ```bash
 # Refresh if expiring soon
-bun run scripts/oauth-refresh.ts credentials/your-domain.credentials.json
+bun run scripts/oauth-refresh.ts credentials/accounts/account-primary.credentials.json
 
 # Force refresh
-bun run scripts/oauth-refresh.ts credentials/your-domain.credentials.json --force
+bun run scripts/oauth-refresh.ts credentials/accounts/account-primary.credentials.json --force
 ```
 
 ### Refresh All Tokens
 
 ```bash
-# Check all domains
+# Check all trains
 bun run scripts/oauth-refresh-all.ts credentials --dry-run
 
 # Actually refresh
@@ -181,7 +182,7 @@ bun run scripts/oauth-refresh-all.ts credentials
 **Solution:**
 
 ```bash
-bun run scripts/oauth-login.ts credentials/your-domain.credentials.json
+bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.json
 ```
 
 #### "No refresh token available"
@@ -195,13 +196,13 @@ bun run scripts/oauth-login.ts credentials/your-domain.credentials.json
 1. **Check credential file**:
 
    ```bash
-   cat credentials/your-domain.credentials.json | jq .
+   cat credentials/accounts/account-primary.credentials.json | jq .
    ```
 
 2. **Verify OAuth status**:
 
    ```bash
-   bun run scripts/check-oauth-status.ts credentials/domain.credentials.json
+   bun run scripts/check-oauth-status.ts credentials/train-id.credentials.json
    ```
 
 3. **Test refresh token**:
@@ -249,7 +250,7 @@ bun run scripts/oauth-login.ts credentials/your-domain.credentials.json
 1. **Secure Storage**: Protect OAuth tokens like passwords
 2. **Monitor Expiration**: Set up alerts for expiring tokens
 3. **Audit Access**: Review OAuth scopes regularly
-4. **Revoke Unused**: Remove tokens for inactive domains
+4. **Revoke Unused**: Remove tokens for inactive trains
 
 ## Dashboard Authentication
 
@@ -274,18 +275,18 @@ fetch('http://localhost:3001/api/stats', {
 // Cookie: dashboard_auth=your-secure-dashboard-key
 ```
 
-## Multi-Domain Setup
+## Multi-Train Setup
 
-Support multiple domains with separate credentials:
+Support multiple trains with separate credentials:
 
 ```bash
 credentials/
-├── app1.example.com.credentials.json
-├── app2.example.com.credentials.json
-└── staging.example.com.credentials.json
+├── train-alpha.credentials.json
+├── train-beta.credentials.json
+└── staging.credentials.json
 ```
 
-Each domain can use different:
+Each train can use different:
 
 - Authentication methods (API key vs OAuth)
 - Claude accounts
@@ -328,12 +329,12 @@ The dashboard shows:
 
 - Authentication success/failure rates
 - Token refresh events
-- Per-domain authentication methods
+- Per-train authentication methods
 - OAuth token expiration status
 
 ## Next Steps
 
-- [Configure your domains](./configuration.md)
+- [Configure your trains](./configuration.md)
 - [Make your first API call](./api-reference.md)
 - [Monitor usage in dashboard](./dashboard-guide.md)
 - [Set up OAuth automation](../03-Operations/security.md)

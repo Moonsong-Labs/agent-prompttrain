@@ -10,7 +10,7 @@ import { ProxyApiClient } from '../services/api-client.js'
 const promptDetailRoute = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    domain?: string
+    trainId?: string
   }
 }>()
 

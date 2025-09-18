@@ -1,748 +1,373 @@
-import { getApiKey, DomainCredentialMapping, loadCredentials, SlackConfig } from '../credentials'
+import { createHash } from 'crypto'
+import { promises as fsp } from 'fs'
+import * as path from 'path'
+import { homedir } from 'os'
+import { getApiKey, loadCredentials, SlackConfig, ClaudeCredentials } from '../credentials'
 import { AuthenticationError } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { logger } from '../middleware/logger'
-import * as path from 'path'
-import * as fs from 'fs'
-import { domainToASCII } from 'url'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const psl = require('psl')
 
 export interface AuthResult {
   type: 'api_key' | 'oauth'
   headers: Record<string, string>
   key: string
   betaHeader?: string
-  accountId?: string // Account identifier from credentials
+  accountId?: string
+  accountName: string
+  slackConfig?: SlackConfig | null
 }
 
-interface CachedResolution {
-  path: string | null
-  matchType: 'exact' | 'wildcard' | 'none'
+interface AuthenticationServiceOptions {
+  defaultApiKey?: string
+  accountsDir: string
+  clientKeysDir: string
+  accountCacheTtlMs?: number
+}
+
+const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
+const ACCOUNT_FILENAME_SUFFIX = '.credentials.json'
+const CLIENT_KEY_FILENAME_SUFFIX = '.client-keys.json'
+const IDENTIFIER_REGEX = /^[a-zA-Z0-9._\-:]+$/
+
+interface CachedAccountList {
+  names: string[]
   expiresAt: number
 }
 
 /**
- * Service responsible for authentication logic
- * Handles API keys, OAuth tokens, and credential resolution
+ * Authentication service responsible for selecting account credentials
+ * based on request metadata and producing headers for Anthropic API calls.
  */
 export class AuthenticationService {
-  private domainMapping: DomainCredentialMapping = {}
-  private warnedDomains = new Set<string>()
-  private resolutionCache = new Map<string, CachedResolution>()
-  private cacheCleanupInterval: NodeJS.Timeout | null = null
-  private readonly maxCacheSize = 10000 // Maximum number of cache entries
+  private readonly defaultApiKey?: string
+  private readonly accountsDir: string
+  private readonly clientKeysDir: string
+  private readonly accountCacheTtl: number
+  private accountCache: CachedAccountList | null = null
 
-  constructor(
-    private defaultApiKey?: string,
-    private credentialsDir: string = process.env.CREDENTIALS_DIR || 'credentials'
-  ) {
-    // Initialize domain mapping if needed
-    // For now, we'll handle credentials dynamically
-
-    // Set up cache cleanup interval (every 5 minutes)
-    this.cacheCleanupInterval = setInterval(
-      () => {
-        this.cleanupExpiredCache()
-      },
-      5 * 60 * 1000
-    )
+  constructor(options: AuthenticationServiceOptions) {
+    this.defaultApiKey = options.defaultApiKey
+    this.accountsDir = this.resolveDirectory(options.accountsDir)
+    this.clientKeysDir = this.resolveDirectory(options.clientKeysDir)
+    this.accountCacheTtl = options.accountCacheTtlMs ?? 5 * 60 * 1000
   }
 
   /**
-   * Check if a domain is a personal domain
+   * Authenticate a request using the selected account.
    */
-  private isPersonalDomain(domain: string): boolean {
-    return domain.toLowerCase().includes('personal')
+  async authenticate(context: RequestContext): Promise<AuthResult> {
+    const requestedAccount = context.account
+    const requestId = context.requestId
+
+    const availableAccounts = await this.listAccounts()
+
+    if (!availableAccounts.length) {
+      throw new AuthenticationError('No accounts are configured for the proxy', {
+        requestId,
+        hint: `Add account credential files under ${this.accountsDir}`,
+      })
+    }
+
+    if (requestedAccount) {
+      return this.loadAccount(requestedAccount, context)
+    }
+
+    return this.loadDeterministicAccount(availableAccounts, context)
   }
 
   /**
-   * Authenticate non-personal domains - only uses domain credentials, no fallbacks
+   * Retrieve the list of valid client API keys for a train.
    */
-  async authenticateNonPersonalDomain(context: RequestContext): Promise<AuthResult> {
+  async getClientApiKeys(trainId: string): Promise<string[]> {
+    const filePath = this.resolveClientKeysPath(trainId)
+    if (!filePath) {
+      return []
+    }
+
     try {
-      const credentialPath = await this.resolveCredentialPath(context.host)
-      if (!credentialPath) {
-        throw new AuthenticationError('No credentials configured for domain', {
-          domain: context.host,
-          requestId: context.requestId,
-          hint: 'Domain credentials are required for non-personal domains',
-        })
-      }
+      const content = await fsp.readFile(filePath, 'utf-8')
+      const parsed = JSON.parse(content)
 
-      const credentials = loadCredentials(credentialPath)
-      if (!credentials) {
-        throw new AuthenticationError('Failed to load credentials for domain', {
-          domain: context.host,
-          requestId: context.requestId,
-          credentialPath,
-        })
-      }
+      const rawKeys = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.keys)
+          ? parsed.keys
+          : Array.isArray(parsed?.client_api_keys)
+            ? parsed.client_api_keys
+            : []
 
-      const apiKey = await getApiKey(credentialPath)
-      if (!apiKey) {
-        throw new AuthenticationError('Failed to retrieve API key for domain', {
-          domain: context.host,
-          requestId: context.requestId,
-        })
-      }
-
-      // Return auth based on credential type
-      if (credentials.type === 'oauth') {
-        logger.info(`Using OAuth credentials for non-personal domain`, {
-          requestId: context.requestId,
-          domain: context.host,
-          metadata: {
-            accountId: credentials.accountId,
-          },
-        })
-
-        return {
-          type: 'oauth',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'anthropic-beta': 'oauth-2025-04-20',
-          },
-          key: apiKey,
-          betaHeader: 'oauth-2025-04-20',
-          accountId: credentials.accountId,
-        }
-      } else {
-        logger.info(`Using API key for non-personal domain`, {
-          requestId: context.requestId,
-          domain: context.host,
-          metadata: {
-            accountId: credentials.accountId,
-          },
-        })
-
-        return {
-          type: 'api_key',
-          headers: {
-            'x-api-key': apiKey,
-          },
-          key: apiKey,
-          accountId: credentials.accountId,
-        }
-      }
+      return rawKeys
+        .filter((key: unknown) => typeof key === 'string' && key.trim().length > 0)
+        .map((key: string) => key.trim())
     } catch (error) {
-      logger.error('Authentication failed for non-personal domain', {
-        requestId: context.requestId,
-        domain: context.host,
-        error:
-          error instanceof Error
-            ? {
-                message: error.message,
-                code: (error as any).code,
-              }
-            : { message: String(error) },
-      })
-
-      if (error instanceof AuthenticationError) {
-        throw error
+      const err = error as NodeJS.ErrnoException
+      if (err.code !== 'ENOENT') {
+        logger.error('Failed to read client API keys file', {
+          trainId,
+          error: err.message,
+        })
       }
-
-      throw new AuthenticationError('Authentication failed', {
-        originalError: error instanceof Error ? error.message : String(error),
-      })
+      return []
     }
   }
 
-  /**
-   * Authenticate personal domains - uses fallback logic
-   * Priority: Domain credentials → Bearer token → Default API key
-   */
-  async authenticatePersonalDomain(context: RequestContext): Promise<AuthResult> {
-    try {
-      // For personal domains, use the original priority logic
-      // Priority order:
-      // 1. Domain-specific credentials from file
-      // 2. API key from request header (Bearer token only, not x-api-key)
-      // 3. Default API key from environment
-
-      // First, check if domain has a credential file
-      const credentialPath = await this.resolveCredentialPath(context.host)
-
-      // Try to load credentials if we have a path
-      if (credentialPath) {
-        try {
-          const credentials = loadCredentials(credentialPath)
-
-          if (credentials) {
-            logger.debug(`Found credentials file for domain`, {
-              requestId: context.requestId,
-              domain: context.host,
-              metadata: {
-                credentialType: credentials.type,
-              },
-            })
-
-            // Get API key from credentials
-            const apiKey = await getApiKey(credentialPath)
-            if (apiKey) {
-              // Return auth result based on credential type
-              if (credentials.type === 'oauth') {
-                logger.debug(`Using OAuth credentials from file`, {
-                  requestId: context.requestId,
-                  domain: context.host,
-                  metadata: {
-                    hasRefreshToken: !!credentials.oauth?.refreshToken,
-                  },
-                })
-
-                return {
-                  type: 'oauth',
-                  headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'anthropic-beta': 'oauth-2025-04-20',
-                  },
-                  key: apiKey,
-                  betaHeader: 'oauth-2025-04-20',
-                  accountId: credentials.accountId,
-                }
-              } else {
-                logger.debug(`Using API key from credential file`, {
-                  requestId: context.requestId,
-                  domain: context.host,
-                  metadata: {
-                    keyPreview: apiKey.substring(0, 20) + '****',
-                  },
-                })
-
-                return {
-                  type: 'api_key',
-                  headers: {
-                    'x-api-key': apiKey,
-                  },
-                  key: apiKey,
-                  accountId: credentials.accountId,
-                }
-              }
-            }
-          }
-        } catch (_e) {
-          // Credential file doesn't exist or couldn't be loaded, continue to fallback options
-          if (!this.warnedDomains.has(context.host)) {
-            logger.debug(`Failed to load credentials for domain: ${context.host}`, {
-              metadata: {
-                credentialsDir: this.credentialsDir,
-              },
-            })
-            this.warnedDomains.add(context.host)
-          }
-        }
-      }
-
-      // For personal domains only: fallback to Bearer token from request or default API key
-      if (context.apiKey && context.apiKey.startsWith('Bearer ')) {
-        // Only accept Bearer tokens from Authorization header
-        logger.debug(`Using Bearer token from request header for personal domain`, {
-          requestId: context.requestId,
-          domain: context.host,
-          metadata: {
-            authType: 'oauth',
-            keyPreview: context.apiKey.substring(0, 20) + '****',
-          },
-        })
-
-        return {
-          type: 'oauth',
-          headers: {
-            Authorization: context.apiKey,
-            'anthropic-beta': 'oauth-2025-04-20',
-          },
-          key: context.apiKey.replace('Bearer ', ''),
-          betaHeader: 'oauth-2025-04-20',
-          // Note: No accountId available when using Bearer token from request
-        }
-      } else if (this.defaultApiKey) {
-        // Use default API key as last resort
-        logger.debug(`Using default API key for personal domain`, {
-          requestId: context.requestId,
-          domain: context.host,
-          metadata: {
-            keyPreview: this.defaultApiKey.substring(0, 20) + '****',
-          },
-        })
-
-        return {
-          type: 'api_key',
-          headers: {
-            'x-api-key': this.defaultApiKey,
-          },
-          key: this.defaultApiKey,
-          // Note: No accountId available when using default API key
-        }
-      }
-
-      // No credentials found anywhere
-      throw new AuthenticationError('No valid credentials found', {
-        domain: context.host,
-        hasApiKey: false,
-        hint: 'For personal domains: create a credential file or pass Bearer token in Authorization header',
-      })
-    } catch (error) {
-      logger.error('Authentication failed for personal domain', {
-        requestId: context.requestId,
-        domain: context.host,
-        error:
-          error instanceof Error
-            ? {
-                message: error.message,
-                code: (error as any).code,
-              }
-            : { message: String(error) },
-      })
-
-      if (error instanceof AuthenticationError) {
-        throw error
-      }
-
-      throw new AuthenticationError('Authentication failed', {
-        originalError: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  /**
-   * Check if a request has valid authentication
-   */
-  hasAuthentication(context: RequestContext): boolean {
-    return !!(context.apiKey || this.defaultApiKey)
-  }
-
-  /**
-   * Get masked credential info for logging
-   */
   getMaskedCredentialInfo(auth: AuthResult): string {
     const maskedKey = auth.key.substring(0, 10) + '****'
     return `${auth.type}:${maskedKey}`
   }
 
-  /**
-   * Get Slack configuration for a domain
-   */
-  async getSlackConfig(domain: string): Promise<SlackConfig | null> {
-    const credentialPath = await this.resolveCredentialPath(domain)
-    if (!credentialPath) {
-      return null
-    }
-
-    try {
-      const credentials = loadCredentials(credentialPath)
-      // Return slack config if it exists and is not explicitly disabled
-      if (credentials?.slack && credentials.slack.enabled !== false) {
-        return credentials.slack
-      }
-    } catch (_error) {
-      // Ignore errors - domain might not have credentials
-    }
-
-    return null
+  clearCaches(): void {
+    this.accountCache = null
   }
 
-  /**
-   * Get client API key for a domain
-   * Used for proxy-level authentication (different from Claude API keys)
-   */
-  async getClientApiKey(domain: string): Promise<string | null> {
-    const credentialPath = await this.resolveCredentialPath(domain)
-    if (!credentialPath) {
-      logger.debug('No credentials found for domain', {
-        domain,
+  destroy(): void {
+    // No-op retained for compatibility
+  }
+
+  private async loadAccount(accountName: string, context: RequestContext): Promise<AuthResult> {
+    const sanitized = this.sanitizeIdentifier(accountName)
+    if (!sanitized) {
+      throw new AuthenticationError('Account header contains invalid characters', {
+        requestId: context.requestId,
+        account: accountName,
       })
-      return null
     }
 
-    try {
-      const credentials = loadCredentials(credentialPath)
-      return credentials?.client_api_key || null
-    } catch (error) {
-      logger.debug(`Failed to get client API key for domain: ${domain}`, {
-        metadata: {
-          error: error instanceof Error ? error.message : String(error),
-        },
+    const accountPath = this.resolveAccountPath(sanitized)
+    if (!accountPath) {
+      throw new AuthenticationError('Account credential path is invalid', {
+        requestId: context.requestId,
+        account: sanitized,
       })
-      return null
     }
-  }
 
-  /**
-   * Get safe credential path, preventing path traversal attacks
-   */
-  private getSafeCredentialPath(domain: string): string | null {
-    try {
-      // Validate domain to prevent path traversal and ensure safe characters
-      // Allow alphanumeric, dots, hyphens, and colons for port numbers
-      const domainRegex = /^[a-zA-Z0-9.\-:]+$/
-      if (!domainRegex.test(domain)) {
-        logger.warn('Domain contains invalid characters', {
-          domain,
-        })
-        return null
-      }
-
-      // Additional check to prevent path traversal attempts
-      if (domain.includes('..') || domain.includes('/') || domain.includes('\\')) {
-        logger.warn('Domain contains path traversal attempt', { domain })
-        return null
-      }
-
-      const safeDomain = domain
-
-      // Build the credential path using the original credentialsDir value
-      // This preserves relative paths for loadCredentials to handle
-      const credentialPath = path.join(this.credentialsDir, `${safeDomain}.credentials.json`)
-
-      // Security check: resolve both paths for comparison only
-      const resolvedCredsDir = path.resolve(this.credentialsDir)
-      const resolvedCredPath = path.resolve(credentialPath)
-
-      // Ensure the resolved path is within the credentials directory
-      if (!resolvedCredPath.startsWith(resolvedCredsDir + path.sep)) {
-        logger.error('Path traversal attempt detected', {
-          domain,
-          metadata: {
-            attemptedPath: credentialPath,
-            safeDir: this.credentialsDir,
-          },
-        })
-        return null
-      }
-
-      // Return the unresolved path for loadCredentials to handle
-      return credentialPath
-    } catch (error) {
-      logger.error('Error sanitizing credential path', {
-        domain,
-        error: error instanceof Error ? { message: error.message } : { message: String(error) },
+    const credentials = loadCredentials(accountPath)
+    if (!credentials) {
+      throw new AuthenticationError('No credentials configured for account', {
+        requestId: context.requestId,
+        account: sanitized,
+        hint: `Create ${sanitized}${ACCOUNT_FILENAME_SUFFIX} under ${this.accountsDir}`,
       })
-      return null
     }
-  }
 
-  /**
-   * Clean up expired cache entries
-   */
-  private cleanupExpiredCache(): void {
-    const now = Date.now()
-    for (const [key, value] of this.resolutionCache.entries()) {
-      if (value.expiresAt <= now) {
-        this.resolutionCache.delete(key)
-      }
-    }
-  }
-
-  /**
-   * Normalize domain for consistent matching
-   */
-  private normalizeDomain(domain: string): string {
-    try {
-      // Remove port
-      const domainWithoutPort = domain.split(':')[0]
-
-      // Convert IDN to ASCII (punycode) - handles internationalized domains
-      let normalized: string
-      try {
-        normalized = domainToASCII(domainWithoutPort)
-      } catch (idnError) {
-        // If IDN conversion fails, use the original (some malformed domains might fail)
-        logger.debug('IDN conversion failed, using original domain', {
-          domain: domainWithoutPort,
-          error: idnError instanceof Error ? idnError.message : String(idnError),
-        })
-        normalized = domainWithoutPort
-      }
-
-      // Lowercase
-      normalized = normalized.toLowerCase()
-
-      // Remove trailing dot if present
-      const withoutTrailingDot = normalized.replace(/\.$/, '')
-
-      // Collapse consecutive dots
-      const collapsed = withoutTrailingDot.replace(/\.{2,}/g, '.')
-
-      // Reject empty labels
-      if (collapsed.split('.').some(label => label === '')) {
-        throw new Error(`Invalid domain: ${domain} (empty labels)`)
-      }
-
-      return collapsed
-    } catch (error) {
-      logger.warn('Domain normalization failed', {
-        domain,
-        error: error instanceof Error ? error.message : String(error),
+    const apiKey = await getApiKey(accountPath)
+    if (!apiKey) {
+      throw new AuthenticationError('Failed to retrieve API key for account', {
+        requestId: context.requestId,
+        account: sanitized,
       })
-      throw error
     }
+
+    return this.buildAuthResult(sanitized, credentials, apiKey, context)
   }
 
-  /**
-   * Check if a credential file exists without loading it
-   */
-  private async credentialFileExists(path: string): Promise<boolean> {
-    try {
-      await fs.promises.access(path, fs.constants.F_OK)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * Build credential path with optional wildcard prefix
-   */
-  private buildCredentialPath(domain: string, isWildcard: boolean): string | null {
-    // First validate the domain using the existing safe method
-    const safePath = this.getSafeCredentialPath(domain)
-    if (!safePath) {
-      return null
-    }
-
-    // Extract the safe filename and add wildcard prefix if needed
-    const dir = path.dirname(safePath)
-    const baseFilename = path.basename(safePath)
-    const filename = isWildcard ? `_wildcard.${baseFilename}` : baseFilename
-    const outputPath = path.join(dir, filename)
-
-    // Double-check the path stays within credentials directory
-    const resolvedCredsDir = path.resolve(this.credentialsDir)
-    const resolvedOutput = path.resolve(outputPath)
-    if (!resolvedOutput.startsWith(resolvedCredsDir + path.sep)) {
-      logger.error('Path escape attempt in buildCredentialPath', {
-        domain,
-        metadata: {
-          attemptedPath: outputPath,
-          credentialsDir: this.credentialsDir,
-        },
+  private async loadDeterministicAccount(
+    accounts: string[],
+    context: RequestContext
+  ): Promise<AuthResult> {
+    if (!accounts.length) {
+      throw new AuthenticationError('No valid accounts available for authentication', {
+        requestId: context.requestId,
       })
-      return null
     }
 
-    return outputPath
-  }
-
-  /**
-   * Find wildcard match for a domain
-   */
-  private async findWildcardMatch(domain: string): Promise<string | null> {
-    const domainParts = domain.split('.')
-
-    // Get the registrable domain using PSL
-    const parsed = psl.parse(domain)
-    if (!parsed.domain) {
-      logger.warn('Could not parse registrable domain', { domain })
-      return null
+    if (accounts.length === 1) {
+      return this.loadAccount(accounts[0], context)
     }
 
-    // Start from most specific wildcard, but stop at registrable domain
-    for (let i = 0; i < domainParts.length - 1; i++) {
-      const wildcardDomain = domainParts.slice(i + 1).join('.')
+    const orderedAccounts = this.rankAccounts(context.trainId, accounts)
 
-      // Stop if we've reached or passed the registrable domain boundary
-      const wildcardParsed = psl.parse(wildcardDomain)
-      if (!wildcardParsed.domain || wildcardParsed.domain !== parsed.domain) {
-        logger.debug('Stopping wildcard search at PSL boundary', {
-          domain,
-          metadata: {
-            wildcardDomain,
-            registrableDomain: parsed.domain,
-          },
-        })
-        break
-      }
-
-      const wildcardPath = this.buildCredentialPath(wildcardDomain, true)
-
-      if (wildcardPath && (await this.credentialFileExists(wildcardPath))) {
-        logger.info('Wildcard match found', {
-          domain,
-          metadata: {
-            wildcardPattern: `*.${wildcardDomain}`,
-            matchLevel: i + 1,
-            registrableDomain: parsed.domain,
-          },
-        })
-        return wildcardPath
-      }
-    }
-
-    return null
-  }
-
-  /**
-   * Enforce cache size limit by removing oldest entries
-   */
-  private enforceCacheLimit(): void {
-    if (this.resolutionCache.size <= this.maxCacheSize) {
-      return
-    }
-
-    // Convert to array, sort by expiration time (oldest first), and remove excess
-    const entries = Array.from(this.resolutionCache.entries()).sort(
-      (a, b) => a[1].expiresAt - b[1].expiresAt
-    )
-
-    const toRemove = entries.slice(0, entries.length - this.maxCacheSize)
-    for (const [key] of toRemove) {
-      this.resolutionCache.delete(key)
-    }
-  }
-
-  /**
-   * Cache resolution result
-   */
-  private cacheResolution(
-    domain: string,
-    path: string | null,
-    matchType: 'exact' | 'wildcard' | 'none'
-  ): void {
-    // Robust TTL parsing with validation
-    const defaultTtl = 300000 // 5 minutes
-    const minTtl = 1000 // 1 second
-    const maxTtl = 86400000 // 24 hours
-
-    let ttlMs = defaultTtl
-    const envTtl = process.env.CNP_RESOLUTION_CACHE_TTL
-    if (envTtl) {
-      const parsed = parseInt(envTtl, 10)
-      if (!isNaN(parsed) && parsed >= minTtl && parsed <= maxTtl) {
-        ttlMs = parsed
-      } else {
-        logger.warn('Invalid CNP_RESOLUTION_CACHE_TTL value, using default', {
-          metadata: {
-            provided: envTtl,
-            default: defaultTtl,
-            min: minTtl,
-            max: maxTtl,
-          },
-        })
-      }
-    }
-
-    this.resolutionCache.set(domain, {
-      path,
-      matchType,
-      expiresAt: Date.now() + ttlMs,
+    logger.debug('Deterministic account selection computed', {
+      requestId: context.requestId,
+      trainId: context.trainId,
+      metadata: { preferredAccount: orderedAccounts[0] },
     })
 
-    // Enforce cache size limit
-    this.enforceCacheLimit()
-  }
-
-  /**
-   * Resolve credential path with wildcard support
-   */
-  private async resolveCredentialPath(domain: string): Promise<string | null> {
-    // Shadow mode for logging only - still use original behavior
-    const shadowMode = process.env.CNP_WILDCARD_CREDENTIALS === 'shadow'
-
-    // Check if wildcard feature is enabled (not in shadow mode)
-    if (process.env.CNP_WILDCARD_CREDENTIALS !== 'true' && !shadowMode) {
-      return this.getSafeCredentialPath(domain)
-    }
-
-    try {
-      // Normalize domain
-      const normalizedDomain = this.normalizeDomain(domain)
-
-      // Check cache with TTL
-      const cached = this.resolutionCache.get(normalizedDomain)
-      if (cached && cached.expiresAt > Date.now()) {
-        if (process.env.CNP_DEBUG_RESOLUTION === 'true') {
-          logger.debug('Resolution cache hit', {
-            domain: normalizedDomain,
-            metadata: {
-              path: cached.path,
-              matchType: cached.matchType,
-            },
-          })
-        }
-        return cached.path
-      }
-
-      // Try exact match first
-      const exactPath = this.buildCredentialPath(normalizedDomain, false)
-      if (exactPath && (await this.credentialFileExists(exactPath))) {
-        this.cacheResolution(normalizedDomain, exactPath, 'exact')
-        if (shadowMode || process.env.CNP_DEBUG_RESOLUTION === 'true') {
-          logger.info('[WILDCARD_RESOLUTION] Exact match found', {
-            domain: normalizedDomain,
-            metadata: {
-              path: exactPath,
-              shadowMode,
-            },
-          })
-        }
-        // In shadow mode, still return original behavior
-        if (shadowMode) {
-          return this.getSafeCredentialPath(domain)
-        }
-        return exactPath
-      }
-
-      // Try wildcard matches from most specific to least
-      const wildcardPath = await this.findWildcardMatch(normalizedDomain)
-      if (wildcardPath) {
-        this.cacheResolution(normalizedDomain, wildcardPath, 'wildcard')
-        if (shadowMode || process.env.CNP_DEBUG_RESOLUTION === 'true') {
-          logger.info('[WILDCARD_RESOLUTION] Wildcard match found', {
-            domain: normalizedDomain,
-            metadata: {
-              path: wildcardPath,
-              shadowMode,
-            },
-          })
-        }
-        // In shadow mode, still return original behavior
-        if (shadowMode) {
-          return this.getSafeCredentialPath(domain)
-        }
-        return wildcardPath
-      }
-
-      // Cache negative result
-      this.cacheResolution(normalizedDomain, null, 'none')
-      if (shadowMode || process.env.CNP_DEBUG_RESOLUTION === 'true') {
-        logger.info('[WILDCARD_RESOLUTION] No match found', {
-          domain: normalizedDomain,
+    for (const accountName of orderedAccounts) {
+      try {
+        return await this.loadAccount(accountName, context)
+      } catch (error) {
+        logger.warn('Skipping account due to credential load failure', {
+          requestId: context.requestId,
           metadata: {
-            shadowMode,
+            accountName,
+            error: error instanceof Error ? error.message : String(error),
           },
         })
       }
-      // In shadow mode, still return original behavior
-      if (shadowMode) {
-        return this.getSafeCredentialPath(domain)
+    }
+
+    throw new AuthenticationError('No valid accounts available for authentication', {
+      requestId: context.requestId,
+    })
+  }
+
+  private rankAccounts(trainId: string | undefined, accounts: string[]): string[] {
+    if (!accounts.length) {
+      return []
+    }
+
+    const trainKey = this.sanitizeIdentifier(trainId) || trainId?.trim() || 'default'
+    const sortedAccounts = [...new Set(accounts)].sort()
+
+    const scored = sortedAccounts.map(accountName => {
+      const hashInput = `${trainKey}::${accountName}`
+      const digest = createHash('sha256').update(hashInput).digest()
+      const score = digest.readBigUInt64BE(0)
+      return { accountName, score }
+    })
+
+    scored.sort((a, b) => {
+      if (a.score === b.score) {
+        return a.accountName.localeCompare(b.accountName)
       }
-      return null
-    } catch (error) {
-      logger.error('Error in credential resolution', {
-        domain,
-        error: error instanceof Error ? error.message : String(error),
+      return a.score > b.score ? -1 : 1
+    })
+
+    return scored.map(entry => entry.accountName)
+  }
+
+  private buildAuthResult(
+    accountName: string,
+    credentials: ClaudeCredentials,
+    apiKey: string,
+    context: RequestContext
+  ): AuthResult {
+    if (credentials.type === 'oauth') {
+      logger.info('Using OAuth credentials for account', {
+        requestId: context.requestId,
+        trainId: context.trainId,
+        metadata: { accountName, accountId: credentials.accountId },
       })
-      // Fall back to original behavior on error
-      return this.getSafeCredentialPath(domain)
+
+      return {
+        type: 'oauth',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'anthropic-beta': OAUTH_BETA_HEADER,
+        },
+        key: apiKey,
+        betaHeader: OAUTH_BETA_HEADER,
+        accountId: credentials.accountId,
+        accountName,
+        slackConfig: credentials.slack ?? null,
+      }
+    }
+
+    logger.info('Using API key credentials for account', {
+      requestId: context.requestId,
+      trainId: context.trainId,
+      metadata: { accountName, accountId: credentials.accountId },
+    })
+
+    return {
+      type: 'api_key',
+      headers: {
+        'x-api-key': apiKey,
+      },
+      key: apiKey,
+      accountId: credentials.accountId,
+      accountName,
+      slackConfig: credentials.slack ?? null,
     }
   }
 
-  /**
-   * Public method to clear resolution cache
-   */
-  public clearResolutionCache(): void {
-    this.resolutionCache.clear()
-    logger.info('Credential resolution cache cleared')
+  private async listAccounts(): Promise<string[]> {
+    const now = Date.now()
+    if (this.accountCache && this.accountCache.expiresAt > now) {
+      return this.accountCache.names
+    }
+
+    try {
+      const entries = await fsp.readdir(this.accountsDir)
+      const names = entries
+        .filter(entry => entry.endsWith(ACCOUNT_FILENAME_SUFFIX))
+        .map(entry => entry.slice(0, -ACCOUNT_FILENAME_SUFFIX.length))
+
+      this.accountCache = {
+        names,
+        expiresAt: now + this.accountCacheTtl,
+      }
+
+      return names
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      if (err.code === 'ENOENT') {
+        logger.error('Accounts directory does not exist', {
+          metadata: { directory: this.accountsDir },
+        })
+        this.accountCache = {
+          names: [],
+          expiresAt: now + this.accountCacheTtl,
+        }
+        return []
+      }
+
+      logger.error('Failed to enumerate account credentials', {
+        metadata: {
+          directory: this.accountsDir,
+          error: err.message,
+        },
+      })
+      throw err
+    }
   }
 
-  /**
-   * Clean up on service shutdown
-   */
-  public destroy(): void {
-    if (this.cacheCleanupInterval) {
-      clearInterval(this.cacheCleanupInterval)
-      this.cacheCleanupInterval = null
+  private resolveAccountPath(accountName: string): string | null {
+    const filePath = path.resolve(this.accountsDir, `${accountName}${ACCOUNT_FILENAME_SUFFIX}`)
+    return this.guardPath(this.accountsDir, filePath) ? filePath : null
+  }
+
+  private resolveClientKeysPath(trainId: string): string | null {
+    const sanitized = this.sanitizeIdentifier(trainId)
+    if (!sanitized) {
+      return null
     }
-    this.clearResolutionCache()
+    const filePath = path.resolve(this.clientKeysDir, `${sanitized}${CLIENT_KEY_FILENAME_SUFFIX}`)
+    return this.guardPath(this.clientKeysDir, filePath) ? filePath : null
+  }
+
+  private sanitizeIdentifier(value?: string | null): string | null {
+    if (!value) {
+      return null
+    }
+
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    if (!IDENTIFIER_REGEX.test(trimmed)) {
+      return null
+    }
+
+    return trimmed
+  }
+
+  private resolveDirectory(dir: string): string {
+    if (dir.startsWith('~')) {
+      return path.resolve(homedir(), dir.slice(1))
+    }
+    if (path.isAbsolute(dir)) {
+      return path.resolve(dir)
+    }
+    return path.resolve(process.cwd(), dir)
+  }
+
+  private guardPath(baseDir: string, candidate: string): boolean {
+    const normalizedBase = path.resolve(baseDir) + path.sep
+    const normalizedCandidate = path.resolve(candidate)
+
+    if (!normalizedCandidate.startsWith(normalizedBase)) {
+      logger.error('Path traversal attempt detected while resolving credential path', {
+        metadata: {
+          baseDir: normalizedBase,
+          candidate: normalizedCandidate,
+        },
+      })
+      return false
+    }
+
+    return true
   }
 }

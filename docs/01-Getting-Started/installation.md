@@ -67,20 +67,25 @@ bun run db:migrate:token-usage
 
 ```bash
 # Create credentials directory
-mkdir -p credentials
+mkdir -p credentials/accounts
+mkdir -p credentials/train-client-keys
 
-# Generate a secure client API key
+# Generate a secure client API key (for proxy authentication)
 bun run scripts/generate-api-key.ts
 
-# Create your first domain credential file
-cat > credentials/your-domain.com.credentials.json << EOF
+# Create your first account credential file
+cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 {
   "type": "api_key",
   "accountId": "acc_unique_id",
-  "api_key": "sk-ant-your-claude-api-key",
-  "client_api_key": "cnp_live_generated_key"
+  "api_key": "sk-ant-your-claude-api-key"
 }
-EOF
+JSON
+
+# Allow clients for a train identifier
+cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+{ "keys": ["cnp_live_generated_key"] }
+JSON
 ```
 
 #### 6. Start the Services
@@ -214,9 +219,9 @@ Open http://localhost:3001 in your browser. You should see the login page.
 ### 3. Test API Call
 
 ```bash
-# Replace with your domain and client API key
+# Replace with your train ID and client API key
 curl -X POST http://localhost:3000/v1/messages \
-  -H "Host: your-domain.com" \
+  -H "MSL-Train-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_client_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -262,7 +267,7 @@ curl -X POST http://localhost:3000/v1/messages \
 
 ## Next Steps
 
-- [Configure your domains](./configuration.md)
+- [Configure train credentials](./configuration.md)
 - [Set up authentication](../02-User-Guide/authentication.md)
 - [Deploy to production](../03-Operations/deployment/docker.md)
 - [Monitor usage](../02-User-Guide/dashboard-guide.md)

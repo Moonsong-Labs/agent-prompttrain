@@ -25,7 +25,8 @@ export type HonoVariables = {
   postRequestTasks?: (() => Promise<void>)[]
 
   // Request metadata
-  domain?: string
+  trainId?: string
+  trainAccount?: string
   requestType?: 'query_evaluation' | 'inference'
   model?: string
 

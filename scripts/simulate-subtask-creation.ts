@@ -29,7 +29,7 @@ async function simulateSubtaskCreation() {
 
     await writer.storeRequest({
       requestId: newSubtaskId,
-      domain: 'test.localhost',
+      trainId: 'test.localhost',
       timestamp: subtaskTimestamp,
       method: 'POST',
       path: '/v1/messages',

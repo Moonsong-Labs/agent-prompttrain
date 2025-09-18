@@ -31,7 +31,7 @@ We will implement a SubtaskQueryExecutor pattern that:
 
 ```typescript
 export type SubtaskQueryExecutor = (
-  domain: string,
+  train_id: string,
   timestamp: Date,
   debugMode?: boolean,
   subtaskPrompt?: string // Optional for SQL-level optimization
@@ -44,7 +44,7 @@ When a subtask prompt is provided, the executor uses an optimized query:
 ```sql
 SELECT request_id, response_body, timestamp
 FROM api_requests
-WHERE domain = $1
+WHERE train_id = $1
   AND timestamp BETWEEN $2 AND $3
   AND response_body @> jsonb_build_object(
     'content', jsonb_build_array(

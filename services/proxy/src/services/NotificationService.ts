@@ -1,8 +1,8 @@
 import { ProxyRequest } from '../domain/entities/ProxyRequest'
 import { ProxyResponse } from '../domain/entities/ProxyResponse'
 import { RequestContext } from '../domain/value-objects/RequestContext'
-import { AuthResult, AuthenticationService } from './AuthenticationService'
-import { sendToSlack, initializeDomainSlack, MessageInfo } from './slack.js'
+import { AuthResult } from './AuthenticationService'
+import { sendToSlack, initializeTrainSlack, MessageInfo } from './slack.js'
 import { logger } from '../middleware/logger'
 
 export interface NotificationConfig {
@@ -18,7 +18,6 @@ export interface NotificationConfig {
 export class NotificationService {
   private previousMessages = new Map<string, string>()
   private readonly maxCacheSize = 1000
-  private authService?: AuthenticationService
 
   constructor(
     private config: NotificationConfig = {
@@ -27,10 +26,6 @@ export class NotificationService {
       maxLength: 3000,
     }
   ) {}
-
-  setAuthService(authService: AuthenticationService) {
-    this.authService = authService
-  }
 
   /**
    * Send notification for a request/response pair
@@ -51,21 +46,16 @@ export class NotificationService {
     }
 
     try {
-      // Get Slack config for the domain
-      const slackConfig = this.authService
-        ? await this.authService.getSlackConfig(context.host)
-        : undefined
-
-      // Initialize Slack for the domain
-      const domainWebhook = slackConfig ? initializeDomainSlack(slackConfig) : null
+      const slackConfig = auth.slackConfig
+      const accountWebhook = slackConfig ? initializeTrainSlack(slackConfig) : null
 
       // Check if user message changed
       const userContent = request.getUserContentForNotification()
-      const previousContent = this.getPreviousMessage(context.host)
+      const previousContent = this.getPreviousMessage(context.trainId)
       const userMessageChanged = userContent !== previousContent
 
       if (userContent) {
-        this.setPreviousMessage(context.host, userContent)
+        this.setPreviousMessage(context.trainId, userContent)
       }
 
       // Only send notifications when user message changes
@@ -224,22 +214,22 @@ export class NotificationService {
       await sendToSlack(
         {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           model: request.model,
           role: 'conversation',
           content: conversationMessage,
           timestamp: new Date().toISOString(),
-          apiKey: this.authService ? this.authService.getMaskedCredentialInfo(auth) : undefined,
+          apiKey: this.getMaskedCredentialInfo(auth),
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
         },
-        domainWebhook
+        accountWebhook
       )
     } catch (error) {
       // Don't fail the request if notification fails
       logger.error('Failed to send notification', {
         requestId: context.requestId,
-        domain: context.host,
+        trainId: context.trainId,
         error: error instanceof Error ? { message: error.message } : { message: String(error) },
       })
     }
@@ -254,16 +244,13 @@ export class NotificationService {
     }
 
     try {
-      // Get Slack config for the domain
-      const slackConfig = this.authService
-        ? await this.authService.getSlackConfig(context.host)
-        : undefined
-      const domainWebhook = slackConfig ? initializeDomainSlack(slackConfig) : null
+      // Get Slack config for the train
+      const accountWebhook = null
 
       await sendToSlack(
         {
           requestId: context.requestId,
-          domain: context.host,
+          trainId: context.trainId,
           role: 'assistant',
           content: `Error: ${error.message}`,
           timestamp: new Date().toISOString(),
@@ -272,7 +259,7 @@ export class NotificationService {
             path: context.path,
           },
         } as MessageInfo,
-        domainWebhook
+        accountWebhook
       )
     } catch (notifyError) {
       logger.error('Failed to send error notification', {
@@ -299,7 +286,7 @@ export class NotificationService {
 
     // Build metadata
     const metadata = {
-      domain: context.host,
+      trainId: context.trainId,
       model: request.model,
       streaming: request.isStreaming ? 'Yes' : 'No',
       inputTokens: metrics.inputTokens,
@@ -308,6 +295,7 @@ export class NotificationService {
       toolCalls: metrics.toolCallCount,
       requestType: request.requestType,
       apiKeyInfo: auth.type === 'api_key' ? auth.key.substring(0, 10) + '****' : 'OAuth',
+      accountName: auth.accountName,
       processingTime: `${context.getElapsedTime()}ms`,
     }
 
@@ -326,17 +314,25 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Get previous message for a domain
-   */
-  private getPreviousMessage(domain: string): string {
-    return this.previousMessages.get(domain) || ''
+  private getMaskedCredentialInfo(auth: AuthResult): string | undefined {
+    if (!auth.key) {
+      return undefined
+    }
+    const maskedKey = auth.key.length > 10 ? `${auth.key.slice(0, 10)}****` : '****'
+    return `${auth.type}:${maskedKey}`
   }
 
   /**
-   * Set previous message for a domain
+   * Get previous message for a train ID
    */
-  private setPreviousMessage(domain: string, message: string): void {
+  private getPreviousMessage(trainId: string): string {
+    return this.previousMessages.get(trainId) || ''
+  }
+
+  /**
+   * Set previous message for a train ID
+   */
+  private setPreviousMessage(trainId: string, message: string): void {
     // Implement cache size limit
     if (this.previousMessages.size >= this.maxCacheSize) {
       const firstKey = this.previousMessages.keys().next().value
@@ -344,6 +340,6 @@ export class NotificationService {
         this.previousMessages.delete(firstKey)
       }
     }
-    this.previousMessages.set(domain, message)
+    this.previousMessages.set(trainId, message)
   }
 }

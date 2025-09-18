@@ -1,4 +1,6 @@
 import { Context } from 'hono'
+import { config } from '@agent-prompttrain/shared/config'
+import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Value object containing request context information
@@ -7,13 +9,14 @@ import { Context } from 'hono'
 export class RequestContext {
   constructor(
     public readonly requestId: string,
-    public readonly host: string,
+    public readonly trainId: string,
     public readonly method: string,
     public readonly path: string,
     public readonly startTime: number,
     public readonly headers: Record<string, string>,
     public readonly apiKey?: string,
-    public readonly honoContext?: Context
+    public readonly honoContext?: Context,
+    public readonly account?: string
   ) {}
 
   /**
@@ -26,7 +29,11 @@ export class RequestContext {
         'RequestContext: requestId not found in context. Ensure request-id middleware is applied.'
       )
     }
-    const host = c.req.header('host') || 'unknown'
+    const fallbackTrainId = config.auth.defaultTrainId || 'default'
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || fallbackTrainId
+    const rawTrainAccount = c.get('trainAccount') || c.req.header(MSL_ACCOUNT_HEADER_LOWER)
+    const trainAccount =
+      rawTrainAccount && rawTrainAccount.trim() ? rawTrainAccount.trim() : undefined
     // Only accept Bearer tokens from Authorization header (not x-api-key)
     const apiKey = c.req.header('authorization')
 
@@ -43,13 +50,14 @@ export class RequestContext {
 
     return new RequestContext(
       requestId,
-      host,
+      trainId,
       c.req.method,
       c.req.path,
       Date.now(),
       headers,
       apiKey,
-      c
+      c,
+      trainAccount
     )
   }
 
@@ -66,7 +74,7 @@ export class RequestContext {
   toTelemetry() {
     return {
       requestId: this.requestId,
-      domain: this.host,
+      trainId: this.trainId,
       method: this.method,
       path: this.path,
       duration: this.getElapsedTime(),

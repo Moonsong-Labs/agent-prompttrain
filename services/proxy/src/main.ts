@@ -111,7 +111,7 @@ Options:
 Environment Variables:
   PORT                        Server port (default: 3000)
   HOST                        Server hostname (default: 0.0.0.0)
-  CREDENTIALS_DIR             Directory containing domain credential files (default: credentials)
+  CREDENTIALS_DIR             Base directory containing account and client key files (default: credentials)
   TELEMETRY_ENDPOINT          URL to send telemetry data (optional)
   DEBUG                       Enable debug logging (default: false)
   DATABASE_URL                PostgreSQL connection string (for storage)

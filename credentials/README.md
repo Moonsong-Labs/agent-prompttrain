@@ -1,91 +1,103 @@
-# Domain Credentials
+# Credentials Directory
 
-This directory contains credential files for domain-specific authentication.
+The proxy now separates **accounts** (Anthropic credential sources) from **trains** (analytics & client access identifiers).
 
-## File Format
+```
+credentials/
+├── accounts/                # Anthropic account credentials
+│   ├── account-primary.credentials.json
+│   └── account-secondary.credentials.json
+└── train-client-keys/       # Proxy client API keys per train
+    ├── train-alpha.client-keys.json
+    └── train-beta.client-keys.json
+```
 
-Each domain should have its own credential file named `<domain>.credentials.json`.
+## Account Credential Files
 
-Example: `example.com.credentials.json`
-
-### Wildcard Credentials
-
-You can create wildcard credential files to match multiple subdomains:
-
-- `_wildcard.example.com.credentials.json` - Matches all subdomains of example.com
-- `_wildcard.staging.example.com.credentials.json` - Matches all subdomains of staging.example.com
-
-**Note**: Exact matches always take precedence over wildcards. Enable with `CNP_WILDCARD_CREDENTIALS=true`.
-
-## Credential Structure
+Account files live under `credentials/accounts/` and are named `<account-name>.credentials.json`.
 
 ```json
 {
-  "type": "api_key" | "oauth",
-  "accountId": "acc_unique_id",       // Unique account identifier
-  "api_key": "sk-ant-...",           // For type: api_key
-  "oauth": { ... },                  // For type: oauth
-  "client_api_key": "cnp_live_...",  // Required for proxy authentication
-  "slack": {                         // Optional Slack configuration
-    "webhook_url": "https://...",
-    "channel": "#alerts",
-    "enabled": true
+  "type": "api_key",              // or "oauth"
+  "accountId": "acc_team_alpha",
+  "api_key": "sk-ant-...",        // Required when type === "api_key"
+  "oauth": {                       // Required when type === "oauth"
+    "accessToken": "...",
+    "refreshToken": "...",
+    "expiresAt": 1737072000000,
+    "scopes": ["user:inference"]
+  },
+  "slack": {
+    "enabled": true,
+    "webhook_url": "https://hooks.slack.com/services/..."
   }
 }
 ```
 
-## Security Features
+Requests select an account by setting the `MSL-Account` header. When the header is omitted, the proxy deterministically assigns an account based on the train ID and falls back only if the preferred account is unavailable.
 
-### Client API Key Authentication
+## Train Client Keys
 
-Each domain can have its own `client_api_key` that clients must provide to access the proxy. This adds an extra layer of security on top of the Claude API authentication.
+Train-level API keys that gate proxy access are stored in `credentials/train-client-keys/<train-id>.client-keys.json`.
 
-To generate a secure API key:
-
-```bash
-bun run ../scripts/generate-api-key.ts
+```json
+{
+  "keys": [
+    "cnp_live_internal_service",
+    "cnp_live_ci_runner"
+  ]
+}
 ```
 
-### How It Works
+The `client-auth` middleware accepts any token listed in the file for the given train. If no file exists (or the list is empty) the proxy returns `401` unless client authentication is disabled.
 
-1. Clients must send the domain's API key in the `Authorization` header:
-   ```
-   Authorization: Bearer cnp_live_YOUR-API-KEY
-   ```
+## Request Headers
 
-2. The proxy verifies this key before forwarding requests to Claude API
+- `MSL-Train-Id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_project"` ensures outgoing Anthropic calls stay tagged.
+- `MSL-Account`: optional; selects a specific account credential file. If omitted, the proxy deterministically maps the train to one of the configured accounts.
 
-3. If no `client_api_key` is configured for a domain, authentication is bypassed (unless disabled via `ENABLE_CLIENT_AUTH=false`)
+Neither header is forwarded to Anthropic.
 
-## Security Best Practices
+## Quick Setup
 
-- Generate strong, random API keys using the provided script
-- Store credential files securely with restricted permissions
-- Rotate API keys regularly
-- Never commit real credentials to version control
-- Use environment-specific credential directories
-
-## Example Setup
-
-1. Generate a client API key:
+1. Create an account credential file:
    ```bash
-   bun run ../scripts/generate-api-key.ts
+   mkdir -p credentials/accounts
+   cat > credentials/accounts/account-primary.credentials.json <<'JSON'
+   {
+     "type": "api_key",
+     "accountId": "acc_team_alpha",
+     "api_key": "sk-ant-your-claude-api-key"
+   }
+   JSON
    ```
 
-2. Create credential file for your domain:
+2. Define allowed client tokens for a train:
    ```bash
-   cp example.com.credentials.json yourdomain.com.credentials.json
+   mkdir -p credentials/train-client-keys
+   cat > credentials/train-client-keys/train-alpha.client-keys.json <<'JSON'
+   { "keys": ["cnp_live_team_alpha"] }
+   JSON
    ```
 
-3. Edit the file and add:
-   - Your Claude API key or OAuth credentials
-   - The generated client API key
-   - Optional Slack configuration
-
-4. Test the authentication:
+3. Tag outbound Anthropic calls:
    ```bash
-   curl -H "Authorization: Bearer YOUR-CLIENT-API-KEY" \
-        -H "Content-Type: application/json" \
-        -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}' \
-        https://yourdomain.com/v1/messages
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"
    ```
+
+4. Choose an account per request when needed:
+   ```bash
+   curl -X POST http://localhost:3000/v1/messages \
+     -H "MSL-Train-Id: train-alpha" \
+     -H "MSL-Account: account-primary" \
+     -H "Authorization: Bearer cnp_live_team_alpha" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
+   ```
+
+## Security Tips
+
+- Restrict filesystem permissions: `chmod 600 credentials/**/*.json`
+- Keep production secrets out of version control
+- Rotate Anthropic keys and client tokens regularly
+- Separate credentials per environment (development, staging, production)

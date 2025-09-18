@@ -13,7 +13,7 @@ The main table storing all API requests and responses.
 | Column                      | Type         | Description                                  |
 | --------------------------- | ------------ | -------------------------------------------- |
 | request_id                  | UUID         | Primary key, unique request identifier       |
-| domain                      | VARCHAR(255) | Domain name from Host header                 |
+| train_id                    | VARCHAR(255) | Train identifier from `MSL-Train-Id` header  |
 | account_id                  | VARCHAR(255) | Account identifier from credential file      |
 | timestamp                   | TIMESTAMPTZ  | Request timestamp                            |
 | method                      | VARCHAR(10)  | HTTP method (always POST for Claude)         |
@@ -88,7 +88,7 @@ Stores AI-generated analyses of conversations.
 
 ### Performance Indexes
 
-- `idx_requests_domain` - Filter by domain
+- `idx_requests_train_id` - Filter by train ID
 - `idx_requests_timestamp` - Time-based queries
 - `idx_requests_model` - Filter by model
 - `idx_requests_request_type` - Filter by request type
@@ -125,9 +125,9 @@ Stores AI-generated analyses of conversations.
 
 ### Account-Based Token Tracking
 
-The `account_id` column enables tracking token usage per account rather than just per domain. This allows:
+The `account_id` column enables tracking token usage per account rather than just per train ID. This allows:
 
-- Multiple domains to share the same Claude account
+- Multiple trains to share the same Claude account
 - Accurate tracking against Claude's 140,000 token per 5-hour window limit
 - Per-account usage dashboards and alerts
 
@@ -303,7 +303,7 @@ bun run scripts/db/migrations/003-add-subtask-tracking.ts
 3. **002-optimize-conversation-indexes.ts** - Performance optimizations
 4. **003-add-subtask-tracking.ts** - Adds sub-task detection support
 5. **004-optimize-conversation-window-functions.ts** - Window function indexes
-6. **005-populate-account-ids.ts** - Populates account IDs from domain mappings
+6. **005-populate-account-ids.ts** - Populates account IDs from train mappings
 7. **006-split-conversation-hashes.ts** - Separates system prompt hashing
 8. **007-add-parent-request-id.ts** - Adds direct parent request linking
 9. **008-subtask-updates-and-task-indexes.ts** - Optimizes Task tool queries

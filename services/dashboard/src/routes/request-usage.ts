@@ -6,8 +6,8 @@ import { layout } from '../layout/index.js'
 import { logger } from '../middleware/logger.js'
 
 // Type definitions
-interface DomainInfo {
-  domain: string
+interface TrainIdInfo {
+  trainId: string
   requestCount: number
 }
 
@@ -19,13 +19,13 @@ interface HourlyDataPoint {
 interface HourlyUsageResponse {
   data: Record<string, HourlyDataPoint[]>
   query: {
-    domain: string | null
+    trainId: string | null
     days: number
   }
 }
 
-interface DomainsResponse {
-  domains: DomainInfo[]
+interface TrainIdsResponse {
+  trainIds?: TrainIdInfo[]
 }
 
 export const requestUsageRoutes = new Hono<{
@@ -39,8 +39,8 @@ function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 
-// Generate consistent color from domain name
-function getDomainColor(domain: string): string {
+// Generate consistent color from train identifier
+function getTrainColor(trainId: string): string {
   // Predefined palette of diverse, aesthetically pleasing colors
   const colorPalette = [
     '#FF6B6B', // Soft red
@@ -65,10 +65,10 @@ function getDomainColor(domain: string): string {
     '#B4A7D6', // Lilac
   ]
 
-  // Generate hash from domain name
+  // Generate hash from train identifier
   let hash = 0
-  for (let i = 0; i < domain.length; i++) {
-    const char = domain.charCodeAt(i)
+  for (let i = 0; i < trainId.length; i++) {
+    const char = trainId.charCodeAt(i)
     hash = (hash << 5) - hash + char
     hash = hash & hash // Convert to 32-bit integer
   }
@@ -79,11 +79,11 @@ function getDomainColor(domain: string): string {
 }
 
 /**
- * Domain stats dashboard page
+ * Train usage dashboard page
  */
 requestUsageRoutes.get('/usage', async c => {
   const apiClient = c.get('apiClient')
-  const selectedDomain = c.req.query('domain')
+  const selectedTrainId = c.req.query('trainId')
 
   if (!apiClient) {
     return c.html(
@@ -99,62 +99,62 @@ requestUsageRoutes.get('/usage', async c => {
   }
 
   try {
-    // Fetch all domains for the selector
-    const domainsResponse = await apiClient.get<DomainsResponse>('/api/domains')
-    const domains = domainsResponse.domains || []
+    // Fetch all trainIds for the selector
+    const trainIdsResponse = await apiClient.get<TrainIdsResponse>('/api/train-ids')
+    const trainIds = trainIdsResponse.trainIds ?? []
 
-    // Use selected domain or null for all domains
-    const displayDomain = selectedDomain || null
+    // Use selected trainId or null to include all trains
+    const displayTrainId = selectedTrainId || null
 
     // Fetch hourly usage data
     const usageParams = new URLSearchParams({ days: '7' })
-    if (displayDomain) {
-      usageParams.append('domain', displayDomain)
+    if (displayTrainId) {
+      usageParams.append('trainId', displayTrainId)
     }
     const usageResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/requests/hourly?${usageParams}`
     )
     const usageData = usageResponse.data || {}
-    const chartData = displayDomain ? usageData[displayDomain] || [] : usageData
+    const chartData = displayTrainId ? usageData[displayTrainId] || [] : usageData
 
     // Fetch hourly token usage data
     const tokenResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/tokens/hourly?${usageParams}`
     )
     const tokenData = tokenResponse.data || {}
-    const tokenChartData = displayDomain ? tokenData[displayDomain] || [] : tokenData
+    const tokenChartData = displayTrainId ? tokenData[displayTrainId] || [] : tokenData
 
     const content = html`
       <div class="mb-6">
         <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
       </div>
 
-      <h2 style="margin: 0 0 1.5rem 0;">Domain Stats - Hourly Statistics</h2>
+      <h2 style="margin: 0 0 1.5rem 0;">Train Usage - Hourly Statistics</h2>
 
-      <!-- Domain Selector -->
+      <!-- Train Selector -->
       <div class="section">
-        <div class="section-header">Select Domain</div>
+        <div class="section-header">Select Train ID</div>
         <div class="section-content">
           <select
-            id="domain-selector"
-            name="domain"
+            id="train-selector"
+            name="trainId"
             style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 0.375rem; font-size: 14px;"
-            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?domain=' + encodeURIComponent(this.value) : '')"
+            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?trainId=' + encodeURIComponent(this.value) : '')"
           >
-            <option value="" ${!selectedDomain ? 'selected' : ''}>
-              All Domains (${formatNumber(domains.reduce((sum, d) => sum + d.requestCount, 0))}
+            <option value="" ${!selectedTrainId ? 'selected' : ''}>
+              All Train IDs (${formatNumber(trainIds.reduce((sum, d) => sum + d.requestCount, 0))}
               requests)
             </option>
-            ${domains.length > 0
+            ${trainIds.length > 0
               ? raw(
-                  domains
+                  trainIds
                     .map(
-                      (d: DomainInfo) =>
+                      (d: TrainIdInfo) =>
                         `<option
-                          value="${d.domain}"
-                          ${d.domain === displayDomain ? 'selected' : ''}
+                          value="${d.trainId}"
+                          ${d.trainId === displayTrainId ? 'selected' : ''}
                         >
-                          ${d.domain} (${formatNumber(d.requestCount)} requests)
+                          ${d.trainId} (${formatNumber(d.requestCount)} requests)
                         </option>`
                     )
                     .join('')
@@ -168,13 +168,13 @@ requestUsageRoutes.get('/usage', async c => {
       <div class="section">
         <div class="section-header">
           Hourly Request Count - Last 7 Days
-          ${displayDomain
-            ? html`<span class="text-sm text-gray-500">(${displayDomain})</span>`
-            : html`<span class="text-sm text-gray-500">(All Domains)</span>`}
+          ${displayTrainId
+            ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
+            : html`<span class="text-sm text-gray-500">(All Train IDs)</span>`}
         </div>
         <div class="section-content">
-          ${(displayDomain && Array.isArray(chartData) && chartData.length > 0) ||
-          (!displayDomain && !Array.isArray(chartData) && Object.keys(chartData).length > 0)
+          ${(displayTrainId && Array.isArray(chartData) && chartData.length > 0) ||
+          (!displayTrainId && !Array.isArray(chartData) && Object.keys(chartData).length > 0)
             ? html`
                 <canvas
                   id="hourlyChart"
@@ -186,10 +186,10 @@ requestUsageRoutes.get('/usage', async c => {
                   <script>
                     // Chart data from API
                     const chartData = ${JSON.stringify(chartData)};
-                    const displayDomain = ${JSON.stringify(displayDomain)};
-                    const domainColors = ${JSON.stringify(
-                      domains.reduce((acc: Record<string, string>, d: DomainInfo) => {
-                        acc[d.domain] = getDomainColor(d.domain)
+                    const displayTrainId = ${JSON.stringify(displayTrainId)};
+                    const trainColors = ${JSON.stringify(
+                      trainIds.reduce((acc: Record<string, string>, d: TrainIdInfo) => {
+                        acc[d.trainId] = getTrainColor(d.trainId)
                         return acc
                       }, {})
                     )};
@@ -224,10 +224,10 @@ requestUsageRoutes.get('/usage', async c => {
                       startTime.setMinutes(0, 0, 0);
                       
                       const hourlyTimeline = [];
-                      const isSingleDomain = displayDomain !== null;
+                      const isSingleTrain = displayTrainId !== null;
                       
-                      if (isSingleDomain) {
-                        // Single domain view
+                      if (isSingleTrain) {
+                        // Single trainId view
                         const dataMap = new Map();
                         chartData.forEach(point => {
                           const hourKey = new Date(point.hour).toISOString();
@@ -243,17 +243,17 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                         }
                       } else {
-                        // Multi-domain stacked view
-                        const domainDataMaps = {};
-                        const allDomains = Object.keys(chartData);
+                        // Multi-trainId stacked view
+                        const trainDataMaps = {};
+                        const allTrainIds = Object.keys(chartData);
                         
-                        // Build data maps for each domain
-                        allDomains.forEach(domain => {
-                          domainDataMaps[domain] = new Map();
-                          if (chartData[domain]) {
-                            chartData[domain].forEach(point => {
+                        // Build data maps for each train ID
+                        allTrainIds.forEach(trainId => {
+                          trainDataMaps[trainId] = new Map();
+                          if (chartData[trainId]) {
+                            chartData[trainId].forEach(point => {
                               const hourKey = new Date(point.hour).toISOString();
-                              domainDataMaps[domain].set(hourKey, point.count);
+                              trainDataMaps[trainId].set(hourKey, point.count);
                             });
                           }
                         });
@@ -262,10 +262,10 @@ requestUsageRoutes.get('/usage', async c => {
                         for (let i = 0; i < 168; i++) {
                           const time = new Date(startTime.getTime() + i * 60 * 60 * 1000);
                           const hourKey = time.toISOString();
-                          const dataPoint = { time: time, domains: {} };
+                          const dataPoint = { time: time, trains: {} };
                           
-                          allDomains.forEach(domain => {
-                            dataPoint.domains[domain] = domainDataMaps[domain].get(hourKey) || 0;
+                          allTrainIds.forEach(trainId => {
+                            dataPoint.trains[trainId] = trainDataMaps[trainId].get(hourKey) || 0;
                           });
                           
                           hourlyTimeline.push(dataPoint);
@@ -274,13 +274,16 @@ requestUsageRoutes.get('/usage', async c => {
                       
                       // Find max count for scaling
                       let maxCount;
-                      if (isSingleDomain) {
+                      if (isSingleTrain) {
                         maxCount = Math.max(...hourlyTimeline.map(d => d.count), 1);
                       } else {
-                        // For stacked view, max is the sum of all domains at any hour
-                        maxCount = Math.max(...hourlyTimeline.map(d => 
-                          Object.values(d.domains).reduce((sum, count) => sum + count, 0)
-                        ), 1);
+                        // For stacked view, max is the sum of all trainIds at any hour
+                        maxCount = Math.max(
+                          ...hourlyTimeline.map(d =>
+                            Object.values(d.trains).reduce((sum, count) => sum + count, 0)
+                          ),
+                          1
+                        );
                       }
                       const yScale = chartHeight / maxCount;
                       const barWidth = chartWidth / hourlyTimeline.length;
@@ -317,33 +320,33 @@ requestUsageRoutes.get('/usage', async c => {
                       }
                       
                       // Draw bars
-                      if (isSingleDomain) {
-                        // Single domain - simple bars
+                      if (isSingleTrain) {
+                        // Single trainId - simple bars
                         hourlyTimeline.forEach((point, index) => {
                           if (point.count > 0) {
                             const x = padding.left + index * barWidth;
                             const barHeight = point.count * yScale;
                             const y = padding.top + chartHeight - barHeight;
                             
-                            ctx.fillStyle = displayDomain ? domainColors[displayDomain] : '#3b82f6';
+                            ctx.fillStyle = displayTrainId ? trainColors[displayTrainId] : '#3b82f6';
                             ctx.fillRect(x, y, barWidth - 1, barHeight);
                           }
                         });
                       } else {
-                        // Multi-domain - stacked bars
-                        const allDomains = Object.keys(chartData);
+                        // Multi-trainId - stacked bars
+                        const allTrainIds = Object.keys(chartData);
                         
                         hourlyTimeline.forEach((point, index) => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allDomains.forEach(domain => {
-                            const count = point.domains[domain] || 0;
+                          allTrainIds.forEach(trainId => {
+                            const count = point.trains[trainId] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
                               const y = padding.top + chartHeight - stackHeight - segmentHeight;
                               
-                              ctx.fillStyle = domainColors[domain];
+                              ctx.fillStyle = trainColors[trainId];
                               ctx.fillRect(x, y, barWidth - 1, segmentHeight);
                               
                               stackHeight += segmentHeight;
@@ -416,20 +419,20 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                           tooltipHTML += '</div>';
                           
-                          if (isSingleDomain) {
+                          if (isSingleTrain) {
                             tooltipHTML += '<div style="color: #10b981;">Requests: ' + formatNumber(point.count) + '</div>';
                           } else {
-                            const total = Object.values(point.domains).reduce((sum, count) => sum + count, 0);
+                            const total = Object.values(point.trains).reduce((sum, count) => sum + count, 0);
                             tooltipHTML += '<div style="color: #10b981; margin-bottom: 4px;">Total: ' + formatNumber(total) + ' requests</div>';
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.domains).forEach(([domain, count]) => {
+                              Object.entries(point.trains).forEach(([trainId, count]) => {
                                 if (count > 0) {
-                                  const color = domainColors[domain];
+                                  const color = trainColors[trainId];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
                                   tooltipHTML += '<div style="width: 10px; height: 10px; background: ' + color + '; margin-right: 6px; border-radius: 2px;"></div>';
-                                  tooltipHTML += '<div style="flex: 1;">' + domain + '</div>';
+                                  tooltipHTML += '<div style="flex: 1;">' + trainId + '</div>';
                                   tooltipHTML += '<div style="margin-left: 8px;">' + formatNumber(count) + '</div>';
                                   tooltipHTML += '</div>';
                                 }
@@ -467,27 +470,27 @@ requestUsageRoutes.get('/usage', async c => {
                   </script>
                 `)}
 
-                <!-- Legend for multi-domain view -->
-                ${!displayDomain
+                <!-- Legend for multi-trainId view -->
+                ${!displayTrainId
                   ? html`
                       <div
                         style="margin-top: 20px; padding: 16px; background: #f9fafb; border-radius: 8px;"
                       >
                         <div style="font-weight: 600; margin-bottom: 12px; color: #1f2937;">
-                          Domains:
+                          Train IDs:
                         </div>
                         <div style="display: flex; flex-wrap: wrap; gap: 16px;">
                           ${raw(
-                            domains
+                            trainIds
                               .map(
-                                (d: DomainInfo) => `
+                                (d: TrainIdInfo) => `
                                   <div style="display: flex; align-items: center; gap: 8px;">
                                     <div
-                                      style="width: 16px; height: 16px; border-radius: 4px; background: ${getDomainColor(
-                                        d.domain
+                                      style="width: 16px; height: 16px; border-radius: 4px; background: ${getTrainColor(
+                                        d.trainId
                                       )};"
                                     ></div>
-                                    <span style="font-size: 14px; color: #4b5563;">${d.domain}</span>
+                                    <span style="font-size: 14px; color: #4b5563;">${d.trainId}</span>
                                   </div>
                                 `
                               )
@@ -498,27 +501,27 @@ requestUsageRoutes.get('/usage', async c => {
                     `
                   : ''}
               `
-            : displayDomain
+            : displayTrainId
               ? html`<p class="text-gray-500">
-                  No request data available for the selected domain in the last 7 days.
+                  No request data available for the selected trainId in the last 7 days.
                 </p>`
               : html`<p class="text-gray-500">
-                  No request data available for any domain in the last 7 days.
+                  No request data available for any trainId in the last 7 days.
                 </p>`}
         </div>
       </div>
 
       <!-- Summary Statistics -->
-      ${(displayDomain && Array.isArray(chartData) && chartData.length > 0) ||
-      (!displayDomain && !Array.isArray(chartData) && Object.keys(chartData).length > 0)
+      ${(displayTrainId && Array.isArray(chartData) && chartData.length > 0) ||
+      (!displayTrainId && !Array.isArray(chartData) && Object.keys(chartData).length > 0)
         ? (() => {
             let totalRequests = 0
             let avgPerHour = 0
             let peakHour = { hour: '', count: 0 }
             let activeHours = 0
 
-            if (displayDomain && Array.isArray(chartData)) {
-              // Single domain stats
+            if (displayTrainId && Array.isArray(chartData)) {
+              // Single trainId stats
               totalRequests = chartData.reduce(
                 (sum: number, point: HourlyDataPoint) => sum + point.count,
                 0
@@ -531,11 +534,11 @@ requestUsageRoutes.get('/usage', async c => {
               )
               activeHours = chartData.length
             } else {
-              // Multi-domain stats
+              // Multi-trainId stats
               const hourlyTotals = new Map<string, number>()
 
-              Object.values(chartData).forEach((domainData: HourlyDataPoint[]) => {
-                domainData.forEach(point => {
+              Object.values(chartData).forEach((trainData: HourlyDataPoint[]) => {
+                trainData.forEach(point => {
                   const current = hourlyTotals.get(point.hour) || 0
                   hourlyTotals.set(point.hour, current + point.count)
                   totalRequests += point.count
@@ -589,13 +592,13 @@ requestUsageRoutes.get('/usage', async c => {
       <div class="section">
         <div class="section-header">
           Hourly Output Token Usage - Last 7 Days
-          ${displayDomain
-            ? html`<span class="text-sm text-gray-500">(${displayDomain})</span>`
-            : html`<span class="text-sm text-gray-500">(All Domains)</span>`}
+          ${displayTrainId
+            ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
+            : html`<span class="text-sm text-gray-500">(All Train IDs)</span>`}
         </div>
         <div class="section-content">
-          ${(displayDomain && Array.isArray(tokenChartData) && tokenChartData.length > 0) ||
-          (!displayDomain &&
+          ${(displayTrainId && Array.isArray(tokenChartData) && tokenChartData.length > 0) ||
+          (!displayTrainId &&
             !Array.isArray(tokenChartData) &&
             Object.keys(tokenChartData).length > 0)
             ? html`
@@ -609,10 +612,10 @@ requestUsageRoutes.get('/usage', async c => {
                   <script>
                     // Token chart data from API
                     const tokenChartData = ${JSON.stringify(tokenChartData)};
-                    const tokenDisplayDomain = ${JSON.stringify(displayDomain)};
-                    const tokenDomainColors = ${JSON.stringify(
-                      domains.reduce((acc: Record<string, string>, d: DomainInfo) => {
-                        acc[d.domain] = getDomainColor(d.domain)
+                    const tokenDisplayTrainId = ${JSON.stringify(displayTrainId)};
+                    const tokenTrainColors = ${JSON.stringify(
+                      trainIds.reduce((acc: Record<string, string>, d: TrainIdInfo) => {
+                        acc[d.trainId] = getTrainColor(d.trainId)
                         return acc
                       }, {})
                     )};
@@ -647,10 +650,10 @@ requestUsageRoutes.get('/usage', async c => {
                       startTime.setMinutes(0, 0, 0);
                       
                       const hourlyTimeline = [];
-                      const isSingleDomain = tokenDisplayDomain !== null;
+                    const isSingleTrain = tokenDisplayTrainId !== null;
                       
-                      if (isSingleDomain) {
-                        // Single domain view
+                      if (isSingleTrain) {
+                        // Single trainId view
                         const dataMap = new Map();
                         tokenChartData.forEach(point => {
                           const hourKey = new Date(point.hour).toISOString();
@@ -666,17 +669,17 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                         }
                       } else {
-                        // Multi-domain stacked view
-                        const domainDataMaps = {};
-                        const allDomains = Object.keys(tokenChartData);
+                        // Multi-trainId stacked view
+                        const trainDataMaps = {};
+                        const allTrainIds = Object.keys(tokenChartData);
                         
-                        // Build data maps for each domain
-                        allDomains.forEach(domain => {
-                          domainDataMaps[domain] = new Map();
-                          if (tokenChartData[domain]) {
-                            tokenChartData[domain].forEach(point => {
+                        // Build data maps for each train ID
+                        allTrainIds.forEach(trainId => {
+                          trainDataMaps[trainId] = new Map();
+                          if (tokenChartData[trainId]) {
+                            tokenChartData[trainId].forEach(point => {
                               const hourKey = new Date(point.hour).toISOString();
-                              domainDataMaps[domain].set(hourKey, point.count);
+                              trainDataMaps[trainId].set(hourKey, point.count);
                             });
                           }
                         });
@@ -685,10 +688,10 @@ requestUsageRoutes.get('/usage', async c => {
                         for (let i = 0; i < 168; i++) {
                           const time = new Date(startTime.getTime() + i * 60 * 60 * 1000);
                           const hourKey = time.toISOString();
-                          const dataPoint = { time: time, domains: {} };
+                          const dataPoint = { time: time, trains: {} };
                           
-                          allDomains.forEach(domain => {
-                            dataPoint.domains[domain] = domainDataMaps[domain].get(hourKey) || 0;
+                          allTrainIds.forEach(trainId => {
+                            dataPoint.trains[trainId] = trainDataMaps[trainId].get(hourKey) || 0;
                           });
                           
                           hourlyTimeline.push(dataPoint);
@@ -697,13 +700,16 @@ requestUsageRoutes.get('/usage', async c => {
                       
                       // Find max count for scaling
                       let maxCount;
-                      if (isSingleDomain) {
+                      if (isSingleTrain) {
                         maxCount = Math.max(...hourlyTimeline.map(d => d.count), 1);
                       } else {
-                        // For stacked view, max is the sum of all domains at any hour
-                        maxCount = Math.max(...hourlyTimeline.map(d => 
-                          Object.values(d.domains).reduce((sum, count) => sum + count, 0)
-                        ), 1);
+                        // For stacked view, max is the sum of all trainIds at any hour
+                        maxCount = Math.max(
+                          ...hourlyTimeline.map(d =>
+                            Object.values(d.trains).reduce((sum, count) => sum + count, 0)
+                          ),
+                          1
+                        );
                       }
                       const yScale = chartHeight / maxCount;
                       const barWidth = chartWidth / hourlyTimeline.length;
@@ -740,33 +746,33 @@ requestUsageRoutes.get('/usage', async c => {
                       }
                       
                       // Draw bars
-                      if (isSingleDomain) {
-                        // Single domain - simple bars
+                      if (isSingleTrain) {
+                        // Single trainId - simple bars
                         hourlyTimeline.forEach((point, index) => {
                           if (point.count > 0) {
                             const x = padding.left + index * barWidth;
                             const barHeight = point.count * yScale;
                             const y = padding.top + chartHeight - barHeight;
                             
-                            ctx.fillStyle = tokenDisplayDomain ? tokenDomainColors[tokenDisplayDomain] : '#3b82f6';
+                            ctx.fillStyle = tokenDisplayTrainId ? tokenTrainColors[tokenDisplayTrainId] : '#3b82f6';
                             ctx.fillRect(x, y, barWidth - 1, barHeight);
                           }
                         });
                       } else {
-                        // Multi-domain - stacked bars
-                        const allDomains = Object.keys(tokenChartData);
+                        // Multi-trainId - stacked bars
+                        const allTrainIds = Object.keys(tokenChartData);
                         
                         hourlyTimeline.forEach((point, index) => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allDomains.forEach(domain => {
-                            const count = point.domains[domain] || 0;
+                          allTrainIds.forEach(trainId => {
+                            const count = point.trains[trainId] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
                               const y = padding.top + chartHeight - stackHeight - segmentHeight;
                               
-                              ctx.fillStyle = tokenDomainColors[domain];
+                              ctx.fillStyle = tokenTrainColors[trainId];
                               ctx.fillRect(x, y, barWidth - 1, segmentHeight);
                               
                               stackHeight += segmentHeight;
@@ -839,20 +845,20 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                           tooltipHTML += '</div>';
                           
-                          if (isSingleDomain) {
+                          if (isSingleTrain) {
                             tooltipHTML += '<div style="color: #60a5fa;">Output Tokens: ' + formatTokenNumber(point.count) + '</div>';
                           } else {
-                            const total = Object.values(point.domains).reduce((sum, count) => sum + count, 0);
+                            const total = Object.values(point.trains).reduce((sum, count) => sum + count, 0);
                             tooltipHTML += '<div style="color: #60a5fa; margin-bottom: 4px;">Total: ' + formatTokenNumber(total) + ' tokens</div>';
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.domains).forEach(([domain, count]) => {
+                              Object.entries(point.trains).forEach(([trainId, count]) => {
                                 if (count > 0) {
-                                  const color = tokenDomainColors[domain];
+                                  const color = tokenTrainColors[trainId];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
                                   tooltipHTML += '<div style="width: 10px; height: 10px; background: ' + color + '; margin-right: 6px; border-radius: 2px;"></div>';
-                                  tooltipHTML += '<div style="flex: 1;">' + domain + '</div>';
+                                  tooltipHTML += '<div style="flex: 1;">' + trainId + '</div>';
                                   tooltipHTML += '<div style="margin-left: 8px;">' + formatTokenNumber(count) + '</div>';
                                   tooltipHTML += '</div>';
                                 }
@@ -890,18 +896,18 @@ requestUsageRoutes.get('/usage', async c => {
                   </script>
                 `)}
               `
-            : displayDomain
+            : displayTrainId
               ? html`<p class="text-gray-500">
-                  No token usage data available for the selected domain in the last 7 days.
+                  No token usage data available for the selected trainId in the last 7 days.
                 </p>`
               : html`<p class="text-gray-500">
-                  No token usage data available for any domain in the last 7 days.
+                  No token usage data available for any trainId in the last 7 days.
                 </p>`}
         </div>
       </div>
     `
 
-    return c.html(layout('Domain Stats', content))
+    return c.html(layout('Train Usage', content))
   } catch (error) {
     logger.error('Failed to load request usage page', { error: getErrorMessage(error) })
     return c.html(
@@ -909,7 +915,7 @@ requestUsageRoutes.get('/usage', async c => {
         'Error',
         html`
           <div class="error-banner">
-            <strong>Error:</strong> Failed to load domain stats data. Please try again later.
+            <strong>Error:</strong> Failed to load trainId stats data. Please try again later.
           </div>
           <div class="mt-4">
             <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
@@ -925,20 +931,20 @@ requestUsageRoutes.get('/usage', async c => {
  */
 requestUsageRoutes.get('/usage/chart', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
 
-  if (!apiClient || !domain) {
+  if (!apiClient || !trainId) {
     return c.html(html`<div class="error-banner">Invalid request</div>`)
   }
 
   try {
-    // Fetch hourly usage data for the specific domain
-    const usageParams = new URLSearchParams({ days: '7', domain })
+    // Fetch hourly usage data for the specific train
+    const usageParams = new URLSearchParams({ days: '7', trainId })
     const usageResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/requests/hourly?${usageParams}`
     )
     const usageData = usageResponse.data || {}
-    const chartData = usageData[domain] || []
+    const chartData = usageData[trainId] || []
 
     return c.html(html`
       <div id="chart-container">
@@ -954,14 +960,14 @@ requestUsageRoutes.get('/usage/chart', async c => {
                 <script>
                   // Same chart rendering logic as above
                   const chartData = ${JSON.stringify(chartData)};
-                  const domain = ${JSON.stringify(domain)};
+                  const trainId = ${JSON.stringify(trainId)};
                   
                   // ... (same chart drawing code as in the main route)
                 </script>
               `)}
             `
           : html`<p class="text-gray-500">
-              No request data available for ${domain} in the last 7 days.
+              No request data available for ${trainId} in the last 7 days.
             </p>`}
       </div>
     `)

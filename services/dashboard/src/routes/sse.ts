@@ -11,12 +11,12 @@ const sseConnections = new Map<
  * SSE endpoint for real-time dashboard updates
  */
 export async function handleSSE(c: Context) {
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const connectionId = crypto.randomUUID()
 
   return streamSSE(c, async stream => {
     // Add this connection to the active connections
-    const key = domain || 'global'
+    const key = trainId || 'global'
     if (!sseConnections.has(key)) {
       sseConnections.set(key, new Set())
     }
@@ -75,21 +75,21 @@ export async function handleSSE(c: Context) {
 /**
  * Broadcast an event to all connected SSE clients
  */
-export function broadcastEvent(event: { type: string; domain?: string; data: any }) {
+export function broadcastEvent(event: { type: string; trainId?: string; data: any }) {
   const message = JSON.stringify({
     type: event.type,
     data: event.data,
     timestamp: new Date().toISOString(),
   })
 
-  // Send to domain-specific connections
-  if (event.domain && sseConnections.has(event.domain)) {
-    sseConnections.get(event.domain)!.forEach(async connection => {
+  // Send to train-specific connections
+  if (event.trainId && sseConnections.has(event.trainId)) {
+    sseConnections.get(event.trainId)!.forEach(async connection => {
       try {
         await connection.write(message)
       } catch (_e) {
         // Remove dead connections
-        sseConnections.get(event.domain!)!.delete(connection)
+        sseConnections.get(event.trainId!)!.delete(connection)
       }
     })
   }
@@ -112,14 +112,14 @@ export function broadcastEvent(event: { type: string; domain?: string; data: any
  */
 export function broadcastConversation(conversation: {
   id: string
-  domain: string
+  trainId: string
   model: string
   tokens: number
   timestamp: string
 }) {
   broadcastEvent({
     type: 'conversation',
-    domain: conversation.domain,
+    trainId: conversation.trainId,
     data: conversation,
   })
 }
@@ -128,14 +128,14 @@ export function broadcastConversation(conversation: {
  * Broadcast metrics updates
  */
 export function broadcastMetrics(metrics: {
-  domain?: string
+  trainId?: string
   requests: number
   tokens: number
   activeUsers: number
 }) {
   broadcastEvent({
     type: 'metrics',
-    domain: metrics.domain,
+    trainId: metrics.trainId,
     data: metrics,
   })
 }

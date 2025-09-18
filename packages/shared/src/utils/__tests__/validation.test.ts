@@ -9,7 +9,7 @@ import {
   isValidCNPApiKey,
   isValidJWT,
   isValidEmail,
-  isValidDomain,
+  isValidTrainId,
   isValidDatabaseUrl,
 
   // Zod schemas
@@ -18,7 +18,7 @@ import {
   cnpApiKeySchema,
   jwtTokenSchema,
   emailSchema,
-  domainSchema,
+  trainIdSchema,
   databaseUrlSchema,
   paginationSchema,
   dateRangeSchema,
@@ -139,31 +139,34 @@ describe('Validation Utilities', () => {
     })
   })
 
-  describe('Domain Validation', () => {
-    it('should validate domain names', () => {
-      const validDomains = [
-        'example.com',
-        'subdomain.example.com',
-        'my-domain.co.uk',
-        'test123.org',
+  describe('Train ID Validation', () => {
+    it('should validate train identifiers', () => {
+      const validTrainIds = [
+        'train-alpha',
+        'train.alpha',
+        'train_alpha',
+        'train-beta:preview',
+        'alpha123',
       ]
 
-      validDomains.forEach(domain => {
-        expect(isValidDomain(domain)).toBe(true)
-        expect(() => domainSchema.parse(domain)).not.toThrow()
+      validTrainIds.forEach(trainId => {
+        expect(isValidTrainId(trainId)).toBe(true)
+        expect(() => trainIdSchema.parse(trainId)).not.toThrow()
       })
     })
 
-    it('should reject invalid domains', () => {
-      const invalidDomains = [
-        'not a domain',
-        'http://example.com', // URL, not domain
-        '-invalid.com',
-        'domain.c', // TLD too short
+    it('should reject invalid train identifiers', () => {
+      const invalidTrainIds = [
+        '../secrets',
+        'train/alpha',
+        'train alpha',
+        '',
+        'alpha@beta',
+        '-leadingdash',
       ]
 
-      invalidDomains.forEach(domain => {
-        expect(isValidDomain(domain)).toBe(false)
+      invalidTrainIds.forEach(trainId => {
+        expect(isValidTrainId(trainId)).toBe(false)
       })
     })
   })

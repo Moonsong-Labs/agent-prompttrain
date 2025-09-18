@@ -5,7 +5,7 @@ import { loadCredentials, ClaudeCredentials } from '../credentials'
 import { logger } from '../middleware/logger'
 
 export interface CredentialStatus {
-  domain: string
+  trainId: string
   file: string
   type: 'api_key' | 'oauth'
   status: 'valid' | 'expired' | 'expiring_soon' | 'missing_refresh_token' | 'invalid' | 'error'
@@ -72,7 +72,7 @@ export class CredentialStatusService {
    * Check the status of a single credential file
    */
   private async checkCredentialFile(filename: string): Promise<CredentialStatus> {
-    const domain = filename.replace('.credentials.json', '')
+    const trainId = filename.replace('.credentials.json', '')
     const filePath = join(this.credentialsDir, filename)
 
     try {
@@ -80,7 +80,7 @@ export class CredentialStatusService {
       const stats = statSync(filePath)
       if (!stats.isFile()) {
         return {
-          domain,
+          trainId,
           file: filename,
           type: 'api_key',
           status: 'error',
@@ -94,7 +94,7 @@ export class CredentialStatusService {
       const credentials = loadCredentials(filePath)
       if (!credentials) {
         return {
-          domain,
+          trainId,
           file: filename,
           type: 'api_key',
           status: 'invalid',
@@ -106,10 +106,10 @@ export class CredentialStatusService {
 
       // Check credential type and status
       if (credentials.type === 'oauth' && credentials.oauth) {
-        return this.checkOAuthStatus(domain, filename, credentials)
+        return this.checkOAuthStatus(trainId, filename, credentials)
       } else if (credentials.type === 'api_key' && credentials.api_key) {
         return {
-          domain,
+          trainId,
           file: filename,
           type: 'api_key',
           status: 'valid',
@@ -119,7 +119,7 @@ export class CredentialStatusService {
         }
       } else {
         return {
-          domain,
+          trainId,
           file: filename,
           type: credentials.type || 'api_key',
           status: 'invalid',
@@ -130,7 +130,7 @@ export class CredentialStatusService {
       }
     } catch (error) {
       return {
-        domain,
+        trainId,
         file: filename,
         type: 'api_key',
         status: 'error',
@@ -145,7 +145,7 @@ export class CredentialStatusService {
    * Check OAuth credential status
    */
   private checkOAuthStatus(
-    domain: string,
+    trainId: string,
     filename: string,
     credentials: ClaudeCredentials
   ): CredentialStatus {
@@ -157,7 +157,7 @@ export class CredentialStatusService {
     // Check if refresh token is available
     if (!oauth.refreshToken) {
       return {
-        domain,
+        trainId,
         file: filename,
         type: 'oauth',
         status: 'missing_refresh_token',
@@ -171,7 +171,7 @@ export class CredentialStatusService {
     // Check expiration status
     if (now >= expiresAt) {
       return {
-        domain,
+        trainId,
         file: filename,
         type: 'oauth',
         status: 'expired',
@@ -189,7 +189,7 @@ export class CredentialStatusService {
       const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
 
       return {
-        domain,
+        trainId,
         file: filename,
         type: 'oauth',
         status: 'expiring_soon',
@@ -206,7 +206,7 @@ export class CredentialStatusService {
     const hours = Math.floor((expiresIn % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
 
     return {
-      domain,
+      trainId,
       file: filename,
       type: 'oauth',
       status: 'valid',
@@ -236,7 +236,7 @@ export class CredentialStatusService {
 
     // Summary
     lines.push(`Credential Status Summary:`)
-    lines.push(`  Total: ${statuses.length} domains`)
+    lines.push(`  Total: ${statuses.length} trains`)
     lines.push(`  Valid: ${byStatus.valid.length}`)
     if (byStatus.expired.length > 0) {
       lines.push(`  Expired: ${byStatus.expired.length}`)
@@ -254,8 +254,8 @@ export class CredentialStatusService {
       lines.push(`  Errors: ${byStatus.error.length}`)
     }
 
-    // Details for each domain
-    lines.push(`\nDomain Details:`)
+    // Details for each train
+    lines.push(`\nTrain Details:`)
     for (const status of statuses) {
       const extras: string[] = []
       if (status.hasClientApiKey) {
@@ -265,7 +265,7 @@ export class CredentialStatusService {
         extras.push('slack')
       }
 
-      let line = `  ${status.domain}: ${status.type} - ${status.status}`
+      let line = `  ${status.trainId}: ${status.type} - ${status.status}`
       if (status.expiresIn) {
         line += ` (expires in ${status.expiresIn})`
       }
@@ -279,7 +279,7 @@ export class CredentialStatusService {
       }
     }
 
-    // Warnings for domains that need attention
+    // Warnings for trains that need attention
     const needsAttention = statuses.filter(
       s =>
         s.status === 'expired' ||
@@ -289,9 +289,9 @@ export class CredentialStatusService {
     )
 
     if (needsAttention.length > 0) {
-      lines.push(`\n⚠️  Domains Needing Attention:`)
+      lines.push(`\n⚠️  Trains Needing Attention:`)
       for (const status of needsAttention) {
-        lines.push(`  - ${status.domain}: ${status.message}`)
+        lines.push(`  - ${status.trainId}: ${status.message}`)
         if (status.status === 'expired' || status.status === 'missing_refresh_token') {
           lines.push(`    Run: bun run scripts/oauth-login.ts credentials/${status.file}`)
         }

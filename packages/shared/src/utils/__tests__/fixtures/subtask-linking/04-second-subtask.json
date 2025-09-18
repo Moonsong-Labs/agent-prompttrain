@@ -5,7 +5,7 @@
   "expectedParentTaskRequestId": "24e0f740-f2b3-4716-984d-48a6fcc309e1",
   "parent": {
     "request_id": "24e0f740-f2b3-4716-984d-48a6fcc309e1",
-    "domain": "localhost:3000",
+    "trainId": "localhost:3000",
     "conversation_id": "f2304222-a3db-4924-af42-5884286cb610",
     "branch_id": "main",
     "current_message_hash": "87161bc2a4aa18d49e389cc001bda9dc5c6869270fb7c215481fccda1b7fde5c",
@@ -91,7 +91,7 @@
   },
   "child": {
     "request_id": "ff58c4c0-a0b8-42a4-b238-3ff3f1190063",
-    "domain": "localhost:3000",
+    "trainId": "localhost:3000",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

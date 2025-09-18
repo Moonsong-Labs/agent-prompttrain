@@ -233,7 +233,7 @@ await pool.query(`
     FROM api_requests child
     JOIN api_requests parent 
       ON child.parent_message_hash = parent.current_message_hash
-      AND child.domain = parent.domain
+      AND child.train_id = parent.train_id
       AND child.conversation_id = parent.conversation_id
   )
   UPDATE api_requests 
@@ -274,10 +274,10 @@ await pool.query(
   `
   UPDATE api_requests 
   SET account_id = $1 
-  WHERE domain = ANY($2::text[])
+  WHERE train_id = ANY($2::text[])
     AND account_id IS NULL
 `,
-  [mapping.accountId, mapping.domains]
+  [mapping.accountId, mapping.train_ids]
 )
 ```
 

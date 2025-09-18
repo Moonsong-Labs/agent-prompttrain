@@ -2,10 +2,11 @@ import { Context, Next } from 'hono'
 import { timingSafeEqual as cryptoTimingSafeEqual } from 'crypto'
 import { logger } from './logger.js'
 import { container } from '../container.js'
+import { config } from '@agent-prompttrain/shared/config'
 
 /**
  * Client API Authentication Middleware
- * Validates domain-specific API keys for proxy access
+ * Validates train-scoped API keys for proxy access
  */
 export function clientAuthMiddleware() {
   return async (c: Context, next: Next) => {
@@ -43,11 +44,11 @@ export function clientAuthMiddleware() {
     }
 
     const token = match[1]
-    const domain = c.get('domain')
+    const trainId = c.get('trainId')
     const requestId = c.get('requestId')
 
-    if (!domain) {
-      logger.error('Client auth middleware: Domain not found in context', {
+    if (!trainId) {
+      logger.error('Client auth middleware: Train ID not found in context', {
         requestId,
         path: c.req.path,
       })
@@ -55,7 +56,7 @@ export function clientAuthMiddleware() {
         {
           error: {
             type: 'internal_error',
-            message: 'Domain context not found. This is an internal proxy error.',
+            message: 'Train ID context not found. This is an internal proxy error.',
           },
         },
         500
@@ -65,13 +66,13 @@ export function clientAuthMiddleware() {
     try {
       // Get the authentication service from container
       const authService = container.getAuthenticationService()
-      logger.debug(`domain: ${domain}, requestId: ${requestId}`)
-      const clientApiKey = await authService.getClientApiKey(domain)
+      logger.debug(`trainId: ${trainId}, requestId: ${requestId}`)
+      const clientApiKeys = await authService.getClientApiKeys(trainId)
 
-      if (!clientApiKey) {
+      if (!clientApiKeys.length) {
         logger.warn('Client auth middleware: No client API key configured', {
           requestId,
-          domain,
+          trainId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
@@ -79,7 +80,7 @@ export function clientAuthMiddleware() {
           {
             error: {
               type: 'authentication_error',
-              message: `No client API key configured for domain "${domain}". Please add "client_api_key" to your credential file or disable client authentication.`,
+              message: `No client API keys configured for train "${trainId}". Add a keys file under ${config.auth.clientKeysDir} or disable client authentication.`,
             },
           },
           401,
@@ -93,22 +94,30 @@ export function clientAuthMiddleware() {
       // This ensures both inputs are always the same length (32 bytes)
       const encoder = new TextEncoder()
       const tokenBuffer = encoder.encode(token)
-      const keyBuffer = encoder.encode(clientApiKey)
 
       // Hash both values before comparison
       const tokenHash = await crypto.subtle.digest('SHA-256', tokenBuffer)
-      const keyHash = await crypto.subtle.digest('SHA-256', keyBuffer)
-
-      // Convert ArrayBuffer to Buffer for Node's timingSafeEqual
       const tokenHashBuffer = Buffer.from(tokenHash)
-      const keyHashBuffer = Buffer.from(keyHash)
 
-      const isValid = cryptoTimingSafeEqual(tokenHashBuffer, keyHashBuffer)
+      let isValid = false
+      for (const clientKey of clientApiKeys) {
+        const clientKeyBuffer = encoder.encode(clientKey)
+        const keyHash = await crypto.subtle.digest('SHA-256', clientKeyBuffer)
+        const keyHashBuffer = Buffer.from(keyHash)
+
+        if (
+          keyHashBuffer.length === tokenHashBuffer.length &&
+          cryptoTimingSafeEqual(tokenHashBuffer, keyHashBuffer)
+        ) {
+          isValid = true
+          break
+        }
+      }
 
       if (!isValid) {
         logger.warn('Client auth middleware: Invalid API key', {
           requestId,
-          domain,
+          trainId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
@@ -128,7 +137,7 @@ export function clientAuthMiddleware() {
 
       logger.debug('Client auth middleware: Authentication successful', {
         requestId,
-        domain,
+        trainId,
       })
 
       // Authentication successful, proceed to next middleware
@@ -136,7 +145,7 @@ export function clientAuthMiddleware() {
     } catch (error) {
       logger.error('Client auth middleware: Error verifying token', {
         requestId,
-        domain,
+        trainId,
         error: error instanceof Error ? { message: error.message } : { message: String(error) },
       })
       return c.json(

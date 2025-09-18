@@ -5,7 +5,7 @@ import { config, validateConfig } from '@agent-prompttrain/shared/config'
 import { loggingMiddleware, logger } from './middleware/logger.js'
 import { requestIdMiddleware } from './middleware/request-id.js'
 import { validationMiddleware } from './middleware/validation.js'
-import { createRateLimiter, createDomainRateLimiter } from './middleware/rate-limit.js'
+import { createRateLimiter, createTrainRateLimiter } from './middleware/rate-limit.js'
 import { createHealthRoutes } from './routes/health.js'
 import { apiRoutes } from './routes/api.js'
 import { sparkApiRoutes } from './routes/spark-api.js'
@@ -15,9 +15,9 @@ import { createMcpApiRoutes } from './routes/mcp-api.js'
 import { initializeSlack } from './services/slack.js'
 import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
-import { domainExtractorMiddleware } from './middleware/domain-extractor.js'
+import { trainIdExtractorMiddleware } from './middleware/train-id-extractor.js'
 import { clientAuthMiddleware } from './middleware/client-auth.js'
-import { HonoVariables, HonoBindings } from '@agent-prompttrain/shared'
+import { HonoVariables, HonoBindings, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Create and configure the Proxy application
@@ -55,7 +55,7 @@ export async function createProxyApp(): Promise<
       requestId,
       path: c.req.path,
       method: c.req.method,
-      domain: c.get('domain'),
+      trainId: c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER),
       metadata: {},
     })
 
@@ -79,8 +79,8 @@ export async function createProxyApp(): Promise<
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Domain extraction for all routes
-  app.use('*', domainExtractorMiddleware())
+  // Train ID extraction for all routes
+  app.use('*', trainIdExtractorMiddleware())
 
   // Client authentication for proxy routes
   // Apply before rate limiting to protect against unauthenticated requests
@@ -91,7 +91,7 @@ export async function createProxyApp(): Promise<
   // Rate limiting
   if (config.features.enableMetrics) {
     app.use('/v1/*', createRateLimiter())
-    app.use('/v1/*', createDomainRateLimiter())
+    app.use('/v1/*', createTrainRateLimiter())
   }
 
   // Validation for API routes
@@ -108,8 +108,8 @@ export async function createProxyApp(): Promise<
 
   // Token stats endpoint
   app.get('/token-stats', c => {
-    const domain = c.req.query('domain')
-    const stats = container.getMetricsService().getStats(domain)
+    const trainId = c.req.query('trainId')
+    const stats = container.getMetricsService().getStats(trainId)
     return c.json(stats)
   })
 
@@ -158,7 +158,7 @@ export async function createProxyApp(): Promise<
     // Apply rate limiting to MCP routes
     if (config.features.enableMetrics) {
       app.use('/mcp/*', createRateLimiter())
-      app.use('/mcp/*', createDomainRateLimiter())
+      app.use('/mcp/*', createTrainRateLimiter())
     }
 
     const mcpHandler = container.getMcpHandler()
@@ -265,7 +265,7 @@ export async function createProxyApp(): Promise<
         stats: '/api/stats',
         requests: '/api/requests',
         'request-details': '/api/requests/:id',
-        domains: '/api/domains',
+        trainIds: '/api/train-ids',
       },
     }
 

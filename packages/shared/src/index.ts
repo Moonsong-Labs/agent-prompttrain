@@ -75,6 +75,13 @@ export {
   type ModelContextRule,
 } from './constants/model-limits.js'
 
+export {
+  MSL_TRAIN_ID_HEADER,
+  MSL_TRAIN_ID_HEADER_LOWER,
+  MSL_ACCOUNT_HEADER,
+  MSL_ACCOUNT_HEADER_LOWER,
+} from './constants/http-headers.js'
+
 // Export AI analysis types and configuration
 export {
   ConversationAnalysisSchema,

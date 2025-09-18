@@ -19,12 +19,14 @@ Include your client API key in the Authorization header:
 Authorization: Bearer cnp_live_YOUR_KEY
 ```
 
-### Domain-Based Routing
+### Train & Account Headers
 
-The proxy uses the `Host` header to determine which credentials to use:
+Use the `MSL-Train-Id` header to associate requests with a project/train, and optionally
+`MSL-Account` to select a specific Anthropic account credential:
 
 ```bash
-Host: example.com
+MSL-Train-Id: train-alpha
+MSL-Account: account-primary  # optional
 ```
 
 ## Endpoints
@@ -100,13 +102,13 @@ data: {"type":"message_stop"}
 GET /token-stats
 ```
 
-Returns token usage statistics per domain.
+Returns token usage statistics per train ID.
 
 **Response:**
 
 ```json
 {
-  "example.com": {
+  "train-alpha": {
     "total_requests": 150,
     "total_input_tokens": 45000,
     "total_output_tokens": 62000,
@@ -164,14 +166,14 @@ Authorization: Bearer YOUR_DASHBOARD_KEY
 #### List Requests
 
 ```http
-GET /api/requests?limit=50&offset=0&domain=example.com
+GET /api/requests?limit=50&offset=0&trainId=train-alpha
 ```
 
 **Query Parameters:**
 
 - `limit` - Number of results (default: 50, max: 100)
 - `offset` - Pagination offset
-- `domain` - Filter by domain
+- `trainId` - Filter by train
 - `model` - Filter by model
 - `from` - Start date (ISO 8601)
 - `to` - End date (ISO 8601)
@@ -184,7 +186,7 @@ GET /api/requests?limit=50&offset=0&domain=example.com
     {
       "request_id": "uuid",
       "timestamp": "2024-01-15T10:00:00Z",
-      "domain": "example.com",
+      "trainId": "train-alpha",
       "model": "claude-3-opus-20240229",
       "input_tokens": 100,
       "output_tokens": 200,
@@ -211,7 +213,7 @@ GET /api/requests/:id
 {
   "request_id": "uuid",
   "timestamp": "2024-01-15T10:00:00Z",
-  "domain": "example.com",
+  "trainId": "train-alpha",
   "request": {
     "messages": [...],
     "model": "claude-3-opus-20240229"
@@ -231,12 +233,12 @@ GET /api/requests/:id
 #### List Conversations
 
 ```http
-GET /api/conversations?domain=example.com&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
+GET /api/conversations?trainId=train-alpha&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
 ```
 
 **Query Parameters:**
 
-- `domain` - Filter by domain (optional)
+- `trainId` - Filter by train (optional)
 - `accountId` - Filter by account (optional)
 - `limit` - Number of conversations per page (default: 50)
 - `offset` - Number of conversations to skip for pagination (default: 0)
@@ -250,7 +252,7 @@ GET /api/conversations?domain=example.com&accountId=acc_123&limit=50&offset=0&da
   "conversations": [
     {
       "conversationId": "uuid",
-      "domain": "example.com",
+      "trainId": "train-alpha",
       "accountId": "acc_123",
       "firstMessageTime": "2024-01-15T09:00:00Z",
       "lastMessageTime": "2024-01-15T10:00:00Z",
@@ -282,14 +284,14 @@ GET /api/conversations?domain=example.com&accountId=acc_123&limit=50&offset=0&da
 #### Get Dashboard Statistics
 
 ```http
-GET /api/dashboard/stats?domain=example.com&accountId=acc_123
+GET /api/dashboard/stats?trainId=train-alpha&accountId=acc_123
 ```
 
 Optimized endpoint for dashboard overview page that returns aggregated statistics in a single query.
 
 **Query Parameters:**
 
-- `domain` - Filter by domain (optional)
+- `trainId` - Filter by train (optional)
 - `accountId` - Filter by account (optional)
 
 **Response:**
@@ -455,8 +457,8 @@ GET /api/analytics/tokens?period=day&days=7
   "periods": [
     {
       "period": "2024-01-15",
-      "domains": {
-        "example.com": {
+      "trains": {
+        "train-alpha": {
           "input_tokens": 10000,
           "output_tokens": 15000,
           "cache_tokens": 500,
@@ -480,7 +482,7 @@ Get token usage for the current sliding window (default 5 hours).
 
 - `accountId` - Account identifier (required)
 - `window` - Window size in minutes (default: 300)
-- `domain` - Filter by domain (optional)
+- `trainId` - Filter by train (optional)
 - `model` - Filter by model (optional)
 
 **Response:**
@@ -488,7 +490,7 @@ Get token usage for the current sliding window (default 5 hours).
 ```json
 {
   "accountId": "acc_123",
-  "domain": "example.com",
+  "trainId": "train-alpha",
   "model": "claude-3-opus-20240229",
   "windowStart": "2024-01-15T05:00:00Z",
   "windowEnd": "2024-01-15T10:00:00Z",
@@ -513,7 +515,7 @@ Get daily token usage statistics.
 
 - `accountId` - Account identifier (required)
 - `days` - Number of days to retrieve (default: 30)
-- `domain` - Filter by domain (optional)
+- `trainId` - Filter by train (optional)
 - `aggregate` - Aggregate across models (default: false)
 
 **Response:**
@@ -524,7 +526,7 @@ Get daily token usage statistics.
     {
       "date": "2024-01-15",
       "accountId": "acc_123",
-      "domain": "example.com",
+      "trainId": "train-alpha",
       "totalInputTokens": 100000,
       "totalOutputTokens": 150000,
       "totalTokens": 250000,
@@ -545,7 +547,7 @@ Get rate limit configurations.
 **Query Parameters:**
 
 - `accountId` - Filter by account
-- `domain` - Filter by domain
+- `trainId` - Filter by train
 - `model` - Filter by model
 
 **Response:**
@@ -556,7 +558,7 @@ Get rate limit configurations.
     {
       "id": 1,
       "accountId": "acc_123",
-      "domain": null,
+      "trainId": null,
       "model": "claude-3-opus-20240229",
       "windowMinutes": 300,
       "tokenLimit": 140000,
@@ -611,10 +613,10 @@ Streams real-time updates for requests.
 
 ```
 event: request
-data: {"request_id":"uuid","domain":"example.com","timestamp":"2024-01-15T10:00:00Z"}
+data: {"request_id":"uuid","trainId":"train-alpha","timestamp":"2024-01-15T10:00:00Z"}
 
 event: stats
-data: {"total_requests":1000,"active_domains":5}
+data: {"total_requests":1000,"active_trains":5}
 ```
 
 ## Error Responses

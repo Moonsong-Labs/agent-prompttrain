@@ -30,7 +30,7 @@ interface ApiRequest {
   conversation_id: string
   timestamp: Date
   model?: string
-  domain?: string
+  trainId?: string
   [key: string]: any
 }
 
@@ -443,7 +443,7 @@ async function executeInDryRunMode(
   console.log(`  Request ID: ${sample.request_id}`)
   console.log(`  Timestamp: ${sample.timestamp}`)
   console.log(`  Model: ${sample.model || 'N/A'}`)
-  console.log(`  Domain: ${sample.domain || 'N/A'}`)
+  console.log(`  Train ID: ${sample.trainId || 'N/A'}`)
 }
 
 async function executeCopy(

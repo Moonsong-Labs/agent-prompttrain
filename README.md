@@ -53,7 +53,7 @@ _Note: This is a read-only demo showcasing real usage data from our development 
 - 🔀 **Conversation Tracking** - Automatic message threading with branch, sub-agent & compact support
 - 📊 **Real-time Dashboard** - Monitor usage, view conversations, and analyze patterns
 - 🔐 **Multi-Auth Support** - API keys and OAuth with auto-refresh
-- 📈 **Token Tracking** - Detailed usage statistics per domain and account
+- 📈 **Token Tracking** - Detailed usage statistics per train and account
 - 🔄 **Streaming Support** - Full SSE streaming with chunk storage
 - 🐳 **Docker Ready** - Separate optimized images for each service
 - 🤖 **Claude CLI Integration** - Run Claude CLI connected to the proxy
@@ -119,7 +119,7 @@ For developers who need complete visibility, access the raw JSON view of any req
 
 For administrators or heavy users, you can follow the token usage and see when approaching the rate limits.
 
-</kbd><img width="400" alt="Token usage graph line per domain" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
+</kbd><img width="400" alt="Token usage graph line per train" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
 
 ## Quick Start
 
@@ -297,53 +297,48 @@ DEBUG=false
 
 See the [Documentation](docs/README.md) for complete configuration options.
 
-### Domain Credentials
+### Accounts & Trains
 
-Create domain-specific credentials:
+1. **Create an account credential** under `credentials/accounts/`:
 
-```bash
-# Generate secure API key
-bun run auth:generate-key
+   ```bash
+   mkdir -p credentials/accounts
+   cat > credentials/accounts/account-primary.credentials.json <<'JSON'
+   {
+     "type": "api_key",
+     "accountId": "acc_team_alpha",
+     "api_key": "sk-ant-your-claude-api-key"
+   }
+   JSON
+   ```
 
-# Create credential file
-cat > credentials/example.com.credentials.json << EOF
-{
-  "type": "api_key",
-  "accountId": "acc_name_to_display",
-  "api_key": "sk-ant-...",
-  "client_api_key": "cnp_live_..."
-}
-EOF
-```
+2. **Allow proxy clients** by listing Bearer tokens per train in `credentials/train-client-keys/`:
 
-(_Use `credentials/localhost\:3000.credentials.json` for using it locally_)
+   ```bash
+   mkdir -p credentials/train-client-keys
+   cat > credentials/train-client-keys/train-alpha.client-keys.json <<'JSON'
+   { "keys": ["cnp_live_team_alpha"] }
+   JSON
+   ```
 
-#### Wildcard Credentials
+3. **Tag outgoing Anthropic calls** so responses stay mapped to the right train:
 
-You can use wildcard credentials to match multiple subdomains with a single credential file:
+   ```bash
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"
+   ```
 
-```bash
-# Matches all subdomains of example.com (api.example.com, staging.example.com, etc.)
-cat > credentials/_wildcard.example.com.credentials.json << EOF
-{
-  "type": "api_key",
-  "accountId": "acc_name_to_display",
-  "api_key": "sk-ant-...",
-  "client_api_key": "cnp_live_..."
-}
-EOF
+4. **Select a specific account at runtime** (optional):
 
-# Enable wildcard support
-export CNP_WILDCARD_CREDENTIALS=true
-```
+   ```bash
+   curl -X POST http://localhost:3000/v1/messages \
+     -H "MSL-Train-Id: train-alpha" \
+     -H "MSL-Account: account-primary" \
+     -H "Authorization: Bearer cnp_live_team_alpha" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
+   ```
 
-Note: Exact matches take precedence over wildcards. See [ADR-023](docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md) for details.
-
-Authenticate your credential with Claude MAX Plan:
-
-```bash
-./scripts/auth/oauth-login.ts credentials/example.com.credentials.json
-```
+If `MSL-Account` is omitted, the proxy deterministically maps each train to an available account (hash-based), falling back to others only if the primary account is unavailable.
 
 ## Usage
 

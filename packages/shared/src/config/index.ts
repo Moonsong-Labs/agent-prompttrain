@@ -7,6 +7,14 @@
 // In development, use dotenv in your entry point or use bun which loads .env automatically.
 
 // Helper to parse environment variables
+const joinPath = (base: string, sub: string): string => {
+  if (!base) {
+    return sub
+  }
+  const normalizedBase = base.endsWith('/') || base.endsWith('\\') ? base.slice(0, -1) : base
+  return `${normalizedBase}/${sub}`
+}
+
 const env = {
   string: (key: string, defaultValue: string): string => {
     return process.env[key] || defaultValue
@@ -61,6 +69,23 @@ export const config = {
   auth: {
     get credentialsDir() {
       return env.string('CREDENTIALS_DIR', 'credentials')
+    },
+    get accountsDir() {
+      const override = env.string('ACCOUNTS_DIR', '')
+      if (override) {
+        return override
+      }
+      return joinPath(env.string('CREDENTIALS_DIR', 'credentials'), 'accounts')
+    },
+    get clientKeysDir() {
+      const override = env.string('TRAIN_CLIENT_KEYS_DIR', '')
+      if (override) {
+        return override
+      }
+      return joinPath(env.string('CREDENTIALS_DIR', 'credentials'), 'train-client-keys')
+    },
+    get defaultTrainId() {
+      return env.string('DEFAULT_TRAIN_ID', 'default')
     },
   },
 

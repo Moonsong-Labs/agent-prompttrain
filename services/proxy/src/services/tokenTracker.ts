@@ -1,4 +1,4 @@
-export interface DomainTokenStats {
+export interface TrainTokenStats {
   inputTokens: number
   outputTokens: number
   requestCount: number
@@ -9,21 +9,21 @@ export interface DomainTokenStats {
 }
 
 class TokenTracker {
-  private stats: Map<string, DomainTokenStats> = new Map()
+  private stats: Map<string, TrainTokenStats> = new Map()
   private intervalId: NodeJS.Timeout | null = null
   private startTime: number = Date.now()
 
   /**
-   * Track token usage for a domain
+   * Track token usage for a trainId
    */
   track(
-    domain: string,
+    trainId: string,
     inputTokens: number = 0,
     outputTokens: number = 0,
     requestType?: 'query_evaluation' | 'inference',
     toolCallCount: number = 0
   ) {
-    const current = this.stats.get(domain) || {
+    const current = this.stats.get(trainId) || {
       inputTokens: 0,
       outputTokens: 0,
       requestCount: 0,
@@ -33,7 +33,7 @@ class TokenTracker {
       lastUpdated: Date.now(),
     }
 
-    this.stats.set(domain, {
+    this.stats.set(trainId, {
       inputTokens: current.inputTokens + inputTokens,
       outputTokens: current.outputTokens + outputTokens,
       requestCount: current.requestCount + 1,
@@ -90,7 +90,7 @@ class TokenTracker {
     )
     console.log('='.repeat(90))
     console.log(
-      'Domain'.padEnd(25) +
+      'Train ID'.padEnd(25) +
         'Reqs'.padStart(6) +
         'Query'.padStart(7) +
         'Infer'.padStart(7) +
@@ -108,13 +108,13 @@ class TokenTracker {
     let totalInference = 0
     let totalToolCalls = 0
 
-    // Sort domains alphabetically
-    const sortedDomains = Array.from(this.stats.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+    // Sort trainIds alphabetically
+    const sortedTrainIds = Array.from(this.stats.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
-    for (const [domain, stats] of sortedDomains) {
+    for (const [trainId, stats] of sortedTrainIds) {
       const total = stats.inputTokens + stats.outputTokens
       console.log(
-        domain.padEnd(25) +
+        trainId.padEnd(25) +
           stats.requestCount.toString().padStart(6) +
           stats.queryEvaluationCount.toString().padStart(7) +
           stats.inferenceCount.toString().padStart(7) +
@@ -175,10 +175,10 @@ class TokenTracker {
   /**
    * Get current statistics (for API endpoints)
    */
-  getStats(): Record<string, DomainTokenStats> {
-    const result: Record<string, DomainTokenStats> = {}
-    for (const [domain, stats] of this.stats) {
-      result[domain] = { ...stats }
+  getStats(): Record<string, TrainTokenStats> {
+    const result: Record<string, TrainTokenStats> = {}
+    for (const [trainId, stats] of this.stats) {
+      result[trainId] = { ...stats }
     }
     return result
   }

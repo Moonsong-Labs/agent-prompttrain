@@ -52,7 +52,7 @@ bun test --watch
 
 - Full request flow through proxy
 - Claude CLI integration
-- Multi-domain authentication
+- Multi-train authentication
 - Error handling scenarios
 - Performance benchmarks
 

@@ -82,7 +82,7 @@ Prevents abuse through tiered rate limits:
 | Analysis Creation  | 15 requests   | 1 minute |
 | Analysis Retrieval | 100 requests  | 1 minute |
 
-Rate limits are enforced per domain/tenant and return appropriate headers:
+Rate limits are enforced per train ID/tenant and return appropriate headers:
 
 ```
 Retry-After: 60
@@ -119,7 +119,7 @@ CREATE TABLE analysis_audit_log (
     outcome VARCHAR(50),         -- SUCCESS, FAILURE_RATE_LIMIT, etc.
     conversation_id UUID,
     branch_id VARCHAR(255),
-    domain VARCHAR(255),
+    train_id VARCHAR(255),
     request_id VARCHAR(255),
     user_context JSONB,
     metadata JSONB,
@@ -171,18 +171,18 @@ Monitor for suspicious activity:
 
 ```sql
 -- Failed authentication attempts
-SELECT COUNT(*), domain, DATE(timestamp)
+SELECT COUNT(*), train_id, DATE(timestamp)
 FROM analysis_audit_log
 WHERE outcome = 'FAILURE_AUTH'
-GROUP BY domain, DATE(timestamp)
+GROUP BY train_id, DATE(timestamp)
 HAVING COUNT(*) > 10;
 
 -- Rate limit violations
-SELECT domain, COUNT(*) as violations
+SELECT train_id, COUNT(*) as violations
 FROM analysis_audit_log
 WHERE outcome = 'FAILURE_RATE_LIMIT'
   AND timestamp > NOW() - INTERVAL '1 hour'
-GROUP BY domain
+GROUP BY train_id
 ORDER BY violations DESC;
 
 -- Regeneration abuse patterns
@@ -245,7 +245,7 @@ Configure alerts for:
    ```
 
 2. Review the sanitized content vs original
-3. Temporarily block the domain if needed
+3. Temporarily block the train ID if needed
 4. Update injection patterns if new attack vector found
 
 ### API Key Compromise

@@ -20,14 +20,14 @@ interface StatsResponse {
   totalOutputTokens: number
   averageResponseTime: number
   errorCount: number
-  activeDomains: number
+  activeTrainIds: number
   requestsByModel: Record<string, number>
   requestsByType: Record<string, number>
 }
 
 interface RequestSummary {
   requestId: string
-  domain: string
+  trainId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -70,16 +70,16 @@ interface RequestDetails extends RequestSummary {
   streaming?: boolean
 }
 
-interface DomainsResponse {
-  domains: Array<{
-    domain: string
+interface TrainIdsResponse {
+  trainIds?: Array<{
+    trainId: string
     requestCount: number
   }>
 }
 
 interface TokenUsageWindow {
   accountId: string
-  domain: string
+  trainId: string
   model: string
   windowStart: string
   windowEnd: string
@@ -94,7 +94,7 @@ interface TokenUsageWindow {
 interface DailyUsage {
   date: string
   accountId: string
-  domain: string
+  trainId: string
   totalInputTokens: number
   totalOutputTokens: number
   totalTokens: number
@@ -104,7 +104,7 @@ interface DailyUsage {
 interface RateLimitConfig {
   id: number
   accountId?: string
-  domain?: string
+  trainId?: string
   model?: string
   windowMinutes: number
   tokenLimit: number
@@ -115,7 +115,7 @@ interface RateLimitConfig {
 
 interface ConversationSummary {
   conversationId: string
-  domain: string
+  trainId: string
   accountId?: string
   firstMessageTime: string
   lastMessageTime: string
@@ -163,11 +163,11 @@ export class ProxyApiClient {
   /**
    * Get aggregated statistics
    */
-  async getStats(params?: { domain?: string; since?: string }): Promise<StatsResponse> {
+  async getStats(params?: { trainId?: string; since?: string }): Promise<StatsResponse> {
     try {
       const url = new URL('/api/stats', this.baseUrl)
-      if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params?.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params?.since) {
         url.searchParams.set('since', params.since)
@@ -180,7 +180,9 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as StatsResponse
+      const stats = (await response.json()) as StatsResponse & { activeTrains?: number }
+
+      return stats
     } catch (error) {
       logger.error('Failed to fetch stats from proxy API', {
         error: getErrorMessage(error),
@@ -194,14 +196,14 @@ export class ProxyApiClient {
    * Get recent requests
    */
   async getRequests(params?: {
-    domain?: string
+    trainId?: string
     limit?: number
     offset?: number
   }): Promise<RequestsResponse> {
     try {
       const url = new URL('/api/requests', this.baseUrl)
-      if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params?.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params?.limit) {
         url.searchParams.set('limit', params.limit.toString())
@@ -217,7 +219,26 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as RequestsResponse
+      const json = (await response.json()) as any
+      const mapped: RequestsResponse = {
+        requests: (json.requests || []).map((req: any) => ({
+          requestId: req.requestId,
+          trainId: req.trainId,
+          model: req.model,
+          timestamp: req.timestamp,
+          inputTokens: req.inputTokens,
+          outputTokens: req.outputTokens,
+          totalTokens: req.totalTokens,
+          durationMs: req.durationMs,
+          responseStatus: req.responseStatus,
+          error: req.error,
+          requestType: req.requestType,
+          conversationId: req.conversationId,
+        })),
+        pagination: json.pagination,
+      }
+
+      return mapped
     } catch (error) {
       logger.error('Failed to fetch requests from proxy API', {
         error: getErrorMessage(error),
@@ -244,7 +265,34 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as RequestDetails
+      const json = (await response.json()) as any
+      const details: RequestDetails = {
+        requestId: json.requestId,
+        trainId: json.trainId,
+        model: json.model,
+        timestamp: json.timestamp,
+        inputTokens: json.inputTokens,
+        outputTokens: json.outputTokens,
+        totalTokens: json.totalTokens,
+        durationMs: json.durationMs,
+        responseStatus: json.responseStatus,
+        error: json.error,
+        requestType: json.requestType,
+        conversationId: json.conversationId,
+        requestBody: json.requestBody,
+        responseBody: json.responseBody,
+        streamingChunks: json.streamingChunks || [],
+        parentRequestId: json.parentRequestId,
+        branchId: json.branchId,
+        requestHeaders: json.requestHeaders,
+        responseHeaders: json.responseHeaders,
+        telemetry: json.telemetry,
+        method: json.method,
+        endpoint: json.endpoint,
+        streaming: json.streaming,
+      }
+
+      return details
     } catch (error) {
       logger.error('Failed to fetch request details from proxy API', {
         error: getErrorMessage(error),
@@ -255,11 +303,11 @@ export class ProxyApiClient {
   }
 
   /**
-   * Get list of active domains with request counts
+   * Get list of active train IDs with request counts
    */
-  async getDomains(): Promise<DomainsResponse> {
+  async getTrainIds(): Promise<TrainIdsResponse> {
     try {
-      const url = new URL('/api/domains', this.baseUrl)
+      const url = new URL('/api/train-ids', this.baseUrl)
 
       const response = await fetch(url.toString(), {
         headers: this.getHeaders(),
@@ -268,11 +316,11 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      const data = (await response.json()) as DomainsResponse
-      // Return the full domain objects with request counts
+      const data = (await response.json()) as TrainIdsResponse
+
       return data
     } catch (error) {
-      logger.error('Failed to fetch domains from proxy API', {
+      logger.error('Failed to fetch train IDs from proxy API', {
         error: getErrorMessage(error),
       })
       throw error
@@ -285,7 +333,7 @@ export class ProxyApiClient {
   async getTokenUsageWindow(params: {
     accountId: string
     window?: number // Window in minutes (default 300 = 5 hours)
-    domain?: string
+    trainId?: string
     model?: string
   }): Promise<TokenUsageWindow> {
     try {
@@ -294,8 +342,8 @@ export class ProxyApiClient {
       if (params.window) {
         url.searchParams.set('window', params.window.toString())
       }
-      if (params.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params.model) {
         url.searchParams.set('model', params.model)
@@ -308,7 +356,20 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as TokenUsageWindow
+      const json = (await response.json()) as any
+      return {
+        accountId: json.accountId,
+        trainId: json.trainId,
+        model: json.model,
+        windowStart: json.windowStart,
+        windowEnd: json.windowEnd,
+        totalInputTokens: json.totalInputTokens,
+        totalOutputTokens: json.totalOutputTokens,
+        totalTokens: json.totalTokens,
+        totalRequests: json.totalRequests,
+        cacheCreationInputTokens: json.cacheCreationInputTokens,
+        cacheReadInputTokens: json.cacheReadInputTokens,
+      }
     } catch (error) {
       logger.error('Failed to fetch token usage window from proxy API', {
         error: getErrorMessage(error),
@@ -324,7 +385,7 @@ export class ProxyApiClient {
   async getDailyTokenUsage(params: {
     accountId: string
     days?: number
-    domain?: string
+    trainId?: string
     aggregate?: boolean
   }): Promise<{ usage: DailyUsage[] }> {
     try {
@@ -333,8 +394,8 @@ export class ProxyApiClient {
       if (params.days) {
         url.searchParams.set('days', params.days.toString())
       }
-      if (params.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params.aggregate !== undefined) {
         url.searchParams.set('aggregate', params.aggregate.toString())
@@ -347,7 +408,12 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as { usage: DailyUsage[] }
+      const json = (await response.json()) as { usage: DailyUsage[] }
+      json.usage = json.usage.map(entry => ({
+        ...entry,
+        trainId: entry.trainId,
+      }))
+      return json
     } catch (error) {
       logger.error('Failed to fetch daily token usage from proxy API', {
         error: getErrorMessage(error),
@@ -491,8 +557,8 @@ export class ProxyApiClient {
       lastRequestTime: string
       remainingTokens: number
       percentageUsed: number
-      domains: Array<{
-        domain: string
+      trainIds: Array<{
+        trainId: string
         outputTokens: number
         requests: number
       }>
@@ -513,26 +579,27 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as {
-        accounts: {
-          accountId: string
-          outputTokens: number
-          inputTokens: number
-          requestCount: number
-          lastRequestTime: string
-          remainingTokens: number
-          percentageUsed: number
-          domains: {
-            domain: string
-            outputTokens: number
-            requests: number
-          }[]
-          miniSeries: {
-            time: string
-            remaining: number
-          }[]
-        }[]
-        tokenLimit: number
+      const json = (await response.json()) as any
+
+      const accounts = (json.accounts || []).map((account: any) => ({
+        accountId: account.accountId,
+        outputTokens: account.outputTokens,
+        inputTokens: account.inputTokens,
+        requestCount: account.requestCount,
+        lastRequestTime: account.lastRequestTime,
+        remainingTokens: account.remainingTokens,
+        percentageUsed: account.percentageUsed,
+        trainIds: (account.trainIds || []).map((item: any) => ({
+          trainId: item.trainId,
+          outputTokens: item.outputTokens,
+          requests: item.requests,
+        })),
+        miniSeries: account.miniSeries || [],
+      }))
+
+      return {
+        accounts,
+        tokenLimit: json.tokenLimit,
       }
     } catch (error) {
       logger.error('Failed to fetch accounts token usage from proxy API', {
@@ -547,7 +614,7 @@ export class ProxyApiClient {
    */
   async getRateLimitConfigs(params?: {
     accountId?: string
-    domain?: string
+    trainId?: string
     model?: string
   }): Promise<{ configs: RateLimitConfig[] }> {
     try {
@@ -555,8 +622,8 @@ export class ProxyApiClient {
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
       }
-      if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params?.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params?.model) {
         url.searchParams.set('model', params.model)
@@ -569,7 +636,12 @@ export class ProxyApiClient {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      return (await response.json()) as { configs: RateLimitConfig[] }
+      const json = (await response.json()) as any
+      json.configs = (json.configs || []).map((cfg: any) => ({
+        ...cfg,
+        trainId: cfg.trainId,
+      }))
+      return json
     } catch (error) {
       logger.error('Failed to fetch rate limit configs from proxy API', {
         error: getErrorMessage(error),
@@ -583,7 +655,7 @@ export class ProxyApiClient {
    * Get conversations with account information
    */
   async getConversations(params?: {
-    domain?: string
+    trainId?: string
     accountId?: string
     limit?: number
     offset?: number
@@ -602,8 +674,8 @@ export class ProxyApiClient {
   }> {
     try {
       const url = new URL('/api/conversations', this.baseUrl)
-      if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params?.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -646,7 +718,7 @@ export class ProxyApiClient {
   /**
    * Get aggregated dashboard statistics
    */
-  async getDashboardStats(params?: { domain?: string; accountId?: string }): Promise<{
+  async getDashboardStats(params?: { trainId?: string; accountId?: string }): Promise<{
     totalConversations: number
     activeUsers: number
     totalRequests: number
@@ -669,8 +741,8 @@ export class ProxyApiClient {
   }> {
     try {
       const url = new URL('/api/dashboard/stats', this.baseUrl)
-      if (params?.domain) {
-        url.searchParams.set('domain', params.domain)
+      if (params?.trainId) {
+        url.searchParams.set('trainId', params.trainId)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -722,11 +794,11 @@ export class ProxyApiClient {
         totalRequests: stats.totalRequests,
         totalTokens: stats.totalTokens,
         estimatedCost: (stats.totalTokens / 1000) * 0.002, // Rough estimate
-        activeDomains: stats.activeDomains,
+        activeTrainIds: stats.activeTrainIds,
       },
       requests: requests.map(req => ({
         request_id: req.requestId,
-        domain: req.domain,
+        trainId: req.trainId,
         model: req.model,
         total_tokens: req.totalTokens,
         input_tokens: req.inputTokens,

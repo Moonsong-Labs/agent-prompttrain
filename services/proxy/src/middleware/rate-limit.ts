@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { RateLimitError } from '@agent-prompttrain/shared'
+import { RateLimitError, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 import { getRequestLogger } from './logger'
 
 // Rate limit configuration
@@ -61,7 +61,7 @@ class RateLimitStore {
 
 // Global rate limit stores
 const apiKeyStore = new RateLimitStore()
-const domainStore = new RateLimitStore()
+const trainStore = new RateLimitStore()
 
 // Default configurations
 const defaultApiKeyConfig: RateLimitConfig = {
@@ -77,13 +77,13 @@ const defaultApiKeyConfig: RateLimitConfig = {
   },
 }
 
-const defaultDomainConfig: RateLimitConfig = {
+const defaultTrainConfig: RateLimitConfig = {
   windowMs: 3600000, // 1 hour
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const domain = c.req.header('host') || 'unknown'
-    return `domain:${domain}`
+    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
+    return `train:${trainId}`
   },
 }
 
@@ -193,16 +193,20 @@ export function createRateLimiter(config: Partial<RateLimitConfig> = {}) {
   }
 }
 
-// Domain-based rate limiter
-export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
-  const finalConfig = { ...defaultDomainConfig, ...config }
+// Train-based rate limiter
+export function createTrainRateLimiter(config: Partial<RateLimitConfig> = {}) {
+  const finalConfig = {
+    ...defaultTrainConfig,
+    ...config,
+    keyGenerator: config.keyGenerator ?? defaultTrainConfig.keyGenerator,
+  }
 
   return async (c: Context, next: Next) => {
     const logger = getRequestLogger(c)
     const key = finalConfig.keyGenerator(c)
     const now = Date.now()
 
-    let entry = domainStore.get(key)
+    let entry = trainStore.get(key)
 
     if (!entry || now - entry.windowStart >= finalConfig.windowMs) {
       entry = {
@@ -211,17 +215,17 @@ export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
         windowStart: now,
         blocked: false,
       }
-      domainStore.set(key, entry)
+      trainStore.set(key, entry)
     }
 
     if (entry.blocked && entry.blockExpiry && now < entry.blockExpiry) {
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Domain rate limit exceeded', {
+      logger.warn('Train rate limit exceeded', {
         key,
         retryAfter,
       })
 
-      throw new RateLimitError('Domain rate limit exceeded', retryAfter)
+      throw new RateLimitError('Train rate limit exceeded', retryAfter)
     }
 
     if (entry.requests >= finalConfig.maxRequests) {
@@ -229,13 +233,13 @@ export function createDomainRateLimiter(config: Partial<RateLimitConfig> = {}) {
       entry.blockExpiry = entry.windowStart + finalConfig.windowMs
 
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Domain rate limit exceeded', {
+      logger.warn('Train rate limit exceeded', {
         key,
         requests: entry.requests,
         maxRequests: finalConfig.maxRequests,
       })
 
-      throw new RateLimitError('Domain rate limit exceeded', retryAfter)
+      throw new RateLimitError('Train rate limit exceeded', retryAfter)
     }
 
     entry.requests++
@@ -279,5 +283,5 @@ export function getRateLimitStatus(c: Context): {
 // Cleanup function for graceful shutdown
 export function closeRateLimitStores(): void {
   apiKeyStore.close()
-  domainStore.close()
+  trainStore.close()
 }

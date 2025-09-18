@@ -30,7 +30,7 @@ function escapeHtml(unsafe: string): string {
 tokenUsageRoutes.get('/token-usage', async c => {
   const apiClient = c.get('apiClient')
   const accountId = c.req.query('accountId')
-  const _domain = c.req.query('domain') // Not currently used but kept for future use
+  const _trainId = c.req.query('trainId') // Not currently used but kept for future use
 
   if (!apiClient) {
     return c.html(
@@ -304,13 +304,13 @@ tokenUsageRoutes.get('/token-usage', async c => {
                               </span>
                             </div>
                             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-                              ${account.domains
+                              ${account.trainIds
                                 .map(
-                                  domain => `
+                                  trainId => `
                                 <div style="font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">
-                                  <span style="color: #374151; font-weight: 500;">${escapeHtml(domain.domain)}:</span>
-                                  ${formatNumber(domain.outputTokens)} tokens
-                                  (${((domain.outputTokens / account.outputTokens) * 100).toFixed(0)}%)
+                                  <span style="color: #374151; font-weight: 500;">${escapeHtml(trainId.trainId)}:</span>
+                                  ${formatNumber(trainId.outputTokens)} tokens
+                                  (${((trainId.outputTokens / account.outputTokens) * 100).toFixed(0)}%)
                                 </div>
                               `
                                 )
@@ -381,7 +381,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
 
     // Find the primary rate limit for this account
     const primaryLimit =
-      rateLimits.find(limit => limit.accountId === accountId && !limit.model && !limit.domain) ||
+      rateLimits.find(limit => limit.accountId === accountId && !limit.model && !limit.trainId) ||
       rateLimits[0]
 
     const content = html`
@@ -468,7 +468,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                     <strong>Total Requests:</strong> ${tokenUsage.totalRequests}<br />
                     <strong>Total All Tokens:</strong> ${formatNumber(tokenUsage.totalTokens)}<br />
                     <strong>Model:</strong> ${tokenUsage.model || 'All models'}<br />
-                    <strong>Domain:</strong> ${tokenUsage.domain || 'All domains'}
+                    <strong>Train ID:</strong> ${tokenUsage.trainId || 'All trainIds'}
                   </div>
                 </div>
               `
@@ -1065,8 +1065,8 @@ tokenUsageRoutes.get('/token-usage', async c => {
                         ${
                           limit.model
                             ? `Model: ${limit.model}`
-                            : limit.domain
-                              ? `Domain: ${limit.domain}`
+                            : limit.trainId
+                              ? `Train ID: ${limit.trainId}`
                               : 'Account Default'
                         }
                       </td>

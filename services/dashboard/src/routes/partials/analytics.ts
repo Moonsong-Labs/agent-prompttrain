@@ -37,7 +37,7 @@ function escapeHtml(unsafe: string): string {
  */
 analyticsPartialRoutes.get('/partials/analytics', async c => {
   const apiClient = c.get('apiClient')
-  const domain = c.req.query('domain')
+  const trainId = c.req.query('trainId')
   const expanded = c.req.query('expanded') === 'true'
 
   if (!apiClient) {
@@ -105,7 +105,9 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                   ${raw(
                     accountsData.accounts
-                      .filter(account => !domain || account.domains.some(d => d.domain === domain))
+                      .filter(
+                        account => !trainId || account.trainIds.some(d => d.trainId === trainId)
+                      )
                       .slice(0, 5) // Show top 5 accounts
                       .map(account => {
                         const chartId = `chart-${account.accountId.replace(/[^a-zA-Z0-9]/g, '-')}`
@@ -182,13 +184,13 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                             </span>
                           </div>
                           <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
-                            ${account.domains
-                              .filter(d => !domain || d.domain === domain)
+                            ${account.trainIds
+                              .filter(d => !trainId || d.trainId === trainId)
                               .slice(0, 3)
                               .map(
                                 d => `
                               <div style="font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">
-                                <span style="color: #374151;">${escapeHtml(d.domain)}:</span>
+                                <span style="color: #374151;">${escapeHtml(d.trainId)}:</span>
                                 ${formatNumber(d.outputTokens)} tokens
                                 (${((d.outputTokens / account.outputTokens) * 100).toFixed(0)}%)
                               </div>
@@ -196,10 +198,10 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                               )
                               .join('')}
                             ${
-                              account.domains.length > 3
+                              account.trainIds.length > 3
                                 ? `
                               <div style="font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">
-                                +${account.domains.length - 3} more
+                                +${account.trainIds.length - 3} more
                               </div>
                             `
                                 : ''
@@ -264,7 +266,7 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
           if (!isExpanded) {
             htmx.ajax(
               'GET',
-              '/partials/analytics?expanded=true${domain ? `&domain=${domain}` : ''}',
+              '/partials/analytics?expanded=true${trainId ? `&trainId=${trainId}` : ''}',
               {
                 target: '#analytics-panel',
                 swap: 'outerHTML',

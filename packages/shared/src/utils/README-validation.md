@@ -117,7 +117,7 @@ function processId(value: unknown) {
 - `CNP_API_KEY_REGEX` - Validates cnp*live*_ or cnp*test*_ keys
 - `JWT_TOKEN_REGEX` - Validates JWT token format (WARNING: format only, not security)
 - `EMAIL_REGEX` - Validates email addresses
-- `DOMAIN_REGEX` - Validates domain names (ReDoS-safe)
+- `TRAIN_ID_REGEX` - Validates train identifiers (ReDoS-safe)
 - `DATABASE_URL_PATTERNS` - Object with postgresql, mysql, mongodb patterns
 - `BEARER_TOKEN_REGEX` - Validates Bearer token Authorization headers
 - `SLUG_REGEX` - Validates URL-friendly slugs
@@ -131,7 +131,7 @@ function processId(value: unknown) {
 - `isValidCNPApiKey(value: string): boolean`
 - `isValidJWT(value: string): boolean`
 - `isValidEmail(value: string): boolean`
-- `isValidDomain(value: string): boolean`
+- `isValidTrainId(value: string): boolean`
 - `isValidDatabaseUrl(value: string, type?: 'postgresql' | 'mysql' | 'mongodb'): boolean`
 - `isValidBearerToken(value: string): boolean`
 - `isValidSlug(value: string): boolean`
@@ -145,7 +145,7 @@ function processId(value: unknown) {
 - `cnpApiKeySchema` - CNP API key validation (with length constraints)
 - `jwtTokenSchema` - JWT token format validation (WARNING: format only)
 - `emailSchema` - Email validation
-- `domainSchema` - Domain name validation
+- `trainIdSchema` - Train ID validation
 - `databaseUrlSchema` - Database URL validation
 - `paginationSchema` - Pagination parameters with defaults
 - `dateRangeSchema` - Date range validation
@@ -303,7 +303,7 @@ Database URLs contain credentials and should be handled with extreme care:
 
 ### ReDoS Prevention
 
-All regex patterns have been reviewed for ReDoS vulnerabilities. The domain regex was specifically simplified to prevent potential attacks. When adding new patterns:
+All regex patterns have been reviewed for ReDoS vulnerabilities. The train identifier regex was specifically simplified to prevent potential attacks. When adding new patterns:
 
 1. Avoid nested quantifiers (e.g., `(a+)+`)
 2. Be careful with alternation and optional groups

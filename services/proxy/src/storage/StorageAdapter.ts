@@ -51,13 +51,13 @@ export class StorageAdapter {
 
     // Create compact search executor
     const compactSearchExecutor: CompactSearchExecutor = async (
-      domain: string,
+      trainId: string,
       summaryContent: string,
       afterTimestamp: Date,
       beforeTimestamp?: Date
     ) => {
       return await this.writer.findParentByResponseContent(
-        domain,
+        trainId,
         summaryContent,
         afterTimestamp,
         beforeTimestamp
@@ -82,12 +82,12 @@ export class StorageAdapter {
 
     // Create subtask query executor that uses the provided timestamp and optional prompt
     const subtaskQueryExecutor: SubtaskQueryExecutor = async (
-      domain: string,
+      trainId: string,
       timestamp: Date,
       debugMode?: boolean,
       subtaskPrompt?: string
     ) => {
-      return this.loadTaskInvocations(domain, timestamp, debugMode, subtaskPrompt)
+      return this.loadTaskInvocations(trainId, timestamp, debugMode, subtaskPrompt)
     }
 
     // Create subtask sequence query executor
@@ -131,7 +131,7 @@ export class StorageAdapter {
    */
   async storeRequest(data: {
     id: string
-    domain: string
+    trainId: string
     accountId?: string
     timestamp: Date
     method: string
@@ -175,7 +175,7 @@ export class StorageAdapter {
 
       await this.writer.storeRequest({
         requestId: uuid,
-        domain: data.domain,
+        trainId: data.trainId,
         accountId: data.accountId,
         timestamp: data.timestamp,
         method: data.method,
@@ -329,14 +329,14 @@ export class StorageAdapter {
 
   /**
    * Link a conversation using the new ConversationLinker
-   * @param domain - The domain for the request
+   * @param trainId - The train identifier for the request
    * @param messages - The conversation messages
    * @param systemPrompt - The system prompt (string or array format)
    * @param requestId - The request ID
    * @param referenceTime - The timestamp of the request being processed
    */
   async linkConversation(
-    domain: string,
+    trainId: string,
     messages: ClaudeMessage[],
     systemPrompt:
       | string
@@ -370,7 +370,7 @@ export class StorageAdapter {
     // ConversationLinker will now handle loading task invocations internally
     // Use the provided referenceTime for task context
     const result = await this.conversationLinker.linkConversation({
-      domain,
+      trainId,
       messages,
       systemPrompt,
       requestId: uuid,
@@ -400,7 +400,7 @@ export class StorageAdapter {
   async processTaskToolInvocations(
     requestId: string,
     responseBody: any,
-    _domain: string
+    _trainId: string
   ): Promise<void> {
     const taskInvocations = this.writer.findTaskToolInvocations(responseBody)
 
@@ -532,13 +532,13 @@ export class StorageAdapter {
   /**
    * Load recent Task tool invocations for subtask detection.
    * This method is called by ConversationLinker via the subtaskQueryExecutor.
-   * @param domain - The domain to search in
+   * @param trainId - The train identifier to search in
    * @param timestamp - The reference timestamp for the search window
    * @param debugMode - Whether to log debug information
    * @param subtaskPrompt - Optional prompt to filter by (for optimization)
    */
   private async loadTaskInvocations(
-    domain: string,
+    trainId: string,
     timestamp: Date,
     debugMode?: boolean,
     subtaskPrompt?: string
@@ -558,7 +558,7 @@ export class StorageAdapter {
           r.response_body,
           r.timestamp
         FROM api_requests r
-        WHERE r.domain = $1
+        WHERE r.train_id = $1
           AND r.timestamp >= $2
           AND r.timestamp <= $3
           AND r.response_body IS NOT NULL
@@ -572,7 +572,7 @@ export class StorageAdapter {
         ORDER BY r.timestamp DESC
         LIMIT 10
       `
-      params = [domain, timeWindowStart, timestamp, subtaskPrompt.replace(/\\n/g, '\n')]
+      params = [trainId, timeWindowStart, timestamp, subtaskPrompt.replace(/\\n/g, '\n')]
 
       if (debugMode) {
         logger.debug('Using optimized subtask query with prompt filter', {
@@ -587,7 +587,7 @@ export class StorageAdapter {
           r.response_body,
           r.timestamp
         FROM api_requests r
-        WHERE r.domain = $1
+        WHERE r.train_id = $1
           AND r.timestamp >= $2
           AND r.timestamp <= $3
           AND r.response_body IS NOT NULL
@@ -595,7 +595,7 @@ export class StorageAdapter {
         ORDER BY r.timestamp DESC
         LIMIT 100
       `
-      params = [domain, timeWindowStart, timestamp]
+      params = [trainId, timeWindowStart, timestamp]
     }
 
     try {
@@ -640,7 +640,7 @@ export class StorageAdapter {
 
       return filteredInvocations.length > 0 ? filteredInvocations : undefined
     } catch (error) {
-      logger.warn(`Failed to load task invocations for domain ${domain}:`, {
+      logger.warn(`Failed to load task invocations for train ${trainId}:`, {
         metadata: {
           error: error instanceof Error ? error.message : String(error),
         },

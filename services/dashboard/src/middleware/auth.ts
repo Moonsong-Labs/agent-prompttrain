@@ -93,20 +93,16 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
 }
 
 /**
- * Optional: Domain-scoped authentication
- * Allows restricting dashboard access to specific domains
+ * Optional: Train ID-scoped authentication
+ * Allows restricting dashboard access to specific train identifiers
  */
-export const domainScopedAuth = async (c: Context, next: Next) => {
-  // Get authenticated domain from context
-  const authenticatedDomain = c.get('authenticatedDomain')
+export const trainScopedAuth = async (c: Context, next: Next) => {
+  const authenticatedTrainId = c.get('authenticatedTrainId')
+  const requestedTrainId = c.req.query('trainId')
 
-  // Get requested domain from query params
-  const requestedDomain = c.req.query('domain')
-
-  // If a specific domain is requested, verify access
-  if (requestedDomain && authenticatedDomain !== 'admin') {
-    if (authenticatedDomain !== requestedDomain) {
-      return c.json({ error: 'Access denied to this domain' }, 403)
+  if (requestedTrainId && authenticatedTrainId && authenticatedTrainId !== 'admin') {
+    if (authenticatedTrainId !== requestedTrainId) {
+      return c.json({ error: 'Access denied to this train' }, 403)
     }
   }
 

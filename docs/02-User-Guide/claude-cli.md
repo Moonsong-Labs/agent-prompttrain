@@ -47,7 +47,7 @@ The Claude CLI service is configured to:
 
 ### Environment Variables
 
-- API key is provided through domain credential files in the `credentials/` directory
+- API key is provided through train credential files in the `credentials/` directory
 
 ## How It Works
 

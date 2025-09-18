@@ -18,10 +18,19 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Authentication
 
-| Variable             | Description                          | Default | Required |
-| -------------------- | ------------------------------------ | ------- | -------- |
-| `DASHBOARD_API_KEY`  | API key for dashboard authentication | -       | ✅       |
-| `ENABLE_CLIENT_AUTH` | Enable client API key authentication | `true`  | ❌       |
+| Variable                | Description                                                                | Default                         | Required |
+| ----------------------- | -------------------------------------------------------------------------- | ------------------------------- | -------- |
+| `DASHBOARD_API_KEY`     | API key for dashboard authentication                                       | -                               | ✅       |
+| `ENABLE_CLIENT_AUTH`    | Enable client API key authentication                                       | `true`                          | ❌       |
+| `ACCOUNTS_DIR`          | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`          | ❌       |
+| `TRAIN_CLIENT_KEYS_DIR` | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌       |
+| `DEFAULT_TRAIN_ID`      | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌       |
+
+### Train Identification
+
+| Variable                   | Description                                                                                                           | Default | Required |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| `ANTHROPIC_CUSTOM_HEADERS` | Custom headers forwarded to the Anthropic API. Set to `"MSL-Train-Id:<your_train>"` so outbound requests stay tagged. | -       | ❌       |
 
 ## Feature Flags
 
@@ -46,14 +55,6 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | Variable              | Description                   | Default |
 | --------------------- | ----------------------------- | ------- |
 | `DASHBOARD_CACHE_TTL` | Dashboard cache TTL (seconds) | `30`    |
-
-### Wildcard Credentials
-
-| Variable                   | Description                                           | Default  |
-| -------------------------- | ----------------------------------------------------- | -------- |
-| `CNP_WILDCARD_CREDENTIALS` | Enable wildcard subdomain support (true/false/shadow) | `false`  |
-| `CNP_RESOLUTION_CACHE_TTL` | TTL for credential resolution cache (ms)              | `300000` |
-| `CNP_DEBUG_RESOLUTION`     | Enable debug logging for credential resolution        | `false`  |
 
 ## Service Configuration
 
@@ -95,10 +96,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 ## Directory Configuration
 
-| Variable           | Description                    | Default          |
-| ------------------ | ------------------------------ | ---------------- |
-| `CREDENTIALS_DIR`  | Directory for credential files | `./credentials`  |
-| `TEST_SAMPLES_DIR` | Directory for test samples     | `./test-samples` |
+| Variable           | Description                          | Default          |
+| ------------------ | ------------------------------------ | ---------------- |
+| `CREDENTIALS_DIR`  | Directory for train credential files | `./credentials`  |
+| `TEST_SAMPLES_DIR` | Directory for test samples           | `./test-samples` |
 
 ## AI Analysis Configuration
 
@@ -243,11 +244,6 @@ GEMINI_MODEL_NAME=gemini-2.0-flash-exp
 # Directories
 CREDENTIALS_DIR=./credentials
 TEST_SAMPLES_DIR=./test-samples
-
-# Wildcard Credentials (optional)
-# CNP_WILDCARD_CREDENTIALS=true
-# CNP_RESOLUTION_CACHE_TTL=300000
-# CNP_DEBUG_RESOLUTION=false
 
 # Production (uncomment for production)
 # NODE_ENV=production

@@ -4,7 +4,7 @@
   "expectedLink": true,
   "parent": {
     "request_id": "9484fa42-2685-4e2a-9198-79a88ae2199e",
-    "domain": "claude-reviews.msldev.io",
+    "trainId": "claude-reviews.msldev.io",
     "conversation_id": "17f4b4ec-f6bd-4569-998f-82ee7459b96a",
     "branch_id": "main",
     "current_message_hash": "bbc88051deafd9371e540c1bde261e128518a3beb3809a2c6a40151e5832bf51",
@@ -85,7 +85,7 @@
   },
   "child": {
     "request_id": "130814d6-9533-40a0-b58b-dd7ca7ac0a46",
-    "domain": "claude-reviews.msldev.io",
+    "trainId": "claude-reviews.msldev.io",
     "body": {
       "model": "claude-opus-4-20250514",
       "stream": true,

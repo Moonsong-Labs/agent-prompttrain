@@ -33,7 +33,7 @@ const formatMemoryUsage = () => {
 
 interface DbRequest {
   request_id: string
-  domain: string
+  train_id: string
   timestamp: Date
   conversation_id: string | null
   branch_id: string | null
@@ -57,7 +57,7 @@ class ConversationRebuilderFinal {
   private pool: Pool
   private storageAdapter: StorageAdapter
   private dryRun: boolean
-  private domainFilter: string | null
+  private trainIdFilter: string | null
   private limit: number | null
   private debugMode: boolean
   private requestIds: string[] | null
@@ -65,14 +65,14 @@ class ConversationRebuilderFinal {
   constructor(
     pool: Pool,
     dryRun: boolean,
-    domainFilter: string | null,
+    trainIdFilter: string | null,
     limit: number | null,
     debugMode: boolean,
     requestIds: string[] | null
   ) {
     this.pool = pool
     this.dryRun = dryRun
-    this.domainFilter = domainFilter
+    this.trainIdFilter = trainIdFilter
     this.limit = limit
     this.debugMode = debugMode
     this.requestIds = requestIds
@@ -136,7 +136,7 @@ class ConversationRebuilderFinal {
             // Use StorageAdapter to determine conversation linkage
             // Pass the request's timestamp for historical processing
             const linkingResult = await this.storageAdapter.linkConversation(
-              request.domain,
+              request.train_id,
               request.body.messages,
               request.body.system,
               request.request_id,
@@ -335,7 +335,7 @@ class ConversationRebuilderFinal {
     let query = `
       SELECT 
         r.request_id,
-        r.domain,
+        r.train_id,
         r.timestamp,
         r.conversation_id,
         r.branch_id,
@@ -361,9 +361,9 @@ class ConversationRebuilderFinal {
       params.push(this.requestIds)
     } else {
       // Apply domain filter only if not filtering by request IDs
-      if (this.domainFilter) {
-        query += ` AND r.domain = $${params.length + 1}`
-        params.push(this.domainFilter)
+      if (this.trainIdFilter) {
+        query += ` AND r.train_id = $${params.length + 1}`
+        params.push(this.trainIdFilter)
       }
     }
 
@@ -461,7 +461,7 @@ standard conversation linking logic.
 Options:
   --help              Show this help message
   --execute           Actually apply changes (default is dry run)
-  --domain <domain>   Filter by specific domain
+  --train-id <id>     Filter by specific train identifier (deprecated: --domain)
   --limit <number>    Limit number of requests to process
   --requests <ids>    Process specific request IDs (comma-separated)
   --debug             Enable debug logging and SQL query logging
@@ -474,8 +474,8 @@ Examples:
   # Actually apply changes to all requests
   bun run scripts/db/rebuild-conversations.ts --execute --yes
 
-  # Process specific domain with debug output
-  bun run scripts/db/rebuild-conversations.ts --domain example.com --debug
+  # Process specific train ID with debug output
+  bun run scripts/db/rebuild-conversations.ts --train-id example --debug
 
   # Process specific requests
   bun run scripts/db/rebuild-conversations.ts --requests "id1,id2,id3" --execute
@@ -500,17 +500,24 @@ function parseArgs() {
 
   const flags = {
     dryRun: !args.includes('--execute'),
-    domain: null as string | null,
+    trainId: null as string | null,
     limit: null as number | null,
     debug: args.includes('--debug'),
     yes: args.includes('--yes'),
     requests: null as string[] | null,
   }
 
-  // Parse domain flag
+  // Parse train-id flag (preferred)
+  const trainIdIndex = args.indexOf('--train-id')
+  if (trainIdIndex !== -1 && args[trainIdIndex + 1]) {
+    flags.trainId = args[trainIdIndex + 1]
+  }
+
+  // Backward compatibility: parse legacy --domain flag
   const domainIndex = args.indexOf('--domain')
-  if (domainIndex !== -1 && args[domainIndex + 1]) {
-    flags.domain = args[domainIndex + 1]
+  if (!flags.trainId && domainIndex !== -1 && args[domainIndex + 1]) {
+    console.warn('⚠️  --domain is deprecated. Please use --train-id instead.')
+    flags.trainId = args[domainIndex + 1]
   }
 
   // Parse limit flag
@@ -561,8 +568,8 @@ async function main() {
 
   if (flags.requests) {
     console.log(`🎯 Processing specific requests: ${flags.requests.join(', ')}`)
-  } else if (flags.domain) {
-    console.log(`🌐 Filtering by domain: ${flags.domain}`)
+  } else if (flags.trainId) {
+    console.log(`🌐 Filtering by train ID: ${flags.trainId}`)
   }
 
   if (flags.limit) {
@@ -610,7 +617,7 @@ async function main() {
     const rebuilder = new ConversationRebuilderFinal(
       pool,
       flags.dryRun,
-      flags.domain,
+      flags.trainId,
       flags.limit,
       flags.debug,
       flags.requests

@@ -37,20 +37,25 @@ nano .env
 
 ```bash
 # Create credentials directory
-mkdir -p credentials
+mkdir -p credentials/accounts
+mkdir -p credentials/train-client-keys
 
 # Generate client API key
 bun run scripts/generate-api-key.ts
 
-# Create domain credentials
-cat > credentials/your-domain.com.credentials.json << EOF
+# Create account credentials
+cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 {
   "type": "api_key",
   "accountId": "acc_$(uuidgen)",
-  "api_key": "sk-ant-your-claude-api-key",
-  "client_api_key": "cnp_live_generated_key"
+  "api_key": "sk-ant-your-claude-api-key"
 }
-EOF
+JSON
+
+# Allow proxy clients for a train
+cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+{ "keys": ["cnp_live_generated_key"] }
+JSON
 ```
 
 ### 3. Start Services

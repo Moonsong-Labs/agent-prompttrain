@@ -25,7 +25,7 @@ describe('ConversationLinker', () => {
       return []
     }
 
-    mockCompactSearchExecutor = async (_domain, _summaryContent, _beforeTimestamp) => {
+    mockCompactSearchExecutor = async (_trainId, _summaryContent, _beforeTimestamp) => {
       return null
     }
 
@@ -50,7 +50,7 @@ describe('ConversationLinker', () => {
   describe('linkConversation', () => {
     test('should handle single message without compact conversation', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -75,7 +75,7 @@ describe('ConversationLinker', () => {
 
     test('should handle single user message (potential sub-task)', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -99,7 +99,7 @@ describe('ConversationLinker', () => {
 
     test('should handle single assistant message', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'assistant',
@@ -120,7 +120,7 @@ describe('ConversationLinker', () => {
 
     test('should handle empty user message', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -141,7 +141,7 @@ describe('ConversationLinker', () => {
 
     test('should handle non-text content', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -171,7 +171,7 @@ describe('ConversationLinker', () => {
 
     test('should handle multi-message conversations', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           { role: 'user', content: 'Hello' },
           { role: 'assistant', content: 'Hi there!' },
@@ -191,7 +191,7 @@ describe('ConversationLinker', () => {
 
     test('should detect compact conversation in single message', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -205,7 +205,7 @@ describe('ConversationLinker', () => {
       }
 
       // Mock finding a parent for compact conversation
-      mockCompactSearchExecutor = async (_domain, summaryContent, _beforeTimestamp) => {
+      mockCompactSearchExecutor = async (_trainId, summaryContent, _beforeTimestamp) => {
         if (summaryContent.toLowerCase().includes('user asked about weather')) {
           return {
             request_id: 'parent-request-1',
@@ -236,7 +236,7 @@ describe('ConversationLinker', () => {
 
     test('should compute parent hash for multiple messages', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           { role: 'user', content: 'What is the weather?' },
           { role: 'assistant', content: 'I can help with weather information.' },
@@ -256,7 +256,7 @@ describe('ConversationLinker', () => {
 
     test('should handle system prompt as array', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [{ role: 'user', content: 'Hello' }],
         systemPrompt: [
           { type: 'text', text: 'You are helpful' },
@@ -273,7 +273,7 @@ describe('ConversationLinker', () => {
 
     test('should not allow empty messages', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [], // Empty messages should trigger error handling
         systemPrompt: 'You are helpful',
         requestId: 'test-request-5',
@@ -289,7 +289,7 @@ describe('ConversationLinker', () => {
   describe('Message content normalization', () => {
     test('should normalize string content', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [{ role: 'user', content: '  Hello world\r\n  ' }],
         systemPrompt: 'Test',
         requestId: 'test-1',
@@ -302,7 +302,7 @@ describe('ConversationLinker', () => {
 
     test('should filter system reminders', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'user',
@@ -323,7 +323,7 @@ describe('ConversationLinker', () => {
 
     test('should deduplicate tool use and results', async () => {
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           {
             role: 'assistant',
@@ -378,7 +378,7 @@ describe('ConversationLinker', () => {
       )
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages,
         systemPrompt: 'Test system prompt',
         requestId: 'test-request',
@@ -424,7 +424,7 @@ describe('ConversationLinker', () => {
       )
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages,
         systemPrompt: 'You are a helpful AI assistant tasked with summarizing conversations',
         requestId: 'test-request',
@@ -484,7 +484,7 @@ describe('ConversationLinker', () => {
       )
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages,
         systemPrompt: 'Test',
         requestId: 'test-request',
@@ -586,8 +586,9 @@ describe('ConversationLinker - JSON File Tests', () => {
       }
 
       const mockCompactSearchExecutor: CompactSearchExecutor = async (
-        _domain,
+        _trainId,
         summaryContent,
+        _afterTimestamp,
         _beforeTimestamp
       ) => {
         // Skip compact search for subtask test cases
@@ -635,7 +636,7 @@ describe('ConversationLinker - JSON File Tests', () => {
       const mockSubtaskQueryExecutor: SubtaskQueryExecutor | undefined =
         testCase.expectedParentTaskRequestId
           ? async (
-              _domain: string,
+              _trainId: string,
               _timestamp: Date,
               _debugMode?: boolean,
               _subtaskPrompt?: string
@@ -712,7 +713,7 @@ describe('ConversationLinker - JSON File Tests', () => {
       }
 
       const request: LinkingRequest = {
-        domain: testCase.child.domain,
+        trainId: testCase.child.trainId ?? 'train-fixture',
         messages: childMessages,
         systemPrompt: childSystemPrompt,
         requestId: testCase.child.request_id,
@@ -959,7 +960,7 @@ describe('Dual Hash System - Message and System Hashing', () => {
       )
 
       const request: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: [
           { role: 'user', content: 'What is TypeScript?' },
           { role: 'assistant', content: 'TypeScript is a programming language.' },
@@ -1014,7 +1015,7 @@ describe('Dual Hash System - Message and System Hashing', () => {
       ]
 
       const request1: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: messages1,
         systemPrompt: 'You are helpful',
         requestId: 'req-1',
@@ -1042,7 +1043,7 @@ describe('Dual Hash System - Message and System Hashing', () => {
       ]
 
       const request2: LinkingRequest = {
-        domain: 'test.com',
+        trainId: 'test.com',
         messages: messages2,
         systemPrompt: 'You are helpful. Git status: modified files', // Changed system
         requestId: 'req-2',

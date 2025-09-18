@@ -5,7 +5,7 @@ import { getErrorMessage } from '@agent-prompttrain/shared'
 
 interface ApiRequest {
   request_id: string
-  domain: string
+  trainId: string
   timestamp: string
   model: string
   input_tokens: number
@@ -51,7 +51,7 @@ interface StorageStats {
   total_tool_calls: number
   avg_response_time_ms: number
   error_count: number
-  unique_domains: number
+  uniqueTrainIds: number
   requests_by_model: Record<string, number>
   requests_by_type: Record<string, number>
 }
@@ -111,10 +111,10 @@ export class StorageReader {
   }
 
   /**
-   * Get requests by domain
+   * Get requests by train identifier
    */
-  async getRequestsByDomain(domain: string, limit: number = 100): Promise<ApiRequest[]> {
-    const cacheKey = `requests:${domain}:${limit}`
+  async getRequestsByTrainId(trainId: string, limit: number = 100): Promise<ApiRequest[]> {
+    const cacheKey = `requests:${trainId}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -126,21 +126,21 @@ export class StorageReader {
     }
 
     try {
-      const query = domain
+      const query = trainId
         ? `SELECT * FROM api_requests 
-           WHERE domain = $1 
+           WHERE train_id = $1 
            ORDER BY timestamp DESC 
            LIMIT $2`
         : `SELECT * FROM api_requests 
            ORDER BY timestamp DESC 
            LIMIT $1`
 
-      const values = domain ? [domain, limit] : [limit]
-      const rows = await this.executeQuery<any>(query, values, 'getRequestsByDomain')
+      const values = trainId ? [trainId, limit] : [limit]
+      const rows = await this.executeQuery<any>(query, values, 'getRequestsByTrainId')
 
       const requests = rows.map(row => ({
         request_id: row.request_id,
-        domain: row.domain,
+        trainId: row.trainId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -167,9 +167,8 @@ export class StorageReader {
       }
       return requests
     } catch (error) {
-      logger.error('Failed to get requests by domain', {
-        domain,
-        error: getErrorMessage(error),
+      logger.error('Failed to get requests by train ID', {
+        metadata: { trainId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -194,7 +193,7 @@ export class StorageReader {
       // Get request
       const requestQuery = `
         SELECT 
-          request_id, domain, timestamp, model, input_tokens, output_tokens,
+          request_id, trainId, timestamp, model, input_tokens, output_tokens,
           total_tokens, duration_ms, error, request_type, tool_call_count,
           conversation_id, branch_id, parent_request_id, body, response_body
         FROM api_requests 
@@ -213,7 +212,7 @@ export class StorageReader {
       const row = requestRows[0]
       const request: ApiRequest = {
         request_id: row.request_id,
-        domain: row.domain,
+        trainId: row.trainId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -265,8 +264,8 @@ export class StorageReader {
   /**
    * Get aggregated statistics
    */
-  async getStats(domain?: string, since?: Date): Promise<StorageStats> {
-    const cacheKey = `stats:${domain || 'all'}:${since?.toISOString() || 'all'}`
+  async getStats(trainId?: string, since?: Date): Promise<StorageStats> {
+    const cacheKey = `stats:${trainId || 'all'}:${since?.toISOString() || 'all'}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -282,9 +281,9 @@ export class StorageReader {
       const values = []
       let paramCount = 0
 
-      if (domain) {
-        conditions.push(`domain = $${++paramCount}`)
-        values.push(domain)
+      if (trainId) {
+        conditions.push(`train_id = $${++paramCount}`)
+        values.push(trainId)
       }
 
       if (since) {
@@ -303,7 +302,7 @@ export class StorageReader {
           COALESCE(SUM(tool_call_count), 0) as total_tool_calls,
           COALESCE(AVG(duration_ms), 0) as avg_response_time_ms,
           COUNT(*) FILTER (WHERE error IS NOT NULL) as error_count,
-          COUNT(DISTINCT domain) as unique_domains
+          COUNT(DISTINCT train_id) as unique_train_ids
         FROM api_requests
         ${whereClause}
       `
@@ -344,7 +343,7 @@ export class StorageReader {
         total_tool_calls: parseInt(baseStats.total_tool_calls),
         avg_response_time_ms: parseFloat(baseStats.avg_response_time_ms),
         error_count: parseInt(baseStats.error_count),
-        unique_domains: parseInt(baseStats.unique_domains),
+        uniqueTrainIds: parseInt(baseStats.unique_train_ids),
         requests_by_model: requestsByModel,
         requests_by_type: requestsByType,
       }
@@ -356,8 +355,7 @@ export class StorageReader {
       return stats
     } catch (error) {
       logger.error('Failed to get storage stats', {
-        domain,
-        error: getErrorMessage(error),
+        metadata: { trainId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -367,7 +365,7 @@ export class StorageReader {
    * Get conversations grouped by conversation_id
    */
   async getConversations(
-    domain?: string,
+    trainId?: string,
     limit: number = 50
   ): Promise<
     {
@@ -380,7 +378,7 @@ export class StorageReader {
       requests: ApiRequest[]
     }[]
   > {
-    const cacheKey = `conversations:${domain || 'all'}:${limit}`
+    const cacheKey = `conversations:${trainId || 'all'}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -393,9 +391,10 @@ export class StorageReader {
 
     try {
       // First get unique conversations with branch information
-      const conversationQuery = domain
+      const conversationQuery = trainId
         ? `SELECT 
              conversation_id,
+             MAX(trainId) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -403,12 +402,13 @@ export class StorageReader {
              SUM(total_tokens) as total_tokens,
              array_agg(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL) as branches
            FROM api_requests
-           WHERE domain = $1 AND conversation_id IS NOT NULL
+           WHERE train_id = $1 AND conversation_id IS NOT NULL
            GROUP BY conversation_id
            ORDER BY MAX(timestamp) DESC
            LIMIT $2`
         : `SELECT 
              conversation_id,
+             MAX(trainId) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -421,7 +421,7 @@ export class StorageReader {
            ORDER BY MAX(timestamp) DESC
            LIMIT $1`
 
-      const conversationValues = domain ? [domain, limit] : [limit]
+      const conversationValues = trainId ? [trainId, limit] : [limit]
       const conversationRows = await this.executeQuery<any>(
         conversationQuery,
         conversationValues,
@@ -434,9 +434,9 @@ export class StorageReader {
         return []
       }
 
-      const requestsQuery = domain
+      const requestsQuery = trainId
         ? `SELECT 
-             request_id, domain, timestamp, model, 
+             request_id, trainId, timestamp, model, 
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
@@ -448,10 +448,10 @@ export class StorageReader {
                  NULL
              END as last_message
            FROM api_requests 
-           WHERE domain = $1 AND conversation_id = ANY($2::uuid[])
+           WHERE train_id = $1 AND conversation_id = ANY($2::uuid[])
            ORDER BY conversation_id, timestamp ASC`
         : `SELECT 
-             request_id, domain, timestamp, model, 
+             request_id, trainId, timestamp, model, 
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
@@ -466,7 +466,7 @@ export class StorageReader {
            WHERE conversation_id = ANY($1::uuid[])
            ORDER BY conversation_id, timestamp ASC`
 
-      const requestsValues = domain ? [domain, conversationIds] : [conversationIds]
+      const requestsValues = trainId ? [trainId, conversationIds] : [conversationIds]
       const requestsRows = await this.executeQuery<any>(
         requestsQuery,
         requestsValues,
@@ -478,7 +478,7 @@ export class StorageReader {
       requestsRows.forEach(row => {
         const request: ApiRequest = {
           request_id: row.request_id,
-          domain: row.domain,
+          trainId: row.trainId,
           timestamp: row.timestamp,
           model: row.model,
           input_tokens: row.input_tokens || 0,
@@ -508,6 +508,7 @@ export class StorageReader {
       // Combine conversation metadata with requests
       const conversations = conversationRows.map(row => ({
         conversation_id: row.conversation_id,
+        trainId: row.trainId,
         message_count: parseInt(row.message_count),
         first_message: new Date(row.first_message),
         last_message: new Date(row.last_message),
@@ -523,8 +524,7 @@ export class StorageReader {
       return conversations
     } catch (error) {
       logger.error('Failed to get conversations', {
-        domain,
-        error: getErrorMessage(error),
+        metadata: { trainId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -592,7 +592,7 @@ export class StorageReader {
           WHERE conversation_id = $1
         )
         SELECT 
-          request_id, domain, timestamp, model, 
+          request_id, trainId, timestamp, model, 
           input_tokens, output_tokens, total_tokens, duration_ms,
           error, request_type, tool_call_count, conversation_id,
           current_message_hash, parent_message_hash, branch_id, message_count,
@@ -619,7 +619,7 @@ export class StorageReader {
       // Map requests
       const requests: ApiRequest[] = requestsRows.map(row => ({
         request_id: row.request_id,
-        domain: row.domain,
+        trainId: row.trainId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -646,6 +646,7 @@ export class StorageReader {
 
       const conversation = {
         conversation_id: conversationRow.conversation_id,
+        trainId: conversationRow.trainId,
         message_count: parseInt(conversationRow.message_count),
         first_message: new Date(conversationRow.first_message),
         last_message: new Date(conversationRow.last_message),
@@ -676,11 +677,11 @@ export class StorageReader {
    * More efficient for displaying conversation lists
    */
   async getConversationSummaries(
-    domain?: string,
+    trainId?: string,
     limit: number = 100,
     excludeSubtasks: boolean = false
   ): Promise<any[]> {
-    const cacheKey = `conversation-summaries:${domain || 'all'}:${limit}:${excludeSubtasks}`
+    const cacheKey = `conversation-summaries:${trainId || 'all'}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -693,11 +694,11 @@ export class StorageReader {
 
     try {
       // Get conversation summaries with branch information
-      const query = domain
+      const query = trainId
         ? `WITH conversation_summary AS (
              SELECT 
                conversation_id,
-               domain,
+               trainId,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -707,8 +708,8 @@ export class StorageReader {
                array_agg(DISTINCT model) as models_used,
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
-             WHERE domain = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, domain
+             WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+             GROUP BY conversation_id, trainId
            ),
            conversation_branches AS (
              SELECT 
@@ -735,8 +736,8 @@ export class StorageReader {
                   WHERE r2.conversation_id = api_requests.conversation_id 
                   AND r2.branch_id = api_requests.branch_id 
                   ORDER BY r2.timestamp DESC LIMIT 1) as latest_request_id
-               FROM api_requests
-               WHERE domain = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+              FROM api_requests
+              WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
                GROUP BY conversation_id, branch_id
              ) b
              GROUP BY conversation_id
@@ -751,7 +752,7 @@ export class StorageReader {
         : `WITH conversation_summary AS (
              SELECT 
                conversation_id,
-               domain,
+               trainId,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -761,8 +762,8 @@ export class StorageReader {
                array_agg(DISTINCT model) as models_used,
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
-             WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, domain
+              WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+             GROUP BY conversation_id, trainId
            ),
            conversation_branches AS (
              SELECT 
@@ -789,21 +790,21 @@ export class StorageReader {
                   WHERE r2.conversation_id = api_requests.conversation_id 
                   AND r2.branch_id = api_requests.branch_id 
                   ORDER BY r2.timestamp DESC LIMIT 1) as latest_request_id
-               FROM api_requests
-               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-               GROUP BY conversation_id, branch_id
-             ) b
-             GROUP BY conversation_id
-           )
-           SELECT 
-             cs.*,
-             cb.branches
-           FROM conversation_summary cs
-           LEFT JOIN conversation_branches cb ON cs.conversation_id = cb.conversation_id
-           ORDER BY cs.last_message_at DESC
-           LIMIT $1`
+              FROM api_requests
+              WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+              GROUP BY conversation_id, branch_id
+           ) b
+           GROUP BY conversation_id
+         )
+         SELECT 
+           cs.*,
+           cb.branches
+         FROM conversation_summary cs
+         LEFT JOIN conversation_branches cb ON cs.conversation_id = cb.conversation_id
+         ORDER BY cs.last_message_at DESC
+         LIMIT $1`
 
-      const values = domain ? [domain, limit] : [limit]
+      const values = trainId ? [trainId, limit] : [limit]
       const rows = await this.executeQuery<any>(query, values, 'getConversationSummaries')
 
       // Only cache if TTL > 0
@@ -813,8 +814,7 @@ export class StorageReader {
       return rows
     } catch (error) {
       logger.error('Failed to get conversation summaries', {
-        domain,
-        error: getErrorMessage(error),
+        metadata: { trainId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -835,7 +835,7 @@ export class StorageReader {
 
       return rows.map(row => ({
         request_id: row.request_id,
-        domain: row.domain,
+        trainId: row.trainId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -870,11 +870,11 @@ export class StorageReader {
    * Get conversations with option to exclude sub-tasks
    */
   async getConversationsWithFilter(
-    domain?: string,
+    trainId?: string,
     limit: number = 50,
     excludeSubtasks: boolean = false
   ): Promise<any[]> {
-    const cacheKey = `conversations:${domain || 'all'}:${limit}:${excludeSubtasks}`
+    const cacheKey = `conversations:${trainId || 'all'}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     if (cacheTTL > 0) {
@@ -889,9 +889,9 @@ export class StorageReader {
       const values = []
       let paramIndex = 1
 
-      if (domain) {
-        whereClause.push(`domain = $${paramIndex}`)
-        values.push(domain)
+      if (trainId) {
+        whereClause.push(`train_id = $${paramIndex}`)
+        values.push(trainId)
         paramIndex++
       }
 
@@ -906,7 +906,7 @@ export class StorageReader {
                MIN(timestamp) as first_message_time,
                MAX(timestamp) as last_message_time,
                COUNT(*) as request_count,
-               array_agg(DISTINCT domain) as domains,
+               array_agg(DISTINCT train_id) as train_ids,
                array_agg(DISTINCT model) as models,
                SUM(input_tokens) as total_input_tokens,
                SUM(output_tokens) as total_output_tokens,
@@ -935,7 +935,7 @@ export class StorageReader {
     } catch (error) {
       logger.error('Failed to get conversations with filter', {
         metadata: {
-          domain,
+          trainId,
           excludeSubtasks,
           error: getErrorMessage(error),
         },
