@@ -111,3 +111,12 @@ export {
   type Message,
   type GeminiContent,
 } from './prompts/index.js'
+
+// Export credential management types and utilities (ADR-026)
+export {
+  type DatabaseAccount,
+  type DatabaseTrain,
+  type TrainAccountMapping,
+  type DecryptedAccount,
+} from './types/credentials.js'
+export { encrypt, decrypt, hashApiKey, verifyApiKeyHash } from './utils/encryption.js'

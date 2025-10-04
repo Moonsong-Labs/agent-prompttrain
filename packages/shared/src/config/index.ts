@@ -89,6 +89,16 @@ export const config = {
     },
   },
 
+  // Credential management (ADR-026)
+  credentials: {
+    get useDatabaseStorage() {
+      return env.bool('USE_DATABASE_CREDENTIALS', false)
+    },
+    get encryptionKey() {
+      return env.string('CREDENTIAL_ENCRYPTION_KEY', '')
+    },
+  },
+
   // Database configuration
   database: {
     get url() {

@@ -26,6 +26,27 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | `TRAIN_CLIENT_KEYS_DIR` | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌       |
 | `DEFAULT_TRAIN_ID`      | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌       |
 
+### Credential Management (ADR-026)
+
+| Variable                    | Description                                                                 | Default | Required                              |
+| --------------------------- | --------------------------------------------------------------------------- | ------- | ------------------------------------- |
+| `USE_DATABASE_CREDENTIALS`  | Enable database-backed credential storage (feature flag)                    | `false` | ❌                                    |
+| `CREDENTIAL_ENCRYPTION_KEY` | Encryption key for storing credentials (AES-256-GCM, minimum 32 characters) | -       | ✅ (if USE_DATABASE_CREDENTIALS=true) |
+
+**Security Notes:**
+
+- The encryption key should be at least 32 characters for AES-256 security
+- Use a secrets manager (AWS Secrets Manager, HashiCorp Vault) in production
+- Never commit the encryption key to version control
+- Rotate keys periodically (requires re-encryption migration)
+
+Example:
+
+```bash
+USE_DATABASE_CREDENTIALS=false  # Safe default - uses filesystem
+CREDENTIAL_ENCRYPTION_KEY=your-secure-random-32plus-character-key-here
+```
+
 ### Train Identification
 
 | Variable                   | Description                                                                                                           | Default | Required |
