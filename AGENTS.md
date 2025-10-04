@@ -222,7 +222,7 @@ Follow [Repository Grooming](docs/01-Getting-Started/repository-grooming.md) for
 ```bash
 # Installation (2 commands)
 bun install                           # Install dependencies
-bun run scripts/init-database.ts      # Initialize database (requires DATABASE_URL in .env)
+bun run scripts/db/migrations/000-init-database.ts  # Initialize database (requires DATABASE_URL in .env)
 
 # Development (3 commands)
 bun run dev                          # Run both services

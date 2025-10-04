@@ -67,7 +67,7 @@ async function checkOAuthStatus() {
         console.error(
           '\nERROR: Token is expired and no refresh token available. Re-authentication required!'
         )
-        console.log(`Run: bun run scripts/oauth-login.ts ${credentialPath}`)
+        console.log(`Run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
       }
     } else if (credentials.type === 'api_key') {
       console.log(

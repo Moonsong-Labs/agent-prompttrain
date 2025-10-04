@@ -293,7 +293,7 @@ export class CredentialStatusService {
       for (const status of needsAttention) {
         lines.push(`  - ${status.trainId}: ${status.message}`)
         if (status.status === 'expired' || status.status === 'missing_refresh_token') {
-          lines.push(`    Run: bun run scripts/oauth-login.ts credentials/${status.file}`)
+          lines.push(`    Run: bun run scripts/auth/oauth-login.ts credentials/${status.file}`)
         }
       }
     }

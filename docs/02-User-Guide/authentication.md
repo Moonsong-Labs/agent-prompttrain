@@ -35,7 +35,7 @@ curl -X POST http://proxy:3000/v1/messages \
 Generate a secure client API key:
 
 ```bash
-bun run scripts/generate-api-key.ts
+bun run scripts/auth/generate-api-key.ts
 ```
 
 ### Disabling Client Authentication
@@ -177,7 +177,7 @@ JSON
 For OAuth authentication:
 
 ```bash
-bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.json
+bun run scripts/auth/oauth-login.ts credentials/accounts/account-primary.credentials.json
 ```
 
 ### Step 3: Configure Request Headers
@@ -251,7 +251,7 @@ bun run scripts/oauth-refresh-all.ts credentials
 **Solution:**
 
 ```bash
-bun run scripts/oauth-login.ts credentials/accounts/account-primary.credentials.json
+bun run scripts/auth/oauth-login.ts credentials/accounts/account-primary.credentials.json
 ```
 
 #### "No refresh token available"

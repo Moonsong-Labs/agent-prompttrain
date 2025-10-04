@@ -62,7 +62,7 @@ async function refreshOAuthToken() {
 
     if (!oauth.refreshToken) {
       console.error('\nERROR: No refresh token available. Re-authentication required.')
-      console.error(`Run: bun run scripts/oauth-login.ts ${credentialPath}`)
+      console.error(`Run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
       process.exit(1)
     }
 

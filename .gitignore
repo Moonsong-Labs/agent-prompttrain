@@ -193,8 +193,10 @@ proxy.log
 dashboard.log
 
 # Credentials (keep the directory but not the files)
-credentials/*.json
-credentials/*.credentials.json
+credentials/
+!credentials/.gitkeep
+!credentials/*/.gitkeep
+!credentials/README.md
 
 # Temporary files
 *.tmp

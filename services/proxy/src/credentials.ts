@@ -435,7 +435,7 @@ export async function getApiKey(
             // Check for specific error codes
             if (refreshError.errorCode === 'invalid_grant' || refreshError.status === 400) {
               console.error('Refresh token is invalid or expired. Re-authentication required.')
-              console.error(`Please run: bun run scripts/oauth-login.ts ${credentialPath}`)
+              console.error(`Please run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
             }
 
             return null

@@ -7,9 +7,9 @@ async function main() {
   const credentialPath = process.argv[2]
 
   if (!credentialPath) {
-    console.error('Usage: bun run scripts/oauth-login.ts <credential-path>')
+    console.error('Usage: bun run scripts/auth/oauth-login.ts <credential-path>')
     console.error(
-      'Example: bun run scripts/oauth-login.ts credentials/example.com.credentials.json'
+      'Example: bun run scripts/auth/oauth-login.ts credentials/example.com.credentials.json'
     )
     process.exit(1)
   }
