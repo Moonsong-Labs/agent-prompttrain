@@ -85,8 +85,18 @@ async function migrate() {
       `)
     }
 
-    console.log('Refreshing hourly_stats materialized view to ensure column changes are applied...')
-    await client.query('REFRESH MATERIALIZED VIEW CONCURRENTLY hourly_stats;')
+    console.log('Refreshing hourly_stats materialized view if it exists...')
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_matviews WHERE matviewname = 'hourly_stats'
+        ) THEN
+          REFRESH MATERIALIZED VIEW CONCURRENTLY hourly_stats;
+        END IF;
+      END
+      $$;
+    `)
 
     await client.query('COMMIT')
     console.log('Train ID migration completed successfully.')
