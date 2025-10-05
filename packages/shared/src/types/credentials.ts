@@ -9,9 +9,9 @@ export interface DatabaseAccount {
   accountId: string
   accountName: string
   credentialType: 'api_key' | 'oauth'
-  apiKeyEncrypted?: string
-  oauthAccessTokenEncrypted?: string
-  oauthRefreshTokenEncrypted?: string
+  apiKey?: string
+  oauthAccessToken?: string
+  oauthRefreshToken?: string
   oauthExpiresAt?: number
   oauthScopes?: string[]
   oauthIsMax?: boolean

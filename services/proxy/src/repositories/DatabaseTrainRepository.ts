@@ -13,11 +13,8 @@ import { logger } from '../middleware/logger'
 export class DatabaseTrainRepository implements ITrainRepository {
   private readonly accountRepo: DatabaseAccountRepository
 
-  constructor(
-    private readonly db: Pool,
-    encryptionKey: string
-  ) {
-    this.accountRepo = new DatabaseAccountRepository(db, encryptionKey)
+  constructor(private readonly db: Pool) {
+    this.accountRepo = new DatabaseAccountRepository(db)
   }
 
   async getAccountNamesForTrain(trainId: string): Promise<string[]> {

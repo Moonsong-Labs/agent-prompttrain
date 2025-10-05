@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { CredentialsRepository } from '../../packages/shared/src/database/credentials-repository'
-import { decrypt } from '../../packages/shared/src/utils/encryption'
 
 async function checkOAuthStatus() {
   const accountIdOrName = process.argv[2]
@@ -13,14 +12,8 @@ async function checkOAuthStatus() {
     process.exit(1)
   }
 
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error('ERROR: CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters')
-    process.exit(1)
-  }
-
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const repo = new CredentialsRepository(pool, encryptionKey)
+  const repo = new CredentialsRepository(pool)
 
   try {
     // Try to find account by ID first, then by name
@@ -65,13 +58,13 @@ async function checkOAuthStatus() {
       console.log(`- Scopes: ${account.oauthScopes ? account.oauthScopes.join(', ') : 'none'}`)
       console.log(`- Is Max: ${account.oauthIsMax}`)
 
-      // Get encrypted credentials to check if refresh token exists
+      // Get credentials to check if refresh token exists
       const fullAccount = await pool.query(
-        'SELECT oauth_refresh_token_encrypted FROM accounts WHERE account_id = $1',
+        'SELECT oauth_refresh_token FROM accounts WHERE account_id = $1',
         [account.accountId]
       )
 
-      const hasRefreshToken = fullAccount.rows[0]?.oauth_refresh_token_encrypted != null
+      const hasRefreshToken = fullAccount.rows[0]?.oauth_refresh_token != null
 
       if (!hasRefreshToken) {
         console.warn(

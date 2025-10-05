@@ -18,13 +18,7 @@ export const trainDetailRoutes = new Hono()
 
 function getRepository(): CredentialsRepository {
   const pool = container.getPool()
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-
-  if (!encryptionKey) {
-    throw new Error('CREDENTIAL_ENCRYPTION_KEY environment variable is required')
-  }
-
-  return new CredentialsRepository(pool, encryptionKey)
+  return new CredentialsRepository(pool)
 }
 
 /**

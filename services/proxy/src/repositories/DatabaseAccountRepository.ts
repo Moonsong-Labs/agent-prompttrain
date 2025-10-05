@@ -1,24 +1,16 @@
 import { Pool } from 'pg'
 import { DecryptedAccount, DatabaseAccount, AuthenticationError } from '@agent-prompttrain/shared'
-import { encrypt, decrypt } from '@agent-prompttrain/shared/utils/encryption'
 import { IAccountRepository } from './IAccountRepository'
 import { logger } from '../middleware/logger'
 
 /**
  * Database-based implementation of IAccountRepository.
  *
- * Stores credentials in PostgreSQL with AES-256-GCM encryption.
+ * Stores credentials in PostgreSQL.
  * Uses row-level locking (SELECT FOR UPDATE) for concurrency-safe OAuth refresh.
  */
 export class DatabaseAccountRepository implements IAccountRepository {
-  constructor(
-    private readonly db: Pool,
-    private readonly encryptionKey: string
-  ) {
-    if (!encryptionKey || encryptionKey.length < 32) {
-      throw new Error('CREDENTIAL_ENCRYPTION_KEY must be at least 32 characters')
-    }
-  }
+  constructor(private readonly db: Pool) {}
 
   async listAccountNames(): Promise<string[]> {
     try {
@@ -42,9 +34,9 @@ export class DatabaseAccountRepository implements IAccountRepository {
         account_id: string
         account_name: string
         credential_type: 'api_key' | 'oauth'
-        api_key_encrypted?: string
-        oauth_access_token_encrypted?: string
-        oauth_refresh_token_encrypted?: string
+        api_key?: string
+        oauth_access_token?: string
+        oauth_refresh_token?: string
         oauth_expires_at?: number
         oauth_scopes?: string[]
         oauth_is_max?: boolean
@@ -52,8 +44,8 @@ export class DatabaseAccountRepository implements IAccountRepository {
         last_used_at?: Date
       }>(
         `SELECT account_id, account_name, credential_type,
-                api_key_encrypted, oauth_access_token_encrypted,
-                oauth_refresh_token_encrypted, oauth_expires_at,
+                api_key, oauth_access_token,
+                oauth_refresh_token, oauth_expires_at,
                 oauth_scopes, oauth_is_max, is_active,
                 created_at, updated_at, last_used_at
          FROM accounts
@@ -65,7 +57,7 @@ export class DatabaseAccountRepository implements IAccountRepository {
         return null
       }
 
-      return this.decryptAccount(result.rows[0])
+      return this.mapAccount(result.rows[0])
     } catch (error) {
       logger.error('Failed to get account from database', {
         metadata: {
@@ -144,25 +136,19 @@ export class DatabaseAccountRepository implements IAccountRepository {
         })
       }
 
-      // Encrypt new tokens
-      const encryptedAccessToken = encrypt(tokens.accessToken, this.encryptionKey)
-      const encryptedRefreshToken = tokens.refreshToken
-        ? encrypt(tokens.refreshToken, this.encryptionKey)
-        : null
-
       // Update the account
       await client.query(
         `UPDATE accounts
-         SET oauth_access_token_encrypted = $1,
-             oauth_refresh_token_encrypted = COALESCE($2, oauth_refresh_token_encrypted),
+         SET oauth_access_token = $1,
+             oauth_refresh_token = COALESCE($2, oauth_refresh_token),
              oauth_expires_at = $3,
              oauth_scopes = $4,
              oauth_is_max = $5,
              updated_at = NOW()
          WHERE account_name = $6`,
         [
-          encryptedAccessToken,
-          encryptedRefreshToken,
+          tokens.accessToken,
+          tokens.refreshToken || null,
           tokens.expiresAt,
           tokens.scopes || null,
           tokens.isMax !== undefined ? tokens.isMax : null,
@@ -214,20 +200,20 @@ export class DatabaseAccountRepository implements IAccountRepository {
     // No-op for compatibility
   }
 
-  private decryptAccount(dbAccount: {
+  private mapAccount(dbAccount: {
     account_id: string
     account_name: string
     credential_type: 'api_key' | 'oauth'
-    api_key_encrypted?: string
-    oauth_access_token_encrypted?: string
-    oauth_refresh_token_encrypted?: string
+    api_key?: string
+    oauth_access_token?: string
+    oauth_refresh_token?: string
     oauth_expires_at?: number
     oauth_scopes?: string[]
     oauth_is_max?: boolean
     is_active: boolean
     last_used_at?: Date
   }): DecryptedAccount {
-    const decrypted: DecryptedAccount = {
+    const account: DecryptedAccount = {
       accountId: dbAccount.account_id,
       accountName: dbAccount.account_name,
       credentialType: dbAccount.credential_type,
@@ -235,28 +221,22 @@ export class DatabaseAccountRepository implements IAccountRepository {
       lastUsedAt: dbAccount.last_used_at,
     }
 
-    if (dbAccount.credential_type === 'api_key' && dbAccount.api_key_encrypted) {
-      decrypted.apiKey = decrypt(dbAccount.api_key_encrypted, this.encryptionKey)
+    if (dbAccount.credential_type === 'api_key' && dbAccount.api_key) {
+      account.apiKey = dbAccount.api_key
     }
 
     if (dbAccount.credential_type === 'oauth') {
-      if (dbAccount.oauth_access_token_encrypted) {
-        decrypted.oauthAccessToken = decrypt(
-          dbAccount.oauth_access_token_encrypted,
-          this.encryptionKey
-        )
+      if (dbAccount.oauth_access_token) {
+        account.oauthAccessToken = dbAccount.oauth_access_token
       }
-      if (dbAccount.oauth_refresh_token_encrypted) {
-        decrypted.oauthRefreshToken = decrypt(
-          dbAccount.oauth_refresh_token_encrypted,
-          this.encryptionKey
-        )
+      if (dbAccount.oauth_refresh_token) {
+        account.oauthRefreshToken = dbAccount.oauth_refresh_token
       }
-      decrypted.oauthExpiresAt = dbAccount.oauth_expires_at
-      decrypted.oauthScopes = dbAccount.oauth_scopes
-      decrypted.oauthIsMax = dbAccount.oauth_is_max
+      account.oauthExpiresAt = dbAccount.oauth_expires_at
+      account.oauthScopes = dbAccount.oauth_scopes
+      account.oauthIsMax = dbAccount.oauth_is_max
     }
 
-    return decrypted
+    return account
   }
 }

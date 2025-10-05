@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { CredentialsRepository } from '../../packages/shared/src/database/credentials-repository'
-import { decrypt } from '../../packages/shared/src/utils/encryption'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 const TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token'
@@ -70,14 +69,8 @@ async function refreshOAuthToken() {
     process.exit(1)
   }
 
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error('ERROR: CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters')
-    process.exit(1)
-  }
-
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const repo = new CredentialsRepository(pool, encryptionKey)
+  const repo = new CredentialsRepository(pool)
 
   try {
     console.log(`Loading account: ${accountIdOrName}`)
@@ -121,29 +114,28 @@ async function refreshOAuthToken() {
       process.exit(0)
     }
 
-    // Get encrypted refresh token from database
+    // Get refresh token from database
     const fullAccount = await pool.query<{
       account_name: string
-      oauth_refresh_token_encrypted: string
-    }>('SELECT account_name, oauth_refresh_token_encrypted FROM accounts WHERE account_id = $1', [
+      oauth_refresh_token: string
+    }>('SELECT account_name, oauth_refresh_token FROM accounts WHERE account_id = $1', [
       account.accountId,
     ])
 
-    if (!fullAccount.rows[0]?.oauth_refresh_token_encrypted) {
+    if (!fullAccount.rows[0]?.oauth_refresh_token) {
       console.error('\nERROR: No refresh token available. Re-authentication required.')
       console.error(`Run: bun run scripts/auth/oauth-login.ts <account-name>`)
       process.exit(1)
     }
 
-    const encryptedRefreshToken = fullAccount.rows[0].oauth_refresh_token_encrypted
-    const decryptedRefreshToken = decrypt(encryptedRefreshToken, encryptionKey)
+    const refreshTokenValue = fullAccount.rows[0].oauth_refresh_token
     const oldAccountName = fullAccount.rows[0].account_name
 
     console.log('\nRefreshing OAuth token...')
     const startTime = Date.now()
 
     try {
-      const newOAuth = await refreshToken(decryptedRefreshToken)
+      const newOAuth = await refreshToken(refreshTokenValue)
       const refreshTime = Date.now() - startTime
 
       console.log(`\n✅ Token refreshed successfully in ${refreshTime}ms`)

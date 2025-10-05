@@ -2,13 +2,12 @@
  * Repository for credential management dashboard operations
  *
  * Provides CRUD operations for accounts and trains through the dashboard UI.
- * Handles encryption/decryption transparently using the encryption utilities.
  */
 
 import { Pool } from 'pg'
 import { randomUUID } from 'crypto'
 import { DatabaseAccount, DatabaseTrain } from '../types/credentials.js'
-import { encrypt, hashApiKey } from '../utils/encryption.js'
+import { hashApiKey } from '../utils/encryption.js'
 
 export interface CreateAccountInput {
   accountName: string
@@ -46,14 +45,7 @@ export interface UpdateTrainInput {
 }
 
 export class CredentialsRepository {
-  constructor(
-    private readonly db: Pool,
-    private readonly encryptionKey: string
-  ) {
-    if (!encryptionKey || encryptionKey.length < 32) {
-      throw new Error('Encryption key must be at least 32 characters')
-    }
-  }
+  constructor(private readonly db: Pool) {}
 
   // ========================================
   // ACCOUNTS CRUD
@@ -63,10 +55,7 @@ export class CredentialsRepository {
    * List all accounts (without sensitive data)
    */
   async listAccounts(): Promise<
-    Omit<
-      DatabaseAccount,
-      'apiKeyEncrypted' | 'oauthAccessTokenEncrypted' | 'oauthRefreshTokenEncrypted'
-    >[]
+    Omit<DatabaseAccount, 'apiKey' | 'oauthAccessToken' | 'oauthRefreshToken'>[]
   > {
     const result = await this.db.query<{
       account_id: string
@@ -106,10 +95,7 @@ export class CredentialsRepository {
    */
   async getAccountById(
     accountId: string
-  ): Promise<Omit<
-    DatabaseAccount,
-    'apiKeyEncrypted' | 'oauthAccessTokenEncrypted' | 'oauthRefreshTokenEncrypted'
-  > | null> {
+  ): Promise<Omit<DatabaseAccount, 'apiKey' | 'oauthAccessToken' | 'oauthRefreshToken'> | null> {
     const result = await this.db.query<{
       account_id: string
       account_name: string
@@ -152,33 +138,16 @@ export class CredentialsRepository {
   }
 
   /**
-   * Create a new account with encrypted credentials
+   * Create a new account with credentials
    */
   async createAccount(input: CreateAccountInput): Promise<string> {
     const accountId = `acc_${randomUUID()}`
-
-    let apiKeyEncrypted: string | null = null
-    let oauthAccessTokenEncrypted: string | null = null
-    let oauthRefreshTokenEncrypted: string | null = null
-
-    if (input.credentialType === 'api_key' && input.apiKey) {
-      apiKeyEncrypted = encrypt(input.apiKey, this.encryptionKey)
-    }
-
-    if (input.credentialType === 'oauth') {
-      if (input.oauthAccessToken) {
-        oauthAccessTokenEncrypted = encrypt(input.oauthAccessToken, this.encryptionKey)
-      }
-      if (input.oauthRefreshToken) {
-        oauthRefreshTokenEncrypted = encrypt(input.oauthRefreshToken, this.encryptionKey)
-      }
-    }
 
     await this.db.query(
       `
       INSERT INTO accounts (
         account_id, account_name, credential_type,
-        api_key_encrypted, oauth_access_token_encrypted, oauth_refresh_token_encrypted,
+        api_key, oauth_access_token, oauth_refresh_token,
         oauth_expires_at, oauth_scopes, oauth_is_max,
         created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
@@ -187,9 +156,9 @@ export class CredentialsRepository {
         accountId,
         input.accountName,
         input.credentialType,
-        apiKeyEncrypted,
-        oauthAccessTokenEncrypted,
-        oauthRefreshTokenEncrypted,
+        input.apiKey || null,
+        input.oauthAccessToken || null,
+        input.oauthRefreshToken || null,
         input.oauthExpiresAt || null,
         input.oauthScopes || null,
         input.oauthIsMax || null,
@@ -542,23 +511,20 @@ export class CredentialsRepository {
 
       const accountId = `acc_${randomUUID()}`
 
-      // Import generateApiKey and hashApiKey here to avoid circular deps
+      // Import hashApiKey here to avoid circular deps
       const { hashApiKey: hashFn } = await import('../utils/encryption.js')
       const keyHash = hashFn(generatedKey)
-
-      // Encrypt the API key
-      const apiKeyEncrypted = encrypt(generatedKey, this.encryptionKey)
 
       // Insert the account
       await client.query(
         `
         INSERT INTO accounts (
           account_id, account_name, credential_type,
-          api_key_encrypted, key_hash, is_generated,
+          api_key, key_hash, is_generated,
           created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       `,
-        [accountId, accountName, 'api_key', apiKeyEncrypted, keyHash, true]
+        [accountId, accountName, 'api_key', generatedKey, keyHash, true]
       )
 
       // Link to train with priority 0 (will be auto-incremented by trigger or manual)
@@ -614,14 +580,11 @@ export class CredentialsRepository {
    * Get accounts for a specific train
    * Includes generated flag and revoked status
    */
-  async getAccountsForTrain(
-    trainId: string
-  ): Promise<
+  async getAccountsForTrain(trainId: string): Promise<
     Array<
-      Omit<
-        DatabaseAccount,
-        'apiKeyEncrypted' | 'oauthAccessTokenEncrypted' | 'oauthRefreshTokenEncrypted'
-      > & { keyHashLast4?: string }
+      Omit<DatabaseAccount, 'apiKey' | 'oauthAccessToken' | 'oauthRefreshToken'> & {
+        keyHashLast4?: string
+      }
     >
   > {
     const result = await this.db.query<{

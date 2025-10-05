@@ -87,14 +87,8 @@ async function main() {
     process.exit(1)
   }
 
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error('ERROR: CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters')
-    process.exit(1)
-  }
-
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const repo = new CredentialsRepository(pool, encryptionKey)
+  const repo = new CredentialsRepository(pool)
 
   try {
     console.log(`Starting OAuth login for account: ${accountName}`)

@@ -30,7 +30,6 @@ export function createRepositories(
   clientKeysDir: string
 ): Repositories {
   const useDatabaseStorage = config.credentials.useDatabaseStorage
-  const encryptionKey = config.credentials.encryptionKey
 
   logger.info('Creating credential repositories', {
     metadata: {
@@ -46,15 +45,9 @@ export function createRepositories(
       throw new Error('Database pool is required when USE_DATABASE_CREDENTIALS=true')
     }
 
-    if (!encryptionKey || encryptionKey.length < 32) {
-      throw new Error(
-        'CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters when using database credentials'
-      )
-    }
-
     return {
-      accountRepository: new DatabaseAccountRepository(dbPool, encryptionKey),
-      trainRepository: new DatabaseTrainRepository(dbPool, encryptionKey),
+      accountRepository: new DatabaseAccountRepository(dbPool),
+      trainRepository: new DatabaseTrainRepository(dbPool),
     }
   }
 

@@ -4,28 +4,7 @@ import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
 import crypto from 'crypto'
 
-// Inline encryption functions to avoid import issues
-const ALGORITHM = 'aes-256-gcm'
-const IV_LENGTH = 16
-const SALT_LENGTH = 32
-const KEY_ITERATIONS = 100000
-
-function encrypt(plaintext: string, key: string): string {
-  if (!key || key.length < 32) {
-    throw new Error('Encryption key must be at least 32 characters')
-  }
-
-  const salt = crypto.randomBytes(SALT_LENGTH)
-  const derivedKey = crypto.pbkdf2Sync(key, salt, KEY_ITERATIONS, 32, 'sha256')
-  const iv = crypto.randomBytes(IV_LENGTH)
-  const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv)
-
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const authTag = cipher.getAuthTag()
-
-  return [salt, iv, authTag, encrypted].map(b => b.toString('base64')).join(':')
-}
-
+// Inline hashing function for client API keys
 function hashApiKey(apiKey: string): string {
   return crypto.createHash('sha256').update(apiKey).digest('hex')
 }
@@ -35,8 +14,6 @@ function hashApiKey(apiKey: string): string {
  *
  * This migration reads existing credential files from the filesystem and imports them
  * into the database. It's idempotent and can be run multiple times safely.
- *
- * Requires: CREDENTIAL_ENCRYPTION_KEY environment variable
  */
 
 interface ClaudeCredentials {
@@ -58,12 +35,6 @@ interface TrainClientKeys {
 
 async function migrateCredentialsData() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error('ERROR: CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters')
-    process.exit(1)
-  }
 
   try {
     await pool.query('BEGIN')
@@ -94,34 +65,21 @@ async function migrateCredentialsData() {
           // Generate account ID if not present
           const accountId = credentials.accountId || `acc_${accountName}`
 
-          // Encrypt sensitive fields
-          const apiKeyEncrypted = credentials.api_key
-            ? encrypt(credentials.api_key, encryptionKey)
-            : null
-
-          const oauthAccessEncrypted = credentials.oauth?.accessToken
-            ? encrypt(credentials.oauth.accessToken, encryptionKey)
-            : null
-
-          const oauthRefreshEncrypted = credentials.oauth?.refreshToken
-            ? encrypt(credentials.oauth.refreshToken, encryptionKey)
-            : null
-
           // Insert with ON CONFLICT for idempotency
           const result = await pool.query(
             `
             INSERT INTO accounts (
               account_id, account_name, credential_type,
-              api_key_encrypted, oauth_access_token_encrypted,
-              oauth_refresh_token_encrypted, oauth_expires_at,
+              api_key, oauth_access_token,
+              oauth_refresh_token, oauth_expires_at,
               oauth_scopes, oauth_is_max
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (account_id) DO UPDATE SET
               account_name = EXCLUDED.account_name,
               credential_type = EXCLUDED.credential_type,
-              api_key_encrypted = EXCLUDED.api_key_encrypted,
-              oauth_access_token_encrypted = EXCLUDED.oauth_access_token_encrypted,
-              oauth_refresh_token_encrypted = EXCLUDED.oauth_refresh_token_encrypted,
+              api_key = EXCLUDED.api_key,
+              oauth_access_token = EXCLUDED.oauth_access_token,
+              oauth_refresh_token = EXCLUDED.oauth_refresh_token,
               oauth_expires_at = EXCLUDED.oauth_expires_at,
               oauth_scopes = EXCLUDED.oauth_scopes,
               oauth_is_max = EXCLUDED.oauth_is_max,
@@ -132,9 +90,9 @@ async function migrateCredentialsData() {
               accountId,
               accountName,
               credentials.type,
-              apiKeyEncrypted,
-              oauthAccessEncrypted,
-              oauthRefreshEncrypted,
+              credentials.api_key || null,
+              credentials.oauth?.accessToken || null,
+              credentials.oauth?.refreshToken || null,
               credentials.oauth?.expiresAt || null,
               credentials.oauth?.scopes || null,
               credentials.oauth?.isMax || false,

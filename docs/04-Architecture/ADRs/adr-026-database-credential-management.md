@@ -60,9 +60,9 @@ CREATE TABLE accounts (
   account_id VARCHAR(255) PRIMARY KEY,
   account_name VARCHAR(255) UNIQUE NOT NULL,
   credential_type VARCHAR(20) NOT NULL,  -- 'api_key' or 'oauth'
-  api_key_encrypted TEXT,
-  oauth_access_token_encrypted TEXT,
-  oauth_refresh_token_encrypted TEXT,
+  api_key TEXT,                          -- Plaintext storage
+  oauth_access_token TEXT,               -- Plaintext storage
+  oauth_refresh_token TEXT,              -- Plaintext storage
   oauth_expires_at BIGINT,
   oauth_scopes TEXT[],
   oauth_is_max BOOLEAN DEFAULT false,
@@ -95,12 +95,11 @@ CREATE TABLE train_account_mappings (
 );
 ```
 
-**Encryption Strategy:**
+**Security Strategy:**
 
-- Algorithm: AES-256-GCM (authenticated encryption)
-- Key Derivation: PBKDF2 with 100,000 iterations
-- Storage Format: `salt:iv:authTag:ciphertext` (base64-encoded)
-- Key Source: `CREDENTIAL_ENCRYPTION_KEY` environment variable
+- **Credential Storage:** Plaintext in PostgreSQL (relies on infrastructure security)
+- **Client API Keys:** SHA-256 hashed for one-way authentication
+- **Infrastructure Security:** VPC isolation, least-privilege DB access, TLS in transit, encryption at rest (RDS-level)
 
 **Feature Flag:**
 
@@ -182,5 +181,69 @@ CREATE TABLE train_account_mappings (
 
 ---
 
+## Decision Update (2025-10-05)
+
+### Removal of Application-Level Encryption
+
+**Status:** Superseded (Encryption Removed)
+
+**Rationale:**
+
+After implementing the database-backed credential storage with AES-256-GCM encryption, we determined that the operational complexity and key management overhead outweighed the security benefits for our deployment model. The decision to remove application-level encryption was based on:
+
+1. **Complexity vs. Benefit:** Application-level encryption added significant complexity (key derivation, storage format, encryption/decryption on every access) for minimal security gain when database-level security is properly configured.
+
+2. **Key Management Burden:** Securely managing `CREDENTIAL_ENCRYPTION_KEY` across environments, implementing rotation, and handling key loss scenarios created operational overhead disproportionate to the threat model.
+
+3. **Defense-in-Depth Reality:** The encryption provided defense-in-depth only against database compromise scenarios. Our infrastructure security (VPC isolation, IAM policies, database access controls) already mitigates this risk effectively.
+
+4. **Deployment Simplicity:** Removing encryption eliminates a required environment variable and potential deployment failure point, simplifying the deployment and configuration process.
+
+**Updated Security Model:**
+
+Credentials are now stored as **plaintext** in PostgreSQL. Security relies on infrastructure-level controls:
+
+1. **Database Access Control:** Least-privilege database user with column-level permissions
+2. **Network Security:** Database accessible only from application servers via private network
+3. **Infrastructure Security:** VPC isolation, security groups, IAM roles
+4. **Encryption at Rest:** RDS/managed database encryption at the storage layer
+5. **Audit Logging:** Database query logging for access monitoring
+6. **TLS in Transit:** Encrypted connections between application and database
+7. **Backup Security:** Database backups (RDS snapshots) contain plaintext credentials and must be strictly access-controlled
+
+**Schema Changes:**
+
+- `api_key_encrypted` → `api_key` (TEXT, plaintext)
+- `oauth_access_token_encrypted` → `oauth_access_token` (TEXT, plaintext)
+- `oauth_refresh_token_encrypted` → `oauth_refresh_token` (TEXT, plaintext)
+
+**Removed Components:**
+
+- `CREDENTIAL_ENCRYPTION_KEY` environment variable
+- `encrypt()` and `decrypt()` functions from `shared/utils/encryption.ts`
+- `encryptionKey` parameter from all repository constructors
+- Encryption key validation logic
+
+**Retained Components:**
+
+- SHA-256 hashing for client API keys (`hashApiKey()`, `verifyApiKeyHash()`)
+- API key generation (`generateApiKey()`)
+
+**Migration Impact:**
+
+Since this change was made **before production deployment** of the database credential feature, no data migration or decryption is required. The schema was updated before any encrypted data was stored in production.
+
+**Trade-offs Accepted:**
+
+- **Risk:** Database compromise exposes credentials immediately without encryption barrier
+- **Mitigation:** Rely on defense-in-depth at infrastructure level (network isolation, access controls, monitoring)
+- **Risk:** Database backups (RDS snapshots, pg_dump exports) contain plaintext credentials
+- **Mitigation:** Strict access control on backup storage, encryption of backups at rest, secure backup retention policies
+- **Benefit:** Significantly simpler deployment, configuration, and operational model without key management overhead
+
+---
+
 Date: 2025-10-04
 Authors: Claude Code (AI Agent)
+
+Updated: 2025-10-05 (Encryption Removal)

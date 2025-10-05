@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { CredentialsRepository } from '../../packages/shared/src/database/credentials-repository'
-import { decrypt } from '../../packages/shared/src/utils/encryption'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 const TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token'
@@ -64,14 +63,8 @@ async function refreshAllOAuthTokens() {
   console.log('=====================')
   console.log(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE'}\n`)
 
-  const encryptionKey = process.env.CREDENTIAL_ENCRYPTION_KEY
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error('ERROR: CREDENTIAL_ENCRYPTION_KEY must be set and at least 32 characters')
-    process.exit(1)
-  }
-
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-  const repo = new CredentialsRepository(pool, encryptionKey)
+  const repo = new CredentialsRepository(pool)
 
   try {
     const accounts = await repo.listAccounts()
@@ -108,14 +101,12 @@ async function refreshAllOAuthTokens() {
         continue
       }
 
-      // Get encrypted refresh token
+      // Get refresh token
       const fullAccount = await pool.query<{
-        oauth_refresh_token_encrypted: string
-      }>('SELECT oauth_refresh_token_encrypted FROM accounts WHERE account_id = $1', [
-        account.accountId,
-      ])
+        oauth_refresh_token: string
+      }>('SELECT oauth_refresh_token FROM accounts WHERE account_id = $1', [account.accountId])
 
-      if (!fullAccount.rows[0]?.oauth_refresh_token_encrypted) {
+      if (!fullAccount.rows[0]?.oauth_refresh_token) {
         console.log('  ⚠️  No refresh token available')
         results.failed++
         results.errors.push({ account: account.accountName, error: 'No refresh token' })
@@ -131,10 +122,9 @@ async function refreshAllOAuthTokens() {
       }
 
       try {
-        const encryptedRefreshToken = fullAccount.rows[0].oauth_refresh_token_encrypted
-        const decryptedRefreshToken = decrypt(encryptedRefreshToken, encryptionKey)
+        const refreshTokenValue = fullAccount.rows[0].oauth_refresh_token
 
-        const newOAuth = await refreshToken(decryptedRefreshToken)
+        const newOAuth = await refreshToken(refreshTokenValue)
 
         // Delete old account and create new one (credentials are immutable)
         await repo.deleteAccount(account.accountId)

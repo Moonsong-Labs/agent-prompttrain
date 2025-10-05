@@ -20,10 +20,10 @@ async function migrateAccountsTrainsSchema() {
         account_name VARCHAR(255) UNIQUE NOT NULL,
         credential_type VARCHAR(20) NOT NULL CHECK (credential_type IN ('api_key', 'oauth')),
 
-        -- Encrypted credentials (base64-encoded ciphertext)
-        api_key_encrypted TEXT,
-        oauth_access_token_encrypted TEXT,
-        oauth_refresh_token_encrypted TEXT,
+        -- Credentials stored in plaintext
+        api_key TEXT,
+        oauth_access_token TEXT,
+        oauth_refresh_token TEXT,
         oauth_expires_at BIGINT,
         oauth_scopes TEXT[],
         oauth_is_max BOOLEAN DEFAULT false,
@@ -36,8 +36,8 @@ async function migrateAccountsTrainsSchema() {
 
         -- Constraint: ensure proper credentials based on type
         CONSTRAINT api_key_required CHECK (
-          (credential_type = 'api_key' AND api_key_encrypted IS NOT NULL) OR
-          (credential_type = 'oauth' AND oauth_access_token_encrypted IS NOT NULL AND oauth_refresh_token_encrypted IS NOT NULL)
+          (credential_type = 'api_key' AND api_key IS NOT NULL) OR
+          (credential_type = 'oauth' AND oauth_access_token IS NOT NULL AND oauth_refresh_token IS NOT NULL)
         )
       )
     `)

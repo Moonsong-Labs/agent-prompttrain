@@ -28,23 +28,20 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Credential Management (ADR-026)
 
-| Variable                    | Description                                                                 | Default | Required                              |
-| --------------------------- | --------------------------------------------------------------------------- | ------- | ------------------------------------- |
-| `USE_DATABASE_CREDENTIALS`  | Enable database-backed credential storage (feature flag)                    | `false` | ❌                                    |
-| `CREDENTIAL_ENCRYPTION_KEY` | Encryption key for storing credentials (AES-256-GCM, minimum 32 characters) | -       | ✅ (if USE_DATABASE_CREDENTIALS=true) |
+| Variable                   | Description                                              | Default | Required |
+| -------------------------- | -------------------------------------------------------- | ------- | -------- |
+| `USE_DATABASE_CREDENTIALS` | Enable database-backed credential storage (feature flag) | `false` | ❌       |
 
 **Security Notes:**
 
-- The encryption key should be at least 32 characters for AES-256 security
-- Use a secrets manager (AWS Secrets Manager, HashiCorp Vault) in production
-- Never commit the encryption key to version control
-- Rotate keys periodically (requires re-encryption migration)
+- Credentials are stored as plaintext in PostgreSQL when database mode is enabled
+- Ensure proper database security: network isolation, least-privilege access, encryption at rest
+- Client API keys are SHA-256 hashed for one-way authentication
 
 Example:
 
 ```bash
 USE_DATABASE_CREDENTIALS=false  # Safe default - uses filesystem
-CREDENTIAL_ENCRYPTION_KEY=your-secure-random-32plus-character-key-here
 ```
 
 ### Train Identification

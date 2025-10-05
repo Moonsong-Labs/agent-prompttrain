@@ -94,9 +94,6 @@ export const config = {
     get useDatabaseStorage() {
       return env.bool('USE_DATABASE_CREDENTIALS', false)
     },
-    get encryptionKey() {
-      return env.string('CREDENTIAL_ENCRYPTION_KEY', '')
-    },
   },
 
   // Database configuration
