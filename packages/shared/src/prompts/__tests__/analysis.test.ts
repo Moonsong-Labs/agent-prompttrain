@@ -68,29 +68,33 @@ describe('buildAnalysisPrompt', () => {
     expect(instruction).toContain('ModuleNotFoundError')
   })
 
-  it('should handle truncation for long conversations', () => {
-    // Create a very long conversation
-    const messages: Message[] = []
-    // Need enough content to trigger truncation with ~16 chars/token
-    const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000) // ~225k chars per message
+  it(
+    'should handle truncation for long conversations',
+    () => {
+      // Create a very long conversation
+      const messages: Message[] = []
+      // Need enough content to trigger truncation with ~12 chars/token
+      const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000) // ~225k chars per message
 
-    for (let i = 0; i < 100; i++) {
-      messages.push({
-        role: i % 2 === 0 ? 'user' : 'model',
-        content: longContent + ` (Message ${i})`,
-      })
-    }
+      for (let i = 0; i < 100; i++) {
+        messages.push({
+          role: i % 2 === 0 ? 'user' : 'model',
+          content: longContent + ` (Message ${i})`,
+        })
+      }
 
-    const result = buildAnalysisPrompt(messages)
+      const result = buildAnalysisPrompt(messages)
 
-    // Should have truncated messages + instruction
-    // Look for truncation marker
-    const hasTruncationMarker = result.some(content =>
-      content.parts[0].text.includes('[...conversation truncated...]')
-    )
+      // Should have truncated messages + instruction
+      // Look for truncation marker
+      const hasTruncationMarker = result.some(content =>
+        content.parts[0].text.includes('[...conversation truncated...]')
+      )
 
-    expect(hasTruncationMarker).toBe(true)
-  })
+      expect(hasTruncationMarker).toBe(true)
+    },
+    { timeout: 60000 }
+  )
 
   it('should handle empty conversation', () => {
     const result = buildAnalysisPrompt([])

@@ -9,7 +9,7 @@ err() { echo -e "${RED}[all-in] ERROR:${NC} $*" >&2; }
 
 # Defaults
 : "${PGDATA:=/var/lib/postgresql/data}"
-: "${DB_NAME:=claude_proxy}"
+: "${DB_NAME:=agent_prompttrain}"
 : "${DB_USER:=postgres}"
 : "${DB_PASSWORD:=postgres}"
 : "${PGPORT:=5432}"
