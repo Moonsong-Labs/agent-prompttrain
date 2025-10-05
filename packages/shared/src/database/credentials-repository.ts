@@ -565,9 +565,9 @@ export class CredentialsRepository {
       await client.query(
         `
         INSERT INTO train_account_mappings (train_id, account_id, priority)
-        VALUES ($1, $2, COALESCE((SELECT MAX(priority) + 1 FROM train_account_mappings WHERE train_id = $1), 0))
+        VALUES ($1, $2, COALESCE((SELECT MAX(priority) + 1 FROM train_account_mappings WHERE train_id = $3), 0))
       `,
-        [trainId, accountId]
+        [trainId, accountId, trainId]
       )
 
       await client.query('COMMIT')
