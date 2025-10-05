@@ -43,7 +43,7 @@ services:
       CREDENTIALS_DIR: /app/credentials
       
       # Database configuration
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_proxy
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agent_prompttrain
       STORAGE_ENABLED: "true"
       
       # Telemetry
@@ -92,9 +92,9 @@ services:
       
       # Proxy API URL for data access
       PROXY_API_URL: http://proxy:3000
-      
+
       # Database configuration
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_proxy
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agent_prompttrain
     ports:
       - "3001:3001"
     depends_on:

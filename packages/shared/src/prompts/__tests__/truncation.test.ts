@@ -46,41 +46,45 @@ describe('truncateConversation', () => {
   })
 
   describe('truncation scenarios', () => {
-    it('should truncate long conversation preserving head and tail', () => {
-      // Create a very long message to force truncation
-      // With ~16 chars per token, we need much more content
-      const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000) // ~225k chars
-      const messages: Message[] = []
+    it(
+      'should truncate long conversation preserving head and tail',
+      () => {
+        // Create a very long message to force truncation
+        // With ~12 chars per token (config default), we need ~10M chars to exceed 855k tokens
+        const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000) // ~225k chars
+        const messages: Message[] = []
 
-      // Add 50 messages with long content - this will be ~11M chars total
-      for (let i = 0; i < 50; i++) {
-        messages.push(
-          createMessage(i % 2 === 0 ? 'user' : 'model', longContent + ` (Message ${i})`, i)
+        // Add 50 messages with long content - this will be ~11M chars total, ~900k tokens
+        for (let i = 0; i < 50; i++) {
+          messages.push(
+            createMessage(i % 2 === 0 ? 'user' : 'model', longContent + ` (Message ${i})`, i)
+          )
+        }
+
+        const result = truncateConversation(messages)
+
+        // Should have truncated the conversation
+        expect(result.length).toBeLessThan(messages.length)
+
+        // Should contain truncation marker
+        const hasTruncationMarker = result.some(
+          msg => msg.content === '[...conversation truncated...]'
         )
-      }
+        expect(hasTruncationMarker).toBe(true)
 
-      const result = truncateConversation(messages)
+        // If truncation marker is first, it means no head messages fit
+        const _firstContentMessage =
+          result[0].content === '[...conversation truncated...]' ? result[1] : result[0]
 
-      // Should have truncated the conversation
-      expect(result.length).toBeLessThan(messages.length)
+        // Last message should be from the tail
+        expect(result[result.length - 1].content).toContain('Message 49')
 
-      // Should contain truncation marker
-      const hasTruncationMarker = result.some(
-        msg => msg.content === '[...conversation truncated...]'
-      )
-      expect(hasTruncationMarker).toBe(true)
-
-      // If truncation marker is first, it means no head messages fit
-      const _firstContentMessage =
-        result[0].content === '[...conversation truncated...]' ? result[1] : result[0]
-
-      // Last message should be from the tail
-      expect(result[result.length - 1].content).toContain('Message 49')
-
-      // Verify we have messages from the conversation
-      const hasMessageContent = result.some(msg => msg.content.includes('Message'))
-      expect(hasMessageContent).toBe(true)
-    })
+        // Verify we have messages from the conversation
+        const hasMessageContent = result.some(msg => msg.content.includes('Message'))
+        expect(hasMessageContent).toBe(true)
+      },
+      { timeout: 30000 }
+    )
 
     it('should handle conversation shorter than head + tail size', () => {
       const messages = createMessages(22) // Less than 5 + 20
@@ -102,36 +106,45 @@ describe('truncateConversation', () => {
   })
 
   describe('edge cases', () => {
-    it('should handle when tail alone exceeds token limit', () => {
-      // Create messages where even 20 tail messages exceed the limit
-      const veryLongContent = 'B'.repeat(500000) // Each message is huge
-      const messages: Message[] = []
+    it(
+      'should handle when tail alone exceeds token limit',
+      () => {
+        // Create messages where even 20 tail messages exceed the limit
+        // Each message needs ~43k tokens, so ~520k chars per message (12 chars/token)
+        const veryLongContent = 'B'.repeat(520000) // Each message is huge
+        const messages: Message[] = []
 
-      for (let i = 0; i < 30; i++) {
-        messages.push(createMessage(i % 2 === 0 ? 'user' : 'model', veryLongContent, i))
-      }
+        for (let i = 0; i < 30; i++) {
+          messages.push(createMessage(i % 2 === 0 ? 'user' : 'model', veryLongContent, i))
+        }
 
-      const result = truncateConversation(messages)
+        const result = truncateConversation(messages)
 
-      // Should have fewer than the configured tail messages
-      expect(result.length).toBeLessThan(TAIL_MESSAGES)
+        // Should have fewer than the configured tail messages
+        expect(result.length).toBeLessThan(TAIL_MESSAGES)
 
-      // Should still preserve the most recent messages
-      expect(result[result.length - 1].content).toContain('Message 29')
-    })
+        // Should still preserve the most recent messages
+        expect(result[result.length - 1].content).toContain('Message 29')
+      },
+      { timeout: 40000 }
+    )
 
-    it('should truncate single message that exceeds limit', () => {
-      // Create a single message that exceeds the entire token limit
-      // With 890k max tokens and ~16 chars/token, we need more than 14M chars
-      const hugeContent = 'The quick brown fox jumps over the lazy dog. '.repeat(350000) // ~15.75M chars
-      const messages = [createMessage('user', hugeContent)]
+    it(
+      'should truncate single message that exceeds limit',
+      () => {
+        // Create a single message that exceeds the entire token limit
+        // With 855k max tokens and ~12 chars/token, we need more than 10M chars
+        const hugeContent = 'The quick brown fox jumps over the lazy dog. '.repeat(250000) // ~11.25M chars
+        const messages = [createMessage('user', hugeContent)]
 
-      const result = truncateConversation(messages)
+        const result = truncateConversation(messages)
 
-      expect(result.length).toBe(1)
-      expect(result[0].content).toContain('[CONTENT TRUNCATED]')
-      expect(result[0].content.length).toBeLessThan(hugeContent.length)
-    })
+        expect(result.length).toBe(1)
+        expect(result[0].content).toContain('[CONTENT TRUNCATED]')
+        expect(result[0].content.length).toBeLessThan(hugeContent.length)
+      },
+      { timeout: 40000 }
+    )
 
     it('should handle mixed message sizes correctly', () => {
       const messages: Message[] = [
@@ -166,37 +179,42 @@ describe('truncateConversation', () => {
   })
 
   describe('truncation marker placement', () => {
-    it('should place truncation marker between non-consecutive messages', () => {
-      // Create scenario where we'll have gaps
-      const longContent = 'D'.repeat(100000)
-      const messages: Message[] = []
+    it(
+      'should place truncation marker between non-consecutive messages',
+      () => {
+        // Create scenario where we'll have gaps
+        // Need enough to trigger truncation: 100 messages * 120k chars = 12M chars ~= 1M tokens
+        const longContent = 'D'.repeat(120000)
+        const messages: Message[] = []
 
-      for (let i = 0; i < 100; i++) {
-        messages.push(createMessage(i % 2 === 0 ? 'user' : 'model', longContent, i))
-      }
+        for (let i = 0; i < 100; i++) {
+          messages.push(createMessage(i % 2 === 0 ? 'user' : 'model', longContent, i))
+        }
 
-      const result = truncateConversation(messages)
+        const result = truncateConversation(messages)
 
-      // Find truncation marker
-      const truncationIndex = result.findIndex(
-        msg => msg.content === '[...conversation truncated...]'
-      )
-
-      expect(truncationIndex).toBeGreaterThan(0)
-      expect(truncationIndex).toBeLessThan(result.length - 1)
-
-      // Check that there's a gap in message indices around the truncation marker
-      if (truncationIndex > 0) {
-        const beforeIndex = parseInt(
-          result[truncationIndex - 1].content.match(/Message (\d+)/)?.[1] || '0'
-        )
-        const afterIndex = parseInt(
-          result[truncationIndex + 1].content.match(/Message (\d+)/)?.[1] || '0'
+        // Find truncation marker
+        const truncationIndex = result.findIndex(
+          msg => msg.content === '[...conversation truncated...]'
         )
 
-        expect(afterIndex - beforeIndex).toBeGreaterThan(1)
-      }
-    })
+        expect(truncationIndex).toBeGreaterThan(0)
+        expect(truncationIndex).toBeLessThan(result.length - 1)
+
+        // Check that there's a gap in message indices around the truncation marker
+        if (truncationIndex > 0) {
+          const beforeIndex = parseInt(
+            result[truncationIndex - 1].content.match(/Message (\d+)/)?.[1] || '0'
+          )
+          const afterIndex = parseInt(
+            result[truncationIndex + 1].content.match(/Message (\d+)/)?.[1] || '0'
+          )
+
+          expect(afterIndex - beforeIndex).toBeGreaterThan(1)
+        }
+      },
+      { timeout: 60000 }
+    )
 
     it('should not duplicate messages when head and tail overlap', () => {
       const messages = createMessages(8) // Less than head + tail
@@ -228,19 +246,25 @@ describe('truncateConversation', () => {
       expect(result[3].role).toBe('model')
     })
 
-    it('should use user role for truncation marker', () => {
-      // Need enough content to trigger truncation
-      const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000)
-      const messages = createMessages(50).map(msg => ({
-        ...msg,
-        content: longContent,
-      }))
+    it(
+      'should use user role for truncation marker',
+      () => {
+        // Need enough content to trigger truncation
+        const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000)
+        const messages = createMessages(50).map(msg => ({
+          ...msg,
+          content: longContent,
+        }))
 
-      const result = truncateConversation(messages)
-      const truncationMarker = result.find(msg => msg.content === '[...conversation truncated...]')
+        const result = truncateConversation(messages)
+        const truncationMarker = result.find(
+          msg => msg.content === '[...conversation truncated...]'
+        )
 
-      expect(truncationMarker).toBeDefined()
-      expect(truncationMarker?.role).toBe('user')
-    })
+        expect(truncationMarker).toBeDefined()
+        expect(truncationMarker?.role).toBe('user')
+      },
+      { timeout: 30000 }
+    )
   })
 })

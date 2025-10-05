@@ -229,10 +229,11 @@ bun run dev                          # Run both services
 bun run dev:proxy                    # Run proxy only (port 3000)
 bun run dev:dashboard                # Run dashboard only (port 3001)
 
-# Build & Test (3 commands)
+# Build & Test (4 commands)
 bun run build                        # Build all packages
 bun test                             # Run unit tests
 bun run test:e2e:smoke              # Run E2E smoke tests
+bun run docker:validate              # Validate Docker build and compose
 
 # Docker (2 commands)
 ./docker/build-images.sh            # Build Docker images

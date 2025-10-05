@@ -36,6 +36,7 @@
     "docker:dev:up": "docker compose -f docker/docker-compose.dev.yml --project-name agent-prompttrain-dev --env-file .env up -d",
     "docker:dev:down": "docker compose -f docker/docker-compose.dev.yml --project-name agent-prompttrain-dev --env-file .env down",
     "docker:dev:logs": "docker compose -f docker/docker-compose.dev.yml --project-name agent-prompttrain-dev --env-file .env logs -f",
+    "docker:validate": "./scripts/validate-docker.sh",
     "typecheck": "tsc --build --force",
     "typecheck:proxy": "tsc --build services/proxy",
     "typecheck:dashboard": "tsc --build services/dashboard",
