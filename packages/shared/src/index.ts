@@ -120,3 +120,10 @@ export {
   type DecryptedAccount,
 } from './types/credentials.js'
 export { encrypt, decrypt, hashApiKey, verifyApiKeyHash } from './utils/encryption.js'
+export {
+  CredentialsRepository,
+  type CreateAccountInput,
+  type UpdateAccountInput,
+  type CreateTrainInput,
+  type UpdateTrainInput,
+} from './database/credentials-repository.js'
