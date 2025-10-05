@@ -241,14 +241,21 @@ async function main() {
 
     // Check all credentials at startup
     console.log('\nChecking credentials...')
-    const credentialService = new CredentialStatusService()
-    const credentialStatuses = await credentialService.checkAllCredentials()
 
-    if (credentialStatuses.length > 0) {
-      const statusLines = credentialService.formatStatusForLogging(credentialStatuses)
-      statusLines.forEach(line => console.log(line))
+    if (process.env.USE_DATABASE_CREDENTIALS === 'true') {
+      console.log('  Using database-backed credentials (USE_DATABASE_CREDENTIALS=true)')
+      console.log('  Skipping filesystem credential check')
+      // TODO: Add database credential status check
     } else {
-      console.log('  No credential files found')
+      const credentialService = new CredentialStatusService()
+      const credentialStatuses = await credentialService.checkAllCredentials()
+
+      if (credentialStatuses.length > 0) {
+        const statusLines = credentialService.formatStatusForLogging(credentialStatuses)
+        statusLines.forEach(line => console.log(line))
+      } else {
+        console.log('  No credential files found')
+      }
     }
 
     // Start credential manager periodic cleanup for long-running service
