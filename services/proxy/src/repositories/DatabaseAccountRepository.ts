@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { DecryptedAccount, DatabaseAccount, AuthenticationError } from '@agent-prompttrain/shared'
+import { DecryptedAccount, AuthenticationError } from '@agent-prompttrain/shared'
 import { encrypt, decrypt } from '@agent-prompttrain/shared/utils/encryption'
 import { IAccountRepository } from './IAccountRepository'
 import { logger } from '../middleware/logger'
@@ -122,8 +122,8 @@ export class DatabaseAccountRepository implements IAccountRepository {
       await client.query('BEGIN')
 
       // Lock the row to prevent concurrent updates
-      const selectResult = await client.query<DatabaseAccount>(
-        `SELECT account_id, account_name, credential_type
+      const selectResult = await client.query<{ credentialType: 'api_key' | 'oauth' }>(
+        `SELECT credential_type AS "credentialType"
          FROM accounts
          WHERE account_name = $1 AND is_active = true
          FOR UPDATE`,

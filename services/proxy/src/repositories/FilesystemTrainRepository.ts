@@ -30,9 +30,26 @@ export class FilesystemTrainRepository implements ITrainRepository {
   }
 
   async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
+    const keys = await this.readClientKeys(trainId)
+    return keys.includes(clientKey)
+  }
+
+  async hasClientKeys(trainId: string): Promise<boolean> {
+    const keys = await this.readClientKeys(trainId)
+    return keys.length > 0
+  }
+
+  async getSlackConfig(_trainId: string): Promise<SlackConfig | null> {
+    // Filesystem mode doesn't support Slack config at train level
+    // Slack config is stored at account level in ClaudeCredentials
+    // Return null - caller should get Slack config from account credentials
+    return null
+  }
+
+  private async readClientKeys(trainId: string): Promise<string[]> {
     const filePath = this.resolveClientKeysPath(trainId)
     if (!filePath) {
-      return false
+      return []
     }
 
     try {
@@ -47,13 +64,9 @@ export class FilesystemTrainRepository implements ITrainRepository {
             ? parsed.client_api_keys
             : []
 
-      const validKeys = rawKeys
+      return rawKeys
         .filter((key: unknown) => typeof key === 'string' && key.trim().length > 0)
         .map((key: string) => key.trim())
-
-      // In filesystem mode, keys are stored in plaintext
-      // Just check if the provided key is in the list
-      return validKeys.includes(clientKey)
     } catch (error) {
       const err = error as NodeJS.ErrnoException
       if (err.code !== 'ENOENT') {
@@ -62,15 +75,8 @@ export class FilesystemTrainRepository implements ITrainRepository {
           error: err.message,
         })
       }
-      return false
+      return []
     }
-  }
-
-  async getSlackConfig(_trainId: string): Promise<SlackConfig | null> {
-    // Filesystem mode doesn't support Slack config at train level
-    // Slack config is stored at account level in ClaudeCredentials
-    // Return null - caller should get Slack config from account credentials
-    return null
   }
 
   private resolveClientKeysPath(trainId: string): string | null {

@@ -47,6 +47,14 @@ export interface ITrainRepository {
   validateClientKey(trainId: string, clientKey: string): Promise<boolean>
 
   /**
+   * Determine whether client API keys are configured for a train.
+   *
+   * @param trainId - The train identifier
+   * @returns True if one or more keys are configured
+   */
+  hasClientKeys(trainId: string): Promise<boolean>
+
+  /**
    * Get the Slack configuration for a train.
    * Returns null if Slack is not configured for this train.
    *

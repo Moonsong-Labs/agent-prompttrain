@@ -83,6 +83,29 @@ export class DatabaseTrainRepository implements ITrainRepository {
     }
   }
 
+  async hasClientKeys(trainId: string): Promise<boolean> {
+    try {
+      const result = await this.db.query<{ has_keys: boolean }>(
+        `SELECT COALESCE(array_length(client_api_keys_hashed, 1), 0) > 0 AS has_keys
+         FROM trains
+         WHERE train_id = $1 AND is_active = true`,
+        [trainId]
+      )
+
+      if (result.rowCount === 0) {
+        return false
+      }
+
+      return result.rows[0].has_keys
+    } catch (error) {
+      logger.error('Failed to inspect client key configuration', {
+        trainId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return false
+    }
+  }
+
   async getSlackConfig(trainId: string): Promise<SlackConfig | null> {
     try {
       const result = await this.db.query<{ slack_config: any }>(

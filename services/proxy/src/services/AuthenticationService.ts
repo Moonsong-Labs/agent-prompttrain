@@ -1,9 +1,9 @@
-import { createHash } from 'crypto'
+import { createHash, timingSafeEqual as cryptoTimingSafeEqual } from 'crypto'
 import { promises as fsp } from 'fs'
 import * as path from 'path'
 import { homedir } from 'os'
 import { getApiKey, loadCredentials, SlackConfig, ClaudeCredentials } from '../credentials'
-import { AuthenticationError } from '@agent-prompttrain/shared'
+import { AuthenticationError, DecryptedAccount } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { logger } from '../middleware/logger'
 import type { IAccountRepository } from '../repositories/IAccountRepository'
@@ -67,12 +67,14 @@ export class AuthenticationService {
     const requestedAccount = context.account
     const requestId = context.requestId
 
-    const availableAccounts = await this.listAccounts()
+    const availableAccounts = await this.getAvailableAccounts(context)
 
     if (!availableAccounts.length) {
       throw new AuthenticationError('No accounts are configured for the proxy', {
         requestId,
-        hint: `Add account credential files under ${this.accountsDir}`,
+        hint: this.accountRepository
+          ? 'Enable at least one active account in the credential repository'
+          : `Add account credential files under ${this.accountsDir}`,
       })
     }
 
@@ -83,10 +85,96 @@ export class AuthenticationService {
     return this.loadDeterministicAccount(availableAccounts, context)
   }
 
+  private async getAvailableAccounts(context: RequestContext): Promise<string[]> {
+    const trainId = context.trainId
+
+    if (this.trainRepository && trainId) {
+      try {
+        const mappedAccounts = await this.trainRepository.getAccountNamesForTrain(trainId)
+        if (mappedAccounts.length > 0) {
+          return mappedAccounts
+        }
+      } catch (error) {
+        logger.warn('Failed to load train-specific account mappings', {
+          requestId: context.requestId,
+          trainId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    return this.listAccounts()
+  }
+
   /**
    * Retrieve the list of valid client API keys for a train.
    */
   async getClientApiKeys(trainId: string): Promise<string[]> {
+    if (this.trainRepository) {
+      logger.debug(
+        'getClientApiKeys called while train repository is enabled; returning empty list'
+      )
+      return []
+    }
+
+    return this.readClientApiKeysFromFilesystem(trainId)
+  }
+
+  async hasClientKeys(trainId: string): Promise<boolean> {
+    if (this.trainRepository) {
+      try {
+        return await this.trainRepository.hasClientKeys(trainId)
+      } catch (error) {
+        logger.error('Failed to check client key configuration from repository', {
+          trainId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return false
+      }
+    }
+
+    const keys = await this.readClientApiKeysFromFilesystem(trainId)
+    return keys.length > 0
+  }
+
+  async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
+    if (!clientKey || !clientKey.trim()) {
+      return false
+    }
+
+    if (this.trainRepository) {
+      try {
+        return await this.trainRepository.validateClientKey(trainId, clientKey)
+      } catch (error) {
+        logger.error('Failed to validate client key via repository', {
+          trainId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return false
+      }
+    }
+
+    const keys = await this.readClientApiKeysFromFilesystem(trainId)
+    if (!keys.length) {
+      return false
+    }
+
+    const tokenHash = this.hashClientKey(clientKey)
+    for (const key of keys) {
+      const keyHash = this.hashClientKey(key)
+      if (keyHash.length === tokenHash.length && cryptoTimingSafeEqual(keyHash, tokenHash)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  usesTrainRepository(): boolean {
+    return Boolean(this.trainRepository)
+  }
+
+  private async readClientApiKeysFromFilesystem(trainId: string): Promise<string[]> {
     const filePath = this.resolveClientKeysPath(trainId)
     if (!filePath) {
       return []
@@ -119,6 +207,10 @@ export class AuthenticationService {
     }
   }
 
+  private hashClientKey(value: string): Buffer {
+    return createHash('sha256').update(value.trim()).digest()
+  }
+
   getMaskedCredentialInfo(auth: AuthResult): string {
     const maskedKey = auth.key.substring(0, 10) + '****'
     return `${auth.type}:${maskedKey}`
@@ -144,11 +236,22 @@ export class AuthenticationService {
       })
     }
 
-    const accountPath = this.resolveAccountPath(sanitized)
+    if (this.accountRepository) {
+      return this.loadAccountFromRepository(sanitized, context)
+    }
+
+    return this.loadAccountFromFilesystem(sanitized, context)
+  }
+
+  private async loadAccountFromFilesystem(
+    accountName: string,
+    context: RequestContext
+  ): Promise<AuthResult> {
+    const accountPath = this.resolveAccountPath(accountName)
     if (!accountPath) {
       throw new AuthenticationError('Account credential path is invalid', {
         requestId: context.requestId,
-        account: sanitized,
+        account: accountName,
       })
     }
 
@@ -156,8 +259,8 @@ export class AuthenticationService {
     if (!credentials) {
       throw new AuthenticationError('No credentials configured for account', {
         requestId: context.requestId,
-        account: sanitized,
-        hint: `Create ${sanitized}${ACCOUNT_FILENAME_SUFFIX} under ${this.accountsDir}`,
+        account: accountName,
+        hint: `Create ${accountName}${ACCOUNT_FILENAME_SUFFIX} under ${this.accountsDir}`,
       })
     }
 
@@ -165,11 +268,167 @@ export class AuthenticationService {
     if (!apiKey) {
       throw new AuthenticationError('Failed to retrieve API key for account', {
         requestId: context.requestId,
-        account: sanitized,
+        account: accountName,
       })
     }
 
-    return this.buildAuthResult(sanitized, credentials, apiKey, context)
+    const slackConfig = await this.resolveSlackConfig(context.trainId, credentials.slack ?? null, {
+      requestId: context.requestId,
+      metadata: { accountName },
+    })
+
+    return this.buildAuthResult(accountName, credentials, apiKey, context, slackConfig)
+  }
+
+  private async loadAccountFromRepository(
+    accountName: string,
+    context: RequestContext
+  ): Promise<AuthResult> {
+    let account: DecryptedAccount | null
+
+    try {
+      account = await this.accountRepository!.getAccountByName(accountName)
+    } catch (error) {
+      logger.error('Failed to fetch account from credential repository', {
+        requestId: context.requestId,
+        metadata: {
+          account: accountName,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw new AuthenticationError('Failed to load credentials for account', {
+        requestId: context.requestId,
+        account: accountName,
+      })
+    }
+
+    if (!account || !account.isActive) {
+      throw new AuthenticationError('No credentials configured for account', {
+        requestId: context.requestId,
+        account: accountName,
+        hint: 'Enable the account in the credential repository',
+      })
+    }
+
+    let apiKey: string | null
+    try {
+      apiKey = await this.accountRepository!.getApiKey(accountName)
+    } catch (error) {
+      logger.error('Failed to retrieve account secret from credential repository', {
+        requestId: context.requestId,
+        metadata: {
+          account: accountName,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw new AuthenticationError('Failed to retrieve API key for account', {
+        requestId: context.requestId,
+        account: accountName,
+      })
+    }
+
+    if (!apiKey) {
+      throw new AuthenticationError('Failed to retrieve API key for account', {
+        requestId: context.requestId,
+        account: accountName,
+        hint: 'Credential may need to be refreshed',
+      })
+    }
+
+    // Update last-used timestamp asynchronously (non-blocking)
+    void this.accountRepository!.updateLastUsed(accountName).catch(error =>
+      logger.debug('Failed to update account last-used timestamp', {
+        metadata: {
+          account: accountName,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    )
+
+    const slackConfig = await this.resolveSlackConfig(context.trainId, null, {
+      requestId: context.requestId,
+      metadata: { accountName },
+    })
+
+    return this.buildAuthResultFromDecryptedAccount(
+      accountName,
+      account,
+      apiKey,
+      context,
+      slackConfig
+    )
+  }
+
+  private async resolveSlackConfig(
+    trainId: string | undefined,
+    fallback: SlackConfig | null,
+    context: { requestId?: string; metadata?: Record<string, unknown> }
+  ): Promise<SlackConfig | null> {
+    if (this.trainRepository && trainId) {
+      try {
+        const config = await this.trainRepository.getSlackConfig(trainId)
+        if (config) {
+          return config
+        }
+      } catch (error) {
+        logger.warn('Failed to load Slack configuration for train', {
+          trainId,
+          requestId: context.requestId,
+          metadata: {
+            ...(context.metadata ?? {}),
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+      }
+    }
+
+    return fallback ?? null
+  }
+
+  private buildAuthResultFromDecryptedAccount(
+    accountName: string,
+    account: DecryptedAccount,
+    apiKey: string,
+    context: RequestContext,
+    slackConfig: SlackConfig | null
+  ): AuthResult {
+    if (account.credentialType === 'oauth') {
+      logger.info('Using OAuth credentials for account', {
+        requestId: context.requestId,
+        trainId: context.trainId,
+        metadata: { accountName, accountId: account.accountId },
+      })
+
+      return {
+        type: 'oauth',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'anthropic-beta': OAUTH_BETA_HEADER,
+        },
+        key: apiKey,
+        betaHeader: OAUTH_BETA_HEADER,
+        accountId: account.accountId,
+        accountName,
+        slackConfig,
+      }
+    }
+
+    logger.info('Using API key credentials for account', {
+      requestId: context.requestId,
+      trainId: context.trainId,
+      metadata: { accountName, accountId: account.accountId },
+    })
+
+    return {
+      type: 'api_key',
+      headers: {
+        'x-api-key': apiKey,
+      },
+      key: apiKey,
+      accountId: account.accountId,
+      accountName,
+      slackConfig,
+    }
   }
 
   private async loadDeterministicAccount(
@@ -242,7 +501,8 @@ export class AuthenticationService {
     accountName: string,
     credentials: ClaudeCredentials,
     apiKey: string,
-    context: RequestContext
+    context: RequestContext,
+    slackConfig: SlackConfig | null
   ): AuthResult {
     if (credentials.type === 'oauth') {
       logger.info('Using OAuth credentials for account', {
@@ -261,7 +521,7 @@ export class AuthenticationService {
         betaHeader: OAUTH_BETA_HEADER,
         accountId: credentials.accountId,
         accountName,
-        slackConfig: credentials.slack ?? null,
+        slackConfig,
       }
     }
 
@@ -279,7 +539,7 @@ export class AuthenticationService {
       key: apiKey,
       accountId: credentials.accountId,
       accountName,
-      slackConfig: credentials.slack ?? null,
+      slackConfig,
     }
   }
 

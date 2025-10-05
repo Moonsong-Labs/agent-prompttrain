@@ -27,6 +27,14 @@ class MockAuthenticationService extends AuthenticationService {
     return this.keyMap.get(trainId) ?? []
   }
 
+  async hasClientKeys(trainId: string): Promise<boolean> {
+    return (this.keyMap.get(trainId) ?? []).length > 0
+  }
+
+  async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
+    return (this.keyMap.get(trainId) ?? []).includes(clientKey)
+  }
+
   // authenticate is not used in these tests but must be implemented
   async authenticate(_context: RequestContext) {
     throw new Error('Not implemented in mock')
