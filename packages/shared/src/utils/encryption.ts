@@ -99,14 +99,14 @@ export function verifyApiKeyHash(apiKey: string, hash: string): boolean {
 }
 
 /**
- * Generate a new API key with format: sk-dash-api01-<random_string>
+ * Generate a new API key with format: ptk_<random_string>
  *
  * Uses cryptographically secure random bytes for the secret portion
  *
  * @returns A newly generated API key
  */
 export function generateApiKey(): string {
-  const prefix = 'sk-dash-api01-'
+  const prefix = 'ptk_'
   const randomBytes = crypto.randomBytes(24)
   const secret = randomBytes.toString('base64url').replace(/[^a-zA-Z0-9]/g, '')
   return `${prefix}${secret}`
