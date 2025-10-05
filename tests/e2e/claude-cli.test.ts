@@ -71,7 +71,7 @@ describe('Claude CLI End-to-End Tests', () => {
     it('should log requests to database', async () => {
       // Get initial count
       const { stdout: initialStdout } = await exec(
-        `${dockerCompose} exec -T postgres psql -U postgres -d claude_proxy -c "SELECT COUNT(*) FROM request_response_logs;" -t`
+        `${dockerCompose} exec -T postgres psql -U postgres -d agent_prompttrain -c "SELECT COUNT(*) FROM request_response_logs;" -t`
       )
       const initialCount = parseInt(initialStdout.trim())
 
@@ -85,7 +85,7 @@ describe('Claude CLI End-to-End Tests', () => {
 
       // Check database for logged requests
       const { stdout: finalStdout } = await exec(
-        `${dockerCompose} exec -T postgres psql -U postgres -d claude_proxy -c "SELECT COUNT(*) FROM request_response_logs;" -t`
+        `${dockerCompose} exec -T postgres psql -U postgres -d agent_prompttrain -c "SELECT COUNT(*) FROM request_response_logs;" -t`
       )
 
       const finalCount = parseInt(finalStdout.trim())

@@ -40,11 +40,11 @@ RUN apk add --no-cache bash curl su-exec tini ca-certificates && \
 # Environment defaults (can be overridden at run time)
 # Postgres
 ENV PGDATA=/var/lib/postgresql/data \
-    DB_NAME=claude_proxy \
+    DB_NAME=agent_prompttrain \
     DB_USER=postgres \
     DB_PASSWORD=postgres \
     PGPORT=5432 \
-    POSTGRES_DB=claude_proxy \
+    POSTGRES_DB=agent_prompttrain \
     POSTGRES_USER=postgres \
     POSTGRES_PASSWORD=postgres
 
