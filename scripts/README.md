@@ -186,6 +186,48 @@ Tests dashboard API endpoints.
 
 Validates storage functionality.
 
+## Validation Scripts
+
+### validate-docker.sh
+
+Validates that Docker images and docker-compose build correctly. Can be run locally or in CI.
+
+```bash
+# Usage
+./scripts/validate-docker.sh
+# Or via npm:
+bun run docker:validate
+```
+
+**Features:**
+
+- 8-step validation process:
+  1. Prerequisites check (Docker, docker compose)
+  2. Environment preparation (.env setup)
+  3. Cleanup existing state
+  4. Build Docker images (single platform for speed)
+  5. Start docker-compose stack
+  6. Health check validation with retry logic
+  7. Basic smoke tests (curl endpoints)
+  8. Cleanup and log collection
+
+**Environment Variables:**
+
+- `BUILD_PLATFORMS` - Target platform (default: linux/amd64)
+- `BUILD_ACTION` - Build action: load or push (default: load)
+
+**Output:**
+
+- Colored terminal output showing progress
+- Saves logs to `docker-compose-logs.txt` on failure
+- Automatic cleanup via trap on exit
+
+**CI Integration:**
+
+- Runs automatically on PR and main branch pushes
+- See `.github/workflows/docker-validation.yml`
+- Uploads logs as artifacts on failure (7-day retention)
+
 ## Test Generation Scripts
 
 ### generate-conversation-test-fixture.ts
