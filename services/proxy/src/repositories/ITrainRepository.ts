@@ -37,6 +37,15 @@ export interface ITrainRepository {
   getAccountsForTrain(trainId: string): Promise<DecryptedAccount[]>
 
   /**
+   * Get the hashed client API keys for a train.
+   * Returns SHA-256 hashes (hex-encoded) for comparison.
+   *
+   * @param trainId - The train identifier
+   * @returns Array of SHA-256 hashed client API keys (hex strings)
+   */
+  getClientApiKeysHashed(trainId: string): Promise<string[]>
+
+  /**
    * Validate a client API key for a train.
    * Client keys are hashed (SHA-256) for security.
    *

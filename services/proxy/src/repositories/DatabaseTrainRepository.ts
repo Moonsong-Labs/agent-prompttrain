@@ -53,6 +53,29 @@ export class DatabaseTrainRepository implements ITrainRepository {
     return accounts
   }
 
+  async getClientApiKeysHashed(trainId: string): Promise<string[]> {
+    try {
+      const result = await this.db.query<{ client_api_keys_hashed: string[] }>(
+        `SELECT client_api_keys_hashed
+         FROM trains
+         WHERE train_id = $1 AND is_active = true`,
+        [trainId]
+      )
+
+      if (result.rowCount === 0 || !result.rows[0].client_api_keys_hashed) {
+        return []
+      }
+
+      return result.rows[0].client_api_keys_hashed
+    } catch (error) {
+      logger.error('Failed to get client API keys for train', {
+        trainId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return []
+    }
+  }
+
   async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
     try {
       // Hash the provided key

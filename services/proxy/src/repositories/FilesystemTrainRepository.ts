@@ -29,6 +29,41 @@ export class FilesystemTrainRepository implements ITrainRepository {
     return []
   }
 
+  async getClientApiKeysHashed(trainId: string): Promise<string[]> {
+    const filePath = this.resolveClientKeysPath(trainId)
+    if (!filePath) {
+      return []
+    }
+
+    try {
+      const content = await fsp.readFile(filePath, 'utf-8')
+      const parsed = JSON.parse(content)
+
+      const rawKeys = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.keys)
+          ? parsed.keys
+          : Array.isArray(parsed?.client_api_keys)
+            ? parsed.client_api_keys
+            : []
+
+      // In filesystem mode, keys are stored in plaintext
+      // Return them as-is (not hashed)
+      return rawKeys
+        .filter((key: unknown) => typeof key === 'string' && key.trim().length > 0)
+        .map((key: string) => key.trim())
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      if (err.code !== 'ENOENT') {
+        logger.error('Failed to read client API keys file', {
+          trainId,
+          error: err.message,
+        })
+      }
+      return []
+    }
+  }
+
   async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
     const filePath = this.resolveClientKeysPath(trainId)
     if (!filePath) {

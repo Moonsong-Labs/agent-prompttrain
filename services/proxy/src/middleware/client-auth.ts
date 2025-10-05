@@ -91,26 +91,44 @@ export function clientAuthMiddleware() {
       }
 
       // Use timing-safe comparison with SHA-256 hashing to prevent timing attacks
-      // This ensures both inputs are always the same length (32 bytes)
+      // The clientApiKeys from database are already SHA-256 hashed (hex-encoded)
+      // So we hash the provided token and compare with the stored hashes
       const encoder = new TextEncoder()
       const tokenBuffer = encoder.encode(token)
 
-      // Hash both values before comparison
+      // Hash the provided token
       const tokenHash = await crypto.subtle.digest('SHA-256', tokenBuffer)
-      const tokenHashBuffer = Buffer.from(tokenHash)
+      const tokenHashHex = Buffer.from(tokenHash).toString('hex')
 
       let isValid = false
-      for (const clientKey of clientApiKeys) {
-        const clientKeyBuffer = encoder.encode(clientKey)
-        const keyHash = await crypto.subtle.digest('SHA-256', clientKeyBuffer)
-        const keyHashBuffer = Buffer.from(keyHash)
+      for (const storedHash of clientApiKeys) {
+        // If stored key looks like a hash (64 hex chars), compare directly
+        // Otherwise treat it as plaintext and hash it (filesystem mode compatibility)
+        const isHexHash = /^[0-9a-f]{64}$/i.test(storedHash)
 
-        if (
-          keyHashBuffer.length === tokenHashBuffer.length &&
-          cryptoTimingSafeEqual(tokenHashBuffer, keyHashBuffer)
-        ) {
-          isValid = true
-          break
+        if (isHexHash) {
+          // Database mode: compare hash with hash
+          if (
+            tokenHashHex.length === storedHash.length &&
+            cryptoTimingSafeEqual(Buffer.from(tokenHashHex), Buffer.from(storedHash))
+          ) {
+            isValid = true
+            break
+          }
+        } else {
+          // Filesystem mode: hash the plaintext key and compare
+          const keyBuffer = encoder.encode(storedHash)
+          const keyHash = await crypto.subtle.digest('SHA-256', keyBuffer)
+          const keyHashBuffer = Buffer.from(keyHash)
+          const tokenHashBuffer = Buffer.from(tokenHash)
+
+          if (
+            keyHashBuffer.length === tokenHashBuffer.length &&
+            cryptoTimingSafeEqual(tokenHashBuffer, keyHashBuffer)
+          ) {
+            isValid = true
+            break
+          }
         }
       }
 

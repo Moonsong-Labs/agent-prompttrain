@@ -87,6 +87,19 @@ export class AuthenticationService {
    * Retrieve the list of valid client API keys for a train.
    */
   async getClientApiKeys(trainId: string): Promise<string[]> {
+    // Use database repository if available
+    if (this.trainRepository) {
+      try {
+        return await this.trainRepository.getClientApiKeysHashed(trainId)
+      } catch (error) {
+        logger.error('Failed to get client API keys from database, falling back to filesystem', {
+          trainId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    // Fallback to filesystem
     const filePath = this.resolveClientKeysPath(trainId)
     if (!filePath) {
       return []
