@@ -23,7 +23,6 @@ export interface DatabaseAccount {
 
 export interface DatabaseTrain {
   trainId: string
-  trainName?: string
   description?: string
   clientApiKeysHashed?: string[]
   slackConfig?: Record<string, unknown>

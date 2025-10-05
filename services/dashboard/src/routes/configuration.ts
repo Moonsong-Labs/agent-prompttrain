@@ -173,7 +173,6 @@ configurationRoutes.get('/', async c => {
                     <thead>
                       <tr>
                         <th>Train ID</th>
-                        <th>Name</th>
                         <th>Description</th>
                         <th>Accounts</th>
                         <th>Status</th>
@@ -184,7 +183,7 @@ configurationRoutes.get('/', async c => {
                     <tbody>
                       ${trains.length === 0
                         ? html` <tr>
-                            <td colspan="7" style="text-align: center; color: #6b7280;">
+                            <td colspan="6" style="text-align: center; color: #6b7280;">
                               No trains configured
                             </td>
                           </tr>`
@@ -194,7 +193,6 @@ configurationRoutes.get('/', async c => {
                                 train => `
                           <tr id="train-row-${train.trainId}">
                             <td><strong>${train.trainId}</strong></td>
-                            <td>${train.trainName || '-'}</td>
                             <td class="text-sm">${train.description || '-'}</td>
                             <td class="text-sm">${train.accountIds.length} account(s)</td>
                             <td>${train.isActive ? '<span style="color: #10b981;">Active</span>' : '<span style="color: #6b7280;">Inactive</span>'}</td>
@@ -569,17 +567,6 @@ configurationRoutes.get('/trains/:id/edit', async c => {
                   value="${train.trainId}"
                   disabled
                   style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background: #e5e7eb;"
-                />
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
-                  >Train Name</label
-                >
-                <input
-                  type="text"
-                  name="trainName"
-                  value="${train.trainName || ''}"
-                  style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
                 />
               </div>
             </div>

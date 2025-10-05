@@ -23,17 +23,12 @@ export interface CreateAccountInput {
 
 export interface UpdateAccountInput {
   accountName?: string
-  apiKey?: string
-  oauthAccessToken?: string
-  oauthRefreshToken?: string
-  oauthExpiresAt?: number
-  oauthScopes?: string[]
-  oauthIsMax?: boolean
   isActive?: boolean
+  // Note: Credential fields (apiKey, OAuth tokens) cannot be updated after creation
+  // for security reasons. Delete and recreate the account to update credentials.
 }
 
 export interface CreateTrainInput {
-  trainName?: string
   description?: string
   clientApiKeys?: string[] // Plain keys, will be hashed
   slackConfig?: Record<string, unknown>
@@ -42,7 +37,6 @@ export interface CreateTrainInput {
 }
 
 export interface UpdateTrainInput {
-  trainName?: string
   description?: string
   clientApiKeys?: string[] // Plain keys, will be hashed
   slackConfig?: Record<string, unknown>
@@ -207,7 +201,8 @@ export class CredentialsRepository {
 
   /**
    * Update an existing account
-   * Only re-encrypts if new credentials are provided
+   * IMPORTANT: Only accountName and isActive can be modified.
+   * Credentials cannot be changed after creation for security reasons.
    */
   async updateAccount(accountId: string, input: UpdateAccountInput): Promise<void> {
     const updates: string[] = []
@@ -217,39 +212,6 @@ export class CredentialsRepository {
     if (input.accountName !== undefined) {
       updates.push(`account_name = $${paramIndex++}`)
       values.push(input.accountName)
-    }
-
-    if (input.apiKey !== undefined) {
-      const encrypted = encrypt(input.apiKey, this.encryptionKey)
-      updates.push(`api_key_encrypted = $${paramIndex++}`)
-      values.push(encrypted)
-    }
-
-    if (input.oauthAccessToken !== undefined) {
-      const encrypted = encrypt(input.oauthAccessToken, this.encryptionKey)
-      updates.push(`oauth_access_token_encrypted = $${paramIndex++}`)
-      values.push(encrypted)
-    }
-
-    if (input.oauthRefreshToken !== undefined) {
-      const encrypted = encrypt(input.oauthRefreshToken, this.encryptionKey)
-      updates.push(`oauth_refresh_token_encrypted = $${paramIndex++}`)
-      values.push(encrypted)
-    }
-
-    if (input.oauthExpiresAt !== undefined) {
-      updates.push(`oauth_expires_at = $${paramIndex++}`)
-      values.push(input.oauthExpiresAt)
-    }
-
-    if (input.oauthScopes !== undefined) {
-      updates.push(`oauth_scopes = $${paramIndex++}`)
-      values.push(input.oauthScopes)
-    }
-
-    if (input.oauthIsMax !== undefined) {
-      updates.push(`oauth_is_max = $${paramIndex++}`)
-      values.push(input.oauthIsMax)
     }
 
     if (input.isActive !== undefined) {
@@ -293,7 +255,6 @@ export class CredentialsRepository {
   async listTrains(): Promise<(DatabaseTrain & { accountIds: string[] })[]> {
     const result = await this.db.query<{
       train_id: string
-      train_name?: string
       description?: string
       client_api_keys_hashed?: string[]
       slack_config?: Record<string, unknown>
@@ -304,7 +265,7 @@ export class CredentialsRepository {
       account_ids: string[]
     }>(`
       SELECT
-        t.train_id, t.train_name, t.description, t.client_api_keys_hashed,
+        t.train_id, t.description, t.client_api_keys_hashed,
         t.slack_config, t.default_account_id, t.is_active, t.created_at, t.updated_at,
         COALESCE(
           array_agg(tam.account_id ORDER BY tam.priority) FILTER (WHERE tam.account_id IS NOT NULL),
@@ -313,12 +274,11 @@ export class CredentialsRepository {
       FROM trains t
       LEFT JOIN train_account_mappings tam ON t.train_id = tam.train_id
       GROUP BY t.train_id
-      ORDER BY t.train_name
+      ORDER BY t.train_id
     `)
 
     return result.rows.map(row => ({
       trainId: row.train_id,
-      trainName: row.train_name,
       description: row.description,
       clientApiKeysHashed: row.client_api_keys_hashed,
       slackConfig: row.slack_config,
@@ -336,7 +296,6 @@ export class CredentialsRepository {
   async getTrainById(trainId: string): Promise<(DatabaseTrain & { accountIds: string[] }) | null> {
     const result = await this.db.query<{
       train_id: string
-      train_name?: string
       description?: string
       client_api_keys_hashed?: string[]
       slack_config?: Record<string, unknown>
@@ -346,7 +305,7 @@ export class CredentialsRepository {
       updated_at: Date
     }>(
       `
-      SELECT train_id, train_name, description, client_api_keys_hashed,
+      SELECT train_id, description, client_api_keys_hashed,
              slack_config, default_account_id, is_active, created_at, updated_at
       FROM trains
       WHERE train_id = $1
@@ -366,7 +325,6 @@ export class CredentialsRepository {
 
     return {
       trainId: row.train_id,
-      trainName: row.train_name,
       description: row.description,
       clientApiKeysHashed: row.client_api_keys_hashed,
       slackConfig: row.slack_config,
@@ -397,13 +355,12 @@ export class CredentialsRepository {
       await client.query(
         `
         INSERT INTO trains (
-          train_id, train_name, description, client_api_keys_hashed,
+          train_id, description, client_api_keys_hashed,
           slack_config, default_account_id, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
       `,
         [
           trainId,
-          input.trainName || null,
           input.description || null,
           clientApiKeysHashed,
           input.slackConfig ? JSON.stringify(input.slackConfig) : null,
@@ -446,11 +403,6 @@ export class CredentialsRepository {
       const updates: string[] = []
       const values: unknown[] = []
       let paramIndex = 1
-
-      if (input.trainName !== undefined) {
-        updates.push(`train_name = $${paramIndex++}`)
-        values.push(input.trainName)
-      }
 
       if (input.description !== undefined) {
         updates.push(`description = $${paramIndex++}`)

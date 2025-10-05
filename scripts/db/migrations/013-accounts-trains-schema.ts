@@ -46,7 +46,6 @@ async function migrateAccountsTrainsSchema() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS trains (
         train_id VARCHAR(255) PRIMARY KEY,
-        train_name VARCHAR(255),
         description TEXT,
 
         -- Client API keys (SHA-256 hashed for security)
