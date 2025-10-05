@@ -2,7 +2,33 @@
 import { Pool } from 'pg'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
-import { encrypt, hashApiKey } from '../../packages/shared/dist/utils/encryption.js'
+import crypto from 'crypto'
+
+// Inline encryption functions to avoid import issues
+const ALGORITHM = 'aes-256-gcm'
+const IV_LENGTH = 16
+const SALT_LENGTH = 32
+const KEY_ITERATIONS = 100000
+
+function encrypt(plaintext: string, key: string): string {
+  if (!key || key.length < 32) {
+    throw new Error('Encryption key must be at least 32 characters')
+  }
+
+  const salt = crypto.randomBytes(SALT_LENGTH)
+  const derivedKey = crypto.pbkdf2Sync(key, salt, KEY_ITERATIONS, 32, 'sha256')
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv)
+
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  return [salt, iv, authTag, encrypted].map(b => b.toString('base64')).join(':')
+}
+
+function hashApiKey(apiKey: string): string {
+  return crypto.createHash('sha256').update(apiKey).digest('hex')
+}
 
 /**
  * Migration 014: Import credentials from filesystem to database
