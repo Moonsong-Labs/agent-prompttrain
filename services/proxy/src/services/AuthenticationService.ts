@@ -6,6 +6,8 @@ import { getApiKey, loadCredentials, SlackConfig, ClaudeCredentials } from '../c
 import { AuthenticationError } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { logger } from '../middleware/logger'
+import type { IAccountRepository } from '../repositories/IAccountRepository'
+import type { ITrainRepository } from '../repositories/ITrainRepository'
 
 export interface AuthResult {
   type: 'api_key' | 'oauth'
@@ -22,6 +24,8 @@ interface AuthenticationServiceOptions {
   accountsDir: string
   clientKeysDir: string
   accountCacheTtlMs?: number
+  accountRepository?: IAccountRepository
+  trainRepository?: ITrainRepository
 }
 
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
@@ -43,6 +47,8 @@ export class AuthenticationService {
   private readonly accountsDir: string
   private readonly clientKeysDir: string
   private readonly accountCacheTtl: number
+  private readonly accountRepository?: IAccountRepository
+  private readonly trainRepository?: ITrainRepository
   private accountCache: CachedAccountList | null = null
 
   constructor(options: AuthenticationServiceOptions) {
@@ -50,6 +56,8 @@ export class AuthenticationService {
     this.accountsDir = this.resolveDirectory(options.accountsDir)
     this.clientKeysDir = this.resolveDirectory(options.clientKeysDir)
     this.accountCacheTtl = options.accountCacheTtlMs ?? 5 * 60 * 1000
+    this.accountRepository = options.accountRepository
+    this.trainRepository = options.trainRepository
   }
 
   /**
@@ -118,6 +126,9 @@ export class AuthenticationService {
 
   clearCaches(): void {
     this.accountCache = null
+    if (this.accountRepository) {
+      this.accountRepository.clearCache()
+    }
   }
 
   destroy(): void {
@@ -273,6 +284,12 @@ export class AuthenticationService {
   }
 
   private async listAccounts(): Promise<string[]> {
+    // Use repository if available
+    if (this.accountRepository) {
+      return this.accountRepository.listAccountNames()
+    }
+
+    // Fall back to filesystem implementation
     const now = Date.now()
     if (this.accountCache && this.accountCache.expiresAt > now) {
       return this.accountCache.names

@@ -14,6 +14,9 @@ import { PromptRegistryService } from './mcp/PromptRegistryService.js'
 import { GitHubSyncService } from './mcp/GitHubSyncService.js'
 import { SyncScheduler } from './mcp/SyncScheduler.js'
 import { JsonRpcHandler } from './mcp/JsonRpcHandler.js'
+import { createRepositories } from './repositories/create-repositories.js'
+import type { IAccountRepository } from './repositories/IAccountRepository.js'
+import type { ITrainRepository } from './repositories/ITrainRepository.js'
 
 /**
  * Dependency injection container for the proxy service
@@ -24,6 +27,8 @@ class Container {
   private tokenUsageService?: TokenUsageService
   private metricsService?: MetricsService
   private notificationService?: NotificationService
+  private accountRepository?: IAccountRepository
+  private trainRepository?: ITrainRepository
   private authenticationService?: AuthenticationService
   private claudeApiClient?: ClaudeApiClient
   private proxyService?: ProxyService
@@ -108,6 +113,15 @@ class Container {
       }
     }
 
+    // Initialize repositories
+    const repositories = createRepositories(
+      this.pool,
+      config.auth.accountsDir,
+      config.auth.clientKeysDir
+    )
+    this.accountRepository = repositories.accountRepository
+    this.trainRepository = repositories.trainRepository
+
     // Initialize services
     this.metricsService = new MetricsService(
       {
@@ -124,6 +138,8 @@ class Container {
       defaultApiKey: undefined,
       accountsDir: config.auth.accountsDir,
       clientKeysDir: config.auth.clientKeysDir,
+      accountRepository: this.accountRepository,
+      trainRepository: this.trainRepository,
     })
     this.claudeApiClient = new ClaudeApiClient({
       baseUrl: config.api.claudeBaseUrl,
@@ -199,6 +215,20 @@ class Container {
     return this.notificationService
   }
 
+  getAccountRepository(): IAccountRepository {
+    if (!this.accountRepository) {
+      throw new Error('AccountRepository not initialized')
+    }
+    return this.accountRepository
+  }
+
+  getTrainRepository(): ITrainRepository {
+    if (!this.trainRepository) {
+      throw new Error('TrainRepository not initialized')
+    }
+    return this.trainRepository
+  }
+
   getAuthenticationService(): AuthenticationService {
     if (!this.authenticationService) {
       throw new Error('AuthenticationService not initialized')
@@ -266,6 +296,8 @@ class Container {
     this.tokenUsageService = undefined
     this.metricsService = undefined
     this.notificationService = undefined
+    this.accountRepository = undefined
+    this.trainRepository = undefined
     this.authenticationService = undefined
     this.claudeApiClient = undefined
     this.proxyService = undefined
@@ -310,6 +342,14 @@ class LazyContainer {
 
   getNotificationService(): NotificationService {
     return this.ensureInstance().getNotificationService()
+  }
+
+  getAccountRepository(): IAccountRepository {
+    return this.ensureInstance().getAccountRepository()
+  }
+
+  getTrainRepository(): ITrainRepository {
+    return this.ensureInstance().getTrainRepository()
   }
 
   getAuthenticationService(): AuthenticationService {
