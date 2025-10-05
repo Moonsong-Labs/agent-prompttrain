@@ -1,8 +1,5 @@
 import { createHash } from 'crypto'
-import { promises as fsp } from 'fs'
-import * as path from 'path'
-import { homedir } from 'os'
-import { getApiKey, loadCredentials, SlackConfig, ClaudeCredentials } from '../credentials'
+import type { SlackConfig, ClaudeCredentials } from '../credentials'
 import { AuthenticationError } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { logger } from '../middleware/logger'
@@ -21,22 +18,13 @@ export interface AuthResult {
 
 interface AuthenticationServiceOptions {
   defaultApiKey?: string
-  accountsDir: string
-  clientKeysDir: string
   accountCacheTtlMs?: number
-  accountRepository?: IAccountRepository
-  trainRepository?: ITrainRepository
+  accountRepository: IAccountRepository
+  trainRepository: ITrainRepository
 }
 
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
-const ACCOUNT_FILENAME_SUFFIX = '.credentials.json'
-const CLIENT_KEY_FILENAME_SUFFIX = '.client-keys.json'
 const IDENTIFIER_REGEX = /^[a-zA-Z0-9._\-:]+$/
-
-interface CachedAccountList {
-  names: string[]
-  expiresAt: number
-}
 
 /**
  * Authentication service responsible for selecting account credentials
@@ -44,17 +32,12 @@ interface CachedAccountList {
  */
 export class AuthenticationService {
   private readonly defaultApiKey?: string
-  private readonly accountsDir: string
-  private readonly clientKeysDir: string
   private readonly accountCacheTtl: number
-  private readonly accountRepository?: IAccountRepository
-  private readonly trainRepository?: ITrainRepository
-  private accountCache: CachedAccountList | null = null
+  private readonly accountRepository: IAccountRepository
+  private readonly trainRepository: ITrainRepository
 
   constructor(options: AuthenticationServiceOptions) {
     this.defaultApiKey = options.defaultApiKey
-    this.accountsDir = this.resolveDirectory(options.accountsDir)
-    this.clientKeysDir = this.resolveDirectory(options.clientKeysDir)
     this.accountCacheTtl = options.accountCacheTtlMs ?? 5 * 60 * 1000
     this.accountRepository = options.accountRepository
     this.trainRepository = options.trainRepository
@@ -67,12 +50,12 @@ export class AuthenticationService {
     const requestedAccount = context.account
     const requestId = context.requestId
 
-    const availableAccounts = await this.listAccounts()
+    const availableAccounts = await this.accountRepository.listAccountNames()
 
     if (!availableAccounts.length) {
       throw new AuthenticationError('No accounts are configured for the proxy', {
         requestId,
-        hint: `Add account credential files under ${this.accountsDir}`,
+        hint: 'Add account credentials to the database',
       })
     }
 
@@ -87,49 +70,7 @@ export class AuthenticationService {
    * Retrieve the list of valid client API keys for a train.
    */
   async getClientApiKeys(trainId: string): Promise<string[]> {
-    // Use database repository if available
-    if (this.trainRepository) {
-      try {
-        return await this.trainRepository.getClientApiKeysHashed(trainId)
-      } catch (error) {
-        logger.error('Failed to get client API keys from database, falling back to filesystem', {
-          trainId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
-    }
-
-    // Fallback to filesystem
-    const filePath = this.resolveClientKeysPath(trainId)
-    if (!filePath) {
-      return []
-    }
-
-    try {
-      const content = await fsp.readFile(filePath, 'utf-8')
-      const parsed = JSON.parse(content)
-
-      const rawKeys = Array.isArray(parsed)
-        ? parsed
-        : Array.isArray(parsed?.keys)
-          ? parsed.keys
-          : Array.isArray(parsed?.client_api_keys)
-            ? parsed.client_api_keys
-            : []
-
-      return rawKeys
-        .filter((key: unknown) => typeof key === 'string' && key.trim().length > 0)
-        .map((key: string) => key.trim())
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code !== 'ENOENT') {
-        logger.error('Failed to read client API keys file', {
-          trainId,
-          error: err.message,
-        })
-      }
-      return []
-    }
+    return await this.trainRepository.getClientApiKeysHashed(trainId)
   }
 
   getMaskedCredentialInfo(auth: AuthResult): string {
@@ -138,10 +79,7 @@ export class AuthenticationService {
   }
 
   clearCaches(): void {
-    this.accountCache = null
-    if (this.accountRepository) {
-      this.accountRepository.clearCache()
-    }
+    this.accountRepository.clearCache()
   }
 
   destroy(): void {
@@ -157,29 +95,40 @@ export class AuthenticationService {
       })
     }
 
-    const accountPath = this.resolveAccountPath(sanitized)
-    if (!accountPath) {
-      throw new AuthenticationError('Account credential path is invalid', {
-        requestId: context.requestId,
-        account: sanitized,
-      })
-    }
-
-    const credentials = loadCredentials(accountPath)
-    if (!credentials) {
+    const account = await this.accountRepository.getAccountByName(sanitized)
+    if (!account) {
       throw new AuthenticationError('No credentials configured for account', {
         requestId: context.requestId,
         account: sanitized,
-        hint: `Create ${sanitized}${ACCOUNT_FILENAME_SUFFIX} under ${this.accountsDir}`,
+        hint: 'Add account credentials to the database',
       })
     }
 
-    const apiKey = await getApiKey(accountPath)
+    // Get API key (handles OAuth token refresh automatically)
+    const apiKey = await this.accountRepository.getApiKey(sanitized)
     if (!apiKey) {
       throw new AuthenticationError('Failed to retrieve API key for account', {
         requestId: context.requestId,
         account: sanitized,
       })
+    }
+
+    // Build credentials object for compatibility with buildAuthResult
+    const credentials: ClaudeCredentials = {
+      type: account.credentialType,
+      accountId: account.accountId,
+      api_key: account.credentialType === 'api_key' ? account.apiKey : undefined,
+      oauth:
+        account.credentialType === 'oauth'
+          ? {
+              accessToken: account.oauthAccessToken || '',
+              refreshToken: account.oauthRefreshToken || '',
+              expiresAt: account.oauthExpiresAt || 0,
+              scopes: account.oauthScopes || [],
+              isMax: account.oauthIsMax || true,
+            }
+          : undefined,
+      slack: undefined, // TODO: Add slack config support when needed
     }
 
     return this.buildAuthResult(sanitized, credentials, apiKey, context)
@@ -296,67 +245,6 @@ export class AuthenticationService {
     }
   }
 
-  private async listAccounts(): Promise<string[]> {
-    // Use repository if available
-    if (this.accountRepository) {
-      return this.accountRepository.listAccountNames()
-    }
-
-    // Fall back to filesystem implementation
-    const now = Date.now()
-    if (this.accountCache && this.accountCache.expiresAt > now) {
-      return this.accountCache.names
-    }
-
-    try {
-      const entries = await fsp.readdir(this.accountsDir)
-      const names = entries
-        .filter(entry => entry.endsWith(ACCOUNT_FILENAME_SUFFIX))
-        .map(entry => entry.slice(0, -ACCOUNT_FILENAME_SUFFIX.length))
-
-      this.accountCache = {
-        names,
-        expiresAt: now + this.accountCacheTtl,
-      }
-
-      return names
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code === 'ENOENT') {
-        logger.error('Accounts directory does not exist', {
-          metadata: { directory: this.accountsDir },
-        })
-        this.accountCache = {
-          names: [],
-          expiresAt: now + this.accountCacheTtl,
-        }
-        return []
-      }
-
-      logger.error('Failed to enumerate account credentials', {
-        metadata: {
-          directory: this.accountsDir,
-          error: err.message,
-        },
-      })
-      throw err
-    }
-  }
-
-  private resolveAccountPath(accountName: string): string | null {
-    const filePath = path.resolve(this.accountsDir, `${accountName}${ACCOUNT_FILENAME_SUFFIX}`)
-    return this.guardPath(this.accountsDir, filePath) ? filePath : null
-  }
-
-  private resolveClientKeysPath(trainId: string): string | null {
-    const sanitized = this.sanitizeIdentifier(trainId)
-    if (!sanitized) {
-      return null
-    }
-    const filePath = path.resolve(this.clientKeysDir, `${sanitized}${CLIENT_KEY_FILENAME_SUFFIX}`)
-    return this.guardPath(this.clientKeysDir, filePath) ? filePath : null
-  }
-
   private sanitizeIdentifier(value?: string | null): string | null {
     if (!value) {
       return null
@@ -372,32 +260,5 @@ export class AuthenticationService {
     }
 
     return trimmed
-  }
-
-  private resolveDirectory(dir: string): string {
-    if (dir.startsWith('~')) {
-      return path.resolve(homedir(), dir.slice(1))
-    }
-    if (path.isAbsolute(dir)) {
-      return path.resolve(dir)
-    }
-    return path.resolve(process.cwd(), dir)
-  }
-
-  private guardPath(baseDir: string, candidate: string): boolean {
-    const normalizedBase = path.resolve(baseDir) + path.sep
-    const normalizedCandidate = path.resolve(candidate)
-
-    if (!normalizedCandidate.startsWith(normalizedBase)) {
-      logger.error('Path traversal attempt detected while resolving credential path', {
-        metadata: {
-          baseDir: normalizedBase,
-          candidate: normalizedCandidate,
-        },
-      })
-      return false
-    }
-
-    return true
   }
 }

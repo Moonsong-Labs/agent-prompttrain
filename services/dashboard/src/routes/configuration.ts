@@ -1,7 +1,7 @@
 /**
  * Configuration management routes
  *
- * Provides UI for managing accounts and trains when USE_DATABASE_CREDENTIALS=true
+ * Provides UI for managing accounts and trains (database-backed credentials - ADR-026)
  */
 
 import { Hono } from 'hono'

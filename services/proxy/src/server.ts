@@ -36,20 +36,26 @@ async function startServer() {
   // === COMPOSITION ROOT START ===
 
   // 1. Create foundational dependencies (no dependencies)
-  const dbPool = config.database.url
-    ? new Pool({
-        connectionString: config.database.url,
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
-      })
-    : undefined
+  if (!config.database.url) {
+    throw new Error('DATABASE_URL is required for credential storage (ADR-026)')
+  }
 
-  // 2. Create services with their dependencies
+  const dbPool = new Pool({
+    connectionString: config.database.url,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  })
+
+  // 2. Create repositories
+  const { createRepositories } = await import('./repositories/create-repositories.js')
+  const { accountRepository, trainRepository } = createRepositories(dbPool)
+
+  // 3. Create services with their dependencies
   const authService = new AuthenticationService({
     defaultApiKey: undefined,
-    accountsDir: config.auth.accountsDir,
-    clientKeysDir: config.auth.clientKeysDir,
+    accountRepository,
+    trainRepository,
   })
 
   const apiClient = new ClaudeApiClient({

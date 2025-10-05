@@ -2,7 +2,6 @@ import { Context, Next } from 'hono'
 import { timingSafeEqual as cryptoTimingSafeEqual } from 'crypto'
 import { logger } from './logger.js'
 import { container } from '../container.js'
-import { config } from '@agent-prompttrain/shared/config'
 
 /**
  * Client API Authentication Middleware
@@ -80,7 +79,7 @@ export function clientAuthMiddleware() {
           {
             error: {
               type: 'authentication_error',
-              message: `No client API keys configured for train "${trainId}". Add a keys file under ${config.auth.clientKeysDir} or disable client authentication.`,
+              message: `No client API keys configured for train "${trainId}". Add client API keys to the database or disable client authentication.`,
             },
           },
           401,

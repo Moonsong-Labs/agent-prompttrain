@@ -2,7 +2,7 @@
  * API endpoints for credential management
  *
  * Provides REST API for CRUD operations on accounts and trains.
- * Requires USE_DATABASE_CREDENTIALS=true
+ * Database credentials are always enabled (ADR-026).
  */
 
 import { Hono } from 'hono'

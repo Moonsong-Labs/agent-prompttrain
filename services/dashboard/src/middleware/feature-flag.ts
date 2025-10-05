@@ -1,8 +1,8 @@
 /**
  * Feature flag middleware for database credentials
  *
- * Runtime check for USE_DATABASE_CREDENTIALS flag.
- * Returns 404 if the feature is disabled.
+ * Database credentials are now always enabled (ADR-026).
+ * This middleware is kept for compatibility but no longer performs any checks.
  */
 
 import { createMiddleware } from 'hono/factory'
@@ -10,11 +10,10 @@ import { createMiddleware } from 'hono/factory'
 /**
  * Middleware to require database credentials feature flag
  *
- * Returns 404 if USE_DATABASE_CREDENTIALS is not 'true'
+ * Database credentials are always enabled (ADR-026).
+ * This middleware is a no-op for backward compatibility.
  */
 export const requireDbCredentials = createMiddleware(async (c, next) => {
-  if (process.env.USE_DATABASE_CREDENTIALS !== 'true') {
-    return c.notFound()
-  }
+  // Database credentials are always enabled (ADR-026)
   await next()
 })

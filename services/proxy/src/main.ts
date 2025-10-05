@@ -15,7 +15,6 @@ import { config as dotenvConfig } from 'dotenv'
 import { tokenTracker } from './services/tokenTracker.js'
 import { initializeContainer, disposeContainer } from './container.js'
 import { closeRateLimitStores } from './middleware/rate-limit.js'
-import { CredentialStatusService } from './services/CredentialStatusService.js'
 import { CredentialManager } from './services/CredentialManager.js'
 import { config } from '@agent-prompttrain/shared'
 import { startAnalysisWorker } from './workers/ai-analysis/index.js'
@@ -239,24 +238,11 @@ async function main() {
       console.log('  - Reason: AI_WORKER_ENABLED not set to true')
     }
 
-    // Check all credentials at startup
-    console.log('\nChecking credentials...')
-
-    if (process.env.USE_DATABASE_CREDENTIALS === 'true') {
-      console.log('  Using database-backed credentials (USE_DATABASE_CREDENTIALS=true)')
-      console.log('  Skipping filesystem credential check')
-      // TODO: Add database credential status check
-    } else {
-      const credentialService = new CredentialStatusService()
-      const credentialStatuses = await credentialService.checkAllCredentials()
-
-      if (credentialStatuses.length > 0) {
-        const statusLines = credentialService.formatStatusForLogging(credentialStatuses)
-        statusLines.forEach(line => console.log(line))
-      } else {
-        console.log('  No credential files found')
-      }
-    }
+    // Check credentials at startup
+    console.log('\nCredential Storage:')
+    console.log('  Mode: Database-backed (ADR-026)')
+    console.log('  Note: All credentials are managed in PostgreSQL')
+    // TODO: Add database credential status check (count of accounts/trains)
 
     // Start credential manager periodic cleanup for long-running service
     const credentialManager = new CredentialManager()

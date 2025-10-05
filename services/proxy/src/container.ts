@@ -113,12 +113,12 @@ class Container {
       }
     }
 
-    // Initialize repositories
-    const repositories = createRepositories(
-      this.pool,
-      config.auth.accountsDir,
-      config.auth.clientKeysDir
-    )
+    // Initialize repositories (requires database pool - ADR-026)
+    if (!this.pool) {
+      throw new Error('Database pool is required for credential storage (ADR-026)')
+    }
+
+    const repositories = createRepositories(this.pool)
     this.accountRepository = repositories.accountRepository
     this.trainRepository = repositories.trainRepository
 
@@ -136,8 +136,6 @@ class Container {
     this.notificationService = new NotificationService()
     this.authenticationService = new AuthenticationService({
       defaultApiKey: undefined,
-      accountsDir: config.auth.accountsDir,
-      clientKeysDir: config.auth.clientKeysDir,
       accountRepository: this.accountRepository,
       trainRepository: this.trainRepository,
     })
