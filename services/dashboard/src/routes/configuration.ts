@@ -467,6 +467,7 @@ configurationRoutes.get('/trains/new', async c => {
             hx-post="/api/credentials/trains"
             hx-target="#train-form-container"
             hx-swap="innerHTML"
+            hx-ext="json-enc"
           >
             <div style="margin-bottom: 1rem;">
               <label style="display: block; margin-bottom: 0.5rem;">Train ID *</label>
