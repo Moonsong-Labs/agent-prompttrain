@@ -142,18 +142,21 @@ echo -e "${YELLOW}Waiting for containers to start...${NC}"
 max_wait=30
 wait_count=0
 while [ $wait_count -lt $max_wait ]; do
-    # Count running containers more reliably by filtering and counting lines
-    running_count=$(docker compose -f docker/docker-compose.yml ps --status running 2>/dev/null | grep -c "running" || echo "0")
-    # Sanitize to ensure it's a valid integer
-    running_count=$(echo "$running_count" | tr -d '\n' | grep -o '[0-9]*' | head -1)
-    running_count=${running_count:-0}
+    # Count running containers by counting non-header lines from docker compose ps
+    # The output has a header line, so we skip it and count actual container lines
+    running_count=$(docker compose -f docker/docker-compose.yml ps --status running 2>/dev/null | tail -n +2 | grep -c . || echo "0")
+
+    # Debug: show what we're checking
+    if [ $wait_count -eq 1 ]; then
+        echo -e "${YELLOW}  Checking for running containers (need 2+)...${NC}"
+    fi
 
     if [ "$running_count" -ge 2 ]; then
-        echo -e "${GREEN}✓ Containers started${NC}"
+        echo -e "${GREEN}✓ Containers started (found $running_count running)${NC}"
         break
     fi
     wait_count=$((wait_count + 1))
-    echo -e "${YELLOW}  Waiting... ($wait_count/$max_wait)${NC}"
+    echo -e "${YELLOW}  Waiting... ($wait_count/$max_wait) - found $running_count running${NC}"
     sleep 1
 done
 
