@@ -278,8 +278,10 @@ configurationRoutes.get('/accounts/new', async c => {
           <div style="margin-bottom: 1rem;">
             <label style="display: block; margin-bottom: 0.5rem;">Credential Type *</label>
             <select
+              id="credentialType"
               name="credentialType"
               required
+              onchange="document.getElementById('apiKeyFields').style.display = this.value === 'api_key' ? 'block' : 'none'; document.getElementById('oauthFields').style.display = this.value === 'oauth' ? 'block' : 'none';"
               style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
             >
               <option value="api_key">API Key</option>
@@ -287,8 +289,8 @@ configurationRoutes.get('/accounts/new', async c => {
             </select>
           </div>
 
-          <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem;">API Key (for API Key type)</label>
+          <div id="apiKeyFields" style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem;">API Key *</label>
             <input
               type="password"
               name="apiKey"
@@ -297,6 +299,38 @@ configurationRoutes.get('/accounts/new', async c => {
             />
             <small style="color: #6b7280;"
               >Note: This will be encrypted and cannot be retrieved later</small
+            >
+          </div>
+
+          <div id="oauthFields" style="display: none;">
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; margin-bottom: 0.5rem;">OAuth Access Token *</label>
+              <input
+                type="password"
+                name="oauthAccessToken"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+              />
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; margin-bottom: 0.5rem;">OAuth Refresh Token *</label>
+              <input
+                type="password"
+                name="oauthRefreshToken"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+              />
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; margin-bottom: 0.5rem;"
+                >Expires At (Unix timestamp)</label
+              >
+              <input
+                type="number"
+                name="oauthExpiresAt"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+              />
+            </div>
+            <small style="color: #6b7280;"
+              >Note: OAuth tokens will be encrypted and cannot be retrieved later</small
             >
           </div>
 
@@ -316,6 +350,102 @@ configurationRoutes.get('/accounts/new', async c => {
   `
 
   return c.html(form)
+})
+
+/**
+ * Account edit form partial
+ */
+configurationRoutes.get('/accounts/:id/edit', async c => {
+  try {
+    const accountId = c.req.param('id')
+    const repo = getRepository()
+    const account = await repo.getAccountById(accountId)
+
+    if (!account) {
+      return c.html(
+        html`<tr>
+          <td colspan="6">Account not found</td>
+        </tr>`
+      )
+    }
+
+    const form = html`
+      <tr>
+        <td colspan="6">
+          <form
+            hx-put="/api/credentials/accounts/${accountId}"
+            hx-target="closest tr"
+            hx-swap="outerHTML"
+            style="padding: 1rem; background: #f9fafb;"
+          >
+            <div
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;"
+            >
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                  >Account Name</label
+                >
+                <input
+                  type="text"
+                  name="accountName"
+                  value="${account.accountName}"
+                  style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+                />
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Type</label>
+                <input
+                  type="text"
+                  value="${account.credentialType === 'api_key' ? 'API Key' : 'OAuth'}"
+                  disabled
+                  style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background: #e5e7eb;"
+                />
+              </div>
+            </div>
+
+            ${account.credentialType === 'api_key'
+              ? html`
+                  <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                      >New API Key (leave empty to keep current)</label
+                    >
+                    <input
+                      type="password"
+                      name="apiKey"
+                      placeholder="Enter new API key to update"
+                      style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+                    />
+                    <small style="color: #6b7280;">Current key is hidden for security</small>
+                  </div>
+                `
+              : ''}
+
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="submit" class="btn">Save Changes</button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                hx-get="/dashboard/configuration?tab=accounts"
+                hx-target="body"
+                hx-push-url="true"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    `
+
+    return c.html(form)
+  } catch (error) {
+    logger.error('Failed to load account edit form', { error: getErrorMessage(error) })
+    return c.html(
+      html`<tr>
+        <td colspan="6">Error loading form</td>
+      </tr>`
+    )
+  }
 })
 
 /**
@@ -398,5 +528,120 @@ configurationRoutes.get('/trains/new', async c => {
   } catch (error) {
     logger.error('Failed to load train form', { error: getErrorMessage(error) })
     return c.text('Error loading form', 500)
+  }
+})
+
+/**
+ * Train edit form partial
+ */
+configurationRoutes.get('/trains/:id/edit', async c => {
+  try {
+    const trainId = c.req.param('id')
+    const repo = getRepository()
+    const [train, accounts] = await Promise.all([repo.getTrainById(trainId), repo.listAccounts()])
+
+    if (!train) {
+      return c.html(
+        html`<tr>
+          <td colspan="7">Train not found</td>
+        </tr>`
+      )
+    }
+
+    const form = html`
+      <tr>
+        <td colspan="7">
+          <form
+            hx-put="/api/credentials/trains/${trainId}"
+            hx-target="closest tr"
+            hx-swap="outerHTML"
+            style="padding: 1rem; background: #f9fafb;"
+          >
+            <div
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;"
+            >
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                  >Train ID</label
+                >
+                <input
+                  type="text"
+                  value="${train.trainId}"
+                  disabled
+                  style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background: #e5e7eb;"
+                />
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                  >Train Name</label
+                >
+                <input
+                  type="text"
+                  name="trainName"
+                  value="${train.trainName || ''}"
+                  style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+                />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                >Description</label
+              >
+              <textarea
+                name="description"
+                rows="2"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+              >
+${train.description || ''}</textarea
+              >
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;"
+                >Associated Accounts</label
+              >
+              <select
+                name="accountIds"
+                multiple
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; min-height: 120px;"
+              >
+                ${raw(
+                  accounts
+                    .map(
+                      acc =>
+                        `<option value="${acc.accountId}" ${train.accountIds.includes(acc.accountId) ? 'selected' : ''}>${acc.accountName}</option>`
+                    )
+                    .join('')
+                )}
+              </select>
+              <small style="color: #6b7280;">Hold Ctrl/Cmd to select multiple accounts</small>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="submit" class="btn">Save Changes</button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                hx-get="/dashboard/configuration?tab=trains"
+                hx-target="body"
+                hx-push-url="true"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    `
+
+    return c.html(form)
+  } catch (error) {
+    logger.error('Failed to load train edit form', { error: getErrorMessage(error) })
+    return c.html(
+      html`<tr>
+        <td colspan="7">Error loading form</td>
+      </tr>`
+    )
   }
 })
