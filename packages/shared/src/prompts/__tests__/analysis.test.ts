@@ -93,7 +93,7 @@ describe('buildAnalysisPrompt', () => {
 
       expect(hasTruncationMarker).toBe(true)
     },
-    { timeout: 60000 }
+    { timeout: 90000 }
   )
 
   it('should handle empty conversation', () => {

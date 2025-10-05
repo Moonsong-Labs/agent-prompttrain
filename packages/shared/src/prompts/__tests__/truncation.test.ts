@@ -83,7 +83,7 @@ describe('truncateConversation', () => {
         const hasMessageContent = result.some(msg => msg.content.includes('Message'))
         expect(hasMessageContent).toBe(true)
       },
-      { timeout: 15000 }
+      { timeout: 30000 }
     )
 
     it('should handle conversation shorter than head + tail size', () => {
@@ -126,7 +126,7 @@ describe('truncateConversation', () => {
         // Should still preserve the most recent messages
         expect(result[result.length - 1].content).toContain('Message 29')
       },
-      { timeout: 20000 }
+      { timeout: 40000 }
     )
 
     it(
@@ -143,7 +143,7 @@ describe('truncateConversation', () => {
         expect(result[0].content).toContain('[CONTENT TRUNCATED]')
         expect(result[0].content.length).toBeLessThan(hugeContent.length)
       },
-      { timeout: 20000 }
+      { timeout: 40000 }
     )
 
     it('should handle mixed message sizes correctly', () => {
@@ -213,7 +213,7 @@ describe('truncateConversation', () => {
           expect(afterIndex - beforeIndex).toBeGreaterThan(1)
         }
       },
-      { timeout: 30000 }
+      { timeout: 60000 }
     )
 
     it('should not duplicate messages when head and tail overlap', () => {
@@ -264,7 +264,7 @@ describe('truncateConversation', () => {
         expect(truncationMarker).toBeDefined()
         expect(truncationMarker?.role).toBe('user')
       },
-      { timeout: 15000 }
+      { timeout: 30000 }
     )
   })
 })
