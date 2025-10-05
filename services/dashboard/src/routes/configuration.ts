@@ -192,12 +192,23 @@ configurationRoutes.get('/', async c => {
                               .map(
                                 train => `
                           <tr id="train-row-${train.trainId}">
-                            <td><strong>${train.trainId}</strong></td>
+                            <td>
+                              <a href="/dashboard/trains/${train.trainId}" style="color: #3b82f6; text-decoration: none;">
+                                <strong>${train.trainId}</strong>
+                              </a>
+                            </td>
                             <td class="text-sm">${train.description || '-'}</td>
                             <td class="text-sm">${train.accountIds.length} account(s)</td>
                             <td>${train.isActive ? '<span style="color: #10b981;">Active</span>' : '<span style="color: #6b7280;">Inactive</span>'}</td>
                             <td class="text-sm">${new Date(train.createdAt).toLocaleString()}</td>
                             <td>
+                              <a
+                                href="/dashboard/trains/${train.trainId}"
+                                class="btn btn-secondary"
+                                style="font-size: 0.75rem; padding: 0.25rem 0.75rem; margin-right: 0.5rem; text-decoration: none; display: inline-block;"
+                              >
+                                View
+                              </a>
                               <button
                                 class="btn btn-secondary"
                                 style="font-size: 0.75rem; padding: 0.25rem 0.75rem; margin-right: 0.5rem;"

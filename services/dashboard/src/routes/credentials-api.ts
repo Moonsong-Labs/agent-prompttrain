@@ -7,7 +7,7 @@
 
 import { Hono } from 'hono'
 import { container } from '../container.js'
-import { CredentialsRepository, getErrorMessage } from '@agent-prompttrain/shared'
+import { CredentialsRepository, getErrorMessage, generateApiKey } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger.js'
 
 export const credentialsApiRoutes = new Hono()
@@ -297,5 +297,134 @@ credentialsApiRoutes.delete('/trains/:id', async c => {
   } catch (error) {
     logger.error('Failed to delete train', { error: getErrorMessage(error) })
     return c.json({ error: 'Failed to delete train' }, 500)
+  }
+})
+
+// ========================================
+// API KEY GENERATION & REVOCATION
+// ========================================
+
+/**
+ * POST /accounts/generate - Generate a new API key for a train
+ */
+credentialsApiRoutes.post('/accounts/generate', async c => {
+  try {
+    const body = await c.req.json()
+
+    // Validate required fields
+    if (!body.trainId || !body.accountName) {
+      return c.json({ error: 'trainId and accountName are required' }, 400)
+    }
+
+    const repo = getRepository()
+
+    // Check per-train limit (10 keys per train)
+    const perTrainCount = await repo.countGeneratedKeysForTrain(body.trainId)
+    if (perTrainCount >= 10) {
+      return c.json(
+        {
+          error: 'Per-train limit reached',
+          message: 'Maximum of 10 generated API keys per train',
+        },
+        429
+      )
+    }
+
+    // Check global limit (50 keys total)
+    const globalCount = await repo.countGeneratedKeysGlobal()
+    if (globalCount >= 50) {
+      return c.json(
+        {
+          error: 'Global limit reached',
+          message: 'Maximum of 50 generated API keys globally',
+        },
+        429
+      )
+    }
+
+    // Generate the key
+    const generatedKey = generateApiKey()
+
+    // Store it
+    const result = await repo.generateApiKeyForTrain(body.trainId, body.accountName, generatedKey)
+
+    logger.info('API key generated', {
+      metadata: {
+        accountId: result.accountId,
+        trainId: body.trainId,
+        accountName: body.accountName,
+      },
+    })
+
+    // Return the plaintext key (ONLY TIME IT WILL BE EXPOSED)
+    return c.json(
+      {
+        status: 'ok',
+        account_id: result.accountId,
+        api_key: result.apiKey,
+        warning: 'Save this key securely. You will not be able to see it again.',
+      },
+      201
+    )
+  } catch (error) {
+    logger.error('Failed to generate API key', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to generate API key' }, 500)
+  }
+})
+
+/**
+ * PATCH /accounts/:id/revoke - Revoke an API key
+ */
+credentialsApiRoutes.patch('/accounts/:id/revoke', async c => {
+  try {
+    const accountId = c.req.param('id')
+
+    const repo = getRepository()
+
+    // Check if account exists
+    const existing = await repo.getAccountById(accountId)
+    if (!existing) {
+      return c.json({ error: 'Account not found' }, 404)
+    }
+
+    await repo.revokeAccount(accountId)
+
+    logger.info('Account revoked', { metadata: { accountId } })
+
+    return c.json({
+      status: 'ok',
+      message: 'Account revoked successfully',
+    })
+  } catch (error) {
+    logger.error('Failed to revoke account', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to revoke account' }, 500)
+  }
+})
+
+/**
+ * GET /trains/:id/accounts - Get all accounts for a specific train
+ */
+credentialsApiRoutes.get('/trains/:id/accounts', async c => {
+  try {
+    const trainId = c.req.param('id')
+
+    const repo = getRepository()
+
+    // Check if train exists
+    const train = await repo.getTrainById(trainId)
+    if (!train) {
+      return c.json({ error: 'Train not found' }, 404)
+    }
+
+    const accounts = await repo.getAccountsForTrain(trainId)
+
+    return c.json({
+      status: 'ok',
+      accounts,
+      count: accounts.length,
+    })
+  } catch (error) {
+    logger.error('Failed to get train accounts', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to retrieve train accounts' }, 500)
   }
 })

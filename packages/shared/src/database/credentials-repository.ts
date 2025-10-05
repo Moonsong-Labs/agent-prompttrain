@@ -479,4 +479,183 @@ export class CredentialsRepository {
   async deleteTrain(trainId: string): Promise<void> {
     await this.db.query('DELETE FROM trains WHERE train_id = $1', [trainId])
   }
+
+  // ========================================
+  // API KEY GENERATION & REVOCATION
+  // ========================================
+
+  /**
+   * Count generated keys for a specific train
+   * Used to enforce per-train generation limits
+   */
+  async countGeneratedKeysForTrain(trainId: string): Promise<number> {
+    const result = await this.db.query<{ count: string }>(
+      `
+      SELECT COUNT(*) as count
+      FROM accounts a
+      INNER JOIN train_account_mappings tam ON a.account_id = tam.account_id
+      WHERE tam.train_id = $1
+      AND a.is_generated = true
+      AND a.revoked_at IS NULL
+    `,
+      [trainId]
+    )
+
+    return parseInt(result.rows[0].count, 10)
+  }
+
+  /**
+   * Count all generated keys globally
+   * Used to enforce global generation limits
+   */
+  async countGeneratedKeysGlobal(): Promise<number> {
+    const result = await this.db.query<{ count: string }>(
+      `
+      SELECT COUNT(*) as count
+      FROM accounts
+      WHERE is_generated = true
+      AND revoked_at IS NULL
+    `
+    )
+
+    return parseInt(result.rows[0].count, 10)
+  }
+
+  /**
+   * Generate a new API key for a train
+   * Returns both the account ID and the plaintext key (only time it's exposed)
+   *
+   * @param trainId - The train to generate the key for
+   * @param accountName - A friendly name for the generated key
+   * @param generatedKey - The pre-generated API key (from generateApiKey utility)
+   * @returns Object containing accountId and the plaintext apiKey
+   */
+  async generateApiKeyForTrain(
+    trainId: string,
+    accountName: string,
+    generatedKey: string
+  ): Promise<{ accountId: string; apiKey: string }> {
+    const client = await this.db.connect()
+
+    try {
+      await client.query('BEGIN')
+
+      const accountId = `acc_${randomUUID()}`
+
+      // Import generateApiKey and hashApiKey here to avoid circular deps
+      const { hashApiKey: hashFn } = await import('../utils/encryption.js')
+      const keyHash = hashFn(generatedKey)
+
+      // Encrypt the API key
+      const apiKeyEncrypted = encrypt(generatedKey, this.encryptionKey)
+
+      // Insert the account
+      await client.query(
+        `
+        INSERT INTO accounts (
+          account_id, account_name, credential_type,
+          api_key_encrypted, key_hash, is_generated,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      `,
+        [accountId, accountName, 'api_key', apiKeyEncrypted, keyHash, true]
+      )
+
+      // Link to train with priority 0 (will be auto-incremented by trigger or manual)
+      await client.query(
+        `
+        INSERT INTO train_account_mappings (train_id, account_id, priority)
+        VALUES ($1, $2, COALESCE((SELECT MAX(priority) + 1 FROM train_account_mappings WHERE train_id = $1), 0))
+      `,
+        [trainId, accountId]
+      )
+
+      await client.query('COMMIT')
+
+      return {
+        accountId,
+        apiKey: generatedKey,
+      }
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
+  /**
+   * Revoke an API key (soft delete)
+   * Sets revoked_at timestamp and marks as inactive
+   */
+  async revokeAccount(accountId: string): Promise<void> {
+    await this.db.query(
+      `
+      UPDATE accounts
+      SET revoked_at = NOW(), is_active = false, updated_at = NOW()
+      WHERE account_id = $1
+    `,
+      [accountId]
+    )
+  }
+
+  /**
+   * Get accounts for a specific train
+   * Includes generated flag and revoked status
+   */
+  async getAccountsForTrain(
+    trainId: string
+  ): Promise<
+    Array<
+      Omit<
+        DatabaseAccount,
+        'apiKeyEncrypted' | 'oauthAccessTokenEncrypted' | 'oauthRefreshTokenEncrypted'
+      > & { keyHashLast4?: string }
+    >
+  > {
+    const result = await this.db.query<{
+      account_id: string
+      account_name: string
+      credential_type: 'api_key' | 'oauth'
+      key_hash?: string
+      is_generated?: boolean
+      revoked_at?: Date
+      oauth_expires_at?: number
+      oauth_scopes?: string[]
+      oauth_is_max?: boolean
+      is_active: boolean
+      created_at: Date
+      updated_at: Date
+      last_used_at?: Date
+    }>(
+      `
+      SELECT a.account_id, a.account_name, a.credential_type,
+             a.key_hash, a.is_generated, a.revoked_at,
+             a.oauth_expires_at, a.oauth_scopes, a.oauth_is_max,
+             a.is_active, a.created_at, a.updated_at, a.last_used_at
+      FROM accounts a
+      INNER JOIN train_account_mappings tam ON a.account_id = tam.account_id
+      WHERE tam.train_id = $1
+      ORDER BY tam.priority, a.created_at
+    `,
+      [trainId]
+    )
+
+    return result.rows.map(row => ({
+      accountId: row.account_id,
+      accountName: row.account_name,
+      credentialType: row.credential_type,
+      isGenerated: row.is_generated,
+      keyHash: row.key_hash,
+      keyHashLast4: row.key_hash ? row.key_hash.slice(-4) : undefined,
+      revokedAt: row.revoked_at,
+      oauthExpiresAt: row.oauth_expires_at,
+      oauthScopes: row.oauth_scopes,
+      oauthIsMax: row.oauth_is_max,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastUsedAt: row.last_used_at,
+    }))
+  }
 }

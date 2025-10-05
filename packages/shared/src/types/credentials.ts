@@ -15,6 +15,9 @@ export interface DatabaseAccount {
   oauthExpiresAt?: number
   oauthScopes?: string[]
   oauthIsMax?: boolean
+  isGenerated?: boolean
+  keyHash?: string
+  revokedAt?: Date
   isActive: boolean
   createdAt: Date
   updatedAt: Date

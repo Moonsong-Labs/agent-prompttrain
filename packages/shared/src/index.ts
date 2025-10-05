@@ -119,7 +119,13 @@ export {
   type TrainAccountMapping,
   type DecryptedAccount,
 } from './types/credentials.js'
-export { encrypt, decrypt, hashApiKey, verifyApiKeyHash } from './utils/encryption.js'
+export {
+  encrypt,
+  decrypt,
+  hashApiKey,
+  verifyApiKeyHash,
+  generateApiKey,
+} from './utils/encryption.js'
 export {
   CredentialsRepository,
   type CreateAccountInput,

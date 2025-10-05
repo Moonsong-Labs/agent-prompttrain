@@ -21,6 +21,7 @@ import { readOnlyProtection } from './middleware/read-only-protection.js'
 import { requireDbCredentials } from './middleware/feature-flag.js'
 import { credentialsApiRoutes } from './routes/credentials-api.js'
 import { configurationRoutes } from './routes/configuration.js'
+import { trainDetailRoutes } from './routes/train-detail.js'
 
 /**
  * Create and configure the Dashboard application
@@ -225,8 +226,10 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   // Mount credential management routes (behind feature flag)
   app.use('/dashboard/configuration*', requireDbCredentials)
+  app.use('/dashboard/trains*', requireDbCredentials)
   app.use('/api/credentials*', requireDbCredentials)
   app.route('/dashboard/configuration', configurationRoutes)
+  app.route('/dashboard/trains', trainDetailRoutes)
   app.route('/api/credentials', credentialsApiRoutes)
 
   // Root redirect to dashboard
