@@ -101,7 +101,7 @@ export const config = {
       return env.int('DB_PORT', 5432)
     },
     get name() {
-      return env.string('DB_NAME', 'claude_proxy')
+      return env.string('DB_NAME', 'agent_prompttrain')
     },
     get user() {
       return env.string('DB_USER', 'postgres')

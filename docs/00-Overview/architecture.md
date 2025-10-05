@@ -109,7 +109,7 @@ HOST=0.0.0.0
 CREDENTIALS_DIR=credentials
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/claude_proxy
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agent_prompttrain
 STORAGE_ENABLED=true
 
 # Telemetry
@@ -131,7 +131,7 @@ HOST=0.0.0.0
 DASHBOARD_API_KEY=your-secret-key
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/claude_proxy
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agent_prompttrain
 
 # Optional
 PROXY_API_URL=http://localhost:3000
