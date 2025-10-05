@@ -570,6 +570,17 @@ export class CredentialsRepository {
         [trainId, accountId, trainId]
       )
 
+      // Add the key hash to the train's client_api_keys_hashed array for client authentication
+      await client.query(
+        `
+        UPDATE trains
+        SET client_api_keys_hashed = array_append(COALESCE(client_api_keys_hashed, ARRAY[]::TEXT[]), $1),
+            updated_at = NOW()
+        WHERE train_id = $2
+      `,
+        [keyHash, trainId]
+      )
+
       await client.query('COMMIT')
 
       return {
