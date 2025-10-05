@@ -2,7 +2,7 @@
 import { Pool } from 'pg'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
-import { encrypt, hashApiKey } from '@agent-prompttrain/shared'
+import { encrypt, hashApiKey } from '../../packages/shared/dist/utils/encryption.js'
 
 /**
  * Migration 014: Import credentials from filesystem to database
