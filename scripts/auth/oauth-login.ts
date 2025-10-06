@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { randomBytes, createHash } from 'crypto'
-import { createCredential } from '@agent-prompttrain/shared/database/queries'
+import { createCredential } from '../../packages/shared/src/database/queries/index.js'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 

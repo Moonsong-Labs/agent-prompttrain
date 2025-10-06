@@ -1,0 +1,109 @@
+name: Feature
+description: Make the agent develop a new feature and publishing a PR from main
+template: |
+  **Project information**
+  This project is fully developed by AI agents. Expect some data to be outdated.
+  ALWAYS double-check your ideas and changes with the Gemini AI Agent using zen-xxxx tools
+
+  **Task Execution:**
+  - Maintain and update your todo list continuously as requirements emerge or tasks decompose
+  - Execute independent operations concurrently - invoke all relevant tools simultaneously, never sequentially when possible
+  - After tool results, assess quality and plan next steps before proceeding
+
+  **Information Gathering:**
+  - Use web search to find current documentation, examples, and up-to-date information before starting work
+  - Establish complete context about library versions, API state, and best practices - incomplete context produces suboptimal solutions
+  - Validate all assumptions through authoritative sources
+
+  **Code Quality:**
+  - Document code for developer navigation and agent comprehension
+  - Never implement mock data unless explicitly requested
+  - ALWAYS clean-up your code/files after finishing a task
+  - ALWAYS search for relevant information in documentation/script/ci/... for outdated information. Fix if necessary
+
+  **Decision Making:**
+  - Work from validated assumptions only.
+  - Make sure you reach consensus with gemini-2.5-pro and o3 because taking conclusions or work.
+  - For complex tasks, use structured reasoning to synthesize information and determine optimal action sequences
+  - Prioritize parallel execution and evidence-based decisions
+
+  **Behavior requirements**
+  - After finishing to edit code/feature, ALWAYS verify it using code
+  - After finishing to edit code/feature, ALWAYS check for documentations to be updated
+  - After finishing to edit code/feature, ALWAYS use tools for validating work
+  - Always publish to a different branch and create a PR if needed
+
+  - When performing bash action, NEVER use `cd`, instead make script/commands/code work from the root directory
+  - When commit files to git, never use -A but add the files specifically. Take time to review them first, checking with Gemini
+
+  When tackling complex issues with multiple sub-tasks, use a structured approach:
+  1. Create a todo list to track all necessary fixes
+  2. Mark items as "in_progress" when working on them
+  3. Mark items as "completed" when finished
+  4. This ensures nothing is missed and provides clear progress tracking
+
+  When debugging CI/CD failures:
+  1. Use `gh pr checks <PR>` to see recent checks
+  2. Use `gh run view <RUN_ID> --log-failed` to see specific failure logs
+  3. Check multiple workflows as they may have different failure reasons
+  4. Fix issues incrementally and verify each fix
+
+  For monorepo projects:
+  - Shared packages must be built before dependent packages can be type-checked
+  - Update CI workflows to build shared packages first: `bun run build:shared`
+  - Ensure build scripts generate TypeScript declaration files when needed
+
+  When fixing TypeScript errors:
+  1. Read the exact error message carefully
+  2. Check type definitions to understand constraints
+  3. Remove unnecessary properties that don't match type definitions
+  4. Use type assertions sparingly and only when necessary
+
+  Follow an iterative approach:
+  1. Fix one category of issues at a time
+  2. Commit with clear, descriptive messages
+  3. Push and wait for CI to run
+  4. Verify fixes before moving to the next issue
+  5. Don't assume all issues are fixed - always verify
+
+  When fixing issues:
+  1. Clearly identify all problems upfront
+  2. Explain what you're doing at each step
+  3. Show the actual commands and their output
+  4. Summarize what was fixed at the end
+
+  <documentations>
+  !`find docs/ -name '*.md' | sort`
+  </documentations>
+
+  <tips>
+  * When trying to add file, commit and push to github, PR. Directly combine those 4 into a single bash tool call.
+  * When requiring more information, you MUST USE perplexity to search
+  * When using Bash commands, consider them ALWAYS as being run from the project root, even iif you used `cd` previously
+  * When analysis errors, you MUST first perform those 2 tool calls in parallel and then try to find the root cause:
+    1. Search perplexity for already popular solution
+    2. Get recommandation from Spark
+  * When planning, first think about it and once you have something prepared, ask more question to the user about the context and requirements, all at once.
+  * When making code implementation, challenge yourself using gemini pro
+  * When finishing to implement, spawn an agent to search for all the relevant documentation and files that might get impact by your changes, only ask him to list them. Then proceed to update them yourself.
+  </tips>
+
+
+
+  <goal>You are tasked to develop a new feature. Write all the steps into your TODO list</goal>
+  <steps>
+  1. git checkout main and pull to ensure latest code version
+  2. Ensure you are working on a new branch and you will finish your work with a PR
+  3. Spawn gemini to read through all the <documentation> and extract meaningful/relevant context for this task and how to achieve it. It must be limited to 10 paragraphs.
+  4. Ask gemini pro to help you prepare a plan
+  5. If the plan and solution is too vague, ask for refinement
+  6. Review the plan and make sure you are confident with the implementation
+  7. If changes are needed ask for review and get into a consensus
+  8. Repeat process 5-8 until the plan is clear and concise
+  9. Spawn gemini to read through all the <documentation> and extract meaningful/relevant context for this plan. It must be limited to 10 paragraphs.
+  10. Execute the plan
+  11. Ask Gemini pro for code review
+  12. Spawn gemini to read through all the <documentation> and extract meaningful/relevant context for reviewing the implementation. It must be limited to 10 paragraphs.
+  13. If there are relevant reviews that are critical and not easily applyable, ask the user.
+  14. you MUST make all actions of your PR pass. 
+  </steps>

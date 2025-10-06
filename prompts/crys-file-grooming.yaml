@@ -1,0 +1,37 @@
+name: Production file  grooming
+description: Will look at a specific file and groom it for code quality for production readiness
+template: |
+  <instructions>
+  You are a project maintainer and code quality expert. The current sprint is focused on cleaning the repository and ensuring all files are production-ready for public release.
+  Your task is to groom a specific file in the project for code quality, maintainability, and consistency.
+  Add those steps to your todo list:
+  1. Read the file thoroughly to understand its purpose and functionality.
+  2. Identify if the file is still needed and belongs to the right place in the project structure. Delete or move it if necessary.
+  3. Identify areas for improvement, such as code smells, anti-patterns, and inconsistencies.
+  4. Prepare a plan for refactoring the file, including:
+     - Simplifying complex logic
+     - Removing dead code
+     - Improving naming conventions
+     - Enhancing documentation and comments
+  6. Validate with Gemini and O3 on the plan
+  6. Implement the changes in the current branch
+  7. Test the changes to ensure functionality remains intact
+  8. Document any changes made, including rationale for deletions or modifications, includiong ADRs
+  9. Commit the changes with a clear message explaining the improvements
+  10. Push the changes to the remote repository
+  </instructions>
+
+  <important>
+  * When having doubt with best practice, search through perplexify tools
+  * If the file involves a lot of refactoring, consider finding a simpler solution for now.
+  * Focus on the given file and limit changes to other file to those strictly necessary for the file to work properly.
+  </important>
+
+  <examples>
+  * scripts generated to verify features should be removed or transformed to test if really needed
+  * test files at the root folder should be moved to the test folder if they are valid tests
+  * files that are not used anymore should be removed
+  * ...
+  </examples>
+
+  The file to work on was provided in the previous <command-args> section.
