@@ -18,6 +18,9 @@ import { analyticsConversationPartialRoutes } from './routes/partials/analytics-
 import { csrfProtection } from './middleware/csrf.js'
 import { rateLimitForReadOnly } from './middleware/rate-limit.js'
 import { readOnlyProtection } from './middleware/read-only-protection.js'
+import credentialsRoutes from './routes/credentials.js'
+import trainsRoutes from './routes/trains.js'
+import apiKeysRoutes from './routes/api-keys.js'
 
 /**
  * Create and configure the Dashboard application
@@ -208,6 +211,11 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   // Mount analysis API routes
   app.route('/api', analysisRoutes)
+
+  // Mount credential and train management routes
+  app.route('/api/credentials', credentialsRoutes)
+  app.route('/api/trains', trainsRoutes)
+  app.route('/api/trains', apiKeysRoutes) // Nested under trains
 
   // Mount analysis partials routes
   app.route('/partials/analysis', analysisPartialsRoutes)

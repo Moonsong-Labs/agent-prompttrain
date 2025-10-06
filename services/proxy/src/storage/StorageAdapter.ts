@@ -652,6 +652,13 @@ export class StorageAdapter {
   /**
    * Close the storage adapter
    */
+  /**
+   * Get the database pool for direct queries
+   */
+  getPool(): Pool {
+    return this.pool
+  }
+
   async close(): Promise<void> {
     // Mark as closed to prevent new cleanups from being scheduled
     this.isClosed = true

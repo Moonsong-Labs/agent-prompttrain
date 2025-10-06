@@ -1,8 +1,7 @@
 import { Context, Next } from 'hono'
-import { timingSafeEqual as cryptoTimingSafeEqual } from 'crypto'
 import { logger } from './logger.js'
 import { container } from '../container.js'
-import { config } from '@agent-prompttrain/shared/config'
+import { verifyTrainApiKey } from '@agent-prompttrain/shared/database/queries'
 
 /**
  * Client API Authentication Middleware
@@ -64,57 +63,30 @@ export function clientAuthMiddleware() {
     }
 
     try {
-      // Get the authentication service from container
-      const authService = container.getAuthenticationService()
-      logger.debug(`trainId: ${trainId}, requestId: ${requestId}`)
-      const clientApiKeys = await authService.getClientApiKeys(trainId)
-
-      if (!clientApiKeys.length) {
-        logger.warn('Client auth middleware: No client API key configured', {
+      // Get database pool from container
+      const pool = container.getDbPool()
+      if (!pool) {
+        logger.error('Client auth middleware: Database pool not available', {
           requestId,
           trainId,
-          path: c.req.path,
-          ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
         return c.json(
           {
             error: {
-              type: 'authentication_error',
-              message: `No client API keys configured for train "${trainId}". Add a keys file under ${config.auth.clientKeysDir} or disable client authentication.`,
+              type: 'internal_error',
+              message: 'Database not configured. Authentication unavailable.',
             },
           },
-          401,
-          {
-            'WWW-Authenticate': 'Bearer realm="Agent Prompt Train"',
-          }
+          500
         )
       }
 
-      // Use timing-safe comparison with SHA-256 hashing to prevent timing attacks
-      // This ensures both inputs are always the same length (32 bytes)
-      const encoder = new TextEncoder()
-      const tokenBuffer = encoder.encode(token)
+      logger.debug(`trainId: ${trainId}, requestId: ${requestId}`)
 
-      // Hash both values before comparison
-      const tokenHash = await crypto.subtle.digest('SHA-256', tokenBuffer)
-      const tokenHashBuffer = Buffer.from(tokenHash)
+      // Verify the API key against the database
+      const verifiedKey = await verifyTrainApiKey(pool, trainId, token)
 
-      let isValid = false
-      for (const clientKey of clientApiKeys) {
-        const clientKeyBuffer = encoder.encode(clientKey)
-        const keyHash = await crypto.subtle.digest('SHA-256', clientKeyBuffer)
-        const keyHashBuffer = Buffer.from(keyHash)
-
-        if (
-          keyHashBuffer.length === tokenHashBuffer.length &&
-          cryptoTimingSafeEqual(tokenHashBuffer, keyHashBuffer)
-        ) {
-          isValid = true
-          break
-        }
-      }
-
-      if (!isValid) {
+      if (!verifiedKey) {
         logger.warn('Client auth middleware: Invalid API key', {
           requestId,
           trainId,

@@ -45,12 +45,12 @@ async function startServer() {
       })
     : undefined
 
+  if (!dbPool) {
+    throw new Error('Database pool is required. Please configure DATABASE_URL.')
+  }
+
   // 2. Create services with their dependencies
-  const authService = new AuthenticationService({
-    defaultApiKey: undefined,
-    accountsDir: config.auth.accountsDir,
-    clientKeysDir: config.auth.clientKeysDir,
-  })
+  const authService = new AuthenticationService(dbPool)
 
   const apiClient = new ClaudeApiClient({
     baseUrl: config.api.claudeBaseUrl,
