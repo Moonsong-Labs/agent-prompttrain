@@ -6,6 +6,8 @@ import { Pool } from 'pg'
  *
  * This migration creates the schema for storing account credentials and train configurations
  * in the database instead of filesystem files. Follows ADR-026.
+ *
+ * Combined from original migrations 013, 015 (train_name never created), and 016 (API key generation support)
  */
 async function migrateAccountsTrainsSchema() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -20,13 +22,18 @@ async function migrateAccountsTrainsSchema() {
         account_name VARCHAR(255) UNIQUE NOT NULL,
         credential_type VARCHAR(20) NOT NULL CHECK (credential_type IN ('api_key', 'oauth')),
 
-        -- Credentials stored in plaintext
+        -- Credentials stored in plaintext (ADR-026)
         api_key TEXT,
         oauth_access_token TEXT,
         oauth_refresh_token TEXT,
         oauth_expires_at BIGINT,
         oauth_scopes TEXT[],
         oauth_is_max BOOLEAN DEFAULT false,
+
+        -- API key generation support (from migration 016)
+        is_generated BOOLEAN NOT NULL DEFAULT FALSE,
+        key_hash VARCHAR(64),
+        revoked_at TIMESTAMPTZ,
 
         -- Audit and metadata
         is_active BOOLEAN DEFAULT true,
@@ -48,10 +55,10 @@ async function migrateAccountsTrainsSchema() {
         train_id VARCHAR(255) PRIMARY KEY,
         description TEXT,
 
-        -- Client API keys (SHA-256 hashed for security)
+        -- Client API keys (stored as plaintext despite column name)
         client_api_keys_hashed TEXT[],
 
-        -- Slack configuration (moved from accounts - per train)
+        -- Slack configuration (per train)
         slack_config JSONB,
 
         -- Configuration
@@ -102,6 +109,12 @@ async function migrateAccountsTrainsSchema() {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_accounts_last_used
       ON accounts(last_used_at DESC NULLS LAST)
+    `)
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_accounts_key_hash
+      ON accounts(key_hash)
+      WHERE key_hash IS NOT NULL
     `)
 
     // Trains indexes

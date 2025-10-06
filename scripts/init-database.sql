@@ -225,3 +225,114 @@ CREATE INDEX IF NOT EXISTS idx_audit_event_type ON analysis_audit_log (event_typ
 
 -- Add comment on analysis_audit_log
 COMMENT ON TABLE analysis_audit_log IS 'Audit log for AI analysis operations. Consider partitioning by timestamp for high-volume deployments.';
+
+-- Create accounts table for database-backed credential management (ADR-026)
+CREATE TABLE IF NOT EXISTS accounts (
+  account_id VARCHAR(255) PRIMARY KEY,
+  account_name VARCHAR(255) UNIQUE NOT NULL,
+  credential_type VARCHAR(20) NOT NULL CHECK (credential_type IN ('api_key', 'oauth')),
+
+  -- Credentials stored in plaintext (ADR-026)
+  api_key TEXT,
+  oauth_access_token TEXT,
+  oauth_refresh_token TEXT,
+  oauth_expires_at BIGINT,
+  oauth_scopes TEXT[],
+  oauth_is_max BOOLEAN DEFAULT false,
+
+  -- API key generation support
+  is_generated BOOLEAN NOT NULL DEFAULT FALSE,
+  key_hash VARCHAR(64),
+  revoked_at TIMESTAMPTZ,
+
+  -- Audit and metadata
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ,
+
+  -- Constraint: ensure proper credentials based on type
+  CONSTRAINT api_key_required CHECK (
+    (credential_type = 'api_key' AND api_key IS NOT NULL) OR
+    (credential_type = 'oauth' AND oauth_access_token IS NOT NULL AND oauth_refresh_token IS NOT NULL)
+  )
+);
+
+-- Create trains table for train configurations
+CREATE TABLE IF NOT EXISTS trains (
+  train_id VARCHAR(255) PRIMARY KEY,
+  description TEXT,
+
+  -- Client API keys (stored as plaintext despite column name)
+  client_api_keys_hashed TEXT[],
+
+  -- Slack configuration (per train)
+  slack_config JSONB,
+
+  -- Configuration
+  default_account_id VARCHAR(255),
+  is_active BOOLEAN DEFAULT true,
+
+  -- Audit
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- Foreign key to accounts (nullable - can be set later)
+  CONSTRAINT fk_default_account FOREIGN KEY (default_account_id)
+    REFERENCES accounts(account_id) ON DELETE SET NULL
+);
+
+-- Create train_account_mappings table for many-to-many relationship
+CREATE TABLE IF NOT EXISTS train_account_mappings (
+  train_id VARCHAR(255) NOT NULL,
+  account_id VARCHAR(255) NOT NULL,
+  priority INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  PRIMARY KEY (train_id, account_id),
+
+  CONSTRAINT fk_mapping_train FOREIGN KEY (train_id)
+    REFERENCES trains(train_id) ON DELETE CASCADE,
+  CONSTRAINT fk_mapping_account FOREIGN KEY (account_id)
+    REFERENCES accounts(account_id) ON DELETE CASCADE
+);
+
+-- Create indexes for accounts table
+CREATE INDEX IF NOT EXISTS idx_accounts_type
+ON accounts(credential_type);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_active
+ON accounts(is_active)
+WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_accounts_last_used
+ON accounts(last_used_at DESC NULLS LAST);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_key_hash
+ON accounts(key_hash)
+WHERE key_hash IS NOT NULL;
+
+-- Create indexes for trains table
+CREATE INDEX IF NOT EXISTS idx_trains_active
+ON trains(is_active)
+WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_trains_default_account
+ON trains(default_account_id)
+WHERE default_account_id IS NOT NULL;
+
+-- Create indexes for train_account_mappings table
+CREATE INDEX IF NOT EXISTS idx_train_mappings_train
+ON train_account_mappings(train_id);
+
+CREATE INDEX IF NOT EXISTS idx_train_mappings_account
+ON train_account_mappings(account_id);
+
+CREATE INDEX IF NOT EXISTS idx_train_mappings_priority
+ON train_account_mappings(train_id, priority);
+
+-- Add comments for credential management tables
+COMMENT ON TABLE accounts IS 'Stores Anthropic account credentials (API keys and OAuth tokens) for making requests to Claude API';
+COMMENT ON TABLE trains IS 'Stores train configurations including client authentication tokens and default account settings';
+COMMENT ON TABLE train_account_mappings IS 'Many-to-many relationship between trains and accounts with priority ordering';
+COMMENT ON COLUMN trains.client_api_keys_hashed IS 'Plaintext client API keys for authenticating TO the proxy service (not Anthropic credentials)';
