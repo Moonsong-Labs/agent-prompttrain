@@ -26,6 +26,24 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | `TRAIN_CLIENT_KEYS_DIR` | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌       |
 | `DEFAULT_TRAIN_ID`      | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌       |
 
+### Credential Management (ADR-026)
+
+| Variable                   | Description                                              | Default | Required |
+| -------------------------- | -------------------------------------------------------- | ------- | -------- |
+| `USE_DATABASE_CREDENTIALS` | Enable database-backed credential storage (feature flag) | `false` | ❌       |
+
+**Security Notes:**
+
+- Credentials are stored as plaintext in PostgreSQL when database mode is enabled
+- Ensure proper database security: network isolation, least-privilege access, encryption at rest
+- Client API keys are SHA-256 hashed for one-way authentication
+
+Example:
+
+```bash
+USE_DATABASE_CREDENTIALS=false  # Safe default - uses filesystem
+```
+
 ### Train Identification
 
 | Variable                   | Description                                                                                                           | Default | Required |

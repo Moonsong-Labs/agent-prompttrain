@@ -1,53 +1,107 @@
 #!/usr/bin/env bun
-import { loadCredentials, refreshToken } from '../../services/proxy/src/credentials'
-import { resolve, dirname } from 'path'
-import { writeFileSync, mkdirSync, readFileSync } from 'fs'
+import { Pool } from 'pg'
+import { CredentialsRepository } from '../../packages/shared/src/database/credentials-repository'
+
+const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+const TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token'
+const BETA_HEADER = 'oauth-2025-04-20'
+
+async function refreshToken(refreshToken: string): Promise<{
+  accessToken: string
+  refreshToken: string
+  expiresAt: number
+  scopes: string[]
+  isMax: boolean
+}> {
+  const CLIENT_ID = process.env.CLAUDE_OAUTH_CLIENT_ID || DEFAULT_OAUTH_CLIENT_ID
+
+  const response = await fetch(TOKEN_URL, {
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-beta': BETA_HEADER,
+    },
+    method: 'POST',
+    body: JSON.stringify({
+      client_id: CLIENT_ID,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    let errorData: any = {}
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {}
+
+    const error = new Error(
+      errorData.error_description ||
+        errorData.error ||
+        `Failed to refresh token: ${response.status} ${response.statusText}`
+    ) as any
+    error.status = response.status
+    error.errorCode = errorData.error
+    error.errorDescription = errorData.error_description
+    throw error
+  }
+
+  const payload = (await response.json()) as any
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token || refreshToken,
+    expiresAt: Date.now() + payload.expires_in * 1000,
+    scopes: payload.scope ? payload.scope.split(' ') : [],
+    isMax: payload.is_max || true,
+  }
+}
 
 async function refreshOAuthToken() {
-  const credentialPath = process.argv[2]
+  const accountIdOrName = process.argv[2]
   const forceRefresh = process.argv[3] === '--force'
 
-  if (!credentialPath) {
-    console.error('Usage: bun run scripts/oauth-refresh.ts <credential-path> [--force]')
-    console.error(
-      'Example: bun run scripts/oauth-refresh.ts credentials/example.com.credentials.json'
-    )
+  if (!accountIdOrName) {
+    console.error('Usage: bun run scripts/auth/oauth-refresh.ts <account-id-or-name> [--force]')
+    console.error('Example: bun run scripts/auth/oauth-refresh.ts acc_example')
+    console.error('Example: bun run scripts/auth/oauth-refresh.ts my-account')
     console.error('\nOptions:')
     console.error('  --force    Force refresh even if token is not expired')
     process.exit(1)
   }
 
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const repo = new CredentialsRepository(pool)
+
   try {
-    const fullPath = resolve(credentialPath)
-    console.log(`Loading credentials from: ${fullPath}`)
+    console.log(`Loading account: ${accountIdOrName}`)
 
-    // Load the credentials
-    const credentials = loadCredentials(fullPath)
+    // Try to find account by ID first, then by name
+    let account = await repo.getAccountById(accountIdOrName)
 
-    if (!credentials) {
-      console.error(`Failed to load credentials from: ${fullPath}`)
+    if (!account) {
+      const accounts = await repo.listAccounts()
+      account = accounts.find(a => a.accountName === accountIdOrName) || null
+    }
+
+    if (!account) {
+      console.error(`No account found with ID or name: ${accountIdOrName}`)
       process.exit(1)
     }
 
-    if (credentials.type !== 'oauth' || !credentials.oauth) {
+    if (account.credentialType !== 'oauth') {
       console.error('This script only works with OAuth credentials')
-      console.error(`Found credential type: ${credentials.type}`)
+      console.error(`Found credential type: ${account.credentialType}`)
       process.exit(1)
     }
 
-    const oauth = credentials.oauth
     const now = Date.now()
-    const expiresAt = oauth.expiresAt || 0
+    const expiresAt = account.oauthExpiresAt || 0
     const isExpired = now >= expiresAt
-    const willExpireSoon = now >= expiresAt - 60000 // 1 minute before expiry
+    const willExpireSoon = now >= expiresAt - 60000
 
     console.log('\nCurrent OAuth status:')
-    console.log(
-      `- Access Token: ${oauth.accessToken ? oauth.accessToken.substring(0, 20) + '...' : 'missing'}`
-    )
-    console.log(
-      `- Refresh Token: ${oauth.refreshToken ? oauth.refreshToken.substring(0, 20) + '...' : 'missing'}`
-    )
+    console.log(`- Account ID: ${account.accountId}`)
+    console.log(`- Account Name: ${account.accountName}`)
     console.log(`- Expires At: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}`)
     console.log(`- Status: ${isExpired ? 'EXPIRED' : willExpireSoon ? 'EXPIRING SOON' : 'VALID'}`)
 
@@ -60,52 +114,50 @@ async function refreshOAuthToken() {
       process.exit(0)
     }
 
-    if (!oauth.refreshToken) {
+    // Get refresh token from database
+    const fullAccount = await pool.query<{
+      account_name: string
+      oauth_refresh_token: string
+    }>('SELECT account_name, oauth_refresh_token FROM accounts WHERE account_id = $1', [
+      account.accountId,
+    ])
+
+    if (!fullAccount.rows[0]?.oauth_refresh_token) {
       console.error('\nERROR: No refresh token available. Re-authentication required.')
-      console.error(`Run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
+      console.error(`Run: bun run scripts/auth/oauth-login.ts <account-name>`)
       process.exit(1)
     }
 
-    // Perform the refresh
+    const refreshTokenValue = fullAccount.rows[0].oauth_refresh_token
+    const oldAccountName = fullAccount.rows[0].account_name
+
     console.log('\nRefreshing OAuth token...')
     const startTime = Date.now()
 
     try {
-      const newOAuth = await refreshToken(oauth.refreshToken)
-
-      // Update credentials with new OAuth data
-      credentials.oauth = newOAuth
-
-      // Load existing file to preserve non-OAuth fields
-      let existingData: any = {}
-      try {
-        const content = readFileSync(fullPath, 'utf-8')
-        existingData = JSON.parse(content)
-      } catch (err) {
-        // If we can't read existing data, we'll just save the new data
-      }
-
-      // Merge the OAuth data with existing data, preserving other fields
-      const mergedCredentials = {
-        ...existingData,
-        ...credentials,
-        // Explicitly preserve fields that might exist
-        client_api_key: existingData.client_api_key,
-        slack: existingData.slack,
-      }
-
-      // Save updated credentials
-      mkdirSync(dirname(fullPath), { recursive: true })
-      writeFileSync(fullPath, JSON.stringify(mergedCredentials, null, 2))
-
+      const newOAuth = await refreshToken(refreshTokenValue)
       const refreshTime = Date.now() - startTime
 
       console.log(`\n✅ Token refreshed successfully in ${refreshTime}ms`)
+
+      // Since credentials are immutable, we need to delete the old account and create a new one
+      console.log('\nUpdating database (delete old + create new)...')
+
+      await repo.deleteAccount(account.accountId)
+
+      const newAccountId = await repo.createAccount({
+        accountName: oldAccountName,
+        credentialType: 'oauth',
+        oauthAccessToken: newOAuth.accessToken,
+        oauthRefreshToken: newOAuth.refreshToken,
+        oauthExpiresAt: newOAuth.expiresAt,
+        oauthScopes: newOAuth.scopes,
+        oauthIsMax: newOAuth.isMax,
+      })
+
       console.log('\nNew OAuth status:')
-      console.log(`- Access Token: ${newOAuth.accessToken.substring(0, 20)}...`)
-      console.log(
-        `- Refresh Token: ${newOAuth.refreshToken ? newOAuth.refreshToken.substring(0, 20) + '...' : 'reused existing'}`
-      )
+      console.log(`- Account ID: ${newAccountId} (new)`)
+      console.log(`- Account Name: ${oldAccountName}`)
       console.log(`- Expires At: ${new Date(newOAuth.expiresAt).toISOString()}`)
       console.log(`- Scopes: ${newOAuth.scopes.join(', ')}`)
       console.log(`- Is Max: ${newOAuth.isMax}`)
@@ -115,14 +167,17 @@ async function refreshOAuthToken() {
       const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
       console.log(`- Valid For: ${hours}h ${minutes}m`)
 
-      console.log(`\nCredentials saved to: ${fullPath}`)
+      console.log('\n⚠️  NOTE: A new account ID was created. Update any train configurations')
+      console.log(
+        `that referenced the old ID (${account.accountId}) to use the new ID (${newAccountId})`
+      )
     } catch (error: any) {
       console.error('\n❌ Failed to refresh token:', error.message)
 
       if (error.errorCode === 'invalid_grant' || error.status === 400) {
         console.error('\nThe refresh token is invalid or has been revoked.')
         console.error('You need to re-authenticate to get new credentials.')
-        console.error(`\nRun: bun run scripts/oauth-login.ts ${credentialPath}`)
+        console.error(`\nRun: bun run scripts/auth/oauth-login.ts <account-name>`)
       } else if (error.status) {
         console.error(`\nHTTP Status: ${error.status}`)
         console.error(`Error Code: ${error.errorCode || 'unknown'}`)
@@ -134,6 +189,8 @@ async function refreshOAuthToken() {
   } catch (error) {
     console.error('Error:', error)
     process.exit(1)
+  } finally {
+    await pool.end()
   }
 }
 
