@@ -1,58 +1,59 @@
 #!/usr/bin/env bun
-import { loadCredentials, refreshToken } from '../../services/proxy/src/credentials'
-import { resolve, dirname } from 'path'
-import { writeFileSync, mkdirSync, readFileSync } from 'fs'
+import { Pool } from 'pg'
+import {
+  getCredential,
+  updateCredential,
+} from '../../packages/shared/src/database/queries/index.js'
+import { refreshOAuthToken } from '../../services/proxy/src/credentials/index.js'
 
-async function refreshOAuthToken() {
-  const credentialPath = process.argv[2]
+async function refreshOAuthCredential() {
+  const credentialId = process.argv[2]
   const forceRefresh = process.argv[3] === '--force'
 
-  if (!credentialPath) {
-    console.error('Usage: bun run scripts/oauth-refresh.ts <credential-path> [--force]')
-    console.error(
-      'Example: bun run scripts/oauth-refresh.ts credentials/example.com.credentials.json'
-    )
+  if (!credentialId) {
+    console.error('Usage: bun run scripts/auth/oauth-refresh.ts <credential-id> [--force]')
+    console.error('Example: bun run scripts/auth/oauth-refresh.ts acc_team_alpha')
     console.error('\nOptions:')
     console.error('  --force    Force refresh even if token is not expired')
     process.exit(1)
   }
 
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    console.error('DATABASE_URL environment variable is required')
+    process.exit(1)
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl })
+
   try {
-    const fullPath = resolve(credentialPath)
-    console.log(`Loading credentials from: ${fullPath}`)
+    console.log(`Loading credential: ${credentialId}`)
 
-    // Load the credentials
-    const credentials = loadCredentials(fullPath)
+    // Load the credential from database
+    const credential = await getCredential(pool, credentialId)
 
-    if (!credentials) {
-      console.error(`Failed to load credentials from: ${fullPath}`)
+    if (!credential) {
+      console.error(`Credential not found: ${credentialId}`)
       process.exit(1)
     }
 
-    if (credentials.type !== 'oauth' || !credentials.oauth) {
-      console.error('This script only works with OAuth credentials')
-      console.error(`Found credential type: ${credentials.type}`)
-      process.exit(1)
-    }
-
-    const oauth = credentials.oauth
-    const now = Date.now()
-    const expiresAt = oauth.expiresAt || 0
-    const isExpired = now >= expiresAt
-    const willExpireSoon = now >= expiresAt - 60000 // 1 minute before expiry
+    const now = new Date()
+    const expiresAt = credential.oauth_expires_at
+    const isExpired = expiresAt ? now >= expiresAt : true
+    const willExpireSoon = expiresAt ? now >= new Date(expiresAt.getTime() - 60000) : true // 1 minute before expiry
 
     console.log('\nCurrent OAuth status:')
     console.log(
-      `- Access Token: ${oauth.accessToken ? oauth.accessToken.substring(0, 20) + '...' : 'missing'}`
+      `- Access Token: ${credential.oauth_access_token ? credential.oauth_access_token.substring(0, 20) + '...' : 'missing'}`
     )
     console.log(
-      `- Refresh Token: ${oauth.refreshToken ? oauth.refreshToken.substring(0, 20) + '...' : 'missing'}`
+      `- Refresh Token: ${credential.oauth_refresh_token ? credential.oauth_refresh_token.substring(0, 20) + '...' : 'missing'}`
     )
-    console.log(`- Expires At: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}`)
+    console.log(`- Expires At: ${expiresAt ? expiresAt.toISOString() : 'unknown'}`)
     console.log(`- Status: ${isExpired ? 'EXPIRED' : willExpireSoon ? 'EXPIRING SOON' : 'VALID'}`)
 
     if (!isExpired && !willExpireSoon && !forceRefresh) {
-      const expiresIn = expiresAt - now
+      const expiresIn = expiresAt!.getTime() - now.getTime()
       const hours = Math.floor(expiresIn / (1000 * 60 * 60))
       const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
       console.log(`- Expires In: ${hours}h ${minutes}m`)
@@ -60,9 +61,9 @@ async function refreshOAuthToken() {
       process.exit(0)
     }
 
-    if (!oauth.refreshToken) {
+    if (!credential.oauth_refresh_token) {
       console.error('\nERROR: No refresh token available. Re-authentication required.')
-      console.error(`Run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
+      console.error(`Run: bun run scripts/auth/oauth-login.ts`)
       process.exit(1)
     }
 
@@ -71,58 +72,42 @@ async function refreshOAuthToken() {
     const startTime = Date.now()
 
     try {
-      const newOAuth = await refreshToken(oauth.refreshToken)
+      const newTokens = await refreshOAuthToken(credential.oauth_refresh_token)
 
-      // Update credentials with new OAuth data
-      credentials.oauth = newOAuth
-
-      // Load existing file to preserve non-OAuth fields
-      let existingData: any = {}
-      try {
-        const content = readFileSync(fullPath, 'utf-8')
-        existingData = JSON.parse(content)
-      } catch (err) {
-        // If we can't read existing data, we'll just save the new data
-      }
-
-      // Merge the OAuth data with existing data, preserving other fields
-      const mergedCredentials = {
-        ...existingData,
-        ...credentials,
-        // Explicitly preserve fields that might exist
-        client_api_key: existingData.client_api_key,
-        slack: existingData.slack,
-      }
-
-      // Save updated credentials
-      mkdirSync(dirname(fullPath), { recursive: true })
-      writeFileSync(fullPath, JSON.stringify(mergedCredentials, null, 2))
+      // Update credential in database
+      await updateCredential(pool, credentialId, {
+        oauth_access_token: newTokens.accessToken,
+        oauth_refresh_token: newTokens.refreshToken,
+        oauth_expires_at: new Date(newTokens.expiresAt),
+        oauth_scopes: newTokens.scopes,
+        oauth_is_max: newTokens.isMax,
+      })
 
       const refreshTime = Date.now() - startTime
 
       console.log(`\n✅ Token refreshed successfully in ${refreshTime}ms`)
       console.log('\nNew OAuth status:')
-      console.log(`- Access Token: ${newOAuth.accessToken.substring(0, 20)}...`)
+      console.log(`- Access Token: ${newTokens.accessToken.substring(0, 20)}...`)
       console.log(
-        `- Refresh Token: ${newOAuth.refreshToken ? newOAuth.refreshToken.substring(0, 20) + '...' : 'reused existing'}`
+        `- Refresh Token: ${newTokens.refreshToken ? newTokens.refreshToken.substring(0, 20) + '...' : 'reused existing'}`
       )
-      console.log(`- Expires At: ${new Date(newOAuth.expiresAt).toISOString()}`)
-      console.log(`- Scopes: ${newOAuth.scopes.join(', ')}`)
-      console.log(`- Is Max: ${newOAuth.isMax}`)
+      console.log(`- Expires At: ${new Date(newTokens.expiresAt).toISOString()}`)
+      console.log(`- Scopes: ${newTokens.scopes.join(', ')}`)
+      console.log(`- Is Max: ${newTokens.isMax}`)
 
-      const expiresIn = newOAuth.expiresAt - Date.now()
+      const expiresIn = newTokens.expiresAt - Date.now()
       const hours = Math.floor(expiresIn / (1000 * 60 * 60))
       const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
       console.log(`- Valid For: ${hours}h ${minutes}m`)
 
-      console.log(`\nCredentials saved to: ${fullPath}`)
+      console.log(`\nCredential updated in database: ${credentialId}`)
     } catch (error: any) {
       console.error('\n❌ Failed to refresh token:', error.message)
 
       if (error.errorCode === 'invalid_grant' || error.status === 400) {
         console.error('\nThe refresh token is invalid or has been revoked.')
         console.error('You need to re-authenticate to get new credentials.')
-        console.error(`\nRun: bun run scripts/oauth-login.ts ${credentialPath}`)
+        console.error(`\nRun: bun run scripts/auth/oauth-login.ts`)
       } else if (error.status) {
         console.error(`\nHTTP Status: ${error.status}`)
         console.error(`Error Code: ${error.errorCode || 'unknown'}`)
@@ -134,7 +119,9 @@ async function refreshOAuthToken() {
   } catch (error) {
     console.error('Error:', error)
     process.exit(1)
+  } finally {
+    await pool.end()
   }
 }
 
-refreshOAuthToken()
+refreshOAuthCredential()
