@@ -7,6 +7,9 @@ import {
   listTrainApiKeys,
   createTrain,
   createTrainApiKey,
+  listCredentialsSafe,
+  linkAccountToTrain,
+  unlinkAccountFromTrain,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -36,7 +39,10 @@ trainsUIRoutes.get('/', async c => {
   }
 
   try {
-    const trains = await listTrainsWithAccounts(pool)
+    const [trains, allCredentials] = await Promise.all([
+      listTrainsWithAccounts(pool),
+      listCredentialsSafe(pool),
+    ])
 
     const content = html`
       <div style="margin-bottom: 2rem;">
@@ -175,6 +181,54 @@ trainsUIRoutes.get('/', async c => {
                       >
                         Linked Credentials (${train.accounts?.length || 0})
                       </h4>
+
+                      <!-- Link Credential Form -->
+                      ${allCredentials.length > 0
+                        ? html`
+                            <form
+                              hx-post="/dashboard/trains/${train.id}/link-credential"
+                              hx-swap="beforebegin"
+                              style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
+                            >
+                              <div style="flex: 1;">
+                                <label
+                                  for="credential-select-${train.id}"
+                                  style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+                                >
+                                  Select Credential to Link
+                                </label>
+                                <select
+                                  id="credential-select-${train.id}"
+                                  name="credential_id"
+                                  required
+                                  style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
+                                >
+                                  <option value="">-- Select a credential --</option>
+                                  ${allCredentials
+                                    .filter(
+                                      cred =>
+                                        !train.accounts?.some(
+                                          (a: AnthropicCredentialSafe) => a.id === cred.id
+                                        )
+                                    )
+                                    .map(
+                                      cred => html`
+                                        <option value="${cred.id}">
+                                          ${cred.account_name} (${cred.account_id})
+                                        </option>
+                                      `
+                                    )}
+                                </select>
+                              </div>
+                              <button
+                                type="submit"
+                                style="background: #3b82f6; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                              >
+                                Link Credential
+                              </button>
+                            </form>
+                          `
+                        : ''}
                       ${!train.accounts || train.accounts.length === 0
                         ? html`
                             <div
@@ -210,6 +264,25 @@ trainsUIRoutes.get('/', async c => {
                                           : ''}
                                       </div>
                                     </div>
+                                    <form
+                                      hx-post="/dashboard/trains/${train.id}/unlink-credential"
+                                      hx-swap="outerHTML"
+                                      hx-target="closest div"
+                                      hx-confirm="Are you sure you want to unlink this credential?"
+                                      style="margin: 0;"
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="credential_id"
+                                        value="${cred.id}"
+                                      />
+                                      <button
+                                        type="submit"
+                                        style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                      >
+                                        Unlink
+                                      </button>
+                                    </form>
                                   </div>
                                 `
                               )}
@@ -515,6 +588,115 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
         style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
       >
         <strong>Error:</strong> ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Link a credential to a train (HTMX form submission)
+ */
+trainsUIRoutes.post('/:trainId/link-credential', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+
+  if (!pool) {
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> Database not configured
+      </div>
+    `)
+  }
+
+  try {
+    const formData = await c.req.parseBody()
+    const credentialId = formData.credential_id as string
+
+    if (!credentialId) {
+      return c.html(html`
+        <div
+          style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+        >
+          <strong>Error:</strong> Please select a credential
+        </div>
+      `)
+    }
+
+    await linkAccountToTrain(pool, trainId, credentialId)
+
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>✅ Success!</strong> Credential linked successfully.
+      </div>
+      <div style="text-align: center;">
+        <button
+          onclick="location.reload()"
+          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+        >
+          Reload Page
+        </button>
+      </div>
+    `)
+  } catch (error) {
+    const errorMessage = getErrorMessage(error)
+
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> ${errorMessage}
+      </div>
+      <div style="text-align: center;">
+        <button
+          onclick="location.reload()"
+          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+        >
+          Try Again
+        </button>
+      </div>
+    `)
+  }
+})
+
+/**
+ * Unlink a credential from a train (HTMX form submission)
+ */
+trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  try {
+    const formData = await c.req.parseBody()
+    const credentialId = formData.credential_id as string
+
+    const success = await unlinkAccountFromTrain(pool, trainId, credentialId)
+
+    if (success) {
+      // Return empty div to remove the credential from the list
+      return c.html(html``)
+    } else {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Failed to unlink credential
+        </div>
+      `)
+    }
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
       </div>
     `)
   }
