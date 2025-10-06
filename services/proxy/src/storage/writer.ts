@@ -313,9 +313,12 @@ export class StorageWriter {
     }>
   > {
     try {
-      const conditions: string[] = ['train_id = $1']
-      const values: any[] = [criteria.trainId]
-      let paramCount = 1
+      // Note: We intentionally do NOT filter by train_id here
+      // This allows conversations to continue even when switching between accounts
+      // The conversation is identified by message hashes, not by train/account
+      const conditions: string[] = []
+      const values: any[] = []
+      let paramCount = 0
 
       if (criteria.currentMessageHash) {
         paramCount++
@@ -359,15 +362,16 @@ export class StorageWriter {
         values.push(criteria.conversationId)
       }
 
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
       const query = `
-        SELECT 
+        SELECT
           request_id,
           conversation_id,
           branch_id,
           current_message_hash,
           system_hash
         FROM api_requests
-        WHERE ${conditions.join(' AND ')}
+        ${whereClause}
         ORDER BY timestamp DESC
         LIMIT 100
       `
@@ -409,8 +413,10 @@ export class StorageWriter {
         .replace(/\n\nSummary:/i, '\n</analysis>\n\n<summary>')
         .trim()
 
+      // Note: We intentionally do NOT filter by train_id here
+      // This allows compact conversations to continue even when switching between accounts
       const query = `
-        SELECT 
+        SELECT
           request_id,
           conversation_id,
           branch_id,
@@ -418,20 +424,19 @@ export class StorageWriter {
           system_hash,
           response_body
         FROM api_requests
-        WHERE train_id = $1
-          AND timestamp >= $2
-          ${beforeTimestamp ? 'AND timestamp < $4' : ''}
+        WHERE timestamp >= $1
+          ${beforeTimestamp ? 'AND timestamp < $3' : ''}
           AND request_type = 'inference'
           AND response_body IS NOT NULL
           AND jsonb_typeof(response_body->'content') = 'array'
           AND (
-            starts_with(LOWER(response_body->'content'->0->>'text'), $3)
+            starts_with(LOWER(response_body->'content'->0->>'text'), $2)
           )
         ORDER BY timestamp DESC
         LIMIT 1
       `
 
-      const params = [trainId, afterTimestamp, cleanSummary]
+      const params = [afterTimestamp, cleanSummary]
 
       if (beforeTimestamp) {
         params.push(beforeTimestamp)
