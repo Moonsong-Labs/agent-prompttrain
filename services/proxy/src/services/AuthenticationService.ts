@@ -37,7 +37,13 @@ export class AuthenticationService {
 
     // If specific account requested, use it
     if (requestedAccount) {
-      const credential = credentials.find(c => c.account_name === requestedAccount)
+      logger.warn('Account specified in request, using deterministic selection', {
+        requestId: context.requestId,
+        trainId,
+        account: requestedAccount,
+        credentials: credentials.map(c => ({ id: c.account_id, name: c.account_name })),
+      } as any)
+      const credential = credentials.find(c => c.account_id === requestedAccount)
       if (!credential) {
         throw new AuthenticationError('Requested account not linked to train', {
           requestId: context.requestId,
