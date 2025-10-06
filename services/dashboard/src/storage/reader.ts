@@ -192,11 +192,11 @@ export class StorageReader {
     try {
       // Get request
       const requestQuery = `
-        SELECT 
-          request_id, trainId, timestamp, model, input_tokens, output_tokens,
+        SELECT
+          request_id, train_id, timestamp, model, input_tokens, output_tokens,
           total_tokens, duration_ms, error, request_type, tool_call_count,
           conversation_id, branch_id, parent_request_id, body, response_body
-        FROM api_requests 
+        FROM api_requests
         WHERE request_id = $1
       `
       const requestRows = await this.executeQuery<any>(
@@ -392,9 +392,9 @@ export class StorageReader {
     try {
       // First get unique conversations with branch information
       const conversationQuery = trainId
-        ? `SELECT 
+        ? `SELECT
              conversation_id,
-             MAX(trainId) as trainId,
+             MAX(train_id) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -406,9 +406,9 @@ export class StorageReader {
            GROUP BY conversation_id
            ORDER BY MAX(timestamp) DESC
            LIMIT $2`
-        : `SELECT 
+        : `SELECT
              conversation_id,
-             MAX(trainId) as trainId,
+             MAX(train_id) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -435,31 +435,31 @@ export class StorageReader {
       }
 
       const requestsQuery = trainId
-        ? `SELECT 
-             request_id, trainId, timestamp, model, 
+        ? `SELECT
+             request_id, train_id, timestamp, model,
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
              parent_task_request_id, is_subtask, task_tool_invocation,
-             CASE 
+             CASE
                WHEN body -> 'messages' IS NOT NULL AND jsonb_array_length(body -> 'messages') > 0 THEN
                  body -> 'messages' -> -1
-               ELSE 
+               ELSE
                  NULL
              END as last_message
-           FROM api_requests 
+           FROM api_requests
            WHERE train_id = $1 AND conversation_id = ANY($2::uuid[])
            ORDER BY conversation_id, timestamp ASC`
-        : `SELECT 
-             request_id, trainId, timestamp, model, 
+        : `SELECT
+             request_id, train_id, timestamp, model,
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
              parent_task_request_id, is_subtask, task_tool_invocation,
-             CASE 
+             CASE
                WHEN body -> 'messages' IS NOT NULL AND jsonb_array_length(body -> 'messages') > 0 THEN
                  body -> 'messages' -> -1
-               ELSE 
+               ELSE
                  NULL
              END as last_message
            FROM api_requests 
@@ -591,8 +591,8 @@ export class StorageReader {
           FROM api_requests 
           WHERE conversation_id = $1
         )
-        SELECT 
-          request_id, trainId, timestamp, model, 
+        SELECT
+          request_id, train_id, timestamp, model,
           input_tokens, output_tokens, total_tokens, duration_ms,
           error, request_type, tool_call_count, conversation_id,
           current_message_hash, parent_message_hash, branch_id, message_count,
@@ -600,10 +600,10 @@ export class StorageReader {
           response_body, account_id,
           -- Only include full body for last request per branch
           CASE WHEN rn = 1 THEN body ELSE NULL END as body,
-          CASE 
+          CASE
             WHEN body -> 'messages' IS NOT NULL AND jsonb_array_length(body -> 'messages') > 0 THEN
               body -> 'messages' -> -1
-            ELSE 
+            ELSE
               NULL
           END as last_message
         FROM ranked_requests
@@ -696,9 +696,9 @@ export class StorageReader {
       // Get conversation summaries with branch information
       const query = trainId
         ? `WITH conversation_summary AS (
-             SELECT 
+             SELECT
                conversation_id,
-               trainId,
+               train_id,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -709,7 +709,7 @@ export class StorageReader {
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
              WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, trainId
+             GROUP BY conversation_id, train_id
            ),
            conversation_branches AS (
              SELECT 
@@ -750,9 +750,9 @@ export class StorageReader {
            ORDER BY cs.last_message_at DESC
            LIMIT $2`
         : `WITH conversation_summary AS (
-             SELECT 
+             SELECT
                conversation_id,
-               trainId,
+               train_id,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -763,7 +763,7 @@ export class StorageReader {
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, trainId
+             GROUP BY conversation_id, train_id
            ),
            conversation_branches AS (
              SELECT 
