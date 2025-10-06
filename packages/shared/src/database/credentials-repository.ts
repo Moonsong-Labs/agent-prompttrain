@@ -504,60 +504,27 @@ export class CredentialsRepository {
     accountName: string,
     generatedKey: string
   ): Promise<{ accountId: string; apiKey: string }> {
-    const client = await this.db.connect()
+    // Import hashApiKey here to avoid circular deps
+    const { hashApiKey: hashFn } = await import('../utils/encryption.js')
+    const keyHash = hashFn(generatedKey)
 
-    try {
-      await client.query('BEGIN')
+    // Add the key hash directly to the train's client_api_keys_hashed array
+    // These are train tokens for client authentication, NOT Anthropic account credentials
+    await this.db.query(
+      `
+      UPDATE trains
+      SET client_api_keys_hashed = array_append(COALESCE(client_api_keys_hashed, ARRAY[]::TEXT[]), $1),
+          updated_at = NOW()
+      WHERE train_id = $2
+    `,
+      [keyHash, trainId]
+    )
 
-      const accountId = `acc_${randomUUID()}`
-
-      // Import hashApiKey here to avoid circular deps
-      const { hashApiKey: hashFn } = await import('../utils/encryption.js')
-      const keyHash = hashFn(generatedKey)
-
-      // Insert the account
-      await client.query(
-        `
-        INSERT INTO accounts (
-          account_id, account_name, credential_type,
-          api_key, key_hash, is_generated,
-          created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-      `,
-        [accountId, accountName, 'api_key', generatedKey, keyHash, true]
-      )
-
-      // Link to train with priority 0 (will be auto-incremented by trigger or manual)
-      await client.query(
-        `
-        INSERT INTO train_account_mappings (train_id, account_id, priority)
-        VALUES ($1, $2, COALESCE((SELECT MAX(priority) + 1 FROM train_account_mappings WHERE train_id = $3), 0))
-      `,
-        [trainId, accountId, trainId]
-      )
-
-      // Add the key hash to the train's client_api_keys_hashed array for client authentication
-      await client.query(
-        `
-        UPDATE trains
-        SET client_api_keys_hashed = array_append(COALESCE(client_api_keys_hashed, ARRAY[]::TEXT[]), $1),
-            updated_at = NOW()
-        WHERE train_id = $2
-      `,
-        [keyHash, trainId]
-      )
-
-      await client.query('COMMIT')
-
-      return {
-        accountId,
-        apiKey: generatedKey,
-      }
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
+    // Return a synthetic accountId for backward compatibility with UI
+    // In the future, we should refactor the UI to not expect an accountId
+    return {
+      accountId: `train-token-${trainId}`,
+      apiKey: generatedKey,
     }
   }
 

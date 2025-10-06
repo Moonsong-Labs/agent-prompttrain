@@ -299,7 +299,10 @@ credentialsApiRoutes.delete('/trains/:id', async c => {
 // ========================================
 
 /**
- * POST /accounts/generate - Generate a new API key for a train
+ * POST /accounts/generate - Generate a new train token (client API key)
+ *
+ * Note: These are tokens for clients to authenticate TO the proxy service,
+ * NOT Anthropic account credentials. They are stored in trains.client_api_keys_hashed.
  */
 credentialsApiRoutes.post('/accounts/generate', async c => {
   try {
@@ -307,62 +310,50 @@ credentialsApiRoutes.post('/accounts/generate', async c => {
 
     // Validate required fields
     if (!body.trainId || !body.accountName) {
-      return c.json({ error: 'trainId and accountName are required' }, 400)
+      return c.json({ error: 'trainId and accountName (token label) are required' }, 400)
     }
 
     const repo = getRepository()
 
-    // Check per-train limit (10 keys per train)
+    // Check per-train limit (10 tokens per train)
     const perTrainCount = await repo.countGeneratedKeysForTrain(body.trainId)
     if (perTrainCount >= 10) {
       return c.json(
         {
           error: 'Per-train limit reached',
-          message: 'Maximum of 10 generated API keys per train',
+          message: 'Maximum of 10 train tokens per train',
         },
         429
       )
     }
 
-    // Check global limit (50 keys total)
-    const globalCount = await repo.countGeneratedKeysGlobal()
-    if (globalCount >= 50) {
-      return c.json(
-        {
-          error: 'Global limit reached',
-          message: 'Maximum of 50 generated API keys globally',
-        },
-        429
-      )
-    }
-
-    // Generate the key
+    // Generate the token
     const generatedKey = generateApiKey()
 
-    // Store it
+    // Store it directly in the train's client_api_keys_hashed array
     const result = await repo.generateApiKeyForTrain(body.trainId, body.accountName, generatedKey)
 
-    logger.info('API key generated', {
+    logger.info('Train token generated', {
       metadata: {
-        accountId: result.accountId,
         trainId: body.trainId,
-        accountName: body.accountName,
+        tokenLabel: body.accountName,
       },
     })
 
-    // Return the plaintext key (ONLY TIME IT WILL BE EXPOSED)
+    // Return the plaintext token (ONLY TIME IT WILL BE EXPOSED)
     return c.json(
       {
         status: 'ok',
-        account_id: result.accountId,
-        api_key: result.apiKey,
-        warning: 'Save this key securely. You will not be able to see it again.',
+        train_id: body.trainId,
+        token: result.apiKey,
+        label: body.accountName,
+        warning: 'Save this token securely. You will not be able to see it again.',
       },
       201
     )
   } catch (error) {
-    logger.error('Failed to generate API key', { error: getErrorMessage(error) })
-    return c.json({ error: 'Failed to generate API key' }, 500)
+    logger.error('Failed to generate train token', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to generate train token' }, 500)
   }
 })
 
