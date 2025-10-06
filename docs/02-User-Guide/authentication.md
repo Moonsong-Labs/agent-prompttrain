@@ -1,41 +1,90 @@
 # Authentication Guide
 
-Agent Prompt Train supports multiple authentication methods to secure access to both the proxy itself and the Claude API.
+Agent Prompt Train uses database-backed credential management to secure access to both the proxy itself and the Claude API.
 
 ## Overview
 
 The proxy uses a two-layer authentication system:
 
-1. **Client Authentication**: Authenticates requests to the proxy
-2. **Claude API Authentication**: Authenticates requests from the proxy to Claude
+1. **Client Authentication**: Authenticates requests to the proxy (train-scoped API keys)
+2. **Claude API Authentication**: OAuth credentials stored in PostgreSQL database
 
 ## Client Authentication
 
-### API Key Authentication
+### Train-Scoped API Keys
 
-The proxy can require clients to authenticate using per-train Bearer tokens stored under
-`credentials/train-client-keys/<train-id>.client-keys.json`:
+The proxy requires clients to authenticate using per-train Bearer tokens stored in the database. API keys are managed via the dashboard REST API.
+
+#### Generating an API Key
+
+**Via Dashboard API**:
 
 ```bash
-cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
-{ "keys": ["cnp_live_your_generated_key"] }
-JSON
+curl -X POST http://localhost:3001/api/trains/your-train-id/api-keys \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"description": "Production API key for mobile app"}'
 ```
 
-Client requests must include this key:
+Response includes the full key (shown only once):
+
+```json
+{
+  "api_key": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "train_id": "your-train-id",
+    "key": "cnp_live_abc123xyz789...",
+    "key_preview": "cnp_live_a",
+    "description": "Production API key for mobile app",
+    "created_at": "2025-08-19T12:00:00Z",
+    "last_used_at": null
+  }
+}
+```
+
+**⚠️ Important**: Save the `key` value immediately - it won't be shown again.
+
+#### Using an API Key
+
+Client requests must include the API key:
 
 ```bash
 curl -X POST http://proxy:3000/v1/messages \
   -H "MSL-Train-Id: your-train-id" \
-  -H "Authorization: Bearer cnp_live_your_generated_key" \
+  -H "Authorization: Bearer cnp_live_abc123xyz789..." \
   -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"messages": [{"role": "user", "content": "Hello"}], "model": "claude-3-5-sonnet-20241022"}'
 ```
 
-Generate a secure client API key:
+#### Listing API Keys
 
 ```bash
-bun run scripts/auth/generate-api-key.ts
+curl http://localhost:3001/api/trains/your-train-id/api-keys \
+  -H "X-Dashboard-Key: your-dashboard-key"
+```
+
+Response shows all keys (without full key values):
+
+```json
+{
+  "api_keys": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "key_preview": "cnp_live_a",
+      "description": "Production API key for mobile app",
+      "created_at": "2025-08-19T12:00:00Z",
+      "last_used_at": "2025-08-19T14:30:00Z",
+      "revoked_at": null
+    }
+  ]
+}
+```
+
+#### Revoking an API Key
+
+```bash
+curl -X DELETE http://localhost:3001/api/trains/your-train-id/api-keys/550e8400-e29b-41d4-a716-446655440000 \
+  -H "X-Dashboard-Key: your-dashboard-key"
 ```
 
 ### Disabling Client Authentication
@@ -50,287 +99,20 @@ ENABLE_CLIENT_AUTH=false
 
 ## Dashboard Authentication
 
-The dashboard now supports two production-grade authentication approaches:
+The dashboard supports two production-grade authentication approaches:
 
 1. **API Key Authentication** (existing behavior)
 2. **Google SSO via OAuth2 Proxy** (recommended for shared deployments)
 
-### Google SSO via OAuth2 Proxy
+### API Key Authentication
 
-For environments running Nginx in front of the dashboard, deploy [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) as an auth middleware. Nginx uses the `auth_request` directive to require Google sign-in before requests reach the dashboard. When SSO is enabled, the dashboard trusts identity headers forwarded by OAuth2 Proxy and no longer needs the dashboard login page.
-
-#### 1. Enable Dashboard SSO
-
-Set the following environment variables (see `.env.example` for the full list):
-
-```
-DASHBOARD_SSO_ENABLED=true
-DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
-DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
-DASHBOARD_API_KEY=cnp_live_automation_only   # keep for API clients and local bypass
-```
-
-`DASHBOARD_SSO_HEADERS` defaults to `X-Authenticated-User,X-Auth-Request-Email,X-Forwarded-Email`. Specify a comma-separated list if you use custom header names. Use `DASHBOARD_SSO_ALLOWED_DOMAINS` to restrict sign-ins to approved Google Workspace domains.
-
-#### 2. Run OAuth2 Proxy
-
-Example Docker Compose service:
-
-```yaml
-oauth2-proxy:
-  image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
-  environment:
-    OAUTH2_PROXY_PROVIDER: google
-    OAUTH2_PROXY_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-    OAUTH2_PROXY_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-    OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH_PROXY_COOKIE_SECRET} # 32 byte base64 string
-    OAUTH2_PROXY_EMAIL_DOMAINS: example.com
-    OAUTH2_PROXY_SET_XAUTHREQUEST: 'true'
-    OAUTH2_PROXY_UPSTREAMS: 'http://dashboard:3001'
-    OAUTH2_PROXY_REDIRECT_URL: https://dashboard.example.com/oauth2/callback
-  ports:
-    - '4180:4180'
-```
-
-#### 3. Update Nginx
-
-```nginx
-location /dashboard/ {
-  auth_request /oauth2/auth;
-  error_page 401 = @oauth2_sign_in;
-
-  auth_request_set $email $upstream_http_x_auth_request_email;
-  proxy_set_header X-Auth-Request-Email $email;
-  proxy_set_header X-Forwarded-User $email;
-  proxy_pass http://dashboard:3001;
-}
-
-location = /oauth2/auth {
-  internal;
-  proxy_pass http://127.0.0.1:4180;
-}
-
-location @oauth2_sign_in {
-  return 302 https://$host/oauth2/start?rd=$scheme://$http_host$request_uri;
-}
-```
-
-Retain API key support by allowing automation clients to route through a dedicated path (e.g., `/dashboard/api/`) with the `X-Dashboard-Key` header. See [ADR-025](../04-Architecture/ADRs/adr-025-dashboard-sso-proxy.md) for architectural context.
-
-## Claude API Authentication
-
-The proxy supports two methods for authenticating with the Claude API:
-
-### Method 1: API Key Authentication
-
-Most common and straightforward method:
-
-```json
-{
-  "type": "api_key",
-  "accountId": "acc_unique_identifier",
-  "api_key": "sk-ant-api03-..."
-}
-```
-
-### Method 2: OAuth Authentication
-
-For enhanced security and automatic token management:
-
-```json
-{
-  "type": "oauth",
-  "accountId": "acc_unique_identifier",
-  "oauth": {
-    "accessToken": "...",
-    "refreshToken": "...",
-    "expiresAt": 1234567890000,
-    "scopes": ["org:create_api_key", "user:profile", "user:inference"],
-    "isMax": false
-  }
-}
-```
-
-## Setting Up Authentication
-
-### Step 1: Create Credentials Directory
+Set a dashboard API key in your environment:
 
 ```bash
-mkdir -p credentials/accounts
-mkdir -p credentials/train-client-keys
-```
-
-### Step 2: Create Account Credential File
-
-For API key authentication:
-
-```bash
-cat > credentials/accounts/account-primary.credentials.json <<'JSON'
-{
-  "type": "api_key",
-  "accountId": "acc_$(uuidgen)",
-  "api_key": "sk-ant-your-claude-api-key"
-}
-JSON
-```
-
-For OAuth authentication:
-
-```bash
-bun run scripts/auth/oauth-login.ts credentials/accounts/account-primary.credentials.json
-```
-
-### Step 3: Configure Request Headers
-
-Requests must include the correct `MSL-Train-Id` header. Add `MSL-Account` to pin a
-specific account credential (otherwise the proxy deterministically assigns an account based on the train ID):
-
-```bash
-# Train identification header (required)
-curl -H "MSL-Train-Id: your-train-id" \
-     -H "MSL-Account: account-primary" \
-     http://localhost:3000/v1/messages
-```
-
-## OAuth Management
-
-### OAuth Auto-Refresh
-
-The proxy automatically refreshes OAuth tokens:
-
-- Checks token expiration 1 minute before expiry
-- Refreshes token using the refresh token
-- Updates credential file with new tokens
-- Adds `anthropic-beta: oauth-2025-04-20` header
-
-### Check OAuth Status
-
-```bash
-bun run scripts/check-oauth-status.ts credentials/accounts/account-primary.credentials.json
-```
-
-Output shows:
-
-- Token validity status
-- Expiration time
-- Available scopes
-- Refresh token presence
-
-### Manual Token Refresh
-
-```bash
-# Refresh if expiring soon
-bun run scripts/oauth-refresh.ts credentials/accounts/account-primary.credentials.json
-
-# Force refresh
-bun run scripts/oauth-refresh.ts credentials/accounts/account-primary.credentials.json --force
-```
-
-### Refresh All Tokens
-
-```bash
-# Check all trains
-bun run scripts/oauth-refresh-all.ts credentials --dry-run
-
-# Actually refresh
-bun run scripts/oauth-refresh-all.ts credentials
-```
-
-## OAuth Troubleshooting
-
-### Common OAuth Errors
-
-#### "Failed to refresh token: 400 Bad Request - Refresh token not found or invalid"
-
-**Causes:**
-
-- Refresh token expired or revoked
-- Invalid or corrupted token
-- OAuth client ID mismatch
-
-**Solution:**
-
-```bash
-bun run scripts/auth/oauth-login.ts credentials/accounts/account-primary.credentials.json
-```
-
-#### "No refresh token available"
-
-**Cause:** OAuth credentials missing refresh token
-
-**Solution:** Re-authenticate to get complete credentials
-
-### Debugging OAuth Issues
-
-1. **Check credential file**:
-
-   ```bash
-   cat credentials/accounts/account-primary.credentials.json | jq .
-   ```
-
-2. **Verify OAuth status**:
-
-   ```bash
-   bun run scripts/check-oauth-status.ts credentials/train-id.credentials.json
-   ```
-
-3. **Test refresh token**:
-
-   ```bash
-   bun run scripts/test-oauth-refresh.ts <refresh_token>
-   ```
-
-4. **Enable debug logging**:
-   ```bash
-   DEBUG=true bun run dev:proxy
-   ```
-
-## Security Best Practices
-
-### Credential File Security
-
-1. **File Permissions**: Restrict access to credential files
-
-   ```bash
-   chmod 600 credentials/*.json
-   ```
-
-2. **Directory Permissions**: Secure the credentials directory
-
-   ```bash
-   chmod 700 credentials/
-   ```
-
-3. **Never Commit**: Add to .gitignore
-   ```
-   credentials/
-   *.credentials.json
-   ```
-
-### API Key Security
-
-1. **Use Strong Keys**: Generate cryptographically secure keys
-2. **Rotate Regularly**: Update client API keys periodically
-3. **Limit Scope**: Use separate keys for different environments
-4. **Monitor Usage**: Track key usage in dashboard
-
-### OAuth Security
-
-1. **Secure Storage**: Protect OAuth tokens like passwords
-2. **Monitor Expiration**: Set up alerts for expiring tokens
-3. **Audit Access**: Review OAuth scopes regularly
-4. **Revoke Unused**: Remove tokens for inactive trains
-
-## Dashboard Authentication
-
-The monitoring dashboard uses a separate API key:
-
-```bash
-# In .env
 DASHBOARD_API_KEY=your-secure-dashboard-key
 ```
 
-Access the dashboard:
+Access the dashboard with this key:
 
 ```javascript
 // Using header
@@ -344,23 +126,301 @@ fetch('http://localhost:3001/api/stats', {
 // Cookie: dashboard_auth=your-secure-dashboard-key
 ```
 
-## Multi-Train Setup
+### Google SSO via OAuth2 Proxy
 
-Support multiple trains with separate credentials:
+For environments running Nginx in front of the dashboard, deploy [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) as an auth middleware. See [ADR-025](../04-Architecture/ADRs/adr-025-dashboard-sso-proxy.md) for full configuration details.
+
+#### Enable Dashboard SSO
 
 ```bash
-credentials/
-├── train-alpha.credentials.json
-├── train-beta.credentials.json
-└── staging.credentials.json
+DASHBOARD_SSO_ENABLED=true
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+DASHBOARD_API_KEY=cnp_live_automation_only   # keep for API clients
 ```
 
-Each train can use different:
+## Claude API Authentication
 
-- Authentication methods (API key vs OAuth)
-- Claude accounts
-- Client API keys
-- Rate limits and quotas
+The proxy uses **OAuth-only authentication** stored in the PostgreSQL database. All credentials are managed via the database and dashboard APIs.
+
+### Setting Up OAuth Credentials
+
+#### Step 1: Run OAuth Login Script
+
+The OAuth login script will guide you through the authentication flow:
+
+```bash
+bun run scripts/auth/oauth-login.ts
+```
+
+The script will:
+
+1. Prompt for **Account ID** (e.g., `acc_team_alpha`)
+2. Prompt for **Account Name** (e.g., `Team Alpha`)
+3. Generate an authorization URL
+4. Open your browser to authorize with Anthropic
+5. Prompt you to paste the authorization code
+6. Exchange the code for OAuth tokens
+7. Save the credential to the database
+
+Example session:
+
+```
+Starting OAuth login flow...
+
+Enter account ID (e.g., acc_team_alpha): acc_marketing
+Enter account name (e.g., Team Alpha): Marketing Team
+
+Please visit the following URL to authorize:
+https://claude.ai/oauth/authorize?code=true&client_id=...
+
+After authorizing, you will see an authorization code.
+Copy the entire code (it should contain a # character).
+
+Enter the authorization code: abc123def456#state789xyz
+
+Exchanging authorization code for tokens...
+Saving credentials to database...
+
+✅ OAuth credentials saved successfully!
+   Account ID: acc_marketing
+   Account Name: Marketing Team
+   Expires At: 2025-08-20T12:00:00Z
+
+Next steps:
+1. Create or update a train via the dashboard
+2. Link this credential to the train
+3. Generate API keys for the train
+```
+
+#### Step 2: Create a Train
+
+Create a train via the dashboard API:
+
+```bash
+curl -X POST http://localhost:3001/api/trains \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{
+    "train_id": "marketing-prod",
+    "description": "Marketing team production train",
+    "is_active": true
+  }'
+```
+
+#### Step 3: Link Credential to Train
+
+Link the OAuth credential to your train:
+
+```bash
+curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key": "your-dashboard-key" \
+  -d '{
+    "credential_id": "550e8400-e29b-41d4-a716-446655440000"
+  }'
+```
+
+#### Step 4: Generate Train API Keys
+
+Now you can generate client API keys for the train (see [Client Authentication](#client-authentication) above).
+
+### Managing Credentials
+
+#### List All Credentials
+
+```bash
+curl http://localhost:3001/api/credentials \
+  -H "X-Dashboard-Key: your-dashboard-key"
+```
+
+Response:
+
+```json
+{
+  "credentials": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "account_id": "acc_marketing",
+      "account_name": "Marketing Team",
+      "oauth_expires_at": "2025-08-20T12:00:00Z",
+      "oauth_scopes": ["org:create_api_key", "user:profile", "user:inference"],
+      "oauth_is_max": false,
+      "created_at": "2025-08-19T10:00:00Z",
+      "updated_at": "2025-08-19T12:00:00Z",
+      "last_refresh_at": "2025-08-19T12:00:00Z"
+    }
+  ]
+}
+```
+
+**Note**: Credential responses never include OAuth tokens (access_token, refresh_token). These are only accessible internally by the proxy service.
+
+#### Get Credential Details
+
+```bash
+curl http://localhost:3001/api/credentials/550e8400-e29b-41d4-a716-446655440000 \
+  -H "X-Dashboard-Key: your-dashboard-key"
+```
+
+### Managing Trains
+
+#### List All Trains
+
+```bash
+curl http://localhost:3001/api/trains \
+  -H "X-Dashboard-Key: your-dashboard-key"
+```
+
+Response shows trains with linked credentials:
+
+```json
+{
+  "trains": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "train_id": "marketing-prod",
+      "description": "Marketing team production train",
+      "is_active": true,
+      "slack_webhook_url": null,
+      "created_at": "2025-08-19T10:00:00Z",
+      "updated_at": "2025-08-19T10:00:00Z",
+      "credentials": [
+        {
+          "id": "660e8400-e29b-41d4-a716-446655440001",
+          "account_id": "acc_marketing",
+          "account_name": "Marketing Team",
+          "oauth_expires_at": "2025-08-20T12:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Update Train Configuration
+
+```bash
+curl -X PUT http://localhost:3001/api/trains/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{
+    "description": "Marketing team production (updated)",
+    "slack_webhook_url": "https://hooks.slack.com/services/T00/B00/XXX",
+    "is_active": true
+  }'
+```
+
+#### Unlink Credential from Train
+
+```bash
+curl -X DELETE http://localhost:3001/api/trains/marketing-prod/accounts/660e8400-e29b-41d4-a716-446655440001 \
+  -H "X-Dashboard-Key: your-dashboard-key"
+```
+
+## OAuth Management
+
+### OAuth Auto-Refresh
+
+The proxy automatically refreshes OAuth tokens:
+
+- Checks token expiration 1 minute before expiry
+- Refreshes token using the refresh token
+- Updates database with new tokens
+- Adds `anthropic-beta: oauth-2025-04-20` header
+
+The OAuth refresh process includes:
+
+- **Concurrent Request Coalescing**: Multiple simultaneous requests share the same refresh operation
+- **Negative Caching**: Failed refresh attempts are cached for 5 minutes to prevent retry storms
+- **Refresh Metrics**: Track attempt counts, success rates, failures, and durations
+
+### Credential Failover
+
+Trains can link multiple credentials for automatic failover. When one credential expires or encounters errors, the proxy automatically tries the next linked credential.
+
+**Example**: Link two credentials to a train for redundancy:
+
+```bash
+# Link primary credential
+curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
+
+# Link backup credential
+curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "770e8400-e29b-41d4-a716-446655440002"}'
+```
+
+The proxy will use credentials in the order they were linked. If the first credential fails, it automatically tries the second.
+
+## Security Best Practices
+
+### Database Security
+
+1. **Secure Database Access**: Use strong PostgreSQL credentials
+2. **Network Security**: Restrict database access to proxy service only
+3. **Connection Encryption**: Use SSL for database connections in production
+
+### API Key Security
+
+1. **Use Strong Keys**: Generated keys are cryptographically secure (32 random bytes)
+2. **Store Securely**: Never commit API keys to version control
+3. **Rotate Regularly**: Revoke and regenerate keys periodically
+4. **Monitor Usage**: Track `last_used_at` timestamps to identify unused keys
+5. **Revoke Unused**: Remove keys that are no longer needed
+
+### OAuth Security
+
+1. **Secure Storage**: OAuth tokens are stored in database (no encryption at rest in dev mode)
+2. **Monitor Expiration**: Tokens auto-refresh, but monitor `oauth_expires_at` timestamps
+3. **Audit Access**: Review OAuth scopes in credential details
+4. **Revoke Unused**: Delete credentials that are no longer needed
+
+### Dashboard Security
+
+1. **Require API Key**: Always set `DASHBOARD_API_KEY` in production
+2. **Use SSO**: Configure OAuth2 Proxy for shared deployments
+3. **Limit Access**: Restrict dashboard access to authorized users only
+
+## Multi-Train Setup
+
+Support multiple trains with separate configurations:
+
+- Each train has independent API keys
+- Trains can share credentials (many-to-many relationship)
+- Each train can have unique Slack webhooks
+- Credential failover is train-specific
+
+Example multi-train setup:
+
+```bash
+# Create marketing train
+curl -X POST http://localhost:3001/api/trains \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"train_id": "marketing-prod", "description": "Marketing team"}'
+
+# Create engineering train
+curl -X POST http://localhost:3001/api/trains \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"train_id": "eng-prod", "description": "Engineering team"}'
+
+# Link same credential to both trains (shared Claude account)
+curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
+
+curl -X POST http://localhost:3001/api/trains/eng-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
+```
 
 ## Environment Variables
 
@@ -370,14 +430,19 @@ Each train can use different:
 # Enable/disable client authentication
 ENABLE_CLIENT_AUTH=true
 
-# OAuth client ID (optional)
+# OAuth client ID (optional, uses default if not set)
 CLAUDE_OAUTH_CLIENT_ID=your-oauth-client-id
 
 # Dashboard authentication
 DASHBOARD_API_KEY=secure-dashboard-key
 
-# Credentials directory
-CREDENTIALS_DIR=./credentials
+# Dashboard SSO (optional)
+DASHBOARD_SSO_ENABLED=false
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+
+# Database connection (required)
+DATABASE_URL=postgresql://user:password@localhost:5432/agent_prompttrain
 ```
 
 ## Monitoring Authentication
@@ -400,10 +465,71 @@ The dashboard shows:
 - Token refresh events
 - Per-train authentication methods
 - OAuth token expiration status
+- API key last used timestamps
+
+## Migration from Filesystem Credentials
+
+If you have existing filesystem-based credentials:
+
+1. **Run Database Migration**:
+
+   ```bash
+   bun run scripts/db/migrations/013-credential-train-management.ts
+   ```
+
+2. **Re-Add OAuth Credentials**: Run the OAuth login script for each account
+
+   ```bash
+   bun run scripts/auth/oauth-login.ts
+   ```
+
+3. **Create Trains**: Use dashboard API to create trains
+
+4. **Link Credentials**: Associate credentials with trains via dashboard API
+
+5. **Generate API Keys**: Create new train-scoped API keys
+
+6. **Update Clients**: Replace old client API keys with new train-scoped keys
+
+7. **Remove Old Files**: Delete the `credentials/` directory after verification
+
+## Troubleshooting
+
+### "No credentials configured for this train"
+
+**Cause**: Train has no linked credentials
+
+**Solution**: Link at least one credential to the train via dashboard API
+
+### "Invalid client API key"
+
+**Cause**: API key not found, revoked, or wrong train ID
+
+**Solution**:
+
+1. Verify train ID in `MSL-Train-Id` header matches
+2. Check API key is not revoked
+3. Regenerate API key if needed
+
+### "Failed to refresh OAuth token"
+
+**Cause**: Refresh token expired or revoked
+
+**Solution**: Re-authenticate via OAuth login script
+
+### Database Connection Errors
+
+**Cause**: PostgreSQL not running or `DATABASE_URL` misconfigured
+
+**Solution**:
+
+1. Verify PostgreSQL is running: `pg_isready`
+2. Check `DATABASE_URL` environment variable
+3. Ensure database exists and migrations are run
 
 ## Next Steps
 
 - [Configure your trains](./configuration.md)
 - [Make your first API call](./api-reference.md)
 - [Monitor usage in dashboard](./dashboard-guide.md)
-- [Set up OAuth automation](../03-Operations/security.md)
+- [Review ADR-026](../04-Architecture/ADRs/adr-026-database-credential-management.md) for architecture details
