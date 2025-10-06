@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { layout } from '../layout/index.js'
 import { container } from '../container.js'
 import {
@@ -412,12 +412,12 @@ trainsUIRoutes.get('/', async c => {
         'Trains',
         content,
         // Add HTMX script for dynamic API key loading
-        `<script>
+        raw(`<script>
           // Handle HTMX errors
           document.body.addEventListener('htmx:responseError', function(evt) {
             evt.target.innerHTML = '<div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">Failed to load API keys</div>';
           });
-        </script>`,
+        </script>`),
         c
       )
     )
