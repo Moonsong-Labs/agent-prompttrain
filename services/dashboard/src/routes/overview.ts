@@ -325,27 +325,24 @@ overviewRoutes.get('/', async c => {
                                   </span>`
                                 })()}
                               </td>
-                              <td class="text-sm">
+                              <td class="text-sm" style="line-height: 1.4;">
                                 ${
                                   branch.accountIds && branch.accountIds.length > 0
-                                    ? branch.accountIds.length === 1
-                                      ? // Single account - show as before
-                                        `<a href="/dashboard/token-usage?accountId=${encodeURIComponent(branch.accountIds[0])}"
-                                           class="text-blue-600"
-                                           style="font-family: monospace; font-size: 0.75rem;"
-                                           title="View token usage for ${escapeHtml(branch.accountIds[0])}">
-                                          ${
-                                            branch.accountIds[0].length > 20
-                                              ? escapeHtml(branch.accountIds[0].substring(0, 17)) +
-                                                '...'
-                                              : escapeHtml(branch.accountIds[0])
-                                          }
-                                        </a>`
-                                      : // Multiple accounts - show count with tooltip
-                                        `<span style="color: #2563eb; font-weight: 600;"
-                                           title="${branch.accountIds.map(id => escapeHtml(id)).join('\\n')}">
-                                          ${branch.accountIds.length} accounts
-                                        </span>`
+                                    ? branch.accountIds
+                                        .map(
+                                          accountId =>
+                                            `<a href="/dashboard/token-usage?accountId=${encodeURIComponent(accountId)}"
+                                               class="text-blue-600"
+                                               style="font-family: monospace; font-size: 0.75rem; display: block;"
+                                               title="View token usage for ${escapeHtml(accountId)}">
+                                              ${
+                                                accountId.length > 20
+                                                  ? escapeHtml(accountId.substring(0, 17)) + '...'
+                                                  : escapeHtml(accountId)
+                                              }
+                                            </a>`
+                                        )
+                                        .join('')
                                     : '<span class="text-gray-400">N/A</span>'
                                 }
                               </td>
