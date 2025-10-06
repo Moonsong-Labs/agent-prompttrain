@@ -66,7 +66,8 @@ overviewRoutes.get('/', async c => {
     // Create flat list of conversations (simplified for now)
     const conversationBranches: Array<{
       conversationId: string
-      accountId?: string
+      accountIds: string[]
+      trainIds: string[]
       branch: string
       branchCount: number
       subtaskBranchCount: number
@@ -90,7 +91,8 @@ overviewRoutes.get('/', async c => {
     apiConversations.forEach(conv => {
       conversationBranches.push({
         conversationId: conv.conversationId,
-        accountId: conv.accountId,
+        accountIds: conv.accountIds || [],
+        trainIds: conv.trainIds || [],
         branch: 'main', // API doesn't return branch info yet
         branchCount: conv.branchCount || 1,
         subtaskBranchCount: conv.subtaskBranchCount || 0,
@@ -100,7 +102,7 @@ overviewRoutes.get('/', async c => {
         tokens: conv.totalTokens,
         firstMessage: new Date(conv.firstMessageTime),
         lastMessage: new Date(conv.lastMessageTime),
-        trainId: conv.trainId,
+        trainId: conv.trainId, // Keep for backward compat
         latestRequestId: conv.latestRequestId,
         latestModel: conv.latestModel,
         latestContextTokens: conv.latestContextTokens,
@@ -253,7 +255,7 @@ overviewRoutes.get('/', async c => {
                     <tr>
                       <th>Conversation</th>
                       <th>Branches</th>
-                      <th>Account</th>
+                      <th>Accounts</th>
                       <th>Train ID</th>
                       <th>Requests</th>
                       <th>Tokens</th>
@@ -325,17 +327,25 @@ overviewRoutes.get('/', async c => {
                               </td>
                               <td class="text-sm">
                                 ${
-                                  branch.accountId
-                                    ? `<a href="/dashboard/token-usage?accountId=${encodeURIComponent(branch.accountId)}" 
-                                         class="text-blue-600" 
-                                         style="font-family: monospace; font-size: 0.75rem;"
-                                         title="View token usage for ${escapeHtml(branch.accountId)}">
-                                        ${
-                                          branch.accountId.length > 20
-                                            ? escapeHtml(branch.accountId.substring(0, 17)) + '...'
-                                            : escapeHtml(branch.accountId)
-                                        }
-                                      </a>`
+                                  branch.accountIds && branch.accountIds.length > 0
+                                    ? branch.accountIds.length === 1
+                                      ? // Single account - show as before
+                                        `<a href="/dashboard/token-usage?accountId=${encodeURIComponent(branch.accountIds[0])}"
+                                           class="text-blue-600"
+                                           style="font-family: monospace; font-size: 0.75rem;"
+                                           title="View token usage for ${escapeHtml(branch.accountIds[0])}">
+                                          ${
+                                            branch.accountIds[0].length > 20
+                                              ? escapeHtml(branch.accountIds[0].substring(0, 17)) +
+                                                '...'
+                                              : escapeHtml(branch.accountIds[0])
+                                          }
+                                        </a>`
+                                      : // Multiple accounts - show count with tooltip
+                                        `<span style="color: #2563eb; font-weight: 600;"
+                                           title="${branch.accountIds.map(id => escapeHtml(id)).join('\\n')}">
+                                          ${branch.accountIds.length} accounts
+                                        </span>`
                                     : '<span class="text-gray-400">N/A</span>'
                                 }
                               </td>
