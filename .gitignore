@@ -245,3 +245,6 @@ test-results/
 
 # Sub-Agent data
 ./IMPORTANT_FILES.yaml
+
+# Prompt temporary files
+/prompts/
