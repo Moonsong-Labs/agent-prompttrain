@@ -504,11 +504,8 @@ export class CredentialsRepository {
     accountName: string,
     generatedKey: string
   ): Promise<{ accountId: string; apiKey: string }> {
-    // Import hashApiKey here to avoid circular deps
-    const { hashApiKey: hashFn } = await import('../utils/encryption.js')
-    const keyHash = hashFn(generatedKey)
-
-    // Add the key hash directly to the train's client_api_keys_hashed array
+    // Store the key in plaintext directly to the train's client_api_keys_hashed array
+    // Note: Despite the column name "hashed", we're storing plaintext for now
     // These are train tokens for client authentication, NOT Anthropic account credentials
     await this.db.query(
       `
@@ -517,7 +514,7 @@ export class CredentialsRepository {
           updated_at = NOW()
       WHERE train_id = $2
     `,
-      [keyHash, trainId]
+      [generatedKey, trainId]
     )
 
     // Return a synthetic accountId for backward compatibility with UI

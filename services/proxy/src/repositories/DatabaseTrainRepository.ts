@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
 import { DecryptedAccount } from '@agent-prompttrain/shared'
-import { hashApiKey } from '@agent-prompttrain/shared/utils/encryption'
 import { ITrainRepository, SlackConfig } from './ITrainRepository'
 import { DatabaseAccountRepository } from './DatabaseAccountRepository'
 import { logger } from '../middleware/logger'
@@ -78,10 +77,8 @@ export class DatabaseTrainRepository implements ITrainRepository {
 
   async validateClientKey(trainId: string, clientKey: string): Promise<boolean> {
     try {
-      // Hash the provided key
-      const keyHash = hashApiKey(clientKey)
-
-      // Query for matching hashed key in the train's client_api_keys_hashed array
+      // Compare plaintext key directly (no hashing for now)
+      // Note: Despite the column name "hashed", we're storing plaintext
       const result = await this.db.query<{ exists: boolean }>(
         `SELECT EXISTS (
           SELECT 1
@@ -90,7 +87,7 @@ export class DatabaseTrainRepository implements ITrainRepository {
             AND is_active = true
             AND $2 = ANY(client_api_keys_hashed)
         ) as exists`,
-        [trainId, keyHash]
+        [trainId, clientKey]
       )
 
       return result.rows[0]?.exists || false

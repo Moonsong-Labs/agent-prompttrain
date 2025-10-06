@@ -18,7 +18,6 @@ import { analyticsConversationPartialRoutes } from './routes/partials/analytics-
 import { csrfProtection } from './middleware/csrf.js'
 import { rateLimitForReadOnly } from './middleware/rate-limit.js'
 import { readOnlyProtection } from './middleware/read-only-protection.js'
-import { requireDbCredentials } from './middleware/feature-flag.js'
 import { credentialsApiRoutes } from './routes/credentials-api.js'
 import { configurationRoutes } from './routes/configuration.js'
 import { trainDetailRoutes } from './routes/train-detail.js'
@@ -224,10 +223,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   const { mcpProxyRoutes } = await import('./routes/mcp-proxy.js')
   app.route('/dashboard/api', mcpProxyRoutes)
 
-  // Mount credential management routes (behind feature flag)
-  app.use('/dashboard/configuration*', requireDbCredentials)
-  app.use('/dashboard/trains*', requireDbCredentials)
-  app.use('/api/credentials*', requireDbCredentials)
+  // Mount credential management routes
   app.route('/dashboard/configuration', configurationRoutes)
   app.route('/dashboard/trains', trainDetailRoutes)
   app.route('/api/credentials', credentialsApiRoutes)
