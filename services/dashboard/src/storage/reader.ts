@@ -394,7 +394,6 @@ export class StorageReader {
       const conversationQuery = trainId
         ? `SELECT
              conversation_id,
-             MAX(train_id) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -408,7 +407,6 @@ export class StorageReader {
            LIMIT $2`
         : `SELECT
              conversation_id,
-             MAX(train_id) as trainId,
              COUNT(*) as request_count,
              MAX(message_count) as message_count,
              MIN(timestamp) as first_message,
@@ -508,7 +506,6 @@ export class StorageReader {
       // Combine conversation metadata with requests
       const conversations = conversationRows.map(row => ({
         conversation_id: row.conversation_id,
-        trainId: row.trainId,
         message_count: parseInt(row.message_count),
         first_message: new Date(row.first_message),
         last_message: new Date(row.last_message),
@@ -646,7 +643,6 @@ export class StorageReader {
 
       const conversation = {
         conversation_id: conversationRow.conversation_id,
-        trainId: conversationRow.trainId,
         message_count: parseInt(conversationRow.message_count),
         first_message: new Date(conversationRow.first_message),
         last_message: new Date(conversationRow.last_message),
@@ -698,7 +694,6 @@ export class StorageReader {
         ? `WITH conversation_summary AS (
              SELECT
                conversation_id,
-               train_id,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -709,7 +704,7 @@ export class StorageReader {
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
              WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, train_id
+             GROUP BY conversation_id
            ),
            conversation_branches AS (
              SELECT 
@@ -752,7 +747,6 @@ export class StorageReader {
         : `WITH conversation_summary AS (
              SELECT
                conversation_id,
-               train_id,
                MIN(timestamp) as started_at,
                MAX(timestamp) as last_message_at,
                COUNT(*) as request_count,
@@ -763,7 +757,7 @@ export class StorageReader {
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
-             GROUP BY conversation_id, train_id
+             GROUP BY conversation_id
            ),
            conversation_branches AS (
              SELECT 
