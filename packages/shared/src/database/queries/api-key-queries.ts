@@ -62,7 +62,42 @@ export async function createTrainApiKey(
 }
 
 /**
- * Verify an API key for a train
+ * Verify an API key and return the associated train ID
+ * This is the primary authentication method - identifies the train from the API key
+ */
+export async function verifyApiKeyAndGetTrain(
+  pool: Pool,
+  apiKey: string
+): Promise<{ trainApiKey: TrainApiKey; trainId: string } | null> {
+  const result = await pool.query<TrainApiKey & { train_id: string }>(
+    `
+    SELECT tak.*, t.train_id
+    FROM train_api_keys tak
+    INNER JOIN trains t ON t.id = tak.train_id
+    WHERE tak.api_key = $1
+      AND tak.revoked_at IS NULL
+    `,
+    [apiKey]
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  const row = result.rows[0]
+
+  // Update last_used_at
+  await pool.query('UPDATE train_api_keys SET last_used_at = NOW() WHERE id = $1', [row.id])
+
+  return {
+    trainApiKey: row,
+    trainId: row.train_id,
+  }
+}
+
+/**
+ * Verify an API key for a train (legacy method - prefer verifyApiKeyAndGetTrain)
+ * @deprecated Use verifyApiKeyAndGetTrain instead
  */
 export async function verifyTrainApiKey(
   pool: Pool,
@@ -117,10 +152,9 @@ export async function getTrainApiKeySafe(
   pool: Pool,
   keyId: string
 ): Promise<TrainApiKeySafe | null> {
-  const result = await pool.query<TrainApiKey>(
-    'SELECT * FROM train_api_keys WHERE id = $1',
-    [keyId]
-  )
+  const result = await pool.query<TrainApiKey>('SELECT * FROM train_api_keys WHERE id = $1', [
+    keyId,
+  ])
 
   if (result.rows.length === 0) {
     return null

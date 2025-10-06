@@ -82,14 +82,16 @@ export async function createProxyApp(): Promise<
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Train ID extraction for all routes
-  app.use('*', trainIdExtractorMiddleware())
-
   // Client authentication for proxy routes
   // Apply before rate limiting to protect against unauthenticated requests
+  // This sets trainId from API key authentication
   if (config.features.enableClientAuth !== false) {
     app.use('/v1/*', clientAuthMiddleware())
   }
+
+  // Train ID extraction fallback for all routes
+  // Only sets trainId if not already set by client auth
+  app.use('*', trainIdExtractorMiddleware())
 
   // Rate limiting
   if (config.features.enableMetrics) {

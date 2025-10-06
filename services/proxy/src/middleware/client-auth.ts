@@ -1,15 +1,17 @@
 import { Context, Next } from 'hono'
 import { logger } from './logger.js'
 import { container } from '../container.js'
-import { verifyTrainApiKey } from '@agent-prompttrain/shared/database/queries'
+import { verifyApiKeyAndGetTrain } from '@agent-prompttrain/shared/database/queries'
 
 /**
  * Client API Authentication Middleware
  * Validates train-scoped API keys for proxy access
+ * Identifies the train from the API key (no MSL-Train-Id header required)
  */
 export function clientAuthMiddleware() {
   return async (c: Context, next: Next) => {
     const authorization = c.req.header('Authorization')
+    const requestId = c.get('requestId')
 
     if (!authorization) {
       return c.json(
@@ -43,24 +45,6 @@ export function clientAuthMiddleware() {
     }
 
     const token = match[1]
-    const trainId = c.get('trainId')
-    const requestId = c.get('requestId')
-
-    if (!trainId) {
-      logger.error('Client auth middleware: Train ID not found in context', {
-        requestId,
-        path: c.req.path,
-      })
-      return c.json(
-        {
-          error: {
-            type: 'internal_error',
-            message: 'Train ID context not found. This is an internal proxy error.',
-          },
-        },
-        500
-      )
-    }
 
     try {
       // Get database pool from container
@@ -68,7 +52,6 @@ export function clientAuthMiddleware() {
       if (!pool) {
         logger.error('Client auth middleware: Database pool not available', {
           requestId,
-          trainId,
         })
         return c.json(
           {
@@ -81,15 +64,12 @@ export function clientAuthMiddleware() {
         )
       }
 
-      logger.debug(`trainId: ${trainId}, requestId: ${requestId}`)
+      // Verify the API key and get the associated train ID
+      const verification = await verifyApiKeyAndGetTrain(pool, token)
 
-      // Verify the API key against the database
-      const verifiedKey = await verifyTrainApiKey(pool, trainId, token)
-
-      if (!verifiedKey) {
+      if (!verification) {
         logger.warn('Client auth middleware: Invalid API key', {
           requestId,
-          trainId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
         })
@@ -107,9 +87,12 @@ export function clientAuthMiddleware() {
         )
       }
 
+      // Set the train ID in context based on the API key
+      c.set('trainId', verification.trainId)
+
       logger.debug('Client auth middleware: Authentication successful', {
         requestId,
-        trainId,
+        trainId: verification.trainId,
       })
 
       // Authentication successful, proceed to next middleware
@@ -117,7 +100,6 @@ export function clientAuthMiddleware() {
     } catch (error) {
       logger.error('Client auth middleware: Error verifying token', {
         requestId,
-        trainId,
         error: error instanceof Error ? { message: error.message } : { message: String(error) },
       })
       return c.json(
