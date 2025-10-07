@@ -16,8 +16,6 @@ import { analysisPartialsRoutes } from './routes/partials/analysis.js'
 import { analyticsPartialRoutes } from './routes/partials/analytics.js'
 import { analyticsConversationPartialRoutes } from './routes/partials/analytics-conversation.js'
 import { csrfProtection } from './middleware/csrf.js'
-import { rateLimitForReadOnly } from './middleware/rate-limit.js'
-import { readOnlyProtection } from './middleware/read-only-protection.js'
 import credentialsRoutes from './routes/credentials.js'
 import trainsRoutes from './routes/trains.js'
 import apiKeysRoutes from './routes/api-keys.js'
@@ -63,12 +61,10 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   // Global middleware
   app.use('*', cors())
   app.use('*', secureHeaders()) // Apply security headers
-  app.use('*', rateLimitForReadOnly(100, 60000)) // 100 requests per minute in read-only mode
-  app.use('*', readOnlyProtection) // Block write operations in read-only mode (fail-fast)
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Apply auth middleware first to set auth context (but after read-only protection)
+  // Apply auth middleware first to set auth context
   app.use('/*', dashboardAuth)
 
   // Apply CSRF protection after auth checks

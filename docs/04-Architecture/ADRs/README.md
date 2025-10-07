@@ -52,12 +52,15 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-016](./adr-016-mcp-server-implementation.md)         | MCP Server Implementation              | Superseded | 2025-01-08 |
 | [ADR-017](./adr-017-mcp-prompt-sharing.md)                | MCP Prompt Sharing                     | Accepted   | 2025-01-10 |
 | [ADR-018](./adr-018-ai-powered-conversation-analysis.md)  | AI-Powered Conversation Analysis       | Accepted   | 2025-01-12 |
-| [ADR-019](./adr-019-dashboard-read-only-mode-security.md) | Dashboard Read-Only Mode Security      | Accepted   | 2025-01-23 |
+| [ADR-019](./adr-019-dashboard-read-only-mode-security.md) | Dashboard Read-Only Mode Security      | Superseded | 2025-01-23 |
 | [ADR-020](./adr-020-circuit-breaker-removal.md)           | Circuit Breaker Removal                | Accepted   | 2025-08-04 |
 | [ADR-021](./adr-021-e2e-testing-strategy.md)              | E2E Testing Strategy                   | Accepted   | —          |
 | [ADR-022](./adr-022-multi-architecture-docker-support.md) | Multi-Architecture Docker Support      | Accepted   | —          |
 | [ADR-023](./adr-023-wildcard-subdomain-support.md)        | Wildcard Subtrain Support              | Superseded | —          |
 | [ADR-024](./adr-024-train-id-header-routing.md)           | Header-Based Train and Account Routing | Accepted   | 2025-09-17 |
+| [ADR-025](./adr-025-dashboard-sso-proxy.md)               | Dashboard SSO via OAuth2 Proxy         | Accepted   | —          |
+| [ADR-026](./adr-026-database-credential-storage.md)       | Database-Based Credential Storage      | Accepted   | —          |
+| [ADR-027](./adr-027-mandatory-user-authentication.md)     | Mandatory User Authentication          | Accepted   | 2025-08-19 |
 
 ## Creating a New ADR
 

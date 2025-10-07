@@ -15,7 +15,11 @@ export const layout = (
   // Get CSRF token if context is provided
   const csrfToken = context?.get('csrfToken') || ''
   // Get auth state if context is provided
-  const auth = context?.get('auth') || { isAuthenticated: false, isReadOnly: false }
+  const auth = context?.get('auth') || {
+    isAuthenticated: false,
+    principal: '',
+    source: 'sso' as const,
+  }
 
   return html`
     <!DOCTYPE html>
@@ -26,7 +30,9 @@ export const layout = (
         <title>${title} - Agent Prompt Train Dashboard</title>
         ${csrfToken ? html`<meta name="csrf-token" content="${csrfToken}" />` : ''}
         <style>
-          ${raw(dashboardStyles)}
+          ${raw(
+            dashboardStyles
+          )}
         
         /* Ultra-dense JSON viewer styles injected globally */
         andypf-json-viewer::part(json-viewer) {
@@ -171,9 +177,8 @@ export const layout = (
           }
         </style>
         <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-        ${
-          csrfToken
-            ? raw(`
+        ${csrfToken
+          ? raw(`
       <script>
         // Add CSRF token to all HTMX requests
         document.addEventListener('DOMContentLoaded', function() {
@@ -185,23 +190,10 @@ export const layout = (
           });
         });
       </script>`)
-            : ''
-        }
+          : ''}
         ${additionalScripts}
       </head>
-      <body${auth.isReadOnly ? ' class="read-only-mode"' : ''}>
-        ${
-          auth.isReadOnly
-            ? html`
-                <div
-                  class="read-only-banner"
-                  style="background-color: #fbbf24; color: #000; text-align: center; padding: 0.5rem; font-weight: bold; position: sticky; top: 0; z-index: 100;"
-                >
-                  Dashboard is running in Read-Only Mode
-                </div>
-              `
-            : ''
-        }
+      <body>
         <nav>
           <div class="container">
             <h1 style="display: flex; align-items: center; gap: 0.5rem;">
@@ -217,11 +209,10 @@ export const layout = (
               <a href="/dashboard/credentials" class="text-sm text-blue-600">Credentials</a>
               <a href="/dashboard/trains" class="text-sm text-blue-600">Trains</a>
               <span class="text-sm text-gray-600" id="current-train">All Train IDs</span>
-              ${
-                !auth.isReadOnly
-                  ? html`<a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>`
-                  : ''
-              }
+              ${auth.isAuthenticated && auth.principal
+                ? html`<span class="text-sm text-gray-600">${auth.principal}</span>`
+                : ''}
+              <a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>
               <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
                 <svg
                   id="theme-icon-light"

@@ -3,22 +3,16 @@
  */
 
 /**
- * Check if the dashboard is running in read-only mode
- * This is determined by the absence of DASHBOARD_API_KEY
- * Note: This is a function to allow dynamic checking in tests
+ * Get the development user email for local development bypass
+ * When set, this email will be used instead of requiring oauth2-proxy headers
+ * This should ONLY be used in development environments
  */
-export const isReadOnly = () => !process.env.DASHBOARD_API_KEY
+export const getDevUserEmail = () => process.env.DASHBOARD_DEV_USER_EMAIL
 
 /**
- * Get the dashboard API key from environment
- * Note: This is a function to allow dynamic checking in tests
+ * Check if running in development mode (dev user email is set)
  */
-export const getDashboardApiKey = () => process.env.DASHBOARD_API_KEY
-
-/**
- * Determine if SSO integration is enabled. Defaults to false unless explicitly set.
- */
-export const isSsoEnabled = () => process.env.DASHBOARD_SSO_ENABLED === 'true'
+export const isDevMode = () => Boolean(getDevUserEmail())
 
 /**
  * Headers forwarded by an upstream auth proxy that the dashboard should trust for identity.
@@ -53,16 +47,12 @@ export const getSsoAllowedDomains = (): string[] => {
     .filter(Boolean)
 }
 
-// Legacy exports for backward compatibility
-export const dashboardApiKey = process.env.DASHBOARD_API_KEY
-
 /**
  * Export configuration flags for easy access
  */
 export const dashboardConfig = {
-  isReadOnly: isReadOnly(),
-  dashboardApiKey,
-  ssoEnabled: isSsoEnabled(),
+  devUserEmail: getDevUserEmail(),
+  isDevMode: isDevMode(),
   ssoHeaders: getSsoHeaderNames(),
   ssoAllowedDomains: getSsoAllowedDomains(),
 } as const

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+**Superseded** by [ADR-027: Mandatory User Authentication for Dashboard](./adr-027-mandatory-user-authentication.md)
+
+This ADR is kept for historical context. The read-only mode and API key authentication described here have been removed in favor of mandatory user authentication via oauth2-proxy.
 
 ## Context
 

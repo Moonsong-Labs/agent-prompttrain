@@ -1,17 +1,6 @@
 import { logger } from '../middleware/logger.js'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import { HttpError } from '../errors/HttpError.js'
-import { isReadOnly } from '../config.js'
-
-/**
- * Error thrown when attempting write operations in read-only mode
- */
-export class ReadOnlyModeError extends Error {
-  constructor(message = 'Operation not allowed: the dashboard is in read-only mode.') {
-    super(message)
-    this.name = 'ReadOnlyModeError'
-  }
-}
 
 interface StatsResponse {
   totalRequests: number
@@ -846,11 +835,6 @@ export class ProxyApiClient {
    * Generic POST method for API calls
    */
   async post<T = unknown>(path: string, body?: unknown): Promise<T> {
-    // Check if in read-only mode without API key
-    if (isReadOnly() && !this.apiKey) {
-      throw new ReadOnlyModeError()
-    }
-
     try {
       const url = new URL(path, this.baseUrl)
       const response = await fetch(url.toString(), {
