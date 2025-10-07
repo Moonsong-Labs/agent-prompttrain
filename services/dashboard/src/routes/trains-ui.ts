@@ -10,6 +10,7 @@ import {
   listCredentialsSafe,
   linkAccountToTrain,
   unlinkAccountFromTrain,
+  getTrainMembers,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -290,6 +291,27 @@ trainsUIRoutes.get('/', async c => {
                           `}
                     </div>
 
+                    <!-- Members Section -->
+                    <div style="margin-bottom: 1.5rem;">
+                      <h4
+                        style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151;"
+                      >
+                        Members
+                      </h4>
+                      <div
+                        id="members-${train.id}"
+                        hx-get="/dashboard/trains/${train.id}/members-list"
+                        hx-trigger="load"
+                        hx-swap="innerHTML"
+                      >
+                        <div
+                          style="background: #f9fafb; padding: 1rem; border-radius: 0.25rem; text-align: center; color: #6b7280;"
+                        >
+                          Loading members...
+                        </div>
+                      </div>
+                    </div>
+
                     <!-- API Keys Section -->
                     <div>
                       <h4
@@ -501,6 +523,68 @@ trainsUIRoutes.get('/:trainId/api-keys-list', async c => {
                 ${key.last_used_at
                   ? html`• Last used: ${new Date(key.last_used_at).toLocaleString()}`
                   : html`• Never used`}
+              </div>
+            </div>
+          `
+        )}
+      </div>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * HTMX endpoint to load members for a specific train
+ */
+trainsUIRoutes.get('/:trainId/members-list', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  try {
+    const members = await getTrainMembers(pool, trainId)
+
+    if (members.length === 0) {
+      return c.html(html`
+        <div
+          style="background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem; color: #92400e;"
+        >
+          ⚠️ No members found. This train should have at least one owner.
+        </div>
+      `)
+    }
+
+    return c.html(html`
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        ${members.map(
+          member => html`
+            <div
+              style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
+            >
+              <div>
+                <div style="font-weight: 600; font-size: 0.875rem;">${member.user_email}</div>
+                <div style="font-size: 0.75rem; color: #6b7280;">
+                  <span
+                    style="background: ${member.role === 'owner'
+                      ? '#3b82f6'
+                      : '#6b7280'}; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; text-transform: uppercase;"
+                  >
+                    ${member.role}
+                  </span>
+                  • Added: ${new Date(member.added_at).toLocaleDateString()} by ${member.added_by}
+                </div>
               </div>
             </div>
           `
