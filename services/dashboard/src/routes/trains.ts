@@ -1,23 +1,27 @@
 import { Hono } from 'hono'
 import { container } from '../container'
 import {
-  listTrainsWithAccounts,
   getTrainWithAccounts,
   createTrain,
   updateTrain,
   linkAccountToTrain,
   unlinkAccountFromTrain,
+  addTrainMember,
+  getUserTrainsWithAccounts,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateTrainRequest, UpdateTrainRequest } from '@agent-prompttrain/shared'
+import type { AuthContext } from '../middleware/auth.js'
+import { requireTrainOwner, requireTrainMembership } from '../middleware/train-ownership.js'
 
-const trains = new Hono()
+const trains = new Hono<{ Variables: { auth: AuthContext } }>()
 
-// GET /api/trains - List all trains with accounts
+// GET /api/trains - List user's trains with accounts
 trains.get('/', async c => {
   try {
     const pool = container.getPool()
+    const auth = c.get('auth')
 
-    const trainsList = await listTrainsWithAccounts(pool)
+    const trainsList = await getUserTrainsWithAccounts(pool, auth.principal)
     return c.json({ trains: trainsList })
   } catch (error) {
     console.error('Failed to list trains:', error)
@@ -25,8 +29,8 @@ trains.get('/', async c => {
   }
 })
 
-// GET /api/trains/:trainId - Get train details with accounts
-trains.get('/:trainId', async c => {
+// GET /api/trains/:trainId - Get train details with accounts (member only)
+trains.get('/:trainId', requireTrainMembership, async c => {
   try {
     const pool = container.getPool()
 
@@ -46,13 +50,28 @@ trains.get('/:trainId', async c => {
 
 // POST /api/trains - Create new train
 trains.post('/', async c => {
+  const pool = container.getPool()
+  const auth = c.get('auth')
+  const client = await pool.connect()
+
   try {
-    const pool = container.getPool()
-
     const body = await c.req.json<CreateTrainRequest>()
-    const train = await createTrain(pool, body)
 
-    return c.json({ train }, 201)
+    // Create train and auto-assign creator as owner in a transaction
+    await client.query('BEGIN')
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const train = await createTrain(client as any, body)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await addTrainMember(client as any, train.id, auth.principal, 'owner', auth.principal)
+      await client.query('COMMIT')
+
+      return c.json({ train }, 201)
+    } catch (innerError) {
+      await client.query('ROLLBACK')
+      throw innerError
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Failed to create train:', error)
     if (error.code === '23505') {
@@ -60,11 +79,13 @@ trains.post('/', async c => {
       return c.json({ error: 'Train ID already exists' }, 409)
     }
     return c.json({ error: 'Failed to create train' }, 500)
+  } finally {
+    client.release()
   }
 })
 
-// PUT /api/trains/:id - Update train
-trains.put('/:id', async c => {
+// PUT /api/trains/:id - Update train (owner only)
+trains.put('/:id', requireTrainOwner, async c => {
   try {
     const pool = container.getPool()
 
@@ -73,6 +94,7 @@ trains.put('/:id', async c => {
     const train = await updateTrain(pool, id, body)
 
     return c.json({ train })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Failed to update train:', error)
     if (error.message.includes('not found')) {
@@ -82,8 +104,8 @@ trains.put('/:id', async c => {
   }
 })
 
-// POST /api/trains/:id/accounts - Link account to train
-trains.post('/:id/accounts', async c => {
+// POST /api/trains/:id/accounts - Link account to train (owner only)
+trains.post('/:id/accounts', requireTrainOwner, async c => {
   try {
     const pool = container.getPool()
 
@@ -99,8 +121,8 @@ trains.post('/:id/accounts', async c => {
   }
 })
 
-// DELETE /api/trains/:id/accounts/:credentialId - Unlink account
-trains.delete('/:id/accounts/:credentialId', async c => {
+// DELETE /api/trains/:id/accounts/:credentialId - Unlink account (owner only)
+trains.delete('/:id/accounts/:credentialId', requireTrainOwner, async c => {
   try {
     const pool = container.getPool()
 

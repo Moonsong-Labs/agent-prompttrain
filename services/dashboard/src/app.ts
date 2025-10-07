@@ -19,6 +19,7 @@ import { csrfProtection } from './middleware/csrf.js'
 import credentialsRoutes from './routes/credentials.js'
 import trainsRoutes from './routes/trains.js'
 import apiKeysRoutes from './routes/api-keys.js'
+import trainMembersRoutes from './routes/train-members.js'
 
 /**
  * Create and configure the Dashboard application
@@ -212,6 +213,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   app.route('/api/credentials', credentialsRoutes)
   app.route('/api/trains', trainsRoutes)
   app.route('/api/trains', apiKeysRoutes) // Nested under trains
+  app.route('/api/trains', trainMembersRoutes) // Nested under trains
 
   // Mount analysis partials routes
   app.route('/partials/analysis', analysisPartialsRoutes)
