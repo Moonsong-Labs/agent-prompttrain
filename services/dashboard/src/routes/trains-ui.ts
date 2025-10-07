@@ -11,11 +11,13 @@ import {
   linkAccountToTrain,
   unlinkAccountFromTrain,
   getTrainMembers,
+  addTrainMember,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
+import type { AuthContext } from '../middleware/auth.js'
 
-export const trainsUIRoutes = new Hono()
+export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
 
 /**
  * Trains management UI page
@@ -802,6 +804,9 @@ trainsUIRoutes.post('/create', async c => {
     `)
   }
 
+  const auth = c.get('auth')
+  const client = await pool.connect()
+
   try {
     const formData = await c.req.parseBody()
     const trainId = formData.train_id as string
@@ -810,6 +815,7 @@ trainsUIRoutes.post('/create', async c => {
 
     // Validate train ID format
     if (!/^[a-z0-9-]+$/.test(trainId)) {
+      client.release()
       return c.html(html`
         <div
           style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
@@ -827,27 +833,41 @@ trainsUIRoutes.post('/create', async c => {
       `)
     }
 
-    const train = await createTrain(pool, {
-      train_id: trainId,
-      name: name,
-      description: description,
-    })
+    // Create train and auto-assign creator as owner in a transaction
+    await client.query('BEGIN')
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const train = await createTrain(client as any, {
+        train_id: trainId,
+        name: name,
+        description: description,
+      })
 
-    return c.html(html`
-      <div
-        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>✅ Success!</strong> Train "${train.train_id}" created successfully.
-      </div>
-      <div style="text-align: center;">
-        <button
-          onclick="location.reload()"
-          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+      // Add the creator as an owner
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await addTrainMember(client as any, train.id, auth.principal, 'owner', auth.principal)
+
+      await client.query('COMMIT')
+
+      return c.html(html`
+        <div
+          style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
         >
-          Reload Page
-        </button>
-      </div>
-    `)
+          <strong>✅ Success!</strong> Train "${train.train_id}" created successfully.
+        </div>
+        <div style="text-align: center;">
+          <button
+            onclick="location.reload()"
+            style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+          >
+            Reload Page
+          </button>
+        </div>
+      `)
+    } catch (innerError) {
+      await client.query('ROLLBACK')
+      throw innerError
+    }
   } catch (error) {
     const errorMessage = getErrorMessage(error)
     const isDuplicate = errorMessage.includes('unique') || errorMessage.includes('duplicate')
@@ -868,5 +888,7 @@ trainsUIRoutes.post('/create', async c => {
         </button>
       </div>
     `)
+  } finally {
+    client.release()
   }
 })
