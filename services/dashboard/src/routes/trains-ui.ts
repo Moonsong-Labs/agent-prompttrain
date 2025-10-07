@@ -7,9 +7,7 @@ import {
   listTrainApiKeys,
   createTrain,
   createTrainApiKey,
-  listCredentialsSafe,
-  linkAccountToTrain,
-  unlinkAccountFromTrain,
+  setTrainDefaultAccount,
   getTrainMembers,
   addTrainMember,
   deleteTrain,
@@ -45,10 +43,7 @@ trainsUIRoutes.get('/', async c => {
   }
 
   try {
-    const [trains, allCredentials] = await Promise.all([
-      listTrainsWithAccounts(pool),
-      listCredentialsSafe(pool),
-    ])
+    const trains = await listTrainsWithAccounts(pool)
 
     // Check ownership for each train
     const trainOwnershipMap = new Map<string, boolean>()
@@ -209,68 +204,24 @@ trainsUIRoutes.get('/', async c => {
                         : ''}
                     </div>
 
-                    <!-- Linked Credentials Section -->
+                    <!-- Available Credentials Section -->
                     <div style="margin-bottom: 1.5rem;">
                       <h4
                         style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151;"
                       >
-                        Linked Credentials (${train.accounts?.length || 0})
+                        Available Credentials (${train.accounts?.length || 0})
                       </h4>
+                      <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
+                        All trains have access to all credentials. Set a default credential below.
+                      </p>
 
-                      <!-- Link Credential Form (owner only) -->
-                      ${trainOwnershipMap.get(train.id) && allCredentials.length > 0
-                        ? html`
-                            <form
-                              hx-post="/dashboard/trains/${train.id}/link-credential"
-                              hx-swap="beforebegin"
-                              style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
-                            >
-                              <div style="flex: 1;">
-                                <label
-                                  for="credential-select-${train.id}"
-                                  style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
-                                >
-                                  Select Credential to Link
-                                </label>
-                                <select
-                                  id="credential-select-${train.id}"
-                                  name="credential_id"
-                                  required
-                                  style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
-                                >
-                                  <option value="">-- Select a credential --</option>
-                                  ${allCredentials
-                                    .filter(
-                                      cred =>
-                                        !train.accounts?.some(
-                                          (a: AnthropicCredentialSafe) => a.id === cred.id
-                                        )
-                                    )
-                                    .map(
-                                      cred => html`
-                                        <option value="${cred.id}">
-                                          ${cred.account_name} (${cred.account_id})
-                                        </option>
-                                      `
-                                    )}
-                                </select>
-                              </div>
-                              <button
-                                type="submit"
-                                style="background: #3b82f6; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
-                              >
-                                Link Credential
-                              </button>
-                            </form>
-                          `
-                        : ''}
                       ${!train.accounts || train.accounts.length === 0
                         ? html`
                             <div
                               style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
                             >
                               <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
-                                ⚠️ No credentials linked. Link a credential to enable API access.
+                                ⚠️ No credentials available. Add credentials first.
                               </p>
                             </div>
                           `
@@ -279,11 +230,22 @@ trainsUIRoutes.get('/', async c => {
                               ${train.accounts.map(
                                 (cred: AnthropicCredentialSafe) => html`
                                   <div
-                                    style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
+                                    style="background: ${train.default_account_id === cred.id
+                                      ? '#eff6ff'
+                                      : '#f9fafb'}; border: 1px solid ${train.default_account_id ===
+                                    cred.id
+                                      ? '#3b82f6'
+                                      : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
                                   >
-                                    <div>
+                                    <div style="flex: 1;">
                                       <div style="font-weight: 600; font-size: 0.875rem;">
                                         ${cred.account_name}
+                                        ${train.default_account_id === cred.id
+                                          ? html`<span
+                                              style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
+                                              >DEFAULT</span
+                                            >`
+                                          : ''}
                                       </div>
                                       <div style="font-size: 0.75rem; color: #6b7280;">
                                         <code
@@ -299,13 +261,13 @@ trainsUIRoutes.get('/', async c => {
                                           : ''}
                                       </div>
                                     </div>
-                                    ${trainOwnershipMap.get(train.id)
+                                    ${trainOwnershipMap.get(train.id) &&
+                                    train.default_account_id !== cred.id
                                       ? html`
                                           <form
-                                            hx-post="/dashboard/trains/${train.id}/unlink-credential"
+                                            hx-post="/dashboard/trains/${train.id}/set-default-account"
                                             hx-swap="outerHTML"
-                                            hx-target="closest div"
-                                            hx-confirm="Are you sure you want to unlink this credential?"
+                                            hx-target="closest div[style*='margin-bottom: 1.5rem']"
                                             style="margin: 0;"
                                           >
                                             <input
@@ -315,9 +277,9 @@ trainsUIRoutes.get('/', async c => {
                                             />
                                             <button
                                               type="submit"
-                                              style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                              style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
                                             >
-                                              Unlink
+                                              Set as Default
                                             </button>
                                           </form>
                                         `
@@ -744,102 +706,9 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
 })
 
 /**
- * Link a credential to a train (HTMX form submission - owner only)
+ * Set default account for a train (HTMX form submission - owner only)
  */
-trainsUIRoutes.post('/:trainId/link-credential', async c => {
-  const trainId = c.req.param('trainId')
-  const pool = container.getPool()
-  const auth = c.get('auth')
-
-  if (!pool) {
-    return c.html(html`
-      <div
-        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>Error:</strong> Database not configured
-      </div>
-    `)
-  }
-
-  // Check authentication
-  if (!auth.isAuthenticated) {
-    return c.html(html`
-      <div
-        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>Error:</strong> Unauthorized - please log in
-      </div>
-    `)
-  }
-
-  // Check ownership
-  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
-  if (!isOwner) {
-    return c.html(html`
-      <div
-        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>Error:</strong> Only train owners can link credentials
-      </div>
-    `)
-  }
-
-  try {
-    const formData = await c.req.parseBody()
-    const credentialId = formData.credential_id as string
-
-    if (!credentialId) {
-      return c.html(html`
-        <div
-          style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-        >
-          <strong>Error:</strong> Please select a credential
-        </div>
-      `)
-    }
-
-    await linkAccountToTrain(pool, trainId, credentialId)
-
-    return c.html(html`
-      <div
-        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>✅ Success!</strong> Credential linked successfully.
-      </div>
-      <div style="text-align: center;">
-        <button
-          onclick="location.reload()"
-          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
-        >
-          Reload Page
-        </button>
-      </div>
-    `)
-  } catch (error) {
-    const errorMessage = getErrorMessage(error)
-
-    return c.html(html`
-      <div
-        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
-      >
-        <strong>Error:</strong> ${errorMessage}
-      </div>
-      <div style="text-align: center;">
-        <button
-          onclick="location.reload()"
-          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
-        >
-          Try Again
-        </button>
-      </div>
-    `)
-  }
-})
-
-/**
- * Unlink a credential from a train (HTMX form submission - owner only)
- */
-trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
+trainsUIRoutes.post('/:trainId/set-default-account', async c => {
   const trainId = c.req.param('trainId')
   const pool = container.getPool()
   const auth = c.get('auth')
@@ -866,7 +735,7 @@ trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
   if (!isOwner) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-        <strong>Error:</strong> Only train owners can unlink credentials
+        <strong>Error:</strong> Only train owners can change the default account
       </div>
     `)
   }
@@ -875,18 +744,24 @@ trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
     const formData = await c.req.parseBody()
     const credentialId = formData.credential_id as string
 
-    const success = await unlinkAccountFromTrain(pool, trainId, credentialId)
+    await setTrainDefaultAccount(pool, trainId, credentialId)
 
-    if (success) {
-      // Return empty div to remove the credential from the list
-      return c.html(html``)
-    } else {
-      return c.html(html`
-        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-          Failed to unlink credential
-        </div>
-      `)
-    }
+    // Reload the credentials section
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>✅ Success!</strong> Default account updated.
+      </div>
+      <div style="text-align: center;">
+        <button
+          onclick="location.reload()"
+          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+        >
+          Reload Page
+        </button>
+      </div>
+    `)
   } catch (error) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">

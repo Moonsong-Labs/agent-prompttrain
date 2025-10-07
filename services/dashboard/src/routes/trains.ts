@@ -4,8 +4,7 @@ import {
   getTrainWithAccounts,
   createTrain,
   updateTrain,
-  linkAccountToTrain,
-  unlinkAccountFromTrain,
+  setTrainDefaultAccount,
   addTrainMember,
   getUserTrainsWithAccounts,
   deleteTrain,
@@ -105,41 +104,20 @@ trains.put('/:id', requireTrainOwner, async c => {
   }
 })
 
-// POST /api/trains/:id/accounts - Link account to train (owner only)
-trains.post('/:id/accounts', requireTrainOwner, async c => {
+// PUT /api/trains/:id/default-account - Set default account (owner only)
+trains.put('/:id/default-account', requireTrainOwner, async c => {
   try {
     const pool = container.getPool()
 
     const trainId = c.req.param('id')
     const { credential_id } = await c.req.json<{ credential_id: string }>()
 
-    await linkAccountToTrain(pool, trainId, credential_id)
+    const train = await setTrainDefaultAccount(pool, trainId, credential_id)
 
-    return c.json({ success: true })
+    return c.json({ train })
   } catch (error) {
-    console.error('Failed to link account:', error)
-    return c.json({ error: 'Failed to link account' }, 500)
-  }
-})
-
-// DELETE /api/trains/:id/accounts/:credentialId - Unlink account (owner only)
-trains.delete('/:id/accounts/:credentialId', requireTrainOwner, async c => {
-  try {
-    const pool = container.getPool()
-
-    const trainId = c.req.param('id')
-    const credentialId = c.req.param('credentialId')
-
-    const success = await unlinkAccountFromTrain(pool, trainId, credentialId)
-
-    if (!success) {
-      return c.json({ error: 'Link not found' }, 404)
-    }
-
-    return c.json({ success: true })
-  } catch (error) {
-    console.error('Failed to unlink account:', error)
-    return c.json({ error: 'Failed to unlink account' }, 500)
+    console.error('Failed to set default account:', error)
+    return c.json({ error: 'Failed to set default account' }, 500)
   }
 })
 

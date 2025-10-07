@@ -35,6 +35,7 @@ export interface Train {
   train_id: string
   name: string
   description: string | null
+  default_account_id: string | null
   slack_enabled: boolean
   slack_webhook_url: string | null
   slack_channel: string | null
