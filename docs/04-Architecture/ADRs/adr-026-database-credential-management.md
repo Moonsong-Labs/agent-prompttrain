@@ -31,11 +31,13 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 **Description**: Enhance the existing filesystem approach with better CLI tools and hot-reloading
 
 **Pros**:
+
 - No migration needed
 - Simple to understand
 - No database dependency
 
 **Cons**:
+
 - Still requires git commits for credential changes
 - Can't provide real-time dashboard UI
 - No audit trail without custom log parsing
@@ -47,11 +49,13 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 **Description**: Migrate to PostgreSQL but maintain filesystem fallback for safety
 
 **Pros**:
+
 - Gradual migration path
 - Fallback if database issues occur
 - Less risky for production
 
 **Cons**:
+
 - Significantly more complex codebase
 - Two sources of truth to maintain
 - Unclear when to remove filesystem code
@@ -62,6 +66,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 **Description**: Migrate all credential and train management to PostgreSQL with no filesystem fallback
 
 **Pros**:
+
 - Single source of truth
 - Enables real-time dashboard UI
 - Full audit trail in database
@@ -70,6 +75,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 - Simpler mental model
 
 **Cons**:
+
 - Requires database for all environments
 - Migration needed for existing credentials
 - More complex initial implementation
@@ -124,6 +130,7 @@ Four new tables manage the credential and train lifecycle:
 ### API Design
 
 **Dashboard Backend APIs**:
+
 - `GET /api/credentials` - List credentials (safe format, no tokens)
 - `GET /api/credentials/:id` - Get credential details
 - `GET /api/trains` - List all trains with linked accounts
@@ -169,21 +176,25 @@ Four new tables manage the credential and train lifecycle:
 ### Code Organization
 
 **Shared Package** (`packages/shared/src/database/queries/`):
+
 - `credential-queries.ts` - CRUD operations for credentials
 - `train-queries.ts` - Train management and account linking
 - `api-key-queries.ts` - API key generation and verification
 - All queries use parameterized SQL to prevent injection attacks
 
 **Types** (`packages/shared/src/types/`):
+
 - `credentials.ts` - Full credential type and safe (no tokens) variant
 - Exported via `packages/shared/src/types/index.ts`
 
 **Database Migration**:
+
 - `scripts/db/migrations/013-credential-train-management.ts`
 - Idempotent: safe to run multiple times
 - Creates all tables with proper indexes
 
 **Scripts**:
+
 - `scripts/auth/oauth-login.ts` - Completely rewritten to save to database
 - Prompts for `account_id` and `account_name`
 - Provides next steps (link to train via dashboard)
@@ -193,6 +204,7 @@ Four new tables manage the credential and train lifecycle:
 **Intentionally Broken**: This is a breaking change requiring manual migration. Documented in IMPLEMENTATION_GUIDE.md.
 
 **Migration Steps for Existing Users**:
+
 1. Run database migration: `bun run scripts/db/migrations/013-credential-train-management.ts`
 2. Re-add OAuth credentials: `bun run scripts/auth/oauth-login.ts`
 3. Create trains via dashboard API
@@ -203,12 +215,14 @@ Four new tables manage the credential and train lifecycle:
 ### Security Considerations
 
 **Current Implementation**:
+
 - API keys hashed with SHA-256 before storage
 - OAuth tokens stored in plaintext (acceptable for dev environment)
 - Database access controlled via PostgreSQL permissions
 - All queries use parameterized SQL
 
 **Not Implemented (Deferred)**:
+
 - Token encryption at rest (would require key management)
 - Timing-safe API key comparison (marginal benefit for dev environment)
 - Rate limiting on credential refresh (handled by Anthropic API)

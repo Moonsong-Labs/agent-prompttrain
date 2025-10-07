@@ -254,7 +254,10 @@ export async function getTrainCredentials(
 /**
  * Get Slack configuration for a train
  */
-export async function getTrainSlackConfig(pool: Pool, trainId: string): Promise<SlackConfig | null> {
+export async function getTrainSlackConfig(
+  pool: Pool,
+  trainId: string
+): Promise<SlackConfig | null> {
   const train = await getTrainByTrainId(pool, trainId)
   if (!train) {
     return null

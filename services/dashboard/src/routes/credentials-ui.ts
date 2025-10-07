@@ -51,102 +51,96 @@ credentialsUIRoutes.get('/', async c => {
           </p>
         </div>
 
-        ${
-          credentials.length === 0
-            ? html`
-                <div
-                  style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.25rem;"
+        ${credentials.length === 0
+          ? html`
+              <div
+                style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.25rem;"
+              >
+                <p style="margin: 0; color: #92400e;">
+                  <strong>⚠️ No credentials found.</strong> Add credentials using the OAuth login
+                  script.
+                </p>
+              </div>
+            `
+          : html`
+              <div style="overflow-x: auto;">
+                <table
+                  style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-radius: 0.25rem;"
                 >
-                  <p style="margin: 0; color: #92400e;">
-                    <strong>⚠️ No credentials found.</strong> Add credentials using the OAuth login
-                    script.
-                  </p>
-                </div>
-              `
-            : html`
-                <div style="overflow-x: auto;">
-                  <table
-                    style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-radius: 0.25rem;"
-                  >
-                    <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-                      <tr>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Account ID
-                        </th>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Account Name
-                        </th>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Expires At
-                        </th>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Scopes
-                        </th>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Is Max
-                        </th>
-                        <th
-                          style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                        >
-                          Last Refreshed
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${credentials.map(
-                        cred => html`
-                          <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                              <code
-                                style="background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
-                                >${cred.account_id}</code
-                              >
-                            </td>
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                              ${cred.account_name}
-                            </td>
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                              ${new Date(cred.oauth_expires_at).toLocaleString()}
-                              ${
-                                new Date(cred.oauth_expires_at) < new Date()
-                                  ? html`<span
-                                      style="color: #dc2626; font-weight: 600; margin-left: 0.5rem;"
-                                      >⚠️ EXPIRED</span
-                                    >`
-                                  : ''
-                              }
-                            </td>
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                              ${cred.oauth_scopes.join(', ')}
-                            </td>
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                              ${cred.oauth_is_max ? '✅ Yes' : '❌ No'}
-                            </td>
-                            <td style="padding: 0.75rem; font-size: 0.875rem; color: #6b7280;">
-                              ${
-                                cred.last_refresh_at
-                                  ? new Date(cred.last_refresh_at).toLocaleString()
-                                  : 'Never'
-                              }
-                            </td>
-                          </tr>
-                        `
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              `
-        }
+                  <thead style="background-color: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                    <tr>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Account ID
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Account Name
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Expires At
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Scopes
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Is Max
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
+                        Last Refreshed
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${credentials.map(
+                      cred => html`
+                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            <code
+                              style="background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                              >${cred.account_id}</code
+                            >
+                          </td>
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            ${cred.account_name}
+                          </td>
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            ${new Date(cred.oauth_expires_at).toLocaleString()}
+                            ${new Date(cred.oauth_expires_at) < new Date()
+                              ? html`<span
+                                  style="color: #dc2626; font-weight: 600; margin-left: 0.5rem;"
+                                  >⚠️ EXPIRED</span
+                                >`
+                              : ''}
+                          </td>
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            ${cred.oauth_scopes.join(', ')}
+                          </td>
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            ${cred.oauth_is_max ? '✅ Yes' : '❌ No'}
+                          </td>
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #6b7280;">
+                            ${cred.last_refresh_at
+                              ? new Date(cred.last_refresh_at).toLocaleString()
+                              : 'Never'}
+                          </td>
+                        </tr>
+                      `
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            `}
       </div>
 
       <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;">
