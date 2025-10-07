@@ -6,6 +6,7 @@ import { ClaudeApiClient } from './ClaudeApiClient'
 import { NotificationService } from './NotificationService'
 import { MetricsService } from './MetricsService'
 import { ClaudeMessagesRequest, generateConversationId, config } from '@agent-prompttrain/shared'
+import { getTrainSlackConfig } from '@agent-prompttrain/shared/database/queries'
 import { logger } from '../middleware/logger'
 import { testSampleCollector } from './TestSampleCollector'
 import { StorageAdapter } from '../storage/StorageAdapter.js'
@@ -156,6 +157,7 @@ export class ProxyService {
           },
           key: context.apiKey.replace('Bearer ', ''),
           betaHeader: 'oauth-2025-04-20',
+          accountId: 'passthrough',
           accountName: 'passthrough',
         }
       } else {
@@ -534,8 +536,10 @@ export class ProxyService {
         auth.accountId
       )
 
-      // Send notifications after streaming completes
-      await this.notificationService.notify(request, response, context, auth)
+      // Fetch Slack config from database and send notifications
+      const pool = this.storageAdapter?.getPool()
+      const slackConfig = pool ? await getTrainSlackConfig(pool, context.trainId) : null
+      await this.notificationService.notify(request, response, context, auth, slackConfig)
     } catch (error) {
       // Track error metrics
       await this.metricsService.trackError(

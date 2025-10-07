@@ -656,10 +656,10 @@ apiRoutes.get('/conversations', async c => {
       ),
       -- STEP 3: Aggregate data only for the paginated conversations
       conversation_summary AS (
-        SELECT 
+        SELECT
           conversation_id,
-          train_id,
-          account_id,
+          ARRAY_AGG(DISTINCT train_id) FILTER (WHERE train_id IS NOT NULL) as train_ids,
+          ARRAY_AGG(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) as account_ids,
           MIN(timestamp) as first_message_time,
           MAX(timestamp) as last_message_time,
           COUNT(*) as message_count,
@@ -678,7 +678,7 @@ apiRoutes.get('/conversations', async c => {
           (array_agg(parent_task_request_id ORDER BY subtask_rn) FILTER (WHERE is_subtask = true AND subtask_rn = 1))[1] as parent_task_request_id,
           COUNT(CASE WHEN is_subtask THEN 1 END) as subtask_message_count
         FROM relevant_requests
-        GROUP BY conversation_id, train_id, account_id
+        GROUP BY conversation_id
       )
       -- STEP 4: Final select with parent conversation lookup and preserve order
       SELECT 
@@ -724,8 +724,11 @@ apiRoutes.get('/conversations', async c => {
 
       return {
         conversationId: row.conversation_id,
-        trainId: row.train_id,
-        accountId: row.account_id,
+        trainIds: row.train_ids || [],
+        accountIds: row.account_ids || [],
+        // Keep backward compatibility with single trainId/accountId (use first one)
+        trainId: (row.train_ids && row.train_ids[0]) || '',
+        accountId: (row.account_ids && row.account_ids[0]) || null,
         firstMessageTime: row.first_message_time,
         lastMessageTime: row.last_message_time,
         messageCount: parseInt(row.message_count),

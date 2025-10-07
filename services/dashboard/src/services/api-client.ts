@@ -115,6 +115,9 @@ interface RateLimitConfig {
 
 interface ConversationSummary {
   conversationId: string
+  trainIds: string[]
+  accountIds: string[]
+  // Backward compatibility - deprecated
   trainId: string
   accountId?: string
   firstMessageTime: string

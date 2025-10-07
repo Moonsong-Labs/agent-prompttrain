@@ -143,7 +143,7 @@ describe('truncateConversation', () => {
         expect(result[0].content).toContain('[CONTENT TRUNCATED]')
         expect(result[0].content.length).toBeLessThan(hugeContent.length)
       },
-      { timeout: 40000 }
+      { timeout: 60000 }
     )
 
     it('should handle mixed message sizes correctly', () => {

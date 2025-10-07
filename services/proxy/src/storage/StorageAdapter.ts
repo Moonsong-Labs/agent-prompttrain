@@ -552,27 +552,28 @@ export class StorageAdapter {
 
     if (subtaskPrompt) {
       // Optimized query using @> containment operator for exact prompt matching
+      // Note: We intentionally do NOT filter by train_id here
+      // This allows subtasks to be detected even when switching between accounts
       query = `
-        SELECT 
+        SELECT
           r.request_id,
           r.response_body,
           r.timestamp
         FROM api_requests r
-        WHERE r.train_id = $1
-          AND r.timestamp >= $2
-          AND r.timestamp <= $3
+        WHERE r.timestamp >= $1
+          AND r.timestamp <= $2
           AND r.response_body IS NOT NULL
           AND r.response_body->'content' @> jsonb_build_array(
             jsonb_build_object(
               'type', 'tool_use',
               'name', 'Task',
-              'input', jsonb_build_object('prompt', $4::text)
+              'input', jsonb_build_object('prompt', $3::text)
             )
           )
         ORDER BY r.timestamp DESC
         LIMIT 10
       `
-      params = [trainId, timeWindowStart, timestamp, subtaskPrompt.replace(/\\n/g, '\n')]
+      params = [timeWindowStart, timestamp, subtaskPrompt.replace(/\\n/g, '\n')]
 
       if (debugMode) {
         logger.debug('Using optimized subtask query with prompt filter', {
@@ -581,21 +582,22 @@ export class StorageAdapter {
       }
     } else {
       // Fallback to original query when no prompt is provided
+      // Note: We intentionally do NOT filter by train_id here
+      // This allows subtasks to be detected even when switching between accounts
       query = `
-        SELECT 
+        SELECT
           r.request_id,
           r.response_body,
           r.timestamp
         FROM api_requests r
-        WHERE r.train_id = $1
-          AND r.timestamp >= $2
-          AND r.timestamp <= $3
+        WHERE r.timestamp >= $1
+          AND r.timestamp <= $2
           AND r.response_body IS NOT NULL
           AND jsonb_path_exists(r.response_body, '$.content[*] ? (@.type == "tool_use" && @.name == "Task")')
         ORDER BY r.timestamp DESC
         LIMIT 100
       `
-      params = [trainId, timeWindowStart, timestamp]
+      params = [timeWindowStart, timestamp]
     }
 
     try {
@@ -652,6 +654,13 @@ export class StorageAdapter {
   /**
    * Close the storage adapter
    */
+  /**
+   * Get the database pool for direct queries
+   */
+  getPool(): Pool {
+    return this.pool
+  }
+
   async close(): Promise<void> {
     // Mark as closed to prevent new cleanups from being scheduled
     this.isClosed = true

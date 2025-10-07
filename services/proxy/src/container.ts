@@ -120,11 +120,12 @@ class Container {
       this.tokenUsageService
     )
     this.notificationService = new NotificationService()
-    this.authenticationService = new AuthenticationService({
-      defaultApiKey: undefined,
-      accountsDir: config.auth.accountsDir,
-      clientKeysDir: config.auth.clientKeysDir,
-    })
+
+    // AuthenticationService requires database pool
+    if (!this.pool) {
+      throw new Error('Database pool is required for AuthenticationService')
+    }
+    this.authenticationService = new AuthenticationService(this.pool)
     this.claudeApiClient = new ClaudeApiClient({
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,

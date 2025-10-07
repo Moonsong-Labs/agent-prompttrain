@@ -4,6 +4,7 @@ import { RequestContext } from '../domain/value-objects/RequestContext'
 import { AuthResult } from './AuthenticationService'
 import { sendToSlack, initializeTrainSlack, MessageInfo } from './slack.js'
 import { logger } from '../middleware/logger'
+import type { SlackConfig } from '@agent-prompttrain/shared'
 
 export interface NotificationConfig {
   enabled: boolean
@@ -34,7 +35,8 @@ export class NotificationService {
     request: ProxyRequest,
     response: ProxyResponse,
     context: RequestContext,
-    auth: AuthResult
+    auth: AuthResult,
+    slackConfig: SlackConfig | null = null
   ): Promise<void> {
     if (!this.config.enabled) {
       return
@@ -46,7 +48,6 @@ export class NotificationService {
     }
 
     try {
-      const slackConfig = auth.slackConfig
       const accountWebhook = slackConfig ? initializeTrainSlack(slackConfig) : null
 
       // Check if user message changed
@@ -294,7 +295,7 @@ export class NotificationService {
       totalTokens: metrics.totalTokens,
       toolCalls: metrics.toolCallCount,
       requestType: request.requestType,
-      apiKeyInfo: auth.type === 'api_key' ? auth.key.substring(0, 10) + '****' : 'OAuth',
+      apiKeyInfo: 'OAuth',
       accountName: auth.accountName,
       processingTime: `${context.getElapsedTime()}ms`,
     }
@@ -319,7 +320,7 @@ export class NotificationService {
       return undefined
     }
     const maskedKey = auth.key.length > 10 ? `${auth.key.slice(0, 10)}****` : '****'
-    return `${auth.type}:${maskedKey}`
+    return `oauth:${maskedKey}`
   }
 
   /**

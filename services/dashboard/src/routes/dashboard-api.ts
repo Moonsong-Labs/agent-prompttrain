@@ -10,6 +10,8 @@ import { tokenUsageRoutes } from './token-usage.js'
 import { requestUsageRoutes } from './request-usage.js'
 import { promptsRoute } from './prompts.js'
 import { promptDetailRoute } from './prompt-detail.js'
+import { credentialsUIRoutes } from './credentials-ui.js'
+import { trainsUIRoutes } from './trains-ui.js'
 
 export const dashboardRoutes = new Hono<{
   Variables: {
@@ -27,3 +29,5 @@ dashboardRoutes.route('/', tokenUsageRoutes)
 dashboardRoutes.route('/', requestUsageRoutes)
 dashboardRoutes.route('/prompts', promptsRoute)
 dashboardRoutes.route('/prompts', promptDetailRoute)
+dashboardRoutes.route('/credentials', credentialsUIRoutes)
+dashboardRoutes.route('/trains', trainsUIRoutes)

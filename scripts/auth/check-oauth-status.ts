@@ -1,92 +1,88 @@
 #!/usr/bin/env bun
-import { loadCredentials } from '../../services/proxy/src/credentials'
-import { resolve } from 'path'
+import { Pool } from 'pg'
+import { getCredential } from '../../packages/shared/src/database/queries/index.js'
 
 async function checkOAuthStatus() {
-  const credentialPath = process.argv[2]
+  const credentialId = process.argv[2]
 
-  if (!credentialPath) {
-    console.error('Usage: bun run scripts/check-oauth-status.ts <credential-path>')
-    console.error(
-      'Example: bun run scripts/check-oauth-status.ts credentials/example.com.credentials.json'
-    )
+  if (!credentialId) {
+    console.error('Usage: bun run scripts/auth/check-oauth-status.ts <credential-id>')
+    console.error('Example: bun run scripts/auth/check-oauth-status.ts acc_team_alpha')
     process.exit(1)
   }
 
-  try {
-    const fullPath = resolve(credentialPath)
-    const credentials = loadCredentials(fullPath)
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    console.error('DATABASE_URL environment variable is required')
+    process.exit(1)
+  }
 
-    if (!credentials) {
-      console.error(`No credentials found at: ${fullPath}`)
+  const pool = new Pool({ connectionString: databaseUrl })
+
+  try {
+    const credential = await getCredential(pool, credentialId)
+
+    if (!credential) {
+      console.error(`Credential not found: ${credentialId}`)
       process.exit(1)
     }
 
-    console.log(`Credential file: ${fullPath}`)
-    console.log(`Type: ${credentials.type}`)
+    console.log(`Credential ID: ${credential.account_id}`)
+    console.log(`Account Name: ${credential.account_name}`)
+    console.log(`Created At: ${credential.created_at}`)
 
-    if (credentials.type === 'oauth' && credentials.oauth) {
-      const oauth = credentials.oauth
-      const now = Date.now()
-      const expiresAt = oauth.expiresAt || 0
-      const isExpired = now >= expiresAt
-      const expiresIn = Math.max(0, expiresAt - now)
+    const now = new Date()
+    const expiresAt = credential.oauth_expires_at
+    const isExpired = expiresAt ? now >= expiresAt : true
+    const expiresIn = expiresAt ? Math.max(0, expiresAt.getTime() - now.getTime()) : 0
 
-      console.log('\nOAuth Details:')
+    console.log('\nOAuth Details:')
+    console.log(
+      `- Access Token: ${credential.oauth_access_token ? credential.oauth_access_token.substring(0, 20) + '...' : 'missing'}`
+    )
+    console.log(
+      `- Refresh Token: ${credential.oauth_refresh_token ? credential.oauth_refresh_token.substring(0, 20) + '...' : 'missing'}`
+    )
+    console.log(`- Expires At: ${expiresAt ? expiresAt.toISOString() : 'unknown'}`)
+    console.log(`- Status: ${isExpired ? 'EXPIRED' : 'Valid'}`)
+
+    if (!isExpired && expiresAt) {
+      const hours = Math.floor(expiresIn / (1000 * 60 * 60))
+      const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
+      console.log(`- Expires In: ${hours}h ${minutes}m`)
+    } else if (isExpired && expiresAt) {
       console.log(
-        `- Access Token: ${oauth.accessToken ? oauth.accessToken.substring(0, 20) + '...' : 'missing'}`
-      )
-      console.log(
-        `- Refresh Token: ${oauth.refreshToken ? oauth.refreshToken.substring(0, 20) + '...' : 'missing'}`
-      )
-      console.log(`- Expires At: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}`)
-      console.log(`- Status: ${isExpired ? 'EXPIRED' : 'Valid'}`)
-
-      if (!isExpired) {
-        const hours = Math.floor(expiresIn / (1000 * 60 * 60))
-        const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
-        console.log(`- Expires In: ${hours}h ${minutes}m`)
-      } else {
-        console.log(`- Expired: ${Math.floor((now - expiresAt) / (1000 * 60 * 60))} hours ago`)
-      }
-
-      console.log(`- Scopes: ${oauth.scopes ? oauth.scopes.join(', ') : 'none'}`)
-      console.log(`- Is Max: ${oauth.isMax}`)
-
-      if (!oauth.refreshToken) {
-        console.warn(
-          '\nWARNING: No refresh token available. Re-authentication will be required when access token expires.'
-        )
-      }
-
-      if (isExpired && oauth.refreshToken) {
-        console.log(
-          '\nToken is expired but has refresh token. The proxy should automatically refresh it.'
-        )
-      } else if (isExpired && !oauth.refreshToken) {
-        console.error(
-          '\nERROR: Token is expired and no refresh token available. Re-authentication required!'
-        )
-        console.log(`Run: bun run scripts/auth/oauth-login.ts ${credentialPath}`)
-      }
-    } else if (credentials.type === 'api_key') {
-      console.log(
-        `\nAPI Key: ${credentials.api_key ? credentials.api_key.substring(0, 20) + '...' : 'missing'}`
+        `- Expired: ${Math.floor((now.getTime() - expiresAt.getTime()) / (1000 * 60 * 60))} hours ago`
       )
     }
 
-    if (credentials.client_api_key) {
-      console.log(
-        `\nClient API Key (for proxy auth): ${credentials.client_api_key.substring(0, 20)}...`
+    console.log(
+      `- Scopes: ${credential.oauth_scopes ? credential.oauth_scopes.join(', ') : 'none'}`
+    )
+    console.log(`- Is Max: ${credential.oauth_is_max}`)
+
+    if (!credential.oauth_refresh_token) {
+      console.warn(
+        '\nWARNING: No refresh token available. Re-authentication will be required when access token expires.'
       )
     }
 
-    if (credentials.slack) {
-      console.log('\nSlack integration: configured')
+    if (isExpired && credential.oauth_refresh_token) {
+      console.log(
+        '\nToken is expired but has refresh token. The proxy should automatically refresh it.'
+      )
+      console.log('Or manually refresh with: bun run scripts/auth/oauth-refresh.ts ' + credentialId)
+    } else if (isExpired && !credential.oauth_refresh_token) {
+      console.error(
+        '\nERROR: Token is expired and no refresh token available. Re-authentication required!'
+      )
+      console.log('Run: bun run scripts/auth/oauth-login.ts')
     }
   } catch (error) {
     console.error('Error checking OAuth status:', error)
     process.exit(1)
+  } finally {
+    await pool.end()
   }
 }
 

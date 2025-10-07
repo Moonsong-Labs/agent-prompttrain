@@ -1,93 +1,78 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { Hono } from 'hono'
-import { mkdtempSync, rmSync } from 'fs'
-import { join } from 'path'
-import { tmpdir } from 'os'
 import { clientAuthMiddleware } from '../src/middleware/client-auth'
-import { trainIdExtractorMiddleware } from '../src/middleware/train-id-extractor'
 import { container } from '../src/container'
-import { AuthenticationService } from '../src/services/AuthenticationService'
-import { RequestContext } from '../src/domain/value-objects/RequestContext'
-
-class MockAuthenticationService extends AuthenticationService {
-  private keyMap = new Map<string, string[]>()
-
-  constructor(rootDir: string) {
-    super({
-      accountsDir: join(rootDir, 'accounts'),
-      clientKeysDir: join(rootDir, 'client-keys'),
-    })
-  }
-
-  setKeys(trainId: string, keys: string[]) {
-    this.keyMap.set(trainId, keys)
-  }
-
-  async getClientApiKeys(trainId: string): Promise<string[]> {
-    return this.keyMap.get(trainId) ?? []
-  }
-
-  // authenticate is not used in these tests but must be implemented
-  async authenticate(_context: RequestContext) {
-    throw new Error('Not implemented in mock')
-  }
-}
+import type { Pool } from 'pg'
+import * as queries from '@agent-prompttrain/shared/database/queries'
 
 describe('Client Authentication Middleware', () => {
   let app: Hono
-  let originalGetAuthService: typeof container.getAuthenticationService
-  let mockAuthService: MockAuthenticationService
-  let tempDir: string
+  let originalGetDbPool: typeof container.getDbPool
+  let mockPool: Pool
+  let mockVerifyApiKeyAndGetTrain: any
 
-  beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'client-auth-'))
-    mockAuthService = new MockAuthenticationService(tempDir)
-    originalGetAuthService = container.getAuthenticationService
-    container.getAuthenticationService = () => mockAuthService
+  beforeEach(async () => {
+    // Create mock pool
+    mockPool = {} as Pool
+
+    // Save original method
+    originalGetDbPool = container.getDbPool
+
+    // Mock container.getDbPool to return our mock pool
+    container.getDbPool = () => mockPool
+
+    // Mock the database query function
+    mockVerifyApiKeyAndGetTrain = spyOn(queries, 'verifyApiKeyAndGetTrain').mockImplementation(
+      () => null as any
+    )
 
     app = new Hono()
-    app.use('*', trainIdExtractorMiddleware())
     app.use('*', clientAuthMiddleware())
     app.get('/test', c => c.json({ ok: true }))
   })
 
   afterEach(() => {
-    container.getAuthenticationService = originalGetAuthService
-    rmSync(tempDir, { recursive: true, force: true })
+    container.getDbPool = originalGetDbPool
+    mockVerifyApiKeyAndGetTrain.mockRestore()
   })
 
   it('allows requests when token matches configured key', async () => {
     const token = 'cnp_live_valid'
-    mockAuthService.setKeys('team-alpha', [token])
+    mockVerifyApiKeyAndGetTrain.mockImplementation(() => ({
+      trainId: 'team-alpha',
+      apiKeyId: 1,
+    }))
 
     const res = await app.request('/test', {
       headers: {
-        'MSL-Train-Id': 'team-alpha',
         Authorization: `Bearer ${token}`,
       },
     })
 
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
+    expect(mockVerifyApiKeyAndGetTrain).toHaveBeenCalledWith(mockPool, token)
   })
 
   it('rejects requests with invalid token', async () => {
-    mockAuthService.setKeys('team-alpha', ['cnp_live_valid'])
+    mockVerifyApiKeyAndGetTrain.mockImplementation(() => null)
 
     const res = await app.request('/test', {
       headers: {
-        'MSL-Train-Id': 'team-alpha',
         Authorization: 'Bearer cnp_live_invalid',
       },
     })
 
     expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error.type).toBe('authentication_error')
   })
 
   it('rejects when no keys are configured for train', async () => {
+    mockVerifyApiKeyAndGetTrain.mockImplementation(() => null)
+
     const res = await app.request('/test', {
       headers: {
-        'MSL-Train-Id': 'team-alpha',
         Authorization: 'Bearer any',
       },
     })
@@ -98,7 +83,11 @@ describe('Client Authentication Middleware', () => {
   })
 
   it('falls back to default train when header missing but still enforces keys', async () => {
-    mockAuthService.setKeys('default', ['cnp_live_default'])
+    mockVerifyApiKeyAndGetTrain.mockImplementation(() => ({
+      trainId: 'default',
+      apiKeyId: 1,
+    }))
+
     const res = await app.request('/test', {
       headers: {
         Authorization: 'Bearer cnp_live_default',

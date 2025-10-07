@@ -214,6 +214,8 @@ export const layout = (
               <a href="/dashboard/usage" class="text-sm text-blue-600">Train Usage</a>
               <a href="/dashboard/token-usage" class="text-sm text-blue-600">Token Usage</a>
               <a href="/dashboard/prompts" class="text-sm text-blue-600">Prompts</a>
+              <a href="/dashboard/credentials" class="text-sm text-blue-600">Credentials</a>
+              <a href="/dashboard/trains" class="text-sm text-blue-600">Trains</a>
               <span class="text-sm text-gray-600" id="current-train">All Train IDs</span>
               ${
                 !auth.isReadOnly

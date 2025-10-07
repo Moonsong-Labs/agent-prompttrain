@@ -4,14 +4,11 @@
  * This class encapsulates credential caching logic and provides
  * lifecycle management for cleanup operations. It replaces the
  * global state and setInterval from credentials.ts.
+ *
+ * Note: This class is now primarily used for OAuth token refresh
+ * management (tracking active refreshes, failures, metrics).
+ * Credential data itself is stored in the database.
  */
-
-import { ClaudeCredentials } from '../credentials'
-
-interface CachedCredential {
-  credential: ClaudeCredentials
-  timestamp: number
-}
 
 interface FailedRefresh {
   timestamp: number
@@ -27,11 +24,6 @@ interface RefreshMetrics {
 }
 
 export class CredentialManager {
-  // Credential cache with TTL
-  private credentialCache = new Map<string, CachedCredential>()
-  private readonly CREDENTIAL_CACHE_TTL: number
-  private readonly CREDENTIAL_CACHE_MAX_SIZE = 100
-
   // Refresh token management
   private activeRefreshes = new Map<string, Promise<string | null>>()
   private refreshTimestamps = new Map<string, number>()
@@ -52,62 +44,8 @@ export class CredentialManager {
   private cleanupIntervalId?: NodeJS.Timeout
   private readonly CLEANUP_INTERVAL = 300000 // 5 minutes
 
-  constructor(cacheTTL: number = 3600000) {
-    // 1 hour default
-    this.CREDENTIAL_CACHE_TTL = cacheTTL
-  }
-
-  /**
-   * Get a cached credential
-   */
-  getCachedCredential(key: string): ClaudeCredentials | null {
-    const cached = this.credentialCache.get(key)
-    if (!cached) {
-      return null
-    }
-
-    // Check if expired
-    if (Date.now() - cached.timestamp > this.CREDENTIAL_CACHE_TTL) {
-      this.credentialCache.delete(key)
-      return null
-    }
-
-    return cached.credential
-  }
-
-  /**
-   * Set a cached credential
-   */
-  setCachedCredential(key: string, credential: ClaudeCredentials): void {
-    // Ensure cache doesn't grow too large
-    if (this.credentialCache.size >= this.CREDENTIAL_CACHE_MAX_SIZE) {
-      // Remove oldest entry
-      let oldestKey: string | undefined
-      let oldestTime = Date.now()
-
-      for (const [k, v] of this.credentialCache.entries()) {
-        if (v.timestamp < oldestTime) {
-          oldestTime = v.timestamp
-          oldestKey = k
-        }
-      }
-
-      if (oldestKey) {
-        this.credentialCache.delete(oldestKey)
-      }
-    }
-
-    this.credentialCache.set(key, {
-      credential,
-      timestamp: Date.now(),
-    })
-  }
-
-  /**
-   * Clear credential cache
-   */
-  clearCredentialCache(): void {
-    this.credentialCache.clear()
+  constructor() {
+    // No-op constructor - cache removed, using database for credentials
   }
 
   /**
@@ -221,13 +159,6 @@ export class CredentialManager {
    */
   private performCleanup(): void {
     const now = Date.now()
-
-    // Clean credential cache
-    for (const [key, value] of this.credentialCache.entries()) {
-      if (now - value.timestamp > this.CREDENTIAL_CACHE_TTL) {
-        this.credentialCache.delete(key)
-      }
-    }
 
     // Clean stuck refresh operations
     for (const [key, timestamp] of this.refreshTimestamps.entries()) {

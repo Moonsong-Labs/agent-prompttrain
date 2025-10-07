@@ -1,160 +1,121 @@
 #!/usr/bin/env bun
-import { readdirSync, writeFileSync, mkdirSync, readFileSync } from 'fs'
-import { resolve, join, dirname } from 'path'
-import { loadCredentials, refreshToken } from '../../services/proxy/src/credentials'
+import { Pool } from 'pg'
+import {
+  listCredentials,
+  updateCredential,
+} from '../../packages/shared/src/database/queries/index.js'
+import { refreshOAuthToken } from '../../services/proxy/src/credentials/index.js'
 
 async function refreshAllOAuthTokens() {
-  const credentialsDir = process.argv[2] || 'credentials'
   const dryRun = process.argv.includes('--dry-run')
 
   console.log('OAuth Refresh All Tool')
   console.log('=====================')
-  console.log(`Credentials directory: ${credentialsDir}`)
   console.log(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE'}\n`)
 
-  if (!credentialsDir) {
-    console.error('Usage: bun run scripts/oauth-refresh-all.ts [credentials-dir] [--dry-run]')
-    console.error('Example: bun run scripts/oauth-refresh-all.ts credentials')
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    console.error('DATABASE_URL environment variable is required')
     process.exit(1)
   }
 
+  const pool = new Pool({ connectionString: databaseUrl })
+
   try {
-    const fullDir = resolve(credentialsDir)
+    // Get all credentials from database
+    const credentials = await listCredentials(pool)
 
-    // Get all credential files
-    const files = readdirSync(fullDir)
-      .filter(file => file.endsWith('.credentials.json'))
-      .sort()
-
-    if (files.length === 0) {
-      console.log('No credential files found.')
+    if (credentials.length === 0) {
+      console.log('No credentials found in database.')
       process.exit(0)
     }
 
-    console.log(`Found ${files.length} credential files\n`)
+    console.log(`Found ${credentials.length} credentials\n`)
 
     const results = {
-      total: files.length,
-      oauth: 0,
-      apiKey: 0,
+      total: credentials.length,
       refreshed: 0,
       failed: 0,
       skipped: 0,
-      errors: [] as { file: string; error: string }[],
+      errors: [] as { accountId: string; error: string }[],
     }
 
-    for (const file of files) {
-      const filePath = join(fullDir, file)
-      const trainId = file.replace('.credentials.json', '')
+    for (const credential of credentials) {
+      const accountId = credential.account_id
 
-      console.log(`\n[${trainId}]`)
+      console.log(`\n[${accountId}]`)
+      console.log(`  Account Name: ${credential.account_name}`)
 
       try {
-        const credentials = loadCredentials(filePath)
+        const now = new Date()
+        const expiresAt = credential.oauth_expires_at
+        const isExpired = expiresAt ? now >= expiresAt : true
+        const willExpireSoon = expiresAt ? now >= new Date(expiresAt.getTime() - 300000) : true // 5 minutes before expiry
 
-        if (!credentials) {
-          console.log('  ❌ Failed to load credentials')
-          results.failed++
-          results.errors.push({ file, error: 'Failed to load' })
-          continue
-        }
-
-        if (credentials.type === 'api_key') {
-          console.log('  ℹ️  API key credential (skipping)')
-          results.apiKey++
+        if (!isExpired && !willExpireSoon) {
+          const expiresIn = expiresAt!.getTime() - now.getTime()
+          const hours = Math.floor(expiresIn / (1000 * 60 * 60))
+          console.log(`  ✓ Token valid for ${hours}h (skipping)`)
           results.skipped++
           continue
         }
 
-        if (credentials.type === 'oauth' && credentials.oauth) {
-          results.oauth++
-          const oauth = credentials.oauth
-          const now = Date.now()
-          const expiresAt = oauth.expiresAt || 0
-          const isExpired = now >= expiresAt
-          const willExpireSoon = now >= expiresAt - 300000 // 5 minutes before expiry
+        if (!credential.oauth_refresh_token) {
+          console.log('  ⚠️  No refresh token available')
+          results.failed++
+          results.errors.push({ accountId, error: 'No refresh token' })
+          continue
+        }
 
-          if (!isExpired && !willExpireSoon) {
-            const expiresIn = expiresAt - now
-            const hours = Math.floor(expiresIn / (1000 * 60 * 60))
-            console.log(`  ✓ Token valid for ${hours}h (skipping)`)
-            results.skipped++
-            continue
-          }
+        console.log(`  🔄 Refreshing ${isExpired ? 'expired' : 'expiring'} token...`)
 
-          if (!oauth.refreshToken) {
-            console.log('  ⚠️  No refresh token available')
-            results.failed++
-            results.errors.push({ file, error: 'No refresh token' })
-            continue
-          }
+        if (dryRun) {
+          console.log('  📝 Would refresh token (dry run)')
+          results.refreshed++
+          continue
+        }
 
-          console.log(`  🔄 Refreshing ${isExpired ? 'expired' : 'expiring'} token...`)
+        try {
+          const newTokens = await refreshOAuthToken(credential.oauth_refresh_token)
 
-          if (dryRun) {
-            console.log('  📝 Would refresh token (dry run)')
-            results.refreshed++
-            continue
-          }
+          // Update credential in database
+          await updateCredential(pool, accountId, {
+            oauth_access_token: newTokens.accessToken,
+            oauth_refresh_token: newTokens.refreshToken,
+            oauth_expires_at: new Date(newTokens.expiresAt),
+            oauth_scopes: newTokens.scopes,
+            oauth_is_max: newTokens.isMax,
+          })
 
-          try {
-            const newOAuth = await refreshToken(oauth.refreshToken)
-            credentials.oauth = newOAuth
-
-            // Load existing file to preserve non-OAuth fields
-            let existingData: any = {}
-            try {
-              const content = readFileSync(filePath, 'utf-8')
-              existingData = JSON.parse(content)
-            } catch (err) {
-              // If we can't read existing data, we'll just save the new data
-            }
-
-            // Merge the OAuth data with existing data, preserving other fields
-            const mergedCredentials = {
-              ...existingData,
-              ...credentials,
-              // Explicitly preserve fields that might exist
-              client_api_key: existingData.client_api_key,
-              slack: existingData.slack,
-            }
-
-            // Save updated credentials
-            mkdirSync(dirname(filePath), { recursive: true })
-            writeFileSync(filePath, JSON.stringify(mergedCredentials, null, 2))
-
-            const expiresIn = newOAuth.expiresAt - Date.now()
-            const hours = Math.floor(expiresIn / (1000 * 60 * 60))
-            console.log(`  ✅ Refreshed! Valid for ${hours}h`)
-            results.refreshed++
-          } catch (error: any) {
-            console.log(`  ❌ Refresh failed: ${error.message}`)
-            results.failed++
-            results.errors.push({ file, error: error.message })
-          }
+          const expiresIn = newTokens.expiresAt - Date.now()
+          const hours = Math.floor(expiresIn / (1000 * 60 * 60))
+          console.log(`  ✅ Refreshed! Valid for ${hours}h`)
+          results.refreshed++
+        } catch (error: any) {
+          console.log(`  ❌ Refresh failed: ${error.message}`)
+          results.failed++
+          results.errors.push({ accountId, error: error.message })
         }
       } catch (error: any) {
         console.log(`  ❌ Error: ${error.message}`)
         results.failed++
-        results.errors.push({ file, error: error.message })
+        results.errors.push({ accountId, error: error.message })
       }
     }
 
     // Summary
     console.log('\n\nSummary')
     console.log('=======')
-    console.log(`Total files: ${results.total}`)
-    console.log(`- OAuth: ${results.oauth}`)
-    console.log(`- API Key: ${results.apiKey}`)
+    console.log(`Total credentials: ${results.total}`)
     console.log(`\nProcessed OAuth credentials:`)
     console.log(`- Refreshed: ${results.refreshed}`)
-    console.log(`- Skipped (valid): ${results.skipped - results.apiKey}`)
+    console.log(`- Skipped (valid): ${results.skipped}`)
     console.log(`- Failed: ${results.failed}`)
 
     if (results.errors.length > 0) {
       console.log('\nErrors:')
-      results.errors.forEach(({ file, error }) => {
-        console.log(`- ${file}: ${error}`)
+      results.errors.forEach(({ accountId, error }) => {
+        console.log(`- ${accountId}: ${error}`)
       })
     }
 
@@ -167,6 +128,8 @@ async function refreshAllOAuthTokens() {
   } catch (error) {
     console.error('Error:', error)
     process.exit(1)
+  } finally {
+    await pool.end()
   }
 }
 
