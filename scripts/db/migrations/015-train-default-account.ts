@@ -43,7 +43,7 @@ async function migrate() {
         SELECT ta.credential_id
         FROM train_accounts ta
         WHERE ta.train_id = t.id
-        ORDER BY ta.linked_at ASC
+        ORDER BY ta.created_at ASC
         LIMIT 1
       )
       WHERE EXISTS (
