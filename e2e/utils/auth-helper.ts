@@ -8,25 +8,26 @@ const __dirname = path.dirname(__filename)
 const AUTH_FILE = path.join(__dirname, '../../.auth/user.json')
 
 export class AuthHelper {
-  private apiKey: string
+  private userEmail: string
   private baseUrl: string
 
-  constructor(apiKey?: string, baseUrl?: string) {
-    // In CI, use the CI-specific API key
-    this.apiKey =
-      apiKey ||
-      process.env.DASHBOARD_API_KEY ||
-      (process.env.CI ? 'test_dashboard_key_ci' : 'test_dashboard_key')
+  constructor(userEmail?: string, baseUrl?: string) {
+    // Use test user email - simulates oauth2-proxy header
+    this.userEmail =
+      userEmail ||
+      process.env.DASHBOARD_DEV_USER_EMAIL ||
+      (process.env.CI ? 'test@ci.localhost' : 'test@localhost')
     this.baseUrl = baseUrl || process.env.TEST_BASE_URL || 'http://localhost:3001'
   }
 
   /**
-   * Perform API-based authentication and save storage state
+   * Perform authentication by simulating oauth2-proxy headers and save storage state
    */
   async authenticate(page: Page): Promise<void> {
-    // Set authentication headers on the page context
+    // Set oauth2-proxy authentication headers on the page context
+    // This simulates what oauth2-proxy would pass to the dashboard
     await page.context().setExtraHTTPHeaders({
-      'X-Dashboard-Key': this.apiKey,
+      'X-Auth-Request-Email': this.userEmail,
     })
 
     // Navigate to dashboard
@@ -40,7 +41,7 @@ export class AuthHelper {
       throw new Error(`Failed to load dashboard: ${response?.status()}`)
     }
 
-    // In CI or when API key is set, the dashboard should accept the header auth
+    // The dashboard should accept the oauth2-proxy header auth
     // We don't need to wait for a cookie as header auth is sufficient
 
     // Save the storage state for reuse (even if empty, for consistency)
@@ -97,12 +98,12 @@ export class AuthHelper {
   }
 
   /**
-   * Setup authentication for a page (adds headers)
+   * Setup authentication for a page (adds oauth2-proxy headers)
    */
   async setupPageAuth(page: Page): Promise<void> {
-    // Add API key header to all requests
+    // Add oauth2-proxy header to all requests
     await page.setExtraHTTPHeaders({
-      'X-Dashboard-Key': this.apiKey,
+      'X-Auth-Request-Email': this.userEmail,
     })
   }
 
@@ -126,15 +127,15 @@ export class AuthHelper {
    * Get authenticated context with retries
    */
   async getAuthenticatedContext(browser: Browser, retries: number = 2): Promise<BrowserContext> {
-    // In CI or when using header auth, we don't need complex storage state management
-    // Just create a context with the proper headers
+    // Create a context with oauth2-proxy headers
+    // This simulates what oauth2-proxy would pass to the dashboard
 
     for (let i = 0; i <= retries; i++) {
       try {
-        // Create context with authentication headers
+        // Create context with oauth2-proxy authentication headers
         const context = await browser.newContext({
           extraHTTPHeaders: {
-            'X-Dashboard-Key': this.apiKey,
+            'X-Auth-Request-Email': this.userEmail,
           },
         })
 

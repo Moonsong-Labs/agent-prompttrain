@@ -26,7 +26,7 @@ Always reference or create ADRs (docs/04-Architecture/ADRs/) for technical decis
 - **ADR-001**: Monorepo structure with shared packages
 - **ADR-013**: TypeScript project references for type safety
 - **ADR-012**: Database schema evolution strategy
-- **ADR-019**: Dashboard security (critical: DASHBOARD_API_KEY required)
+- **ADR-027**: Mandatory user authentication (critical: oauth2-proxy required in production)
 - **ADR-021**: E2E testing with Playwright
 
 ### Contribution Style Guide
@@ -144,10 +144,10 @@ To ensure consistency, all contributions should adhere to the following key styl
 
 #### Security
 
-**20. Require an API Key for Production Dashboards**
+**20. Require User Authentication for Production Dashboards**
 
-- **Rationale**: Explicitly enforces authentication to prevent the accidental public exposure of sensitive conversation data, metrics, and account information.
-- **Reference**: [ADR-019: Dashboard Read-Only Mode Security Implications](docs/04-Architecture/ADRs/adr-019-dashboard-read-only-mode-security.md)
+- **Rationale**: Enforces mandatory user authentication via oauth2-proxy to prevent unauthorized access to sensitive conversation data, metrics, and account information. All actions are attributed to specific users.
+- **Reference**: [ADR-027: Mandatory User Authentication](docs/04-Architecture/ADRs/adr-027-mandatory-user-authentication.md)
 
 ### AI Agent Rules
 
@@ -187,7 +187,7 @@ agent-prompttrain/
 
 - Request history and analytics
 - Conversation visualization with branch support
-- **⚠️ CRITICAL**: `DASHBOARD_API_KEY` is REQUIRED in production environments. Without it, dashboard runs unauthenticated (see [ADR-019](docs/04-Architecture/ADRs/adr-019-dashboard-read-only-mode-security.md))
+- **⚠️ CRITICAL**: User authentication is MANDATORY via oauth2-proxy in production (see [ADR-027](docs/04-Architecture/ADRs/adr-027-mandatory-user-authentication.md))
 
 ### How It Works
 

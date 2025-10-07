@@ -86,10 +86,17 @@ services:
       # Server configuration
       PORT: 3001
       HOST: 0.0.0.0
-      
-      # Dashboard authentication 
-      DASHBOARD_API_KEY: ${DASHBOARD_API_KEY}
-      
+
+      # Dashboard authentication (development mode - use oauth2-proxy in production)
+      DASHBOARD_DEV_USER_EMAIL: ${DASHBOARD_DEV_USER_EMAIL:-dev@localhost}
+
+      # Dashboard SSO (production - requires oauth2-proxy)
+      DASHBOARD_SSO_HEADERS: ${DASHBOARD_SSO_HEADERS:-X-Auth-Request-Email}
+      DASHBOARD_SSO_ALLOWED_DOMAINS: ${DASHBOARD_SSO_ALLOWED_DOMAINS:-}
+
+      # Service-to-service authentication (dashboard → proxy)
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+
       # Proxy API URL for data access
       PROXY_API_URL: http://proxy:3000
 

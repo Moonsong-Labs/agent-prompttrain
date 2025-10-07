@@ -14,8 +14,8 @@ git clone https://github.com/moonsong-labs/agent-prompttrain.git
 cd agent-prompttrain
 cp .env.example .env
 
-# ⚠️ CRITICAL: Edit .env and set DASHBOARD_API_KEY!
-# Without it, the dashboard has NO authentication!
+# For development: Set DASHBOARD_DEV_USER_EMAIL for local testing
+# For production: Configure oauth2-proxy (see deployment docs)
 ```
 
 ### 2. Create credentials
@@ -71,7 +71,7 @@ docker compose exec claude-cli /usr/local/bin/claude-cli "Hello!"
 
 - **View logs**: `docker compose logs -f proxy`
 - **Token stats**: `curl http://localhost:3000/token-stats`
-- **Dashboard**: http://localhost:3001 (requires DASHBOARD_API_KEY from .env - ⚠️ NO AUTH if not set!)
+- **Dashboard**: http://localhost:3001 (authentication required - use `DASHBOARD_DEV_USER_EMAIL=dev@localhost` for local development)
 
 ## Troubleshooting
 
