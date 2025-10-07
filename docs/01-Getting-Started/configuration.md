@@ -6,10 +6,9 @@ This guide covers all configuration options for Agent Prompt Train.
 
 ### Core Configuration
 
-| Variable            | Required | Default | Description                             |
-| ------------------- | -------- | ------- | --------------------------------------- |
-| `DATABASE_URL`      | Yes      | -       | PostgreSQL connection string            |
-| `DASHBOARD_API_KEY` | Yes      | -       | Authentication key for dashboard access |
+| Variable       | Required | Default | Description                  |
+| -------------- | -------- | ------- | ---------------------------- |
+| `DATABASE_URL` | Yes      | -       | PostgreSQL connection string |
 
 ### Proxy Service
 
@@ -26,11 +25,15 @@ This guide covers all configuration options for Agent Prompt Train.
 
 ### Dashboard Service
 
-| Variable                  | Required | Default | Description                         |
-| ------------------------- | -------- | ------- | ----------------------------------- |
-| `DASHBOARD_PORT`          | No       | 3001    | Dashboard service port              |
-| `DASHBOARD_CACHE_TTL`     | No       | 30      | Cache TTL in seconds (0 to disable) |
-| `SLOW_QUERY_THRESHOLD_MS` | No       | 5000    | Threshold for logging slow queries  |
+| Variable                        | Required          | Default | Description                                         |
+| ------------------------------- | ----------------- | ------- | --------------------------------------------------- |
+| `DASHBOARD_PORT`                | No                | 3001    | Dashboard service port                              |
+| `DASHBOARD_CACHE_TTL`           | No                | 30      | Cache TTL in seconds (0 to disable)                 |
+| `SLOW_QUERY_THRESHOLD_MS`       | No                | 5000    | Threshold for logging slow queries                  |
+| `DASHBOARD_SSO_HEADERS`         | Yes (Production)  | -       | oauth2-proxy headers (e.g., X-Auth-Request-Email)   |
+| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Yes (Production)  | -       | Allowed email domains (e.g., your-company.com)      |
+| `INTERNAL_API_KEY`              | Yes               | -       | Service-to-service authentication key               |
+| `DASHBOARD_DEV_USER_EMAIL`      | Yes (Development) | -       | Development bypass email (never use in production!) |
 
 ## Accounts & Train Client Keys
 
@@ -261,7 +264,11 @@ Token usage metrics are automatically collected and available at:
 ```bash
 # .env.development
 DATABASE_URL=postgresql://localhost:5432/claude_nexus_dev
-DASHBOARD_API_KEY=dev-key
+
+# Dashboard authentication (development bypass)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
+
 DEBUG=true
 STORAGE_ENABLED=true
 ENABLE_CLIENT_AUTH=false
@@ -273,7 +280,12 @@ COLLECT_TEST_SAMPLES=true
 ```bash
 # .env.production
 DATABASE_URL=postgresql://prod-db:5432/claude_nexus
-DASHBOARD_API_KEY=secure-random-key
+
+# Dashboard authentication (oauth2-proxy MANDATORY for production)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=secure-random-key
+
 STORAGE_ENABLED=true
 ENABLE_CLIENT_AUTH=true
 SLACK_WEBHOOK_URL=https://hooks.slack.com/...

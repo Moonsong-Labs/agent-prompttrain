@@ -60,12 +60,14 @@ docker run -d \
   moonsonglabs/agent-prompttrain-proxy
 
 # Run dashboard
-# ⚠️ CRITICAL: Always set DASHBOARD_API_KEY to prevent unauthorized access
+# ⚠️ CRITICAL: Production requires oauth2-proxy authentication
 docker run -d \
   --name claude-dashboard \
   -p 3001:3001 \
   -e DATABASE_URL=$DATABASE_URL \
-  -e DASHBOARD_API_KEY=$DASHBOARD_API_KEY \
+  -e DASHBOARD_SSO_HEADERS=X-Auth-Request-Email \
+  -e DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com \
+  -e INTERNAL_API_KEY=$INTERNAL_API_KEY \
   agent-prompttrain-dashboard
 ```
 
@@ -138,8 +140,10 @@ Create production `.env`:
 # Database (use connection pooling)
 DATABASE_URL=postgresql://user:pass@db-host:5432/claude_nexus?pool_max=20
 
-# Authentication
-DASHBOARD_API_KEY=$(openssl rand -base64 32)
+# Dashboard authentication (Production - oauth2-proxy MANDATORY)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=$(openssl rand -base64 32)
 
 # Features
 STORAGE_ENABLED=true
@@ -529,35 +533,37 @@ ls -la credentials/
 
 ### ⚠️ CRITICAL: Dashboard Authentication
 
-**Never deploy the dashboard without setting `DASHBOARD_API_KEY`!**
+**Never deploy the dashboard without oauth2-proxy in production!**
 
-When `DASHBOARD_API_KEY` is not set, the dashboard runs in "read-only mode" with NO authentication, exposing:
-
-- All conversation histories
-- Token usage and costs
-- Account information
-- AI analysis results
-- Potentially sensitive customer data
+The dashboard requires mandatory user authentication via oauth2-proxy headers. Production deployments MUST configure oauth2-proxy.
 
 **Production Security Checklist:**
 
 ```bash
-# 1. ALWAYS set DASHBOARD_API_KEY (minimum 32 characters)
-export DASHBOARD_API_KEY=$(openssl rand -base64 32)
+# 1. ALWAYS configure oauth2-proxy headers
+export DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+export DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+export INTERNAL_API_KEY=$(openssl rand -base64 32)
 
-# 2. Verify it's set before deployment
-if [ -z "$DASHBOARD_API_KEY" ]; then
-  echo "ERROR: DASHBOARD_API_KEY not set!"
+# 2. Verify configuration before deployment
+if [ -z "$DASHBOARD_SSO_HEADERS" ] || [ -z "$DASHBOARD_SSO_ALLOWED_DOMAINS" ]; then
+  echo "ERROR: Dashboard SSO configuration not set!"
   exit 1
 fi
 
-# 3. Never expose dashboard port directly to internet
-# Use reverse proxy with additional authentication
+# 3. Ensure development bypass is NOT set in production
+if [ -n "$DASHBOARD_DEV_USER_EMAIL" ]; then
+  echo "ERROR: DASHBOARD_DEV_USER_EMAIL must not be set in production!"
+  exit 1
+fi
+
+# 4. Never expose dashboard port directly to internet
+# Use oauth2-proxy reverse proxy for authentication
 # Block port 3001 at firewall level
 
-# 4. Test authentication is working
+# 5. Test authentication is working
 curl -I http://localhost:3001/dashboard
-# Should return 302 redirect to login
+# Should be protected by oauth2-proxy
 ```
 
 ### Network Security

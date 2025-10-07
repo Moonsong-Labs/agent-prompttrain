@@ -45,8 +45,17 @@ Required environment variables:
 # Database connection
 DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
-# Dashboard authentication
-DASHBOARD_API_KEY=your-secure-dashboard-key
+# Dashboard authentication (Production - REQUIRED)
+# oauth2-proxy headers (mandatory for production)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+
+# Service-to-service authentication
+INTERNAL_API_KEY=your-internal-key
+
+# Dashboard authentication (Development)
+# Development bypass (never use in production!)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
 
 # Enable storage (recommended)
 STORAGE_ENABLED=true
@@ -149,7 +158,8 @@ docker run -d \
   --name claude-dashboard \
   -p 3001:3001 \
   -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/claude_nexus \
-  -e DASHBOARD_API_KEY=your-dashboard-key \
+  -e DASHBOARD_DEV_USER_EMAIL=dev@localhost \
+  -e INTERNAL_API_KEY=dev-internal-key \
   moonsonglabs/agent-prompttrain-dashboard:latest
 ```
 
@@ -171,7 +181,12 @@ DATABASE_URL=postgresql://user:password@your-rds-endpoint:5432/claude_nexus
 # Production .env
 NODE_ENV=production
 DATABASE_URL=postgresql://...
-DASHBOARD_API_KEY=<strong-random-key>
+
+# Dashboard authentication (MANDATORY for production - oauth2-proxy required)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=<strong-random-key>
+
 STORAGE_ENABLED=true
 SLOW_QUERY_THRESHOLD_MS=1000
 CLAUDE_API_TIMEOUT=600000
@@ -214,7 +229,7 @@ curl http://localhost:3000/health
 
 ### 2. Check Dashboard
 
-Open http://localhost:3001 in your browser. You should see the login page.
+Open http://localhost:3001 in your browser. You should see the dashboard (in development mode with `DASHBOARD_DEV_USER_EMAIL` set).
 
 ### 3. Test API Call
 

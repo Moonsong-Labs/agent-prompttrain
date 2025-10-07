@@ -115,14 +115,16 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_nexus
-      DASHBOARD_API_KEY: ${DASHBOARD_API_KEY}
-      DASHBOARD_SSO_ENABLED: ${DASHBOARD_SSO_ENABLED}
       DASHBOARD_SSO_HEADERS: ${DASHBOARD_SSO_HEADERS}
       DASHBOARD_SSO_ALLOWED_DOMAINS: ${DASHBOARD_SSO_ALLOWED_DOMAINS}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      # Development only - never set in production
+      DASHBOARD_DEV_USER_EMAIL: ${DASHBOARD_DEV_USER_EMAIL:-}
     ports:
       - '3001:3001'
     restart: unless-stopped
 
+  # oauth2-proxy is MANDATORY for production deployments
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
     depends_on:
@@ -150,14 +152,21 @@ volumes:
 
 ```bash
 # .env file
-# Dashboard authentication
-DASHBOARD_API_KEY=your-secure-dashboard-key
-DASHBOARD_SSO_ENABLED=true
+
+# Dashboard authentication (Production - REQUIRED)
+# oauth2-proxy headers (mandatory for production)
 DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
 DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+INTERNAL_API_KEY=your-internal-key
+
+# oauth2-proxy configuration
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 OAUTH_PROXY_COOKIE_SECRET=base64-encoded-32-byte-secret
+
+# Dashboard authentication (Development - Optional)
+# Development bypass (never use in production!)
+# DASHBOARD_DEV_USER_EMAIL=dev@localhost
 
 # Optional configurations
 DEBUG=false
@@ -182,9 +191,9 @@ dashboard:
   environment:
     - DASHBOARD_CACHE_TTL=30
     - TZ=UTC
-    - DASHBOARD_SSO_ENABLED=${DASHBOARD_SSO_ENABLED}
     - DASHBOARD_SSO_HEADERS=${DASHBOARD_SSO_HEADERS}
     - DASHBOARD_SSO_ALLOWED_DOMAINS=${DASHBOARD_SSO_ALLOWED_DOMAINS}
+    - INTERNAL_API_KEY=${INTERNAL_API_KEY}
 ```
 
 ## Advanced Deployment
