@@ -133,8 +133,8 @@ describe('truncateConversation', () => {
       'should truncate single message that exceeds limit',
       () => {
         // Create a single message that exceeds the entire token limit
-        // With 855k max tokens and ~12 chars/token, we need more than 10M chars
-        const hugeContent = 'The quick brown fox jumps over the lazy dog. '.repeat(250000) // ~11.25M chars
+        // With 200k max tokens and ~4 chars/token, we need more than 800k chars
+        const hugeContent = 'The quick brown fox jumps over the lazy dog. '.repeat(18000) // ~810k chars
         const messages = [createMessage('user', hugeContent)]
 
         const result = truncateConversation(messages)
