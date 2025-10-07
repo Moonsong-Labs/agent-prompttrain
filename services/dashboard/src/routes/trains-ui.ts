@@ -217,8 +217,8 @@ trainsUIRoutes.get('/', async c => {
                         Linked Credentials (${train.accounts?.length || 0})
                       </h4>
 
-                      <!-- Link Credential Form -->
-                      ${allCredentials.length > 0
+                      <!-- Link Credential Form (owner only) -->
+                      ${trainOwnershipMap.get(train.id) && allCredentials.length > 0
                         ? html`
                             <form
                               hx-post="/dashboard/trains/${train.id}/link-credential"
@@ -299,25 +299,29 @@ trainsUIRoutes.get('/', async c => {
                                           : ''}
                                       </div>
                                     </div>
-                                    <form
-                                      hx-post="/dashboard/trains/${train.id}/unlink-credential"
-                                      hx-swap="outerHTML"
-                                      hx-target="closest div"
-                                      hx-confirm="Are you sure you want to unlink this credential?"
-                                      style="margin: 0;"
-                                    >
-                                      <input
-                                        type="hidden"
-                                        name="credential_id"
-                                        value="${cred.id}"
-                                      />
-                                      <button
-                                        type="submit"
-                                        style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
-                                      >
-                                        Unlink
-                                      </button>
-                                    </form>
+                                    ${trainOwnershipMap.get(train.id)
+                                      ? html`
+                                          <form
+                                            hx-post="/dashboard/trains/${train.id}/unlink-credential"
+                                            hx-swap="outerHTML"
+                                            hx-target="closest div"
+                                            hx-confirm="Are you sure you want to unlink this credential?"
+                                            style="margin: 0;"
+                                          >
+                                            <input
+                                              type="hidden"
+                                              name="credential_id"
+                                              value="${cred.id}"
+                                            />
+                                            <button
+                                              type="submit"
+                                              style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                            >
+                                              Unlink
+                                            </button>
+                                          </form>
+                                        `
+                                      : ''}
                                   </div>
                                 `
                               )}
@@ -354,34 +358,38 @@ trainsUIRoutes.get('/', async c => {
                         API Keys
                       </h4>
 
-                      <!-- Generate API Key Form -->
-                      <form
-                        hx-post="/dashboard/trains/${train.id}/generate-api-key"
-                        hx-swap="beforebegin"
-                        style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
-                      >
-                        <div style="flex: 1;">
-                          <label
-                            for="api-key-name-${train.id}"
-                            style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
-                          >
-                            Key Name (optional)
-                          </label>
-                          <input
-                            type="text"
-                            id="api-key-name-${train.id}"
-                            name="name"
-                            placeholder="e.g., Production Key"
-                            style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          style="background: #10b981; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
-                        >
-                          Generate API Key
-                        </button>
-                      </form>
+                      <!-- Generate API Key Form (owner only) -->
+                      ${trainOwnershipMap.get(train.id)
+                        ? html`
+                            <form
+                              hx-post="/dashboard/trains/${train.id}/generate-api-key"
+                              hx-swap="beforebegin"
+                              style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
+                            >
+                              <div style="flex: 1;">
+                                <label
+                                  for="api-key-name-${train.id}"
+                                  style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+                                >
+                                  Key Name (optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  id="api-key-name-${train.id}"
+                                  name="name"
+                                  placeholder="e.g., Production Key"
+                                  style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
+                                />
+                              </div>
+                              <button
+                                type="submit"
+                                style="background: #10b981; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                              >
+                                Generate API Key
+                              </button>
+                            </form>
+                          `
+                        : ''}
 
                       <div
                         id="api-keys-${train.id}"
