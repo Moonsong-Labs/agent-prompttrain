@@ -12,6 +12,7 @@ import {
   unlinkAccountFromTrain,
   getTrainMembers,
   addTrainMember,
+  deleteTrain,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -175,6 +176,20 @@ trainsUIRoutes.get('/', async c => {
                           ? html`<p style="color: #6b7280; margin: 0;">${train.description}</p>`
                           : ''}
                       </div>
+                      <form
+                        hx-delete="/dashboard/trains/${train.id}/delete"
+                        hx-confirm="Are you sure you want to delete this train? This action cannot be undone and will remove all associated members and API keys."
+                        hx-swap="outerHTML"
+                        hx-target="closest div[style*='background: white']"
+                        style="margin: 0;"
+                      >
+                        <button
+                          type="submit"
+                          style="background: #ef4444; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                        >
+                          Delete Train
+                        </button>
+                      </form>
                     </div>
 
                     <!-- Linked Credentials Section -->
@@ -779,6 +794,43 @@ trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
         </div>
       `)
     }
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Delete a train (HTMX form submission)
+ */
+trainsUIRoutes.delete('/:trainId/delete', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  try {
+    const success = await deleteTrain(pool, trainId)
+
+    if (!success) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Train not found
+        </div>
+      `)
+    }
+
+    // Return empty HTML to remove the train card via HTMX swap
+    return c.html(html``)
   } catch (error) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">

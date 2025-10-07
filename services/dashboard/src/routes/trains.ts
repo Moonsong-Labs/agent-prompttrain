@@ -8,6 +8,7 @@ import {
   unlinkAccountFromTrain,
   addTrainMember,
   getUserTrainsWithAccounts,
+  deleteTrain,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateTrainRequest, UpdateTrainRequest } from '@agent-prompttrain/shared'
 import type { AuthContext } from '../middleware/auth.js'
@@ -139,6 +140,25 @@ trains.delete('/:id/accounts/:credentialId', requireTrainOwner, async c => {
   } catch (error) {
     console.error('Failed to unlink account:', error)
     return c.json({ error: 'Failed to unlink account' }, 500)
+  }
+})
+
+// DELETE /api/trains/:id - Delete train (owner only)
+trains.delete('/:id', requireTrainOwner, async c => {
+  try {
+    const pool = container.getPool()
+    const id = c.req.param('id')
+
+    const success = await deleteTrain(pool, id)
+
+    if (!success) {
+      return c.json({ error: 'Train not found' }, 404)
+    }
+
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Failed to delete train:', error)
+    return c.json({ error: 'Failed to delete train' }, 500)
   }
 })
 
