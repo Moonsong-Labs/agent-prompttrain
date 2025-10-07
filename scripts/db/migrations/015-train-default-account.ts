@@ -12,10 +12,16 @@
  * Backfills existing trains with their first linked account as default
  */
 
-import { createPool } from '@agent-prompttrain/shared/database'
+import { Pool } from 'pg'
 
 async function migrate() {
-  const pool = createPool()
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    console.error('DATABASE_URL environment variable is required')
+    process.exit(1)
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl })
 
   try {
     console.log('Starting migration 015: Train default account...')
