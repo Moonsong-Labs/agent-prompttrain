@@ -120,22 +120,6 @@ trainsUIRoutes.get('/', async c => {
               />
             </div>
 
-            <div>
-              <label
-                for="description"
-                style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
-              >
-                Description
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                rows="2"
-                placeholder="Optional description of this train's purpose"
-                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem; resize: vertical;"
-              ></textarea>
-            </div>
-
             <div style="display: flex; gap: 1rem; align-items: center;">
               <button
                 type="submit"
@@ -180,9 +164,6 @@ trainsUIRoutes.get('/', async c => {
                             >ACTIVE</span
                           >
                         </h3>
-                        ${train.description
-                          ? html`<p style="color: #6b7280; margin: 0;">${train.description}</p>`
-                          : ''}
                       </div>
                       ${trainOwnershipMap.get(train.id)
                         ? html`
@@ -402,8 +383,7 @@ trainsUIRoutes.get('/', async c => {
   -H "X-Dashboard-Key: your-dashboard-key" \\
   -d '{
     "train_id": "my-train",
-    "description": "My production train",
-    "is_active": true
+    "name": "My Production Train"
   }'</code></pre>
         </div>
 
@@ -428,7 +408,7 @@ trainsUIRoutes.get('/', async c => {
           ><code>curl -X POST http://localhost:3001/api/trains/my-train/api-keys \\
   -H "Content-Type: application/json" \\
   -H "X-Dashboard-Key: your-dashboard-key" \\
-  -d '{"description": "Production key"}'</code></pre>
+  -d '{"name": "Production key"}'</code></pre>
         </div>
       </div>
     `
@@ -851,7 +831,6 @@ trainsUIRoutes.post('/create', async c => {
     const formData = await c.req.parseBody()
     const trainId = formData.train_id as string
     const name = formData.name as string
-    const description = (formData.description as string) || undefined
 
     // Validate train ID format
     if (!/^[a-z0-9-]+$/.test(trainId)) {
@@ -880,7 +859,6 @@ trainsUIRoutes.post('/create', async c => {
       const train = await createTrain(client as any, {
         train_id: trainId,
         name: name,
-        description: description,
       })
 
       // Add the creator as an owner

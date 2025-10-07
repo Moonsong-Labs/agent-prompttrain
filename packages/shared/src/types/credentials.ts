@@ -34,7 +34,6 @@ export interface Train {
   id: string
   train_id: string
   name: string
-  description: string | null
   default_account_id: string | null
   slack_enabled: boolean
   slack_webhook_url: string | null
@@ -102,7 +101,6 @@ export interface UpdateCredentialTokensRequest {
 export interface CreateTrainRequest {
   train_id: string
   name: string
-  description?: string
   slack_enabled?: boolean
   slack_webhook_url?: string
   slack_channel?: string
@@ -112,7 +110,6 @@ export interface CreateTrainRequest {
 
 export interface UpdateTrainRequest {
   name?: string
-  description?: string
   slack_enabled?: boolean
   slack_webhook_url?: string
   slack_channel?: string

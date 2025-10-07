@@ -58,7 +58,13 @@ async function migrate() {
       ON trains(default_account_id);
     `)
 
-    // 4. Drop train_accounts table (no longer needed)
+    // 4. Drop description column from trains (no longer needed)
+    console.log('Dropping description column from trains...')
+    await pool.query(`
+      ALTER TABLE trains DROP COLUMN IF EXISTS description;
+    `)
+
+    // 5. Drop train_accounts table (no longer needed)
     console.log('Dropping train_accounts table...')
     await pool.query(`
       DROP TABLE IF EXISTS train_accounts;
@@ -69,6 +75,7 @@ async function migrate() {
     console.log('✅ Migration 015 completed successfully')
     console.log('  - Added default_account_id to trains table')
     console.log('  - Backfilled defaults from train_accounts')
+    console.log('  - Dropped description column from trains')
     console.log('  - Dropped train_accounts table')
     console.log('  - All trains now have access to all credentials')
   } catch (error) {

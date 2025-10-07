@@ -25,20 +25,18 @@ export async function createTrain(pool: Pool, request: CreateTrainRequest): Prom
     INSERT INTO trains (
       train_id,
       name,
-      description,
       slack_enabled,
       slack_webhook_url,
       slack_channel,
       slack_username,
       slack_icon_emoji,
       default_account_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
     `,
     [
       request.train_id,
       request.name,
-      request.description || null,
       request.slack_enabled ?? false,
       request.slack_webhook_url || null,
       request.slack_channel || null,
@@ -137,10 +135,6 @@ export async function updateTrain(
   if (request.name !== undefined) {
     updates.push(`name = $${paramIndex++}`)
     values.push(request.name)
-  }
-  if (request.description !== undefined) {
-    updates.push(`description = $${paramIndex++}`)
-    values.push(request.description)
   }
   if (request.slack_enabled !== undefined) {
     updates.push(`slack_enabled = $${paramIndex++}`)
