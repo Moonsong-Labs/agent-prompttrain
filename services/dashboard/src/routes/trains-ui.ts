@@ -13,6 +13,7 @@ import {
   getTrainMembers,
   addTrainMember,
   deleteTrain,
+  isTrainOwner,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -25,6 +26,7 @@ export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
  */
 trainsUIRoutes.get('/', async c => {
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(
@@ -47,6 +49,17 @@ trainsUIRoutes.get('/', async c => {
       listTrainsWithAccounts(pool),
       listCredentialsSafe(pool),
     ])
+
+    // Check ownership for each train
+    const trainOwnershipMap = new Map<string, boolean>()
+    if (auth.isAuthenticated) {
+      await Promise.all(
+        trains.map(async train => {
+          const isOwner = await isTrainOwner(pool, train.id, auth.principal)
+          trainOwnershipMap.set(train.id, isOwner)
+        })
+      )
+    }
 
     const content = html`
       <div style="margin-bottom: 2rem;">
@@ -176,20 +189,24 @@ trainsUIRoutes.get('/', async c => {
                           ? html`<p style="color: #6b7280; margin: 0;">${train.description}</p>`
                           : ''}
                       </div>
-                      <form
-                        hx-delete="/dashboard/trains/${train.id}/delete"
-                        hx-confirm="Are you sure you want to delete this train? This action cannot be undone and will remove all associated members and API keys."
-                        hx-swap="outerHTML"
-                        hx-target="closest div[style*='background: white']"
-                        style="margin: 0;"
-                      >
-                        <button
-                          type="submit"
-                          style="background: #ef4444; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
-                        >
-                          Delete Train
-                        </button>
-                      </form>
+                      ${trainOwnershipMap.get(train.id)
+                        ? html`
+                            <form
+                              hx-delete="/dashboard/trains/${train.id}/delete"
+                              hx-confirm="Are you sure you want to delete this train? This action cannot be undone and will remove all associated members and API keys."
+                              hx-swap="outerHTML"
+                              hx-target="closest div[style*='background: white']"
+                              style="margin: 0;"
+                            >
+                              <button
+                                type="submit"
+                                style="background: #ef4444; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                              >
+                                Delete Train
+                              </button>
+                            </form>
+                          `
+                        : ''}
                     </div>
 
                     <!-- Linked Credentials Section -->
@@ -618,11 +635,12 @@ trainsUIRoutes.get('/:trainId/members-list', async c => {
 })
 
 /**
- * Generate a new API key for a train (HTMX form submission)
+ * Generate a new API key for a train (HTMX form submission - owner only)
  */
 trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
   const trainId = c.req.param('trainId')
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(html`
@@ -634,13 +652,36 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
     `)
   }
 
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check ownership
+  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> Only train owners can generate API keys
+      </div>
+    `)
+  }
+
   try {
     const formData = await c.req.parseBody()
     const name = (formData.name as string) || undefined
 
     const generatedKey = await createTrainApiKey(pool, trainId, {
       name,
-      created_by: undefined,
+      created_by: auth.principal,
     })
 
     return c.html(html`
@@ -695,11 +736,12 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
 })
 
 /**
- * Link a credential to a train (HTMX form submission)
+ * Link a credential to a train (HTMX form submission - owner only)
  */
 trainsUIRoutes.post('/:trainId/link-credential', async c => {
   const trainId = c.req.param('trainId')
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(html`
@@ -707,6 +749,29 @@ trainsUIRoutes.post('/:trainId/link-credential', async c => {
         style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
       >
         <strong>Error:</strong> Database not configured
+      </div>
+    `)
+  }
+
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check ownership
+  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div
+        style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Error:</strong> Only train owners can link credentials
       </div>
     `)
   }
@@ -764,16 +829,36 @@ trainsUIRoutes.post('/:trainId/link-credential', async c => {
 })
 
 /**
- * Unlink a credential from a train (HTMX form submission)
+ * Unlink a credential from a train (HTMX form submission - owner only)
  */
 trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
   const trainId = c.req.param('trainId')
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
         Database not configured
+      </div>
+    `)
+  }
+
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check ownership
+  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only train owners can unlink credentials
       </div>
     `)
   }
@@ -804,11 +889,12 @@ trainsUIRoutes.post('/:trainId/unlink-credential', async c => {
 })
 
 /**
- * Delete a train (HTMX form submission)
+ * Delete a train (HTMX form submission - owner only)
  */
 trainsUIRoutes.delete('/:trainId/delete', async c => {
   const trainId = c.req.param('trainId')
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(html`
@@ -818,7 +904,26 @@ trainsUIRoutes.delete('/:trainId/delete', async c => {
     `)
   }
 
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
   try {
+    // Check ownership
+    const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+    if (!isOwner) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only train owners can delete trains
+        </div>
+      `)
+    }
+
     const success = await deleteTrain(pool, trainId)
 
     if (!success) {
