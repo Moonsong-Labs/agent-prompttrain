@@ -11,8 +11,7 @@ export async function renderSparkRecommendationInline(
   recommendation: SparkRecommendation,
   sessionId: string,
   messageIndex: number,
-  existingFeedback?: Record<string, unknown>,
-  isReadOnly?: boolean
+  existingFeedback?: Record<string, unknown>
 ): Promise<string> {
   // Render markdown content
   const dirtyHtml = await marked.parse(recommendation.response)
@@ -103,23 +102,16 @@ export async function renderSparkRecommendationInline(
 
       <!-- Feedback Dropdown -->
       <div class="spark-inline-feedback-wrapper">
-        <button 
+        <button
           class="spark-feedback-toggle"
           onclick="toggleSparkFeedback('${sessionId}')"
-          ${isReadOnly ? 'disabled title="Feedback is disabled in read-only mode"' : ''}
         >
           <span class="toggle-icon">▼</span>
-          ${hasFeedback ? 'View Feedback' : isReadOnly ? 'Feedback Disabled' : 'Add Feedback'}
+          ${hasFeedback ? 'View Feedback' : 'Add Feedback'}
         </button>
-        
+
         <div class="spark-inline-feedback" id="${feedbackId}" style="display: none;">
-          ${
-            hasFeedback
-              ? renderInlineExistingFeedback(existingFeedback)
-              : isReadOnly
-                ? '<p style="text-align: center; color: #64748b; margin: 1rem 0;">Feedback is disabled in read-only mode</p>'
-                : renderInlineFeedbackForm(sessionId)
-          }
+          ${hasFeedback ? renderInlineExistingFeedback(existingFeedback) : renderInlineFeedbackForm(sessionId)}
         </div>
       </div>
     </div>

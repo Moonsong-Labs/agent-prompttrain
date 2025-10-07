@@ -4,11 +4,13 @@ This guide covers security considerations and best practices for deploying Agent
 
 ## ⚠️ CRITICAL SECURITY NOTICE
 
-**Dashboard Read-Only Mode**: When `DASHBOARD_API_KEY` is not set, the dashboard operates in "read-only mode" without ANY authentication. This exposes ALL conversation data, token usage, and potentially sensitive information to anyone with network access.
+**Dashboard Authentication**: The dashboard requires mandatory user authentication via oauth2-proxy headers. There is no unauthenticated mode.
 
-**NEVER deploy to production without setting `DASHBOARD_API_KEY`!**
+**ALWAYS deploy with oauth2-proxy in production!**
 
-See [ADR-019: Dashboard Read-Only Mode Security Implications](../04-Architecture/ADRs/adr-019-dashboard-read-only-mode-security.md) for detailed information about this security consideration.
+Without oauth2-proxy configured, the dashboard will only be accessible in development mode with `DASHBOARD_DEV_USER_EMAIL` set. Production deployments MUST use oauth2-proxy with proper SSO configuration.
+
+See [ADR-027: Mandatory User Authentication](../04-Architecture/ADRs/adr-027-mandatory-user-authentication.md) for detailed information about the authentication architecture.
 
 ## Authentication
 
@@ -217,12 +219,14 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/...
 ### Pre-Deployment
 
 - [ ] Generate strong client API keys
-- [ ] Set secure `DASHBOARD_API_KEY`
-- [ ] Configure OAuth2 Proxy + `DASHBOARD_SSO_ENABLED=true` for shared dashboards
+- [ ] Configure oauth2-proxy for dashboard (MANDATORY for production)
+- [ ] Set `DASHBOARD_SSO_HEADERS` and `DASHBOARD_SSO_ALLOWED_DOMAINS`
+- [ ] Generate secure `INTERNAL_API_KEY`
 - [ ] Configure TLS/SSL
 - [ ] Set appropriate file permissions
 - [ ] Enable database SSL
 - [ ] Review firewall rules
+- [ ] Ensure `DASHBOARD_DEV_USER_EMAIL` is NOT set in production
 
 ### Post-Deployment
 
@@ -237,37 +241,36 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/...
 
 ### 1. Exposed Dashboard (CRITICAL)
 
-**Risk**: Dashboard accessible without authentication exposes ALL conversation data
+**Risk**: Dashboard accessible without proper authentication exposes ALL conversation data
 
 **⚠️ CRITICAL SECURITY WARNING**:
-When `DASHBOARD_API_KEY` is not set, the dashboard runs in "read-only mode" with NO authentication. This means:
-
-- Anyone with network access can view ALL conversations
-- All API requests and responses are visible
-- Token usage, costs, and account information are exposed
-- AI analysis results and insights are accessible
-- This includes potentially sensitive customer data, API keys in conversations, and proprietary information
+The dashboard requires mandatory user authentication via oauth2-proxy headers. Without oauth2-proxy properly configured in production, the dashboard will not function correctly and may expose sensitive data.
 
 **Impact**: Complete data exposure, privacy breach, potential compliance violations
 
 **Mitigation**:
 
-- **ALWAYS** set `DASHBOARD_API_KEY` in production
-- Use strong, unique keys (minimum 32 characters)
-- Restrict dashboard to internal network only
-- Never expose dashboard port (3001) to the internet
-- Consider using a reverse proxy with additional authentication
-- For local development only, use read-only mode behind a firewall
+- **ALWAYS** deploy oauth2-proxy in production environments
+- Configure `DASHBOARD_SSO_HEADERS` and `DASHBOARD_SSO_ALLOWED_DOMAINS`
+- Set secure `INTERNAL_API_KEY` for service-to-service communication
+- Restrict dashboard to internal network with proper SSO authentication
+- Never expose dashboard port (3001) directly to the internet
+- Never set `DASHBOARD_DEV_USER_EMAIL` in production (development only)
 
 **Checking for Vulnerability**:
 
 ```bash
-# If this returns empty, your dashboard is UNSECURED
-echo $DASHBOARD_API_KEY
+# Verify production configuration is set
+echo $DASHBOARD_SSO_HEADERS
+echo $DASHBOARD_SSO_ALLOWED_DOMAINS
+echo $INTERNAL_API_KEY
 
-# Check if dashboard is publicly accessible
+# Ensure dev bypass is NOT set in production
+echo $DASHBOARD_DEV_USER_EMAIL  # Should be empty in production
+
+# Check if dashboard requires authentication
 curl http://your-server:3001/dashboard
-# If you see the dashboard without login, it's exposed
+# Should be protected by oauth2-proxy, not directly accessible
 ```
 
 ### 2. Credential Leakage

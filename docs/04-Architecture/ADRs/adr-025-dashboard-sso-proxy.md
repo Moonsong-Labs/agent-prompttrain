@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (Updated by [ADR-027: Mandatory User Authentication](./adr-027-mandatory-user-authentication.md) - now mandatory, not optional)
 
 ## Context
 
@@ -18,7 +18,9 @@ The dashboard currently relies on `DASHBOARD_API_KEY` cookies/headers for authen
 
 ## Decision
 
-Adopt an identity-aware auth proxy (initially [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/)) between Nginx and the dashboard. Nginx uses `auth_request` to delegate authentication to the proxy. On success, OAuth2 Proxy forwards trusted identity headers (e.g., `X-Auth-Request-Email`) to the dashboard. The dashboard now accepts those headers when `DASHBOARD_SSO_ENABLED=true`, while continuing to honor `DASHBOARD_API_KEY` cookies/headers and read-only behavior when no key is configured.
+Adopt an identity-aware auth proxy (initially [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/)) between Nginx and the dashboard. Nginx uses `auth_request` to delegate authentication to the proxy. On success, OAuth2 Proxy forwards trusted identity headers (e.g., `X-Auth-Request-Email`) to the dashboard.
+
+**Note**: As of [ADR-027](./adr-027-mandatory-user-authentication.md), oauth2-proxy is now **mandatory** for production deployments. The dashboard requires authenticated users via oauth2-proxy headers, with `DASHBOARD_DEV_USER_EMAIL` as the only bypass for local development. The previous API key and read-only modes have been removed.
 
 ## Options Considered
 

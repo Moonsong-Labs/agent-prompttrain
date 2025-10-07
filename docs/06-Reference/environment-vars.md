@@ -18,13 +18,16 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Authentication
 
-| Variable                | Description                                                                | Default                         | Required |
-| ----------------------- | -------------------------------------------------------------------------- | ------------------------------- | -------- |
-| `DASHBOARD_API_KEY`     | API key for dashboard authentication                                       | -                               | ✅       |
-| `ENABLE_CLIENT_AUTH`    | Enable client API key authentication                                       | `true`                          | ❌       |
-| `ACCOUNTS_DIR`          | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`          | ❌       |
-| `TRAIN_CLIENT_KEYS_DIR` | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌       |
-| `DEFAULT_TRAIN_ID`      | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌       |
+| Variable                        | Description                                                                | Default                         | Required         |
+| ------------------------------- | -------------------------------------------------------------------------- | ------------------------------- | ---------------- |
+| `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)  | -                               | ✅ (Production)  |
+| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)        | -                               | ✅ (Production)  |
+| `INTERNAL_API_KEY`              | Service-to-service authentication key                                      | -                               | ✅               |
+| `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                        | -                               | ✅ (Development) |
+| `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                       | `true`                          | ❌               |
+| `ACCOUNTS_DIR`                  | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`          | ❌               |
+| `TRAIN_CLIENT_KEYS_DIR`         | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌               |
+| `DEFAULT_TRAIN_ID`              | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌               |
 
 ### Train Identification
 
@@ -211,8 +214,17 @@ When running in Docker, additional variables may be needed:
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/claude_nexus
 
-# Authentication
-DASHBOARD_API_KEY=your-secure-dashboard-key
+# Dashboard authentication (Production - REQUIRED)
+# oauth2-proxy headers (mandatory for production)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=your-internal-key
+
+# Dashboard authentication (Development)
+# Development bypass (never use in production!)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+
+# Proxy authentication
 ENABLE_CLIENT_AUTH=true
 
 # Features
@@ -261,6 +273,8 @@ NODE_ENV=development
 DEBUG=true
 LOG_LEVEL=debug
 STORAGE_ENABLED=true
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
 ```
 
 ### Staging
@@ -283,6 +297,9 @@ STORAGE_ENABLED=true
 METRICS_ENABLED=true
 FORCE_HTTPS=true
 SECURE_COOKIES=true
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=secure-random-key
 ```
 
 ## Loading Environment Variables
@@ -327,7 +344,23 @@ services:
 The proxy validates required environment variables on startup:
 
 ```typescript
-const requiredVars = ['DATABASE_URL', 'DASHBOARD_API_KEY']
+const requiredVars = ['DATABASE_URL', 'INTERNAL_API_KEY']
+
+// Production requires SSO configuration
+if (process.env.NODE_ENV === 'production') {
+  requiredVars.push('DASHBOARD_SSO_HEADERS', 'DASHBOARD_SSO_ALLOWED_DOMAINS')
+
+  if (process.env.DASHBOARD_DEV_USER_EMAIL) {
+    throw new Error('DASHBOARD_DEV_USER_EMAIL must not be set in production')
+  }
+}
+
+// Development requires either SSO or dev bypass
+if (process.env.NODE_ENV === 'development') {
+  if (!process.env.DASHBOARD_DEV_USER_EMAIL && !process.env.DASHBOARD_SSO_HEADERS) {
+    throw new Error('Either DASHBOARD_DEV_USER_EMAIL or DASHBOARD_SSO_HEADERS must be set')
+  }
+}
 
 for (const varName of requiredVars) {
   if (!process.env[varName]) {

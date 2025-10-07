@@ -14,13 +14,26 @@ http://localhost:3001
 
 ### Authentication
 
-Enter your dashboard API key on the login page. This key is configured in your `.env` file:
+The dashboard requires user authentication via oauth2-proxy headers.
+
+**Production (REQUIRED):**
 
 ```bash
-DASHBOARD_API_KEY=your-secure-dashboard-key
+# oauth2-proxy headers (mandatory for production)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=your-internal-key
 ```
 
-The authentication is stored as a cookie for the session.
+**Development:**
+
+```bash
+# Development bypass (never use in production!)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
+```
+
+See [ADR-027](../04-Architecture/ADRs/adr-027-mandatory-user-authentication.md) for details.
 
 ## Dashboard Features
 
@@ -250,15 +263,23 @@ Monitor PostgreSQL performance:
 
 ### Authentication Issues
 
-1. Verify API key in .env:
+1. Verify authentication configuration in .env:
 
    ```bash
-   echo $DASHBOARD_API_KEY
+   # Production
+   echo $DASHBOARD_SSO_HEADERS
+   echo $DASHBOARD_SSO_ALLOWED_DOMAINS
+   echo $INTERNAL_API_KEY
+
+   # Development
+   echo $DASHBOARD_DEV_USER_EMAIL
    ```
 
-2. Clear browser cookies
+2. Ensure oauth2-proxy is running and configured (production only)
 
-3. Try incognito/private mode
+3. Verify oauth2-proxy headers are being forwarded correctly
+
+4. Check oauth2-proxy logs for authentication errors
 
 ### Missing Data
 
@@ -306,21 +327,21 @@ The dashboard exposes APIs for integration:
 
 ```bash
 curl http://localhost:3001/api/stats \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ### Get Token Usage
 
 ```bash
 curl "http://localhost:3001/api/token-usage/current?window=300" \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ### Get Conversations
 
 ```bash
 curl "http://localhost:3001/api/conversations?limit=10" \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ## Customization

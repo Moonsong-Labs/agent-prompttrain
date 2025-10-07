@@ -127,8 +127,15 @@ SLACK_CHANNEL=#notifications
 PORT=3001
 HOST=0.0.0.0
 
-# Authentication
-DASHBOARD_API_KEY=your-secret-key
+# Authentication (Production)
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+
+# Authentication (Development)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+
+# Service-to-Service
+INTERNAL_API_KEY=your-internal-service-key
 
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agent_prompttrain

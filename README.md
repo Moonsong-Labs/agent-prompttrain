@@ -148,6 +148,8 @@ You're all set!
 
 Access the **dashboard** at http://localhost:3001 to watch conversations as you use Claude Code.
 
+Note: For local development, the all-in-one image includes `DASHBOARD_DEV_USER_EMAIL=dev@localhost` for easy access.
+
 ---
 
 Looking to develop or contribute? Jump to [Development Setup](#development-setup).
@@ -268,11 +270,12 @@ Choose your deployment method:
 
 ### ⚠️ Important Considerations
 
-- Always set `DASHBOARD_API_KEY` in production
+- **MANDATORY**: Deploy oauth2-proxy for production dashboard access
 - Configure proper SSL/TLS certificates
 - Set up monitoring and alerting
 - Implement proper backup strategies
 - Review security documentation thoroughly
+- Use `DASHBOARD_DEV_USER_EMAIL` only for local development
 
 ## Configuration
 
@@ -285,10 +288,15 @@ Essential configuration:
 DATABASE_URL=postgresql://user:password@localhost:5432/agent_prompttrain
 
 # Dashboard Authentication
-# ⚠️ CRITICAL SECURITY WARNING: Without this key, the dashboard runs in read-only mode
-# with NO authentication, exposing ALL conversation data to anyone with network access!
-# NEVER deploy to production without setting this!
-DASHBOARD_API_KEY=your-secure-key
+# Production: oauth2-proxy is MANDATORY - see deployment docs
+DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+
+# Development: Use dev bypass (never in production!)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+
+# Service-to-Service Authentication
+INTERNAL_API_KEY=your-internal-service-key
 
 # Optional Features
 STORAGE_ENABLED=true
@@ -358,9 +366,10 @@ curl -X POST http://localhost:3000/v1/messages \
 
 ### Dashboard
 
-Access the dashboard at `http://localhost:3001` with your `DASHBOARD_API_KEY`.
+Access the dashboard at `http://localhost:3001`. The dashboard requires user authentication:
 
-**⚠️ Security Warning**: If `DASHBOARD_API_KEY` is not set, the dashboard runs in read-only mode without any authentication, exposing all conversation data. This should NEVER be used in production. See the [Security Guide](docs/03-Operations/security.md) for details.
+- **Production**: oauth2-proxy is MANDATORY for user authentication (see [Deployment Guide](docs/03-Operations/deployment/docker.md))
+- **Development**: Set `DASHBOARD_DEV_USER_EMAIL=dev@localhost` for local development bypass
 
 Features:
 
@@ -444,7 +453,7 @@ See [AWS Infrastructure Guide](docs/03-Operations/deployment/aws-infrastructure.
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-(_dashboard key: `key` - demo only, set DASHBOARD_API_KEY in production_)
+**Production deployments must use oauth2-proxy** for user authentication. See [Docker Compose Deployment](docs/03-Operations/deployment/docker-compose.md) for configuration.
 
 #### Building Images Separately
 

@@ -38,7 +38,10 @@ Create `.env` file:
 ```bash
 # Required
 DATABASE_URL=postgresql://localhost/claude_nexus_dev
-DASHBOARD_API_KEY=dev-dashboard-key
+
+# Dashboard authentication (development bypass)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
 
 # Optional
 DEBUG=true

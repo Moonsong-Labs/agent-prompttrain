@@ -99,45 +99,36 @@ ENABLE_CLIENT_AUTH=false
 
 ## Dashboard Authentication
 
-The dashboard supports two production-grade authentication approaches:
+The dashboard requires mandatory user authentication via oauth2-proxy headers. There is no API key authentication mode.
 
-1. **API Key Authentication** (existing behavior)
-2. **Google SSO via OAuth2 Proxy** (recommended for shared deployments)
+### Production Authentication (MANDATORY)
 
-### API Key Authentication
+**⚠️ CRITICAL**: oauth2-proxy is MANDATORY for all production deployments. The dashboard authenticates users via SSO headers injected by oauth2-proxy.
 
-Set a dashboard API key in your environment:
-
-```bash
-DASHBOARD_API_KEY=your-secure-dashboard-key
-```
-
-Access the dashboard with this key:
-
-```javascript
-// Using header
-fetch('http://localhost:3001/api/stats', {
-  headers: {
-    'X-Dashboard-Key': 'your-secure-dashboard-key',
-  },
-})
-
-// Using cookie (set by login page)
-// Cookie: dashboard_auth=your-secure-dashboard-key
-```
-
-### Google SSO via OAuth2 Proxy
-
-For environments running Nginx in front of the dashboard, deploy [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) as an auth middleware. See [ADR-025](../04-Architecture/ADRs/adr-025-dashboard-sso-proxy.md) for full configuration details.
-
-#### Enable Dashboard SSO
+Configure dashboard authentication:
 
 ```bash
-DASHBOARD_SSO_ENABLED=true
+# oauth2-proxy headers (mandatory for production)
 DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
-DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
-DASHBOARD_API_KEY=cnp_live_automation_only   # keep for API clients
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+
+# Service-to-service authentication
+INTERNAL_API_KEY=your-internal-key
 ```
+
+Deploy [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) as an auth middleware in front of the dashboard. See [ADR-027](../04-Architecture/ADRs/adr-027-mandatory-user-authentication.md) for full configuration details.
+
+### Development Authentication
+
+For local development only, bypass SSO with a development email:
+
+```bash
+# Development bypass (never use in production!)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
+```
+
+**WARNING**: Never set `DASHBOARD_DEV_USER_EMAIL` in production environments. This bypasses all authentication and should only be used during local development.
 
 ## Claude API Authentication
 
@@ -382,9 +373,10 @@ The proxy will use credentials in the order they were linked. If the first crede
 
 ### Dashboard Security
 
-1. **Require API Key**: Always set `DASHBOARD_API_KEY` in production
-2. **Use SSO**: Configure OAuth2 Proxy for shared deployments
-3. **Limit Access**: Restrict dashboard access to authorized users only
+1. **Require oauth2-proxy**: Always deploy with oauth2-proxy in production
+2. **Configure SSO Headers**: Set `DASHBOARD_SSO_HEADERS` and `DASHBOARD_SSO_ALLOWED_DOMAINS`
+3. **Use INTERNAL_API_KEY**: Protect service-to-service communication
+4. **Never Use Dev Bypass in Production**: `DASHBOARD_DEV_USER_EMAIL` is for development only
 
 ## Multi-Train Setup
 
@@ -433,13 +425,14 @@ ENABLE_CLIENT_AUTH=true
 # OAuth client ID (optional, uses default if not set)
 CLAUDE_OAUTH_CLIENT_ID=your-oauth-client-id
 
-# Dashboard authentication
-DASHBOARD_API_KEY=secure-dashboard-key
-
-# Dashboard SSO (optional)
-DASHBOARD_SSO_ENABLED=false
+# Dashboard authentication (Production - MANDATORY)
 DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
-DASHBOARD_SSO_ALLOWED_DOMAINS=example.com
+DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
+INTERNAL_API_KEY=secure-random-key
+
+# Dashboard authentication (Development)
+DASHBOARD_DEV_USER_EMAIL=dev@localhost
+INTERNAL_API_KEY=dev-internal-key
 
 # Database connection (required)
 DATABASE_URL=postgresql://user:password@localhost:5432/agent_prompttrain

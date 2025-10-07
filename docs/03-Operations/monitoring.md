@@ -62,11 +62,11 @@ Access via dashboard API:
 ```bash
 # Current statistics
 curl http://localhost:3001/api/stats \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 
 # Token usage by account
 curl "http://localhost:3001/api/token-usage/current?window=300" \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ## Performance Monitoring
@@ -134,7 +134,7 @@ Monitor Claude API limits:
 ```bash
 # Check current window usage
 curl "http://localhost:3001/api/token-usage/current?accountId=acc_12345&window=300" \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ### Daily Usage Reports
@@ -144,7 +144,7 @@ Historical analysis:
 ```bash
 # Last 30 days aggregated
 curl "http://localhost:3001/api/token-usage/daily?accountId=acc_12345&aggregate=true" \
-  -H "X-Dashboard-Key: $DASHBOARD_API_KEY"
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
 ```
 
 ### Usage Alerts
