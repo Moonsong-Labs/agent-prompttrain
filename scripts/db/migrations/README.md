@@ -151,16 +151,38 @@ Creates infrastructure for AI-powered conversation analysis:
 - Optimized indexes for pending analyses and conversation lookups
 - Supports multiple AI models and comprehensive token tracking
 
-### 012-add-analysis-audit-log.ts
+### 012-train-id-migration.ts
 
-Creates audit logging infrastructure for AI analysis security:
+Migrates existing data to use train IDs:
 
-- `analysis_audit_log` table for tracking all analysis-related events
-- Event types: ANALYSIS_REQUEST, ANALYSIS_REGENERATION_REQUEST, etc.
-- Outcome tracking: SUCCESS, FAILURE_AUTH, FAILURE_RATE_LIMIT, etc.
-- Comprehensive metadata storage with JSONB fields
-- Indexes for efficient querying by conversation, domain, and timestamp
-- Supports security monitoring and compliance requirements
+- Updates api_requests table with train_id references
+- Maintains backward compatibility with existing data
+- Creates indexes for efficient train-based queries
+- Supports multi-train architecture
+
+### 013-credential-train-management.ts
+
+Implements database-backed credential and train management system:
+
+- `trains` table for project/team organization
+- `anthropic_credentials` table for OAuth credential storage
+- `train_accounts` many-to-many relationship table
+- `train_api_keys` for client authentication
+- Replaces filesystem-based credential management
+- Supports credential failover and rotation
+- See ADR-026 for architectural details
+
+### 014-train-members.ts
+
+Adds train ownership and membership management:
+
+- `train_members` table with role-based access control (owner/member)
+- Ensures each train has at least one owner
+- Role validation with CHECK constraint
+- Backfills existing trains with default owner (todo@localhost)
+- Indexes on train_id, user_email, and composite (train_id, role)
+- Supports OAuth email-based user identification
+- Enables team collaboration with proper authorization
 
 ## Future Migrations
 
