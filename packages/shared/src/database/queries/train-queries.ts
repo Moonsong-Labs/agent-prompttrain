@@ -10,32 +10,39 @@ import type {
 import { toSafeCredential } from './credential-queries-internal'
 
 /**
- * Create a new train
+ * Create a new train with a randomly selected default account
  */
 export async function createTrain(pool: Pool, request: CreateTrainRequest): Promise<Train> {
+  // Get a random credential to use as default
+  const credentialResult = await pool.query<{ id: string }>(
+    'SELECT id FROM anthropic_credentials ORDER BY RANDOM() LIMIT 1'
+  )
+
+  const defaultAccountId = credentialResult.rows[0]?.id || null
+
   const result = await pool.query<Train>(
     `
     INSERT INTO trains (
       train_id,
       name,
-      description,
       slack_enabled,
       slack_webhook_url,
       slack_channel,
       slack_username,
-      slack_icon_emoji
+      slack_icon_emoji,
+      default_account_id
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
     `,
     [
       request.train_id,
       request.name,
-      request.description || null,
       request.slack_enabled ?? false,
       request.slack_webhook_url || null,
       request.slack_channel || null,
       request.slack_username || null,
       request.slack_icon_emoji || null,
+      defaultAccountId,
     ]
   )
 
@@ -59,7 +66,8 @@ export async function getTrainByTrainId(pool: Pool, trainId: string): Promise<Tr
 }
 
 /**
- * Get train with its linked accounts
+ * Get train with all available accounts
+ * All trains have access to all credentials
  */
 export async function getTrainWithAccounts(
   pool: Pool,
@@ -70,15 +78,9 @@ export async function getTrainWithAccounts(
     return null
   }
 
+  // All trains have access to all credentials
   const accountsResult = await pool.query<AnthropicCredential>(
-    `
-    SELECT ac.*
-    FROM anthropic_credentials ac
-    INNER JOIN train_accounts ta ON ta.credential_id = ac.id
-    WHERE ta.train_id = $1
-    ORDER BY ac.account_name ASC
-    `,
-    [train.id]
+    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
 
   return {
@@ -96,30 +98,24 @@ export async function listTrains(pool: Pool): Promise<Train[]> {
 }
 
 /**
- * List all trains with their accounts
+ * List all trains with all available accounts
+ * All trains have access to all credentials
  */
 export async function listTrainsWithAccounts(pool: Pool): Promise<TrainWithAccounts[]> {
   const trains = await listTrains(pool)
 
-  const trainsWithAccounts = await Promise.all(
-    trains.map(async train => {
-      const accountsResult = await pool.query<AnthropicCredential>(
-        `
-        SELECT ac.*
-        FROM anthropic_credentials ac
-        INNER JOIN train_accounts ta ON ta.credential_id = ac.id
-        WHERE ta.train_id = $1
-        ORDER BY ac.account_name ASC
-        `,
-        [train.id]
-      )
-
-      return {
-        ...train,
-        accounts: accountsResult.rows.map(cred => toSafeCredential(cred)),
-      }
-    })
+  // Get all credentials once (shared across all trains)
+  const accountsResult = await pool.query<AnthropicCredential>(
+    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
+
+  const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
+
+  // All trains have access to all credentials
+  const trainsWithAccounts = trains.map(train => ({
+    ...train,
+    accounts: allAccounts,
+  }))
 
   return trainsWithAccounts
 }
@@ -133,16 +129,12 @@ export async function updateTrain(
   request: UpdateTrainRequest
 ): Promise<Train> {
   const updates: string[] = []
-  const values: any[] = []
+  const values: unknown[] = []
   let paramIndex = 1
 
   if (request.name !== undefined) {
     updates.push(`name = $${paramIndex++}`)
     values.push(request.name)
-  }
-  if (request.description !== undefined) {
-    updates.push(`description = $${paramIndex++}`)
-    values.push(request.description)
   }
   if (request.slack_enabled !== undefined) {
     updates.push(`slack_enabled = $${paramIndex++}`)
@@ -197,55 +189,40 @@ export async function deleteTrain(pool: Pool, id: string): Promise<boolean> {
 }
 
 /**
- * Link an account to a train
+ * Set the default account for a train
  */
-export async function linkAccountToTrain(
+export async function setTrainDefaultAccount(
   pool: Pool,
   trainId: string,
   credentialId: string
-): Promise<void> {
-  await pool.query(
+): Promise<Train> {
+  const result = await pool.query<Train>(
     `
-    INSERT INTO train_accounts (train_id, credential_id)
-    VALUES ($1, $2)
-    ON CONFLICT (train_id, credential_id) DO NOTHING
+    UPDATE trains
+    SET default_account_id = $2, updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
     `,
     [trainId, credentialId]
   )
+
+  if (result.rows.length === 0) {
+    throw new Error(`Train with ID ${trainId} not found`)
+  }
+
+  return result.rows[0]
 }
 
 /**
- * Unlink an account from a train
- */
-export async function unlinkAccountFromTrain(
-  pool: Pool,
-  trainId: string,
-  credentialId: string
-): Promise<boolean> {
-  const result = await pool.query(
-    'DELETE FROM train_accounts WHERE train_id = $1 AND credential_id = $2',
-    [trainId, credentialId]
-  )
-  return (result.rowCount ?? 0) > 0
-}
-
-/**
- * Get all credentials linked to a train
+ * Get all credentials available to a train (all credentials)
  */
 export async function getTrainCredentials(
   pool: Pool,
-  trainId: string
+  _trainId: string
 ): Promise<AnthropicCredential[]> {
+  // All trains have access to all credentials
   const result = await pool.query<AnthropicCredential>(
-    `
-    SELECT ac.*
-    FROM anthropic_credentials ac
-    INNER JOIN train_accounts ta ON ta.credential_id = ac.id
-    INNER JOIN trains t ON t.id = ta.train_id
-    WHERE t.train_id = $1
-    ORDER BY ac.account_name ASC
-    `,
-    [trainId]
+    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
 
   return result.rows
@@ -273,5 +250,30 @@ export async function getTrainSlackConfig(
     channel: train.slack_channel || undefined,
     username: train.slack_username || undefined,
     icon_emoji: train.slack_icon_emoji || undefined,
+  }
+}
+
+/**
+ * Get train statistics (last used, 24h request count)
+ */
+export async function getTrainStats(
+  pool: Pool,
+  trainId: string
+): Promise<{ lastUsedAt: Date | null; requestCount24h: number }> {
+  const result = await pool.query<{ last_used_at: Date | null }>(
+    `
+    SELECT
+      MAX(tak.last_used_at) as last_used_at
+    FROM trains t
+    LEFT JOIN train_api_keys tak ON t.id = tak.train_id
+    WHERE t.id = $1
+    GROUP BY t.id
+    `,
+    [trainId]
+  )
+
+  return {
+    lastUsedAt: result.rows[0]?.last_used_at || null,
+    requestCount24h: 0, // TODO: Implement request tracking
   }
 }
