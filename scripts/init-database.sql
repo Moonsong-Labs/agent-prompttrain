@@ -4,7 +4,7 @@
 -- Create api_requests table with all required columns including branch_id
 CREATE TABLE IF NOT EXISTS api_requests (
     request_id UUID PRIMARY KEY,
-    train_id VARCHAR(255) NOT NULL,
+    project_id VARCHAR(255) NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL,
     method VARCHAR(10) NOT NULL,
     path VARCHAR(255) NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS streaming_chunks (
 );
 
 -- Create indexes for api_requests
-CREATE INDEX IF NOT EXISTS idx_requests_train_id ON api_requests(train_id);
+CREATE INDEX IF NOT EXISTS idx_requests_project_id ON api_requests(project_id);
 CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON api_requests(timestamp);
 CREATE INDEX IF NOT EXISTS idx_requests_model ON api_requests(model);
 CREATE INDEX IF NOT EXISTS idx_requests_request_type ON api_requests(request_type);
@@ -94,9 +94,9 @@ CREATE INDEX IF NOT EXISTS idx_api_requests_response_body_task
 ON api_requests USING gin (response_body)
 WHERE response_body IS NOT NULL;
 
--- Composite index for train_id + timestamp queries
-CREATE INDEX IF NOT EXISTS idx_api_requests_train_timestamp_response
-ON api_requests(train_id, timestamp DESC)
+-- Composite index for project_id + timestamp queries
+CREATE INDEX IF NOT EXISTS idx_api_requests_project_timestamp_response
+ON api_requests(project_id, timestamp DESC)
 WHERE response_body IS NOT NULL;
 
 -- Functional index for faster text searches
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS analysis_audit_log (
     outcome VARCHAR(50) NOT NULL,
     conversation_id UUID NOT NULL,
     branch_id VARCHAR(255) NOT NULL,
-    train_id VARCHAR(255) NOT NULL,
+    project_id VARCHAR(255) NOT NULL,
     request_id VARCHAR(255) NOT NULL,
     user_context JSONB DEFAULT '{}',
     metadata JSONB DEFAULT '{}',
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS analysis_audit_log (
 
 -- Create indexes for analysis_audit_log
 CREATE INDEX IF NOT EXISTS idx_audit_conversation ON analysis_audit_log (conversation_id, branch_id);
-CREATE INDEX IF NOT EXISTS idx_audit_train ON analysis_audit_log (train_id);
+CREATE INDEX IF NOT EXISTS idx_audit_project ON analysis_audit_log (project_id);
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON analysis_audit_log (timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_event_type ON analysis_audit_log (event_type);
 
