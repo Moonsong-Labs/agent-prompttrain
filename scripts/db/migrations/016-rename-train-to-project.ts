@@ -36,8 +36,33 @@ async function migrate() {
       ALTER TABLE IF EXISTS train_members RENAME TO project_members
     `)
 
-    // Note: Column renames train_id -> project_id were already done in migration 013
-    // The tables were created with project_id from the start due to sed replacements
+    // Rename columns in main tables that still use train_id
+    console.log('Renaming train_id columns to project_id...')
+
+    // api_requests table (renamed from domain to project_id in migration 012, column is correct)
+    // conversations, subtasks, token_usage tables need column renames
+
+    const columnRenames = [
+      { table: 'conversations', column: 'train_id' },
+      { table: 'subtasks', column: 'train_id' },
+      { table: 'token_usage', column: 'train_id' },
+    ]
+
+    for (const { table, column } of columnRenames) {
+      await client.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = '${table}' AND column_name = '${column}'
+          ) THEN
+            ALTER TABLE ${table} RENAME COLUMN ${column} TO project_id;
+          END IF;
+        END
+        $$;
+      `)
+    }
 
     // Rename indexes
     console.log('Renaming indexes...')
