@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Agent Prompt Train will be documented in this file.
+All notable changes to Agent Prompt Troject will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -37,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reorganized scripts into categorized subdirectories
 - Consolidated documentation into organized docs/ folder
 - Updated request information display for better density
-- Renamed client headers to `MSL-Project-Id` and `MSL-Account`, removing legacy `train-id`/`X-Train-Account`
-- Switched account selection fallback to deterministic per-train hashing instead of random rotation
+- Renamed client headers to `MSL-Project-Id` and `MSL-Account`, removing legacy `project-id`/`X-Train-Account`
+- Switched account selection fallback to deterministic per-troject hashing instead of random rotation
 
 ### Fixed
 

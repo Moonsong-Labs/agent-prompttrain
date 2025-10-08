@@ -3,9 +3,9 @@ generated_by: repo-knowledge-tracker
 last_updated: '2025-08-19T00:00:00Z'
 entries:
   - path: 'docs/04-Architecture/ADRs/adr-024-train-id-header-routing.md'
-    title: 'ADR-024: Header-Based Train and Account Routing'
-    why_important: 'Defines the core routing mechanism using MSL-Train-Id and MSL-Account headers; replaces domain-based routing'
-    topics: ['train', 'routing', 'authentication', 'headers']
+    title: 'ADR-024: Header-Based Project and Account Routing'
+    why_important: 'Defines the core routing mechanism using MSL-Project-Id and MSL-Account headers; replaces domain-based routing'
+    topics: ['project', 'routing', 'authentication', 'headers']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-023-wildcard-subdomain-support.md'
@@ -17,17 +17,17 @@ entries:
       direct: []
       indirect: []
     update_triggers:
-      ['header naming changes', 'routing logic changes', 'train identification updates']
+      ['header naming changes', 'routing logic changes', 'project identification updates']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Reference when implementing train-related routing features'
-    notes: 'Supersedes ADR-023; establishes MSL-Train-Id and MSL-Account as the primary routing mechanism'
+    recommended_action: 'Reference when implementing project-related routing features'
+    notes: 'Supersedes ADR-023; establishes MSL-Project-Id and MSL-Account as the primary routing mechanism'
 
   - path: 'docs/04-Architecture/ADRs/adr-026-database-credential-management.md'
-    title: 'ADR-026: Database-Based Credential and Train Management'
+    title: 'ADR-026: Database-Based Credential and Project Management'
     why_important: 'Defines database schema and architecture for train, credential, and API key management; central to multi-tenancy'
-    topics: ['train', 'database', 'credentials', 'oauth', 'multi-tenancy']
+    topics: ['project', 'database', 'credentials', 'oauth', 'multi-tenancy']
     owners: ['@backend-team', '@database-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-004-proxy-authentication.md'
@@ -48,13 +48,13 @@ entries:
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Consult before making any train or credential schema changes'
-    notes: 'Introduces four core tables: anthropic_credentials, trains, train_accounts, train_api_keys'
+    recommended_action: 'Consult before making any project or credential schema changes'
+    notes: 'Introduces four core tables: anthropic_credentials, projects, project_accounts, project_api_keys'
 
   - path: 'scripts/db/migrations/013-credential-train-management.ts'
-    title: 'Database Migration 013: Train and Credential Tables'
-    why_important: 'Creates core database schema for trains, credentials, and many-to-many relationships'
-    topics: ['database', 'migration', 'train', 'schema']
+    title: 'Database Migration 013: Project and Credential Tables'
+    why_important: 'Creates core database schema for projects, credentials, and many-to-many relationships'
+    topics: ['database', 'migration', 'project', 'schema']
     owners: ['@database-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-026-database-credential-management.md'
@@ -64,17 +64,17 @@ entries:
     dependencies:
       direct: ['pg']
       indirect: []
-    update_triggers: ['schema evolution', 'new train features', 'credential storage changes']
+    update_triggers: ['schema evolution', 'new project features', 'credential storage changes']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Review when adding new train-related tables or columns'
-    notes: 'Creates: anthropic_credentials, trains, train_accounts, train_api_keys tables'
+    recommended_action: 'Review when adding new project-related tables or columns'
+    notes: 'Creates: anthropic_credentials, projects, project_accounts, project_api_keys tables'
 
   - path: 'scripts/db/migrations/014-train-members.ts'
-    title: 'Database Migration 014: Train Membership and Ownership'
-    why_important: 'Implements train ownership and member access control'
-    topics: ['database', 'migration', 'train', 'access-control', 'ownership']
+    title: 'Database Migration 014: Project Membership and Ownership'
+    why_important: 'Implements project ownership and member access control'
+    topics: ['database', 'migration', 'project', 'access-control', 'ownership']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-027-mandatory-user-authentication.md'
@@ -90,12 +90,12 @@ entries:
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
     recommended_action: 'Update when implementing additional roles or permission levels'
-    notes: 'Creates train_members table with owner/member roles; backfills existing trains with default owner'
+    notes: 'Creates project_members table with owner/member roles; backfills existing projects with default owner'
 
   - path: 'packages/shared/src/constants/http-headers.ts'
     title: 'HTTP Header Constants'
-    why_important: 'Defines MSL-Train-Id and MSL-Account header constants used throughout the codebase'
-    topics: ['constants', 'headers', 'train']
+    why_important: 'Defines MSL-Project-Id and MSL-Account header constants used throughout the codebase'
+    topics: ['constants', 'headers', 'project']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-024-train-id-header-routing.md'
@@ -115,14 +115,14 @@ entries:
   - path: 'docs/02-User-Guide/authentication.md'
     title: 'Authentication Guide'
     why_important: 'Complete user-facing guide for train-based authentication, API key management, and OAuth setup'
-    topics: ['authentication', 'train', 'oauth', 'api-keys', 'documentation']
+    topics: ['authentication', 'project', 'oauth', 'api-keys', 'documentation']
     owners: ['@docs-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-026-database-credential-management.md'
       - 'docs/04-Architecture/ADRs/adr-027-mandatory-user-authentication.md'
       - 'docs/02-User-Guide/api-reference.md'
     related_components:
-      - 'services/dashboard/src/routes/trains.ts'
+      - 'services/dashboard/src/routes/projects.ts'
       - 'services/dashboard/src/routes/api-keys.ts'
       - 'scripts/auth/oauth-login.ts'
     dependencies:
@@ -133,19 +133,19 @@ entries:
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
     recommended_action: 'Update when authentication flows or APIs change'
-    notes: 'Covers train-scoped API keys, OAuth setup, credential management, multi-train setup'
+    notes: 'Covers train-scoped API keys, OAuth setup, credential management, multi-project setup'
 
   - path: 'docs/02-User-Guide/api-reference.md'
     title: 'API Reference Documentation'
-    why_important: 'Defines public API contracts for train headers and train management endpoints'
-    topics: ['api', 'documentation', 'train', 'headers']
+    why_important: 'Defines public API contracts for project headers and project management endpoints'
+    topics: ['api', 'documentation', 'project', 'headers']
     owners: ['@api-team']
     linked_docs:
       - 'docs/02-User-Guide/authentication.md'
       - 'docs/06-Reference/api-schemas.md'
     related_components:
       - 'services/proxy/src/routes/api.ts'
-      - 'services/dashboard/src/routes/trains.ts'
+      - 'services/dashboard/src/routes/projects.ts'
       - 'services/dashboard/src/routes/api-keys.ts'
     dependencies:
       direct: []
@@ -154,13 +154,13 @@ entries:
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Update when adding/modifying train-related API endpoints'
-    notes: 'Documents MSL-Train-Id and MSL-Account headers, train management APIs, conversation filtering'
+    recommended_action: 'Update when adding/modifying project-related API endpoints'
+    notes: 'Documents MSL-Project-Id and MSL-Account headers, project management APIs, conversation filtering'
 
   - path: 'docs/06-Reference/environment-vars.md'
     title: 'Environment Variables Reference'
-    why_important: 'Defines train-related configuration variables (DEFAULT_TRAIN_ID, ANTHROPIC_CUSTOM_HEADERS)'
-    topics: ['configuration', 'environment', 'train']
+    why_important: 'Defines project-related configuration variables (DEFAULT_TRAIN_ID, ANTHROPIC_CUSTOM_HEADERS)'
+    topics: ['configuration', 'environment', 'project']
     owners: ['@devops-team']
     linked_docs:
       - 'docs/01-Getting-Started/configuration.md'
@@ -174,34 +174,34 @@ entries:
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Add new environment variables here when implementing train features'
+    recommended_action: 'Add new environment variables here when implementing project features'
     notes: 'Documents DEFAULT_TRAIN_ID (fallback), ANTHROPIC_CUSTOM_HEADERS (header forwarding)'
 
   - path: 'packages/shared/src/database/queries/train-queries.ts'
-    title: 'Train Database Query Functions'
-    why_important: 'Core database operations for train CRUD, credential linking, and train retrieval'
-    topics: ['database', 'queries', 'train']
+    title: 'Project Database Query Functions'
+    why_important: 'Core database operations for project CRUD, credential linking, and project retrieval'
+    topics: ['database', 'queries', 'project']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-026-database-credential-management.md'
     related_components:
       - 'packages/shared/src/database/queries/credential-queries.ts'
       - 'packages/shared/src/database/queries/api-key-queries.ts'
-      - 'services/dashboard/src/routes/trains.ts'
+      - 'services/dashboard/src/routes/projects.ts'
     dependencies:
       direct: ['pg']
       indirect: []
-    update_triggers: ['train schema changes', 'new train features', 'query optimization needs']
+    update_triggers: ['project schema changes', 'new project features', 'query optimization needs']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Add new train-related queries here; use parameterized SQL for security'
+    recommended_action: 'Add new project-related queries here; use parameterized SQL for security'
     notes: 'Contains getTrain, createTrain, updateTrain, linkCredential, unlinkCredential functions'
 
   - path: 'packages/shared/src/database/queries/train-member-queries.ts'
-    title: 'Train Member Database Query Functions'
-    why_important: 'Manages train ownership and membership access control'
-    topics: ['database', 'queries', 'train', 'access-control']
+    title: 'Project Member Database Query Functions'
+    why_important: 'Manages project ownership and membership access control'
+    topics: ['database', 'queries', 'project', 'access-control']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-027-mandatory-user-authentication.md'
@@ -219,10 +219,10 @@ entries:
     recommended_action: 'Update when adding new roles or permission checks'
     notes: 'Contains getTrainMembers, addTrainMember, removeTrainMember, isTrainOwner functions'
 
-  - path: 'services/dashboard/src/routes/trains.ts'
-    title: 'Dashboard Train Management API Routes'
-    why_important: 'REST API endpoints for creating, updating, and managing trains'
-    topics: ['api', 'dashboard', 'train']
+  - path: 'services/dashboard/src/routes/projects.ts'
+    title: 'Dashboard Project Management API Routes'
+    why_important: 'REST API endpoints for creating, updating, and managing projects'
+    topics: ['api', 'dashboard', 'project']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/02-User-Guide/api-reference.md'
@@ -234,23 +234,23 @@ entries:
     dependencies:
       direct: ['hono']
       indirect: []
-    update_triggers: ['train API changes', 'new train management features']
+    update_triggers: ['project API changes', 'new project management features']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Add new train-related endpoints here'
-    notes: 'Implements GET /api/trains, POST /api/trains, PUT /api/trains/:id, credential linking'
+    recommended_action: 'Add new project-related endpoints here'
+    notes: 'Implements GET /api/projects, POST /api/projects, PUT /api/projects/:id, credential linking'
 
   - path: 'services/dashboard/src/routes/train-members.ts'
-    title: 'Dashboard Train Member API Routes'
-    why_important: 'REST API endpoints for managing train ownership and membership'
-    topics: ['api', 'dashboard', 'train', 'access-control']
+    title: 'Dashboard Project Member API Routes'
+    why_important: 'REST API endpoints for managing project ownership and membership'
+    topics: ['api', 'dashboard', 'project', 'access-control']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/02-User-Guide/authentication.md'
     related_components:
       - 'packages/shared/src/database/queries/train-member-queries.ts'
-      - 'services/dashboard/src/routes/trains.ts'
+      - 'services/dashboard/src/routes/projects.ts'
     dependencies:
       direct: ['hono']
       indirect: []
@@ -262,9 +262,9 @@ entries:
     notes: 'Implements member listing, adding, removing, and permission checks'
 
   - path: 'services/proxy/src/middleware/train-id-extractor.ts'
-    title: 'Train ID Extraction Middleware'
-    why_important: 'Extracts and validates MSL-Train-Id header from incoming requests'
-    topics: ['middleware', 'train', 'routing']
+    title: 'Project ID Extraction Middleware'
+    why_important: 'Extracts and validates MSL-Project-Id header from incoming requests'
+    topics: ['middleware', 'project', 'routing']
     owners: ['@backend-team']
     linked_docs:
       - 'docs/04-Architecture/ADRs/adr-024-train-id-header-routing.md'
@@ -274,17 +274,17 @@ entries:
     dependencies:
       direct: ['hono']
       indirect: []
-    update_triggers: ['header extraction logic changes', 'train validation updates']
+    update_triggers: ['header extraction logic changes', 'project validation updates']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Review when changing train identification logic'
+    recommended_action: 'Review when changing project identification logic'
     notes: 'Applies DEFAULT_TRAIN_ID fallback when header is missing'
 
   - path: 'docs/00-Overview/features.md'
     title: 'Feature Overview'
-    why_important: 'High-level documentation of train-related features and capabilities'
-    topics: ['documentation', 'features', 'train']
+    why_important: 'High-level documentation of project-related features and capabilities'
+    topics: ['documentation', 'features', 'project']
     owners: ['@docs-team']
     linked_docs:
       - 'docs/00-Overview/architecture.md'
@@ -292,26 +292,26 @@ entries:
     dependencies:
       direct: []
       indirect: []
-    update_triggers: ['new train features', 'feature capability changes']
+    update_triggers: ['new project features', 'feature capability changes']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Update when adding new train-related features'
-    notes: 'Documents train & account routing, multi-auth support, train-scoped configuration'
+    recommended_action: 'Update when adding new project-related features'
+    notes: 'Documents project & account routing, multi-auth support, train-scoped configuration'
 
   - path: 'docs/06-Reference/changelog.md'
     title: 'Project Changelog'
-    why_important: 'Tracks train-related changes including header renames and routing updates'
-    topics: ['documentation', 'changelog', 'train']
+    why_important: 'Tracks project-related changes including header renames and routing updates'
+    topics: ['documentation', 'changelog', 'project']
     owners: ['@docs-team']
     linked_docs: []
     related_components: []
     dependencies:
       direct: []
       indirect: []
-    update_triggers: ['major train feature releases', 'breaking changes']
+    update_triggers: ['major project feature releases', 'breaking changes']
     last_seen: '2025-08-19'
     last_reviewed_at: '2025-08-19T00:00:00Z'
     staleness_hints: ''
-    recommended_action: 'Add entries for train-related changes'
-    notes: 'Documents MSL-Train-Id/MSL-Account header rename, deterministic train hashing'
+    recommended_action: 'Add entries for project-related changes'
+    notes: 'Documents MSL-Project-Id/MSL-Account header rename, deterministic project hashing'

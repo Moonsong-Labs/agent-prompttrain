@@ -53,7 +53,7 @@ _Note: This is a read-only demo showcasing real usage data from our development 
 - 🔀 **Conversation Tracking** - Automatic message threading with branch, sub-agent & compact support
 - 📊 **Real-time Dashboard** - Monitor usage, view conversations, and analyze patterns
 - 🔐 **Multi-Auth Support** - API keys and OAuth with auto-refresh
-- 📈 **Token Tracking** - Detailed usage statistics per train and account
+- 📈 **Token Tracking** - Detailed usage statistics per project and account
 - 🔄 **Streaming Support** - Full SSE streaming with chunk storage
 - 🐳 **Docker Ready** - Separate optimized images for each service
 - 🤖 **Claude CLI Integration** - Run Claude CLI connected to the proxy
@@ -119,7 +119,7 @@ For developers who need complete visibility, access the raw JSON view of any req
 
 For administrators or heavy users, you can follow the token usage and see when approaching the rate limits.
 
-</kbd><img width="400" alt="Token usage graph line per train" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
+</kbd><img width="400" alt="Token usage graph line per project" src="https://github.com/user-attachments/assets/e16fedc5-c90a-45fb-bfa8-4c37a525edee" /></kbd>
 
 ## Quick Start
 
@@ -305,7 +305,7 @@ DEBUG=false
 
 See the [Documentation](docs/README.md) for complete configuration options.
 
-### Accounts & Trains
+### Accounts & Projects
 
 1. **Create an account credential** under `credentials/accounts/`:
 
@@ -320,33 +320,33 @@ See the [Documentation](docs/README.md) for complete configuration options.
    JSON
    ```
 
-2. **Allow proxy clients** by listing Bearer tokens per train in `credentials/train-client-keys/`:
+2. **Allow proxy clients** by listing Bearer tokens per project in `credentials/project-client-keys/`:
 
    ```bash
-   mkdir -p credentials/train-client-keys
-   cat > credentials/train-client-keys/train-alpha.client-keys.json <<'JSON'
+   mkdir -p credentials/project-client-keys
+   cat > credentials/project-client-keys/project-alpha.client-keys.json <<'JSON'
    { "keys": ["cnp_live_team_alpha"] }
    JSON
    ```
 
-3. **Tag outgoing Anthropic calls** so responses stay mapped to the right train:
+3. **Tag outgoing Anthropic calls** so responses stay mapped to the right project:
 
    ```bash
-   export ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:train-alpha"
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:project-alpha"
    ```
 
 4. **Select a specific account at runtime** (optional):
 
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
-     -H "MSL-Project-Id: train-alpha" \
+     -H "MSL-Project-Id: project-alpha" \
      -H "MSL-Account: account-primary" \
      -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \
      -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
    ```
 
-If `MSL-Account` is omitted, the proxy deterministically maps each train to an available account (hash-based), falling back to others only if the primary account is unavailable.
+If `MSL-Account` is omitted, the proxy deterministically maps each project to an available account (hash-based), falling back to others only if the primary account is unavailable.
 
 ## Usage
 

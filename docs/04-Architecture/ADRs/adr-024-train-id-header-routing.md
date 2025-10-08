@@ -1,4 +1,4 @@
-# ADR-024: Header-Based Train and Account Routing
+# ADR-024: Header-Based Project and Account Routing
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Domain-based credential resolution (including wildcard subtrain support from ADR-023) added
+Domain-based credential resolution (including wildcard subproject support from ADR-023) added
 significant complexity and operational surprises:
 
 - Many deployments run the proxy behind load balancers or tunnels where the `Host` header
@@ -15,8 +15,8 @@ significant complexity and operational surprises:
 - Multi-account customers wanted to reuse the same project identifier across several Anthropic
   subscriptions without duplicating domain mappings.
 
-At the same time, analytics and storage systems continued to rely on the logical train id, so we
-needed a mechanism that clearly separates **who** is making the request (train) from **which
+At the same time, analytics and storage systems continued to rely on the logical project id, so we
+needed a mechanism that clearly separates **who** is making the request (project) from **which
 credentials** are used to fulfil it (account).
 
 ## Decision
@@ -32,7 +32,7 @@ credentials** are used to fulfil it (account).
 2. **Filesystem Layout**
    - Account credentials live under `credentials/accounts/<account>.credentials.json` and contain only
      Anthropic authentication data (API key or OAuth fields plus optional Slack configuration).
-   - Proxy client API keys move to `credentials/project-client-keys/<train>.client-keys.json`, decoupling
+   - Proxy client API keys move to `credentials/project-client-keys/<project>.client-keys.json`, decoupling
      proxy access control from Anthropic credentials.
 
 3. **Authentication Service Simplification**
@@ -44,11 +44,11 @@ credentials** are used to fulfil it (account).
 
 ### Positive
 
-- Clear separation between trains (analytics) and accounts (credentials).
-- Simpler operational model: new trains require only a header; new accounts require only a credential
+- Clear separation between projects (analytics) and accounts (credentials).
+- Simpler operational model: new projects require only a header; new accounts require only a credential
   file.
 - Eliminates wildcard precedence edge cases and large path traversal surface area.
-- Deterministic hashing provides consistent per-train account selection while still distributing load
+- Deterministic hashing provides consistent per-project account selection while still distributing load
   across multiple keys.
 
 ### Negative
@@ -66,7 +66,7 @@ credentials** are used to fulfil it (account).
 
 1. Move each `*.credentials.json` file from the root `credentials/` directory into
    `credentials/accounts/` and rename the file to the desired account name.
-2. Create per-train client key files under `credentials/project-client-keys/` if proxy authentication is
+2. Create per-project client key files under `credentials/project-client-keys/` if proxy authentication is
    enabled.
 3. Update clients to send `MSL-Project-Id` (and optionally `MSL-Account`) headers.
 4. Remove any `CNP_WILDCARD_*` environment variables; they are no longer used.

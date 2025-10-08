@@ -234,7 +234,7 @@ Open http://localhost:3001 in your browser. You should see the dashboard (in dev
 ### 3. Test API Call
 
 ```bash
-# Replace with your train ID and client API key
+# Replace with your project ID and client API key
 curl -X POST http://localhost:3000/v1/messages \
   -H "MSL-Project-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_client_key" \
@@ -282,7 +282,7 @@ curl -X POST http://localhost:3000/v1/messages \
 
 ## Next Steps
 
-- [Configure train credentials](./configuration.md)
+- [Configure project credentials](./configuration.md)
 - [Set up authentication](../02-User-Guide/authentication.md)
 - [Deploy to production](../03-Operations/deployment/docker.md)
 - [Monitor usage](../02-User-Guide/dashboard-guide.md)

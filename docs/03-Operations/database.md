@@ -88,7 +88,7 @@ Stores AI-generated analyses of conversations.
 
 ### Performance Indexes
 
-- `idx_requests_project_id` - Filter by train ID
+- `idx_requests_project_id` - Filter by project ID
 - `idx_requests_timestamp` - Time-based queries
 - `idx_requests_model` - Filter by model
 - `idx_requests_request_type` - Filter by request type
@@ -127,7 +127,7 @@ Stores AI-generated analyses of conversations.
 
 The `account_id` column enables tracking token usage per account rather than just per project ID. This allows:
 
-- Multiple trains to share the same Claude account
+- Multiple projects to share the same Claude account
 - Accurate tracking against Claude's 140,000 token per 5-hour window limit
 - Per-account usage dashboards and alerts
 

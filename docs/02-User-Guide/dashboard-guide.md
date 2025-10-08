@@ -136,8 +136,8 @@ View per-account statistics:
 Many dashboard views support URL parameters:
 
 ```
-# Filter by train ID
-/requests?projectId=train-alpha
+# Filter by project ID
+/requests?projectId=project-alpha
 
 # Filter by account
 /token-usage?accountId=acc_12345
@@ -161,7 +161,7 @@ Many dashboard views support URL parameters:
 ### Token Usage Chart
 
 - Line chart showing usage over time
-- Stacked by train ID or account
+- Stacked by project ID or account
 - Zoom and pan capabilities
 - Export as PNG/SVG
 

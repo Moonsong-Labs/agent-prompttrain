@@ -60,7 +60,7 @@ authentication_error: invalid x-api-key
    **Note:** The proxy will warn once when a projectId doesn't have a credential file:
 
    ```
-   WARN: No credential file found for train: train-alpha
+   WARN: No credential file found for project: project-alpha
    ```
 
    This helps identify missing credential configurations.

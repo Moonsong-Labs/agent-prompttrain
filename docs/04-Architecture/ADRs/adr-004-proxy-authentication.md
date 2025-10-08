@@ -53,7 +53,7 @@ We needed a way to authenticate clients at the proxy level while maintaining bac
 
 ## Decision
 
-We will implement **Bearer Token Authentication** with train-specific API keys stored in credential files.
+We will implement **Bearer Token Authentication** with project-specific API keys stored in credential files.
 
 ### Implementation Details
 
@@ -61,7 +61,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 
    ```
    Client → Proxy: Authorization: Bearer cnp_live_xxx...
-   Proxy: Extract train ID and optional account headers
+   Proxy: Extract project ID and optional account headers
    Proxy: Load credentials/project-client-keys/<train>.client-keys.json
    Proxy: Compare tokens using timing-safe SHA-256
    Proxy: Select account credential (header or deterministic hash of train)
@@ -94,7 +94,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 ### Positive
 
 - **Enhanced Security**: Only authorized clients can use the proxy
-- **Per-Train Control**: Each train has independent authentication
+- **Per-Train Control**: Each project has independent authentication
 - **Standards Compliance**: Uses OAuth 2.0 Bearer token standard
 - **Audit Trail**: All authentication attempts are logged
 - **Backward Compatible**: Can be disabled via `ENABLE_CLIENT_AUTH=false`
@@ -111,7 +111,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 
 - **Risk**: Leaked client API keys
   - **Mitigation**: Keys can be revoked by updating credential files
-  - **Mitigation**: Keys are train-specific, limiting blast radius
+  - **Mitigation**: Keys are project-specific, limiting blast radius
 
 - **Risk**: Timing attacks on key comparison
   - **Mitigation**: SHA-256 hashing ensures constant-time comparison

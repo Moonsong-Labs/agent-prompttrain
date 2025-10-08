@@ -22,7 +22,7 @@ import type { AuthContext } from '../middleware/auth.js'
 export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
 
 /**
- * Trains management UI page - Table view
+ * Projects management UI page - Table view
  */
 trainsUIRoutes.get('/', async c => {
   const pool = container.getPool()
@@ -31,7 +31,7 @@ trainsUIRoutes.get('/', async c => {
   if (!pool) {
     return c.html(
       layout(
-        'Trains',
+        'Projects',
         html`
           <div class="error-banner">
             <strong>Error:</strong> Database not configured. Please set DATABASE_URL environment
@@ -289,7 +289,7 @@ trainsUIRoutes.get('/', async c => {
 
     return c.html(
       layout(
-        'Trains',
+        'Projects',
         content,
         raw(`<script>
           document.body.addEventListener('htmx:responseError', function(evt) {
@@ -302,7 +302,7 @@ trainsUIRoutes.get('/', async c => {
   } catch (error) {
     return c.html(
       layout(
-        'Trains - Error',
+        'Projects - Error',
         html`
           <div class="error-banner">
             <strong>Error:</strong> Failed to load projects: ${getErrorMessage(error)}
@@ -359,7 +359,7 @@ trainsUIRoutes.get('/:projectId/view', async c => {
             href="/dashboard/projects"
             style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;"
           >
-            ← Back to Trains
+            ← Back to Projects
           </a>
         </div>
 

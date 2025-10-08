@@ -9,7 +9,7 @@ Accepted
 Claude API implements rate limiting based on token usage within 5-hour sliding windows. Initially, the proxy only tracked tokens in memory for basic statistics, which had several limitations:
 
 - No persistence across restarts
-- No account-level tracking (only train-level)
+- No account-level tracking (only project-level)
 - No support for monitoring Claude's 5-hour windows
 - No historical data for cost analysis
 - Couldn't track all request types (query_evaluation, quota)
@@ -19,7 +19,7 @@ With Claude's 140,000 token limit per 5-hour window, users needed better visibil
 ## Decision Drivers
 
 - **Rate Limit Compliance**: Monitor Claude API's 5-hour sliding windows
-- **Account-Level Tracking**: Support multiple trains per account
+- **Account-Level Tracking**: Support multiple projects per account
 - **Historical Analysis**: Enable cost tracking and usage patterns
 - **Performance**: Minimal impact on request processing
 - **Simplicity**: Avoid complex partitioning schemes initially
@@ -102,7 +102,7 @@ We will implement **direct storage in the api_requests table** with account-leve
 ### Positive
 
 - **Single Source of Truth**: All data in one table, no synchronization issues
-- **Account-Level Visibility**: Track usage across multiple trains
+- **Account-Level Visibility**: Track usage across multiple projects
 - **5-Hour Window Support**: Accurate Claude API limit monitoring
 - **Historical Data**: Complete usage history for analysis
 - **Simple Implementation**: No complex partitioning or additional services
@@ -123,7 +123,7 @@ We will implement **direct storage in the api_requests table** with account-leve
 
 - **Risk**: Missing account IDs in legacy data
   - **Mitigation**: Warning logs for missing accountId
-  - **Mitigation**: Backward compatible with train-only tracking
+  - **Mitigation**: Backward compatible with project-only tracking
 
 ## Implementation Notes
 

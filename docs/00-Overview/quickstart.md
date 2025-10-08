@@ -24,7 +24,7 @@ Create credential files for your project identifier:
 
 ```bash
 # For OAuth (Claude Code)
-cat > credentials/train-alpha.credentials.json << 'EOF'
+cat > credentials/project-alpha.credentials.json << 'EOF'
 {
   "type": "oauth",
   "accountId": "acc_unique_identifier",
@@ -40,13 +40,13 @@ EOF
 
 # Create single source of credentials
 mkdir -p client-setup
-cp credentials/train-alpha.credentials.json client-setup/.credentials.json
+cp credentials/project-alpha.credentials.json client-setup/.credentials.json
 
 # Link for proxy service (avoids duplication)
 ln -sf ../client-setup/.credentials.json credentials/proxy.credentials.json
 
-# Configure outgoing requests to tag the train ID
-echo 'ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:train-alpha"' >> .env
+# Configure outgoing requests to tag the project ID
+echo 'ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:project-alpha"' >> .env
 ```
 
 ### 3. Start services

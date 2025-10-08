@@ -270,7 +270,7 @@ export async function getProjectStats(
     SELECT
       MAX(tak.last_used_at) as last_used_at
     FROM projects t
-    LEFT JOIN train_api_keys tak ON t.id = tak.project_id
+    LEFT JOIN project_api_keys tak ON t.id = tak.project_id
     WHERE t.id = $1
     GROUP BY t.id
     `,

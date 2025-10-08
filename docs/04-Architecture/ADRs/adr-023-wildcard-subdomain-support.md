@@ -1,4 +1,4 @@
-# ADR-023: Wildcard Subtrain Support
+# ADR-023: Wildcard Subproject Support
 
 ## Status
 
@@ -6,13 +6,13 @@ Superseded by [ADR-024](./adr-024-train-id-header-routing.md)
 
 ## Context
 
-The Claude Nexus Proxy needs to support organizations with many subtrains (e.g., `api.staging.example.com`, `api.prod.example.com`, `api.dev.example.com`) without requiring separate credential files for each subtrain. This is particularly important for:
+The Claude Nexus Proxy needs to support organizations with many subprojects (e.g., `api.staging.example.com`, `api.prod.example.com`, `api.dev.example.com`) without requiring separate credential files for each subproject. This is particularly important for:
 
-1. Large organizations with environment-based subtrains
-2. Multi-tenant SaaS applications with customer-specific subtrains
+1. Large organizations with environment-based subprojects
+2. Multi-tenant SaaS applications with customer-specific subprojects
 3. Development teams using feature branch deployments
 
-Currently, each subtrain requires its own credential file, leading to:
+Currently, each subproject requires its own credential file, leading to:
 
 - Credential proliferation and management overhead
 - Increased risk of configuration drift
@@ -20,7 +20,7 @@ Currently, each subtrain requires its own credential file, leading to:
 
 ## Decision
 
-We will implement wildcard subtrain support using a prefix-based approach that is cross-platform compatible:
+We will implement wildcard subproject support using a prefix-based approach that is cross-platform compatible:
 
 ### 1. Wildcard Credential Files
 
@@ -40,7 +40,7 @@ Credentials are resolved in order of specificity:
 ### 3. Security Boundaries
 
 - Integrate Public Suffix List (PSL) to prevent privilege escalation
-- Wildcard matching stops at registrable train boundaries
+- Wildcard matching stops at registrable project boundaries
 - Example: `_wildcard.co.uk.credentials.json` will NOT match `example.co.uk`
 
 ### 4. Feature Flag Control
@@ -70,7 +70,7 @@ Credentials are resolved in order of specificity:
 
 ### Positive
 
-- **Simplified credential management**: One file can serve multiple subtrains
+- **Simplified credential management**: One file can serve multiple subprojects
 - **Reduced configuration drift**: Centralized credential updates
 - **Better security**: PSL integration prevents unauthorized access
 - **Cross-platform compatibility**: Works on all operating systems
@@ -103,10 +103,10 @@ Credentials are resolved in order of specificity:
 ### Configuration Examples
 
 ```
-# Wildcard for all staging subtrains
+# Wildcard for all staging subprojects
 _wildcard.staging.example.com.credentials.json
 
-# Wildcard for all subtrains of example.com
+# Wildcard for all subprojects of example.com
 _wildcard.example.com.credentials.json
 
 # Exact match (takes precedence)

@@ -39,7 +39,7 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 
 1. **Client Request** → Proxy Service
 2. **Authentication** → Validate client API key
-3. **Train Resolution** → Load credentials for train
+3. **Project Resolution** → Load credentials for project
 4. **Request Enhancement** → Add auth headers, tracking
 5. **Claude API Call** → Forward to Anthropic
 6. **Response Processing** → Stream or JSON response
@@ -55,8 +55,8 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 ```typescript
 // Simplified request flow
 async function handleRequest(c: Context) {
-  // 1. Extract train ID from header
-  const projectId = c.get('projectId') ?? c.req.header('msl-train-id')
+  // 1. Extract project ID from header
+  const projectId = c.get('projectId') ?? c.req.header('msl-project-id')
 
   // 2. Load credentials
   const credentials = await loadCredentials(projectId)
@@ -464,12 +464,12 @@ class CacheManager {
 ### 1. Credential Isolation
 
 ```typescript
-// Each train has isolated credentials
+// Each project has isolated credentials
 const credentialPath = path.join(CREDENTIALS_DIR, `${projectId}.credentials.json`)
 
-// Validate train ID format to prevent path traversal
+// Validate project ID format to prevent path traversal
 if (!isValidProjectId(projectId)) {
-  throw new Error('Invalid train ID')
+  throw new Error('Invalid project ID')
 }
 
 // Read with restricted permissions
@@ -500,7 +500,7 @@ function sanitizeRequest(request: any): any {
 ### 3. Rate Limiting
 
 ```typescript
-// Per-train rate limiting (future implementation)
+// Per-project rate limiting (future implementation)
 class RateLimiter {
   private limits = new Map<string, RateLimit>()
 

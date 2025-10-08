@@ -1,6 +1,6 @@
 # Monitoring Guide
 
-Comprehensive monitoring ensures your Agent Prompt Train operates reliably and efficiently.
+Comprehensive monitoring ensures your Agent Prompt Troject operates reliably and efficiently.
 
 ## Overview
 
@@ -252,7 +252,7 @@ Example dashboard config:
 ```json
 {
   "dashboard": {
-    "title": "Agent Prompt Train",
+    "title": "Agent Prompt Troject",
     "panels": [
       {
         "title": "Request Rate",
@@ -301,7 +301,7 @@ Enable JSON logging:
 // Structured log format
 logger.info({
   event: 'api_request',
-  projectId: req.get('msl-train-id'),
+  projectId: req.get('msl-project-id'),
   method: req.method,
   path: req.path,
   status: res.statusCode,

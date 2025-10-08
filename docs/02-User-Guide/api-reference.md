@@ -25,7 +25,7 @@ Use the `MSL-Project-Id` header to associate requests with a project/train, and 
 `MSL-Account` to select a specific Anthropic account credential:
 
 ```bash
-MSL-Project-Id: train-alpha
+MSL-Project-Id: project-alpha
 MSL-Account: account-primary  # optional
 ```
 
@@ -108,7 +108,7 @@ Returns token usage statistics per project ID.
 
 ```json
 {
-  "train-alpha": {
+  "project-alpha": {
     "total_requests": 150,
     "total_input_tokens": 45000,
     "total_output_tokens": 62000,
@@ -166,7 +166,7 @@ Authorization: Bearer YOUR_DASHBOARD_KEY
 #### List Requests
 
 ```http
-GET /api/requests?limit=50&offset=0&projectId=train-alpha
+GET /api/requests?limit=50&offset=0&projectId=project-alpha
 ```
 
 **Query Parameters:**
@@ -186,7 +186,7 @@ GET /api/requests?limit=50&offset=0&projectId=train-alpha
     {
       "request_id": "uuid",
       "timestamp": "2024-01-15T10:00:00Z",
-      "projectId": "train-alpha",
+      "projectId": "project-alpha",
       "model": "claude-3-opus-20240229",
       "input_tokens": 100,
       "output_tokens": 200,
@@ -213,7 +213,7 @@ GET /api/requests/:id
 {
   "request_id": "uuid",
   "timestamp": "2024-01-15T10:00:00Z",
-  "projectId": "train-alpha",
+  "projectId": "project-alpha",
   "request": {
     "messages": [...],
     "model": "claude-3-opus-20240229"
@@ -233,7 +233,7 @@ GET /api/requests/:id
 #### List Conversations
 
 ```http
-GET /api/conversations?projectId=train-alpha&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
+GET /api/conversations?projectId=project-alpha&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
 ```
 
 **Query Parameters:**
@@ -252,7 +252,7 @@ GET /api/conversations?projectId=train-alpha&accountId=acc_123&limit=50&offset=0
   "conversations": [
     {
       "conversationId": "uuid",
-      "projectId": "train-alpha",
+      "projectId": "project-alpha",
       "accountId": "acc_123",
       "firstMessageTime": "2024-01-15T09:00:00Z",
       "lastMessageTime": "2024-01-15T10:00:00Z",
@@ -284,7 +284,7 @@ GET /api/conversations?projectId=train-alpha&accountId=acc_123&limit=50&offset=0
 #### Get Dashboard Statistics
 
 ```http
-GET /api/dashboard/stats?projectId=train-alpha&accountId=acc_123
+GET /api/dashboard/stats?projectId=project-alpha&accountId=acc_123
 ```
 
 Optimized endpoint for dashboard overview page that returns aggregated statistics in a single query.
@@ -458,7 +458,7 @@ GET /api/analytics/tokens?period=day&days=7
     {
       "period": "2024-01-15",
       "trains": {
-        "train-alpha": {
+        "project-alpha": {
           "input_tokens": 10000,
           "output_tokens": 15000,
           "cache_tokens": 500,
@@ -490,7 +490,7 @@ Get token usage for the current sliding window (default 5 hours).
 ```json
 {
   "accountId": "acc_123",
-  "projectId": "train-alpha",
+  "projectId": "project-alpha",
   "model": "claude-3-opus-20240229",
   "windowStart": "2024-01-15T05:00:00Z",
   "windowEnd": "2024-01-15T10:00:00Z",
@@ -526,7 +526,7 @@ Get daily token usage statistics.
     {
       "date": "2024-01-15",
       "accountId": "acc_123",
-      "projectId": "train-alpha",
+      "projectId": "project-alpha",
       "totalInputTokens": 100000,
       "totalOutputTokens": 150000,
       "totalTokens": 250000,
@@ -613,10 +613,10 @@ Streams real-time updates for requests.
 
 ```
 event: request
-data: {"request_id":"uuid","projectId":"train-alpha","timestamp":"2024-01-15T10:00:00Z"}
+data: {"request_id":"uuid","projectId":"project-alpha","timestamp":"2024-01-15T10:00:00Z"}
 
 event: stats
-data: {"total_requests":1000,"active_trains":5}
+data: {"total_requests":1000,"active_projects":5}
 ```
 
 ## Error Responses
