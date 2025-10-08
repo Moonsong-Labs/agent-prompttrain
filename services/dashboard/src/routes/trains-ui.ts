@@ -151,7 +151,7 @@ trainsUIRoutes.get('/', async c => {
                       <tr style="border-bottom: 1px solid #e5e7eb;">
                         <td style="padding: 0.75rem 1rem;">
                           <a
-                            href="/dashboard/trains/${train.id}/view"
+                            href="/dashboard/trains/${train.train_id}/view"
                             style="color: #3b82f6; font-weight: 600; text-decoration: none; hover:text-decoration: underline;"
                           >
                             ${train.train_id}
