@@ -96,7 +96,7 @@ async function generateSimpleClient() {
   console.log('🚀 Generating simple TypeScript client...')
 
   const clientCode = `/**
- * Auto-generated API client for Agent Prompt Project AI Analysis API
+ * Auto-generated API client for Agent Prompt Train AI Analysis API
  * Generated from: ${OPENAPI_SPEC}
  * Generated on: ${new Date().toISOString()}
  */
