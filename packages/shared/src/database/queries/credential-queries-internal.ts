@@ -30,6 +30,5 @@ export function toSafeCredential(credential: AnthropicCredential): AnthropicCred
     updated_at: credential.updated_at,
     last_refresh_at: credential.last_refresh_at,
     token_status: tokenStatus,
-    token_suffix: credential.oauth_access_token.slice(-4),
   }
 }

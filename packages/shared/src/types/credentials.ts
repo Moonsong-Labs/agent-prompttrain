@@ -27,7 +27,6 @@ export interface AnthropicCredentialSafe {
   updated_at: Date
   last_refresh_at: Date | null
   token_status: 'valid' | 'expiring_soon' | 'expired'
-  token_suffix: string // Last 4 characters of access token
 }
 
 export interface Train {

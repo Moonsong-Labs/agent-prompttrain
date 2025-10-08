@@ -20,6 +20,7 @@ import credentialsRoutes from './routes/credentials.js'
 import trainsRoutes from './routes/trains.js'
 import apiKeysRoutes from './routes/api-keys.js'
 import trainMembersRoutes from './routes/train-members.js'
+import { getTrainByTrainId, isTrainMember } from '@agent-prompttrain/shared/database/queries'
 
 /**
  * Create and configure the Dashboard application
@@ -106,11 +107,58 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     return c.json(health, health.status === 'healthy' ? 200 : 503)
   })
 
+  /**
+   * Helper function to validate train access
+   */
+  async function validateTrainAccess(
+    c: any,
+    trainId?: string
+  ): Promise<{ authorized: boolean; trainUuid?: string; error?: any }> {
+    if (!trainId) {
+      // No train filter - allow (shows all trains user has access to)
+      return { authorized: true }
+    }
+
+    const auth = c.get('auth')
+    if (!auth.isAuthenticated) {
+      return {
+        authorized: false,
+        error: c.json({ error: 'Unauthorized' }, 401),
+      }
+    }
+
+    const pool = container.getPool()
+    const train = await getTrainByTrainId(pool, trainId)
+
+    if (!train) {
+      return {
+        authorized: false,
+        error: c.json({ error: 'Train not found' }, 404),
+      }
+    }
+
+    const isMember = await isTrainMember(pool, train.id, auth.principal)
+    if (!isMember) {
+      return {
+        authorized: false,
+        error: c.json({ error: 'Access denied: You are not a member of this train' }, 403),
+      }
+    }
+
+    return { authorized: true, trainUuid: train.id }
+  }
+
   // API endpoints for dashboard data
   app.get('/api/requests', async c => {
     const storageService = container.getStorageService()
     const trainId = c.req.query('trainId')
     const limit = parseInt(c.req.query('limit') || '100')
+
+    // Validate train access
+    const accessCheck = await validateTrainAccess(c, trainId)
+    if (!accessCheck.authorized) {
+      return accessCheck.error
+    }
 
     try {
       const requests = await storageService.getRequestsByTrainId(trainId || '', limit)
@@ -134,6 +182,13 @@ export async function createDashboardApp(): Promise<DashboardApp> {
       if (!details.request) {
         return c.json({ error: 'Request not found' }, 404)
       }
+
+      // Validate access to the train this request belongs to
+      const accessCheck = await validateTrainAccess(c, details.request.trainId)
+      if (!accessCheck.authorized) {
+        return accessCheck.error
+      }
+
       return c.json({
         status: 'ok',
         ...details,
@@ -148,6 +203,12 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const storageService = container.getStorageService()
     const trainId = c.req.query('trainId')
     const since = c.req.query('since')
+
+    // Validate train access
+    const accessCheck = await validateTrainAccess(c, trainId)
+    if (!accessCheck.authorized) {
+      return accessCheck.error
+    }
 
     try {
       const stats = await storageService.getStats(trainId, since ? new Date(since) : undefined)
@@ -166,6 +227,12 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const trainId = c.req.query('trainId')
     const limit = parseInt(c.req.query('limit') || '50')
     const excludeSubtasks = c.req.query('excludeSubtasks') === 'true'
+
+    // Validate train access
+    const accessCheck = await validateTrainAccess(c, trainId)
+    if (!accessCheck.authorized) {
+      return accessCheck.error
+    }
 
     try {
       const conversations = await storageService.getConversationsWithFilter(
@@ -190,6 +257,15 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
     try {
       const subtasks = await storageService.getSubtasksForRequest(requestId)
+
+      // Validate access - check the parent request's train if subtasks exist
+      if (subtasks.length > 0) {
+        const accessCheck = await validateTrainAccess(c, subtasks[0].trainId)
+        if (!accessCheck.authorized) {
+          return accessCheck.error
+        }
+      }
+
       return c.json({
         status: 'ok',
         subtasks,

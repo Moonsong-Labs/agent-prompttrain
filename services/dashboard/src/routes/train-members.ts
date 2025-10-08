@@ -1,35 +1,15 @@
 import { Hono } from 'hono'
 import { container } from '../container.js'
 import {
-  getTrainMembers,
   addTrainMember,
   removeTrainMember,
   updateTrainMemberRole,
   getTrainById,
 } from '@agent-prompttrain/shared/database/queries'
 import type { AddTrainMemberRequest, UpdateTrainMemberRequest } from '@agent-prompttrain/shared'
-import { requireTrainOwner, requireTrainMembership } from '../middleware/train-ownership.js'
+import { requireTrainOwner } from '../middleware/train-ownership.js'
 
 const trainMembers = new Hono()
-
-// GET /api/trains/:id/members - List all members (owners + members can view)
-trainMembers.get('/:id/members', requireTrainMembership, async c => {
-  try {
-    const pool = container.getPool()
-    const trainId = c.req.param('id')
-
-    const train = await getTrainById(pool, trainId)
-    if (!train) {
-      return c.json({ error: 'Train not found' }, 404)
-    }
-
-    const members = await getTrainMembers(pool, trainId)
-    return c.json({ members })
-  } catch (error) {
-    console.error('Failed to list train members:', error)
-    return c.json({ error: 'Failed to list train members' }, 500)
-  }
-})
 
 // POST /api/trains/:id/members - Add member (owner only)
 trainMembers.post('/:id/members', requireTrainOwner, async c => {

@@ -487,6 +487,57 @@ trainsUIRoutes.get('/:trainId/view', async c => {
           style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
         >
           <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">Members</h3>
+
+          ${isOwner
+            ? html`
+                <form
+                  hx-post="/dashboard/trains/${train.id}/add-member"
+                  hx-swap="beforebegin"
+                  style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
+                >
+                  <div style="flex: 1;">
+                    <label
+                      for="member-email-${train.id}"
+                      style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+                    >
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="member-email-${train.id}"
+                      name="user_email"
+                      required
+                      placeholder="e.g., user@example.com"
+                      style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
+                    />
+                  </div>
+                  <div style="width: 150px;">
+                    <label
+                      for="member-role-${train.id}"
+                      style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+                    >
+                      Role
+                    </label>
+                    <select
+                      id="member-role-${train.id}"
+                      name="role"
+                      required
+                      style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
+                    >
+                      <option value="member">Member</option>
+                      <option value="owner">Owner</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    style="background: #10b981; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                  >
+                    Add Member
+                  </button>
+                </form>
+              `
+            : ''}
+
           <div
             id="members-${train.id}"
             hx-get="/dashboard/trains/${train.id}/members-list"
@@ -643,7 +694,8 @@ trainsUIRoutes.get('/:trainId/api-keys-list', async c => {
                     >`}
               </div>
               <div style="font-size: 0.75rem; color: #6b7280;">
-                Created: ${new Date(key.created_at).toLocaleString()}
+                Owner: ${key.created_by || 'Unknown'} • Created:
+                ${new Date(key.created_at).toLocaleString()}
                 ${key.last_used_at
                   ? html`• Last used: ${new Date(key.last_used_at).toLocaleString()}`
                   : html`• Never used`}
@@ -813,6 +865,9 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
           Done
         </button>
       </div>
+      <script>
+        setTimeout(() => location.reload(), 10000)
+      </script>
     `)
   } catch (error) {
     return c.html(html`
@@ -873,14 +928,9 @@ trainsUIRoutes.post('/:trainId/set-default-account', async c => {
       >
         <strong>✅ Success!</strong> Default account updated.
       </div>
-      <div style="text-align: center;">
-        <button
-          onclick="location.reload()"
-          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
-        >
-          Reload Page
-        </button>
-      </div>
+      <script>
+        setTimeout(() => location.reload(), 1500)
+      </script>
     `)
   } catch (error) {
     return c.html(html`
@@ -939,6 +989,67 @@ trainsUIRoutes.delete('/:trainId/delete', async c => {
 
     // Return empty HTML to remove the train row via HTMX swap
     return c.html(html``)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Add a member to a train (HTMX form submission - owner only)
+ */
+trainsUIRoutes.post('/:trainId/add-member', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check ownership
+  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only train owners can add members
+      </div>
+    `)
+  }
+
+  try {
+    const formData = await c.req.parseBody()
+    const userEmail = formData.user_email as string
+    const role = formData.role as 'owner' | 'member'
+
+    await addTrainMember(pool, trainId, userEmail, role, auth.principal)
+
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>✅ Success!</strong> Member ${userEmail} added as ${role}.
+      </div>
+      <script>
+        setTimeout(() => location.reload(), 1500)
+      </script>
+    `)
   } catch (error) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
@@ -1013,14 +1124,9 @@ trainsUIRoutes.post('/create', async c => {
         >
           <strong>✅ Success!</strong> Train "${train.train_id}" created successfully.
         </div>
-        <div style="text-align: center;">
-          <button
-            onclick="location.reload()"
-            style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
-          >
-            Reload Page
-          </button>
-        </div>
+        <script>
+          setTimeout(() => location.reload(), 1500)
+        </script>
       `)
     } catch (innerError) {
       await client.query('ROLLBACK')
@@ -1037,14 +1143,9 @@ trainsUIRoutes.post('/create', async c => {
         <strong>Error:</strong>
         ${isDuplicate ? 'A train with this ID already exists' : errorMessage}
       </div>
-      <div style="text-align: center;">
-        <button
-          onclick="location.reload()"
-          style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
-        >
-          Try Again
-        </button>
-      </div>
+      <script>
+        setTimeout(() => location.reload(), 2000)
+      </script>
     `)
   } finally {
     client.release()
