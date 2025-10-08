@@ -12,6 +12,8 @@ import {
   addTrainMember,
   deleteTrain,
   isTrainOwner,
+  getTrainStats,
+  getTrainWithAccounts,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -20,7 +22,7 @@ import type { AuthContext } from '../middleware/auth.js'
 export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
 
 /**
- * Trains management UI page
+ * Trains management UI page - Table view
  */
 trainsUIRoutes.get('/', async c => {
   const pool = container.getPool()
@@ -45,43 +47,188 @@ trainsUIRoutes.get('/', async c => {
   try {
     const trains = await listTrainsWithAccounts(pool)
 
-    // Check ownership for each train
-    const trainOwnershipMap = new Map<string, boolean>()
-    if (auth.isAuthenticated) {
-      await Promise.all(
-        trains.map(async train => {
-          const isOwner = await isTrainOwner(pool, train.id, auth.principal)
-          trainOwnershipMap.set(train.id, isOwner)
-        })
-      )
-    }
+    // Fetch stats and ownership for each train
+    const trainData = await Promise.all(
+      trains.map(async train => {
+        const [stats, members, isOwner] = await Promise.all([
+          getTrainStats(pool, train.id),
+          getTrainMembers(pool, train.id),
+          auth.isAuthenticated ? isTrainOwner(pool, train.id, auth.principal) : false,
+        ])
+
+        const firstOwner = members.find(m => m.role === 'owner')
+
+        return {
+          ...train,
+          stats,
+          membersCount: members.length,
+          firstOwner: firstOwner?.user_email || 'Unknown',
+          isOwner,
+        }
+      })
+    )
 
     const content = html`
       <div style="margin-bottom: 2rem;">
-        <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Train Management</h2>
-
         <div
-          style="background-color: #eff6ff; border: 1px solid #3b82f6; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;"
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;"
         >
-          <p style="margin: 0; color: #1e40af;">
-            <strong>ℹ️ Trains</strong> represent isolated Claude API access configurations. Each
-            train can link multiple credentials and generate unique API keys for client access.
-          </p>
+          <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0;">Train Management</h2>
+          <button
+            onclick="document.getElementById('create-train-modal').style.display='flex'"
+            style="background: #10b981; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+          >
+            + Create New Train
+          </button>
         </div>
 
-        <!-- Create Train Form -->
+        ${trainData.length === 0
+          ? html`
+              <div
+                style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.25rem;"
+              >
+                <p style="margin: 0; color: #92400e;">
+                  <strong>⚠️ No trains found.</strong> Create a train to get started.
+                </p>
+              </div>
+            `
+          : html`
+              <table
+                style="width: 100%; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; border-collapse: collapse; overflow: hidden;"
+              >
+                <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+                  <tr>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Train ID
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Name
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Status
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Default Account
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Owner
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Members
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Last Used
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      24h Requests
+                    </th>
+                    <th
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${trainData.map(
+                    train => html`
+                      <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 0.75rem 1rem;">
+                          <a
+                            href="/dashboard/trains/${train.id}/view"
+                            style="color: #3b82f6; font-weight: 600; text-decoration: none; hover:text-decoration: underline;"
+                          >
+                            ${train.train_id}
+                          </a>
+                        </td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">${train.name}</td>
+                        <td style="padding: 0.75rem 1rem; text-align: center;">
+                          <span
+                            style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >
+                            ACTIVE
+                          </span>
+                        </td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                          ${train.accounts.find(a => a.id === train.default_account_id)
+                            ?.account_name || 'None'}
+                        </td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                          ${train.firstOwner}
+                        </td>
+                        <td style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem;">
+                          ${train.membersCount}
+                        </td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                          ${train.stats.lastUsedAt
+                            ? new Date(train.stats.lastUsedAt).toLocaleString()
+                            : 'Never'}
+                        </td>
+                        <td style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem;">
+                          ${train.stats.requestCount24h}
+                        </td>
+                        <td style="padding: 0.75rem 1rem; text-align: center;">
+                          ${train.isOwner
+                            ? html`
+                                <form
+                                  hx-delete="/dashboard/trains/${train.id}/delete"
+                                  hx-confirm="Are you sure you want to delete '${train.train_id}'? This action cannot be undone."
+                                  hx-swap="outerHTML"
+                                  hx-target="closest tr"
+                                  style="margin: 0;"
+                                >
+                                  <button
+                                    type="submit"
+                                    style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                  >
+                                    Delete
+                                  </button>
+                                </form>
+                              `
+                            : ''}
+                        </td>
+                      </tr>
+                    `
+                  )}
+                </tbody>
+              </table>
+            `}
+      </div>
+
+      <!-- Create Train Modal -->
+      <div
+        id="create-train-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;"
+        onclick="if(event.target === this) this.style.display='none'"
+      >
         <div
-          style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+          style="background: white; border-radius: 0.5rem; padding: 2rem; max-width: 500px; width: 90%;"
+          onclick="event.stopPropagation()"
         >
-          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1.5rem;">
             Create New Train
           </h3>
           <form
             hx-post="/dashboard/trains/create"
             hx-swap="outerHTML"
-            hx-target="#train-form-container"
+            hx-target="#create-train-modal"
             style="display: grid; gap: 1rem;"
-            id="train-form-container"
           >
             <div>
               <label
@@ -99,7 +246,7 @@ trainsUIRoutes.get('/', async c => {
                 style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
               />
               <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #6b7280;">
-                Unique identifier for this train (lowercase, alphanumeric, hyphens allowed)
+                Lowercase, alphanumeric, hyphens only
               </p>
             </div>
 
@@ -120,295 +267,22 @@ trainsUIRoutes.get('/', async c => {
               />
             </div>
 
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 0.5rem;">
+              <button
+                type="button"
+                onclick="document.getElementById('create-train-modal').style.display='none'"
+                style="background: #6b7280; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
-                style="background: #3b82f6; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
+                style="background: #10b981; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
               >
                 Create Train
               </button>
-              <div
-                class="htmx-indicator"
-                style="display: none; color: #6b7280; font-size: 0.875rem;"
-              >
-                Creating...
-              </div>
             </div>
           </form>
-        </div>
-
-        ${trains.length === 0
-          ? html`
-              <div
-                style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.25rem;"
-              >
-                <p style="margin: 0; color: #92400e;">
-                  <strong>⚠️ No trains found.</strong> Create a train using the API or dashboard.
-                </p>
-              </div>
-            `
-          : html`
-              ${trains.map(
-                train => html`
-                  <div
-                    style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
-                  >
-                    <div
-                      style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;"
-                    >
-                      <div>
-                        <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">
-                          ${train.train_id}
-                          <span
-                            style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem;"
-                            >ACTIVE</span
-                          >
-                        </h3>
-                      </div>
-                      ${trainOwnershipMap.get(train.id)
-                        ? html`
-                            <form
-                              hx-delete="/dashboard/trains/${train.id}/delete"
-                              hx-confirm="Are you sure you want to delete this train? This action cannot be undone and will remove all associated members and API keys."
-                              hx-swap="outerHTML"
-                              hx-target="closest div[style*='background: white']"
-                              style="margin: 0;"
-                            >
-                              <button
-                                type="submit"
-                                style="background: #ef4444; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
-                              >
-                                Delete Train
-                              </button>
-                            </form>
-                          `
-                        : ''}
-                    </div>
-
-                    <!-- Available Credentials Section -->
-                    <div style="margin-bottom: 1.5rem;">
-                      <h4
-                        style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151;"
-                      >
-                        Available Credentials (${train.accounts?.length || 0})
-                      </h4>
-                      <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
-                        All trains have access to all credentials. Set a default credential below.
-                      </p>
-
-                      ${!train.accounts || train.accounts.length === 0
-                        ? html`
-                            <div
-                              style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
-                            >
-                              <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
-                                ⚠️ No credentials available. Add credentials first.
-                              </p>
-                            </div>
-                          `
-                        : html`
-                            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                              ${train.accounts.map(
-                                (cred: AnthropicCredentialSafe) => html`
-                                  <div
-                                    style="background: ${train.default_account_id === cred.id
-                                      ? '#eff6ff'
-                                      : '#f9fafb'}; border: 1px solid ${train.default_account_id ===
-                                    cred.id
-                                      ? '#3b82f6'
-                                      : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
-                                  >
-                                    <div style="flex: 1;">
-                                      <div style="font-weight: 600; font-size: 0.875rem;">
-                                        ${cred.account_name}
-                                        ${train.default_account_id === cred.id
-                                          ? html`<span
-                                              style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
-                                              >DEFAULT</span
-                                            >`
-                                          : ''}
-                                      </div>
-                                      <div style="font-size: 0.75rem; color: #6b7280;">
-                                        <code
-                                          style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
-                                          >${cred.account_id}</code
-                                        >
-                                        • Expires:
-                                        ${new Date(cred.oauth_expires_at).toLocaleDateString()}
-                                        ${new Date(cred.oauth_expires_at) < new Date()
-                                          ? html`<span style="color: #dc2626; font-weight: 600;"
-                                              >⚠️ EXPIRED</span
-                                            >`
-                                          : ''}
-                                      </div>
-                                    </div>
-                                    ${trainOwnershipMap.get(train.id) &&
-                                    train.default_account_id !== cred.id
-                                      ? html`
-                                          <form
-                                            hx-post="/dashboard/trains/${train.id}/set-default-account"
-                                            hx-swap="outerHTML"
-                                            hx-target="closest div[style*='margin-bottom: 1.5rem']"
-                                            style="margin: 0;"
-                                          >
-                                            <input
-                                              type="hidden"
-                                              name="credential_id"
-                                              value="${cred.id}"
-                                            />
-                                            <button
-                                              type="submit"
-                                              style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
-                                            >
-                                              Set as Default
-                                            </button>
-                                          </form>
-                                        `
-                                      : ''}
-                                  </div>
-                                `
-                              )}
-                            </div>
-                          `}
-                    </div>
-
-                    <!-- Members Section -->
-                    <div style="margin-bottom: 1.5rem;">
-                      <h4
-                        style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151;"
-                      >
-                        Members
-                      </h4>
-                      <div
-                        id="members-${train.id}"
-                        hx-get="/dashboard/trains/${train.id}/members-list"
-                        hx-trigger="load"
-                        hx-swap="innerHTML"
-                      >
-                        <div
-                          style="background: #f9fafb; padding: 1rem; border-radius: 0.25rem; text-align: center; color: #6b7280;"
-                        >
-                          Loading members...
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- API Keys Section -->
-                    <div>
-                      <h4
-                        style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151;"
-                      >
-                        API Keys
-                      </h4>
-
-                      <!-- Generate API Key Form (owner only) -->
-                      ${trainOwnershipMap.get(train.id)
-                        ? html`
-                            <form
-                              hx-post="/dashboard/trains/${train.id}/generate-api-key"
-                              hx-swap="beforebegin"
-                              style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
-                            >
-                              <div style="flex: 1;">
-                                <label
-                                  for="api-key-name-${train.id}"
-                                  style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
-                                >
-                                  Key Name (optional)
-                                </label>
-                                <input
-                                  type="text"
-                                  id="api-key-name-${train.id}"
-                                  name="name"
-                                  placeholder="e.g., Production Key"
-                                  style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
-                                />
-                              </div>
-                              <button
-                                type="submit"
-                                style="background: #10b981; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
-                              >
-                                Generate API Key
-                              </button>
-                            </form>
-                          `
-                        : ''}
-
-                      <div
-                        id="api-keys-${train.id}"
-                        hx-get="/dashboard/trains/${train.id}/api-keys-list"
-                        hx-trigger="load"
-                        hx-swap="innerHTML"
-                      >
-                        <div
-                          style="background: #f9fafb; padding: 1rem; border-radius: 0.25rem; text-align: center; color: #6b7280;"
-                        >
-                          Loading API keys...
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Slack Webhook -->
-                    ${train.slack_webhook_url
-                      ? html`
-                          <div
-                            style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;"
-                          >
-                            <div style="font-size: 0.875rem; color: #6b7280;">
-                              <strong>Slack Webhook:</strong> Configured ✅
-                            </div>
-                          </div>
-                        `
-                      : ''}
-                  </div>
-                `
-              )}
-            `}
-      </div>
-
-      <!-- Instructions -->
-      <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;">
-        <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
-          Managing Trains via API
-        </h3>
-
-        <div style="margin-bottom: 1.5rem;">
-          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">
-            Create a New Train
-          </h4>
-          <pre
-            style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.875rem;"
-          ><code>curl -X POST http://localhost:3001/api/trains \\
-  -H "Content-Type: application/json" \\
-  -H "X-Dashboard-Key: your-dashboard-key" \\
-  -d '{
-    "train_id": "my-train",
-    "name": "My Production Train"
-  }'</code></pre>
-        </div>
-
-        <div style="margin-bottom: 1.5rem;">
-          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">
-            Link Credential to Train
-          </h4>
-          <pre
-            style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.875rem;"
-          ><code>curl -X POST http://localhost:3001/api/trains/my-train/accounts \\
-  -H "Content-Type: application/json" \\
-  -H "X-Dashboard-Key: your-dashboard-key" \\
-  -d '{"credential_id": "credential-uuid-here"}'</code></pre>
-        </div>
-
-        <div>
-          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">
-            Generate API Key
-          </h4>
-          <pre
-            style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.875rem;"
-          ><code>curl -X POST http://localhost:3001/api/trains/my-train/api-keys \\
-  -H "Content-Type: application/json" \\
-  -H "X-Dashboard-Key: your-dashboard-key" \\
-  -d '{"name": "Production key"}'</code></pre>
         </div>
       </div>
     `
@@ -417,11 +291,9 @@ trainsUIRoutes.get('/', async c => {
       layout(
         'Trains',
         content,
-        // Add HTMX script for dynamic API key loading
         raw(`<script>
-          // Handle HTMX errors
           document.body.addEventListener('htmx:responseError', function(evt) {
-            evt.target.innerHTML = '<div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">Failed to load API keys</div>';
+            evt.target.innerHTML = '<div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">Operation failed</div>';
           });
         </script>`),
         c
@@ -434,6 +306,274 @@ trainsUIRoutes.get('/', async c => {
         html`
           <div class="error-banner">
             <strong>Error:</strong> Failed to load trains: ${getErrorMessage(error)}
+          </div>
+        `,
+        '',
+        c
+      )
+    )
+  }
+})
+
+/**
+ * Train detail view page
+ */
+trainsUIRoutes.get('/:trainId/view', async c => {
+  const trainId = c.req.param('trainId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(
+      layout(
+        'Train Details',
+        html` <div class="error-banner"><strong>Error:</strong> Database not configured.</div> `,
+        '',
+        c
+      )
+    )
+  }
+
+  try {
+    const train = await getTrainWithAccounts(pool, trainId)
+
+    if (!train) {
+      return c.html(
+        layout(
+          'Train Not Found',
+          html` <div class="error-banner"><strong>Error:</strong> Train not found</div> `,
+          '',
+          c
+        )
+      )
+    }
+
+    const isOwner = auth.isAuthenticated
+      ? await isTrainOwner(pool, train.id, auth.principal)
+      : false
+
+    const content = html`
+      <div style="margin-bottom: 2rem;">
+        <div style="margin-bottom: 1.5rem;">
+          <a
+            href="/dashboard/trains"
+            style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;"
+          >
+            ← Back to Trains
+          </a>
+        </div>
+
+        <div
+          style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;"
+        >
+          <div>
+            <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 0.5rem 0;">
+              ${train.train_id}
+              <span
+                style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem;"
+              >
+                ACTIVE
+              </span>
+            </h2>
+            <p style="color: #6b7280; margin: 0; font-size: 0.875rem;">${train.name}</p>
+          </div>
+        </div>
+
+        <!-- Train Information -->
+        <div
+          style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+        >
+          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
+            Train Information
+          </h3>
+          <div style="display: grid; gap: 0.75rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Train ID</div>
+              <div style="font-size: 0.875rem;">${train.train_id}</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Name</div>
+              <div style="font-size: 0.875rem;">${train.name}</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Created</div>
+              <div style="font-size: 0.875rem;">${new Date(train.created_at).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Default Account Section -->
+        <div
+          style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+        >
+          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
+            Default Account
+          </h3>
+          <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
+            All trains have access to all credentials. The default account is used for API calls.
+          </p>
+
+          ${!train.accounts || train.accounts.length === 0
+            ? html`
+                <div
+                  style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
+                >
+                  <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
+                    ⚠️ No credentials available.
+                  </p>
+                </div>
+              `
+            : html`
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  ${train.accounts.map(
+                    (cred: AnthropicCredentialSafe) => html`
+                      <div
+                        style="background: ${train.default_account_id === cred.id
+                          ? '#eff6ff'
+                          : '#f9fafb'}; border: 1px solid ${train.default_account_id === cred.id
+                          ? '#3b82f6'
+                          : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
+                      >
+                        <div style="flex: 1;">
+                          <div style="font-weight: 600; font-size: 0.875rem;">
+                            ${cred.account_name}
+                            ${train.default_account_id === cred.id
+                              ? html`<span
+                                  style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
+                                  >DEFAULT</span
+                                >`
+                              : ''}
+                          </div>
+                          <div style="font-size: 0.75rem; color: #6b7280;">
+                            <code
+                              style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                              >${cred.account_id}</code
+                            >
+                            • Expires: ${new Date(cred.oauth_expires_at).toLocaleDateString()}
+                            ${new Date(cred.oauth_expires_at) < new Date()
+                              ? html`<span style="color: #dc2626; font-weight: 600;"
+                                  >⚠️ EXPIRED</span
+                                >`
+                              : ''}
+                          </div>
+                        </div>
+                        ${isOwner && train.default_account_id !== cred.id
+                          ? html`
+                              <form
+                                hx-post="/dashboard/trains/${train.id}/set-default-account"
+                                hx-swap="outerHTML"
+                                hx-target="closest div[style*='margin-bottom: 1.5rem']"
+                                style="margin: 0;"
+                              >
+                                <input type="hidden" name="credential_id" value="${cred.id}" />
+                                <button
+                                  type="submit"
+                                  style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Set as Default
+                                </button>
+                              </form>
+                            `
+                          : ''}
+                      </div>
+                    `
+                  )}
+                </div>
+              `}
+        </div>
+
+        <!-- Members Section -->
+        <div
+          style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+        >
+          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">Members</h3>
+          <div
+            id="members-${train.id}"
+            hx-get="/dashboard/trains/${train.id}/members-list"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+          >
+            <div
+              style="background: #f9fafb; padding: 1rem; border-radius: 0.25rem; text-align: center; color: #6b7280;"
+            >
+              Loading members...
+            </div>
+          </div>
+        </div>
+
+        <!-- API Keys Section -->
+        <div
+          style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem;"
+        >
+          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">API Keys</h3>
+
+          ${isOwner
+            ? html`
+                <form
+                  hx-post="/dashboard/trains/${train.id}/generate-api-key"
+                  hx-swap="beforebegin"
+                  style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
+                >
+                  <div style="flex: 1;">
+                    <label
+                      for="api-key-name-${train.id}"
+                      style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+                    >
+                      Key Name (optional)
+                    </label>
+                    <input
+                      type="text"
+                      id="api-key-name-${train.id}"
+                      name="name"
+                      placeholder="e.g., Production Key"
+                      style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    style="background: #10b981; color: white; padding: 0.375rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                  >
+                    Generate API Key
+                  </button>
+                </form>
+              `
+            : ''}
+
+          <div
+            id="api-keys-${train.id}"
+            hx-get="/dashboard/trains/${train.id}/api-keys-list"
+            hx-trigger="load"
+            hx-swap="innerHTML"
+          >
+            <div
+              style="background: #f9fafb; padding: 1rem; border-radius: 0.25rem; text-align: center; color: #6b7280;"
+            >
+              Loading API keys...
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    return c.html(
+      layout(
+        `Train: ${train.train_id}`,
+        content,
+        raw(`<script>
+          document.body.addEventListener('htmx:responseError', function(evt) {
+            evt.target.innerHTML = '<div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">Failed to load</div>';
+          });
+        </script>`),
+        c
+      )
+    )
+  } catch (error) {
+    return c.html(
+      layout(
+        'Train Error',
+        html`
+          <div class="error-banner">
+            <strong>Error:</strong> Failed to load train: ${getErrorMessage(error)}
           </div>
         `,
         '',
@@ -797,7 +937,7 @@ trainsUIRoutes.delete('/:trainId/delete', async c => {
       `)
     }
 
-    // Return empty HTML to remove the train card via HTMX swap
+    // Return empty HTML to remove the train row via HTMX swap
     return c.html(html``)
   } catch (error) {
     return c.html(html`

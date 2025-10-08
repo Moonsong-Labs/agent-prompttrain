@@ -252,3 +252,32 @@ export async function getTrainSlackConfig(
     icon_emoji: train.slack_icon_emoji || undefined,
   }
 }
+
+/**
+ * Get train statistics (last used, 24h request count)
+ */
+export async function getTrainStats(
+  pool: Pool,
+  trainId: string
+): Promise<{ lastUsedAt: Date | null; requestCount24h: number }> {
+  const result = await pool.query<{ last_used_at: Date | null; request_count_24h: string }>(
+    `
+    SELECT
+      MAX(tak.last_used_at) as last_used_at,
+      COUNT(DISTINCT ar.request_id) FILTER (
+        WHERE ar.timestamp > NOW() - INTERVAL '24 hours'
+      ) as request_count_24h
+    FROM trains t
+    LEFT JOIN train_api_keys tak ON t.id = tak.train_id
+    LEFT JOIN api_requests ar ON ar.api_key_id = tak.key_prefix
+    WHERE t.id = $1
+    GROUP BY t.id
+    `,
+    [trainId]
+  )
+
+  return {
+    lastUsedAt: result.rows[0]?.last_used_at || null,
+    requestCount24h: parseInt(result.rows[0]?.request_count_24h || '0', 10),
+  }
+}
