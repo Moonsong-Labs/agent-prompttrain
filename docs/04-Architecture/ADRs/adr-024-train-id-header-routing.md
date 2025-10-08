@@ -12,7 +12,7 @@ significant complexity and operational surprises:
 - Many deployments run the proxy behind load balancers or tunnels where the `Host` header
   reflects infrastructure rather than the original tenant identifier.
 - Wildcard resolution created implicit credential precedence rules that were hard to audit.
-- Multi-account customers wanted to reuse the same train identifier across several Anthropic
+- Multi-account customers wanted to reuse the same project identifier across several Anthropic
   subscriptions without duplicating domain mappings.
 
 At the same time, analytics and storage systems continued to rely on the logical train id, so we
@@ -22,9 +22,9 @@ credentials** are used to fulfil it (account).
 ## Decision
 
 1. **Explicit Headers**
-   - `MSL-Train-Id` remains mandatory for analytics but now defaults to `DEFAULT_TRAIN_ID` when absent.
+   - `MSL-Project-Id` remains mandatory for analytics but now defaults to `DEFAULT_PROJECT_ID` when absent.
    - `MSL-Account` selects the Anthropic account credential file. When omitted the proxy chooses a
-     deterministic account based on the train identifier, falling back to other accounts only when the
+     deterministic account based on the project identifier, falling back to other accounts only when the
      preferred one fails to load.
    - Neither header is forwarded to Anthropic; only configured custom headers (e.g. via
      `ANTHROPIC_CUSTOM_HEADERS`) are propagated.
@@ -32,7 +32,7 @@ credentials** are used to fulfil it (account).
 2. **Filesystem Layout**
    - Account credentials live under `credentials/accounts/<account>.credentials.json` and contain only
      Anthropic authentication data (API key or OAuth fields plus optional Slack configuration).
-   - Proxy client API keys move to `credentials/train-client-keys/<train>.client-keys.json`, decoupling
+   - Proxy client API keys move to `credentials/project-client-keys/<train>.client-keys.json`, decoupling
      proxy access control from Anthropic credentials.
 
 3. **Authentication Service Simplification**
@@ -54,7 +54,7 @@ credentials** are used to fulfil it (account).
 ### Negative
 
 - Existing wildcard configurations must be migrated to explicit account files and header usage.
-- Requests that previously relied on implicit domain defaults must now supply the `MSL-Train-Id` header or
+- Requests that previously relied on implicit domain defaults must now supply the `MSL-Project-Id` header or
   accept the configured fallback.
 
 ### Neutral
@@ -66,9 +66,9 @@ credentials** are used to fulfil it (account).
 
 1. Move each `*.credentials.json` file from the root `credentials/` directory into
    `credentials/accounts/` and rename the file to the desired account name.
-2. Create per-train client key files under `credentials/train-client-keys/` if proxy authentication is
+2. Create per-train client key files under `credentials/project-client-keys/` if proxy authentication is
    enabled.
-3. Update clients to send `MSL-Train-Id` (and optionally `MSL-Account`) headers.
+3. Update clients to send `MSL-Project-Id` (and optionally `MSL-Account`) headers.
 4. Remove any `CNP_WILDCARD_*` environment variables; they are no longer used.
 
 ## References

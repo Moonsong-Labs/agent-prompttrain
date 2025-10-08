@@ -18,22 +18,22 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Authentication
 
-| Variable                        | Description                                                                | Default                         | Required         |
-| ------------------------------- | -------------------------------------------------------------------------- | ------------------------------- | ---------------- |
-| `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)  | -                               | ✅ (Production)  |
-| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)        | -                               | ✅ (Production)  |
-| `INTERNAL_API_KEY`              | Service-to-service authentication key                                      | -                               | ✅               |
-| `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                        | -                               | ✅ (Development) |
-| `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                       | `true`                          | ❌               |
-| `ACCOUNTS_DIR`                  | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`          | ❌               |
-| `TRAIN_CLIENT_KEYS_DIR`         | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/train-client-keys` | ❌               |
-| `DEFAULT_TRAIN_ID`              | Fallback identifier when a request omits `MSL-Train-Id`                    | `default`                       | ❌               |
+| Variable                        | Description                                                                | Default                           | Required         |
+| ------------------------------- | -------------------------------------------------------------------------- | --------------------------------- | ---------------- |
+| `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)  | -                                 | ✅ (Production)  |
+| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)        | -                                 | ✅ (Production)  |
+| `INTERNAL_API_KEY`              | Service-to-service authentication key                                      | -                                 | ✅               |
+| `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                        | -                                 | ✅ (Development) |
+| `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                       | `true`                            | ❌               |
+| `ACCOUNTS_DIR`                  | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`            | ❌               |
+| `TRAIN_CLIENT_KEYS_DIR`         | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/project-client-keys` | ❌               |
+| `DEFAULT_PROJECT_ID`            | Fallback identifier when a request omits `MSL-Project-Id`                  | `default`                         | ❌               |
 
 ### Train Identification
 
-| Variable                   | Description                                                                                                           | Default | Required |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| `ANTHROPIC_CUSTOM_HEADERS` | Custom headers forwarded to the Anthropic API. Set to `"MSL-Train-Id:<your_train>"` so outbound requests stay tagged. | -       | ❌       |
+| Variable                   | Description                                                                                                             | Default | Required |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| `ANTHROPIC_CUSTOM_HEADERS` | Custom headers forwarded to the Anthropic API. Set to `"MSL-Project-Id:<your_train>"` so outbound requests stay tagged. | -       | ❌       |
 
 ## Feature Flags
 

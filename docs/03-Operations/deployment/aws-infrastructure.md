@@ -35,7 +35,7 @@ Each EC2 instance should have the following structure in the ubuntu user's home 
 │   ├── accounts/                 # Anthropic account credential files
 │   │   ├── account-primary.credentials.json
 │   │   └── account-secondary.credentials.json
-│   └── train-client-keys/        # Proxy client API key allowlists
+│   └── project-client-keys/        # Proxy client API key allowlists
 │       ├── train-alpha.client-keys.json
 │       └── train-beta.client-keys.json
 ```

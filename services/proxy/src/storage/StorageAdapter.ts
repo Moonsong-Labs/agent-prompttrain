@@ -51,13 +51,13 @@ export class StorageAdapter {
 
     // Create compact search executor
     const compactSearchExecutor: CompactSearchExecutor = async (
-      trainId: string,
+      projectId: string,
       summaryContent: string,
       afterTimestamp: Date,
       beforeTimestamp?: Date
     ) => {
       return await this.writer.findParentByResponseContent(
-        trainId,
+        projectId,
         summaryContent,
         afterTimestamp,
         beforeTimestamp
@@ -82,12 +82,12 @@ export class StorageAdapter {
 
     // Create subtask query executor that uses the provided timestamp and optional prompt
     const subtaskQueryExecutor: SubtaskQueryExecutor = async (
-      trainId: string,
+      projectId: string,
       timestamp: Date,
       debugMode?: boolean,
       subtaskPrompt?: string
     ) => {
-      return this.loadTaskInvocations(trainId, timestamp, debugMode, subtaskPrompt)
+      return this.loadTaskInvocations(projectId, timestamp, debugMode, subtaskPrompt)
     }
 
     // Create subtask sequence query executor
@@ -131,7 +131,7 @@ export class StorageAdapter {
    */
   async storeRequest(data: {
     id: string
-    trainId: string
+    projectId: string
     accountId?: string
     timestamp: Date
     method: string
@@ -175,7 +175,7 @@ export class StorageAdapter {
 
       await this.writer.storeRequest({
         requestId: uuid,
-        trainId: data.trainId,
+        projectId: data.projectId,
         accountId: data.accountId,
         timestamp: data.timestamp,
         method: data.method,
@@ -329,14 +329,14 @@ export class StorageAdapter {
 
   /**
    * Link a conversation using the new ConversationLinker
-   * @param trainId - The train identifier for the request
+   * @param projectId - The train identifier for the request
    * @param messages - The conversation messages
    * @param systemPrompt - The system prompt (string or array format)
    * @param requestId - The request ID
    * @param referenceTime - The timestamp of the request being processed
    */
   async linkConversation(
-    trainId: string,
+    projectId: string,
     messages: ClaudeMessage[],
     systemPrompt:
       | string
@@ -370,7 +370,7 @@ export class StorageAdapter {
     // ConversationLinker will now handle loading task invocations internally
     // Use the provided referenceTime for task context
     const result = await this.conversationLinker.linkConversation({
-      trainId,
+      projectId,
       messages,
       systemPrompt,
       requestId: uuid,
@@ -400,7 +400,7 @@ export class StorageAdapter {
   async processTaskToolInvocations(
     requestId: string,
     responseBody: any,
-    _trainId: string
+    _projectId: string
   ): Promise<void> {
     const taskInvocations = this.writer.findTaskToolInvocations(responseBody)
 
@@ -532,13 +532,13 @@ export class StorageAdapter {
   /**
    * Load recent Task tool invocations for subtask detection.
    * This method is called by ConversationLinker via the subtaskQueryExecutor.
-   * @param trainId - The train identifier to search in
+   * @param projectId - The train identifier to search in
    * @param timestamp - The reference timestamp for the search window
    * @param debugMode - Whether to log debug information
    * @param subtaskPrompt - Optional prompt to filter by (for optimization)
    */
   private async loadTaskInvocations(
-    trainId: string,
+    projectId: string,
     timestamp: Date,
     debugMode?: boolean,
     subtaskPrompt?: string
@@ -552,7 +552,7 @@ export class StorageAdapter {
 
     if (subtaskPrompt) {
       // Optimized query using @> containment operator for exact prompt matching
-      // Note: We intentionally do NOT filter by train_id here
+      // Note: We intentionally do NOT filter by project_id here
       // This allows subtasks to be detected even when switching between accounts
       query = `
         SELECT
@@ -582,7 +582,7 @@ export class StorageAdapter {
       }
     } else {
       // Fallback to original query when no prompt is provided
-      // Note: We intentionally do NOT filter by train_id here
+      // Note: We intentionally do NOT filter by project_id here
       // This allows subtasks to be detected even when switching between accounts
       query = `
         SELECT
@@ -642,7 +642,7 @@ export class StorageAdapter {
 
       return filteredInvocations.length > 0 ? filteredInvocations : undefined
     } catch (error) {
-      logger.warn(`Failed to load task invocations for train ${trainId}:`, {
+      logger.warn(`Failed to load task invocations for train ${projectId}:`, {
         metadata: {
           error: error instanceof Error ? error.message : String(error),
         },

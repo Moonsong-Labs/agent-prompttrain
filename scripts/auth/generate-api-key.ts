@@ -29,7 +29,7 @@ if (import.meta.main) {
 
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-Agent Prompt Train API Key Generator
+Agent Prompt Project API Key Generator
 
 Usage:
   bun run generate-api-key.ts [options]

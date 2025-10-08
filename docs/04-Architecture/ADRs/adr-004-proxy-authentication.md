@@ -22,7 +22,7 @@ We needed a way to authenticate clients at the proxy level while maintaining bac
 - **Simplicity**: Easy to implement and understand
 - **Standards Compliance**: Use established authentication patterns
 - **Performance**: Minimal overhead on request processing
-- **Flexibility**: Support different authentication needs per train
+- **Flexibility**: Support different authentication needs per project
 
 ## Considered Options
 
@@ -62,7 +62,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
    ```
    Client → Proxy: Authorization: Bearer cnp_live_xxx...
    Proxy: Extract train ID and optional account headers
-   Proxy: Load credentials/train-client-keys/<train>.client-keys.json
+   Proxy: Load credentials/project-client-keys/<train>.client-keys.json
    Proxy: Compare tokens using timing-safe SHA-256
    Proxy: Select account credential (header or deterministic hash of train)
    Proxy → Claude: Forward if authenticated
@@ -104,7 +104,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 
 - **Key Management**: Additional keys to generate and distribute
 - **No Built-in Rotation**: Manual process to rotate keys
-- **Single Key per Train**: No support for multiple keys per train
+- **Single Key per Train**: No support for multiple keys per project
 - **No Rate Limiting**: Authentication doesn't include rate limiting
 
 ### Risks and Mitigations
@@ -129,7 +129,7 @@ We will implement **Bearer Token Authentication** with train-specific API keys s
 ## Future Enhancements
 
 1. **Key Rotation**: Automated key rotation with grace period
-2. **Multiple Keys**: Support multiple valid keys per train
+2. **Multiple Keys**: Support multiple valid keys per project
 3. **Key Expiration**: Time-limited keys
 4. **Rate Limiting**: Per-key rate limiting
 5. **API Key Management**: API endpoints for key management

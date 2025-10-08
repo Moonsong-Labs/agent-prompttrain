@@ -39,12 +39,12 @@ async function migrate() {
       ON anthropic_credentials(account_id)
     `)
 
-    // Create trains table
-    console.log('Creating trains table...')
+    // Create projects table
+    console.log('Creating projects table...')
     await client.query(`
-      CREATE TABLE IF NOT EXISTS trains (
+      CREATE TABLE IF NOT EXISTS projects (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        train_id VARCHAR(255) UNIQUE NOT NULL,
+        project_id VARCHAR(255) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
         description TEXT,
         slack_enabled BOOLEAN DEFAULT false,
@@ -57,10 +57,10 @@ async function migrate() {
       )
     `)
 
-    console.log('Creating index on trains.train_id...')
+    console.log('Creating index on projects.project_id...')
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_trains_train_id
-      ON trains(train_id)
+      ON projects(project_id)
     `)
 
     // Create train_accounts junction table
@@ -68,17 +68,17 @@ async function migrate() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS train_accounts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        train_id UUID NOT NULL REFERENCES trains(id) ON DELETE CASCADE,
+        project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         credential_id UUID NOT NULL REFERENCES anthropic_credentials(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(train_id, credential_id)
+        UNIQUE(project_id, credential_id)
       )
     `)
 
     console.log('Creating indexes on train_accounts...')
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_accounts_train
-      ON train_accounts(train_id)
+      ON train_accounts(project_id)
     `)
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_accounts_credential
@@ -90,7 +90,7 @@ async function migrate() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS train_api_keys (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        train_id UUID NOT NULL REFERENCES trains(id) ON DELETE CASCADE,
+        project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         api_key TEXT UNIQUE NOT NULL,
         key_prefix VARCHAR(20) NOT NULL,
         key_suffix VARCHAR(10) NOT NULL,
@@ -106,7 +106,7 @@ async function migrate() {
     console.log('Creating indexes on train_api_keys...')
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_api_keys_train
-      ON train_api_keys(train_id)
+      ON train_api_keys(project_id)
     `)
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_api_keys_key

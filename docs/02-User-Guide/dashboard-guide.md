@@ -137,7 +137,7 @@ Many dashboard views support URL parameters:
 
 ```
 # Filter by train ID
-/requests?trainId=train-alpha
+/requests?projectId=train-alpha
 
 # Filter by account
 /token-usage?accountId=acc_12345

@@ -27,7 +27,7 @@ export const layout = (
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>${title} - Agent Prompt Train Dashboard</title>
+        <title>${title} - Agent Prompt Project Dashboard</title>
         ${csrfToken ? html`<meta name="csrf-token" content="${csrfToken}" />` : ''}
         <style>
           ${raw(
@@ -198,17 +198,17 @@ export const layout = (
           <div class="container">
             <h1 style="display: flex; align-items: center; gap: 0.5rem;">
               ${raw(nexusLogo())}
-              <span>Agent Prompt Train Dashboard</span>
+              <span>Agent Prompt Project Dashboard</span>
             </h1>
             <div class="space-x-4" style="display: flex; align-items: center;">
               <a href="/dashboard" class="text-sm text-blue-600">Dashboard</a>
               <a href="/dashboard/requests" class="text-sm text-blue-600">Requests</a>
-              <a href="/dashboard/usage" class="text-sm text-blue-600">Train Usage</a>
+              <a href="/dashboard/usage" class="text-sm text-blue-600">Project Usage</a>
               <a href="/dashboard/token-usage" class="text-sm text-blue-600">Token Usage</a>
               <a href="/dashboard/prompts" class="text-sm text-blue-600">Prompts</a>
               <a href="/dashboard/credentials" class="text-sm text-blue-600">Credentials</a>
-              <a href="/dashboard/trains" class="text-sm text-blue-600">Trains</a>
-              <span class="text-sm text-gray-600" id="current-train">All Train IDs</span>
+              <a href="/dashboard/projects" class="text-sm text-blue-600">Trains</a>
+              <span class="text-sm text-gray-600" id="current-train">All Project IDs</span>
               ${auth.isAuthenticated && auth.principal
                 ? html`<span class="text-sm text-gray-600">${auth.principal}</span>`
                 : ''}

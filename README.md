@@ -332,14 +332,14 @@ See the [Documentation](docs/README.md) for complete configuration options.
 3. **Tag outgoing Anthropic calls** so responses stay mapped to the right train:
 
    ```bash
-   export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:train-alpha"
    ```
 
 4. **Select a specific account at runtime** (optional):
 
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
-     -H "MSL-Train-Id: train-alpha" \
+     -H "MSL-Project-Id: train-alpha" \
      -H "MSL-Account: account-primary" \
      -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \

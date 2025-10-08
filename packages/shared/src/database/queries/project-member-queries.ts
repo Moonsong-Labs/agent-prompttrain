@@ -1,39 +1,39 @@
 import { Pool } from 'pg'
 import type {
-  TrainMember,
-  TrainMemberRole,
-  Train,
-  TrainWithAccounts,
+  ProjectMember,
+  ProjectMemberRole,
+  Project,
+  ProjectWithAccounts,
   AnthropicCredential,
 } from '../../types/index.js'
 import { toSafeCredential } from './credential-queries.js'
 
 /**
- * Add a member to a train
+ * Add a member to a project
  * Does not modify role if member already exists (use updateTrainMemberRole for that)
  */
-export async function addTrainMember(
+export async function addProjectMember(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   userEmail: string,
-  role: TrainMemberRole,
+  role: ProjectMemberRole,
   addedBy: string
-): Promise<TrainMember> {
-  const result = await pool.query<TrainMember>(
+): Promise<ProjectMember> {
+  const result = await pool.query<ProjectMember>(
     `
-    INSERT INTO train_members (train_id, user_email, role, added_by)
+    INSERT INTO train_members (project_id, user_email, role, added_by)
     VALUES ($1, $2, $3, $4)
-    ON CONFLICT (train_id, user_email) DO NOTHING
+    ON CONFLICT (project_id, user_email) DO NOTHING
     RETURNING *
     `,
-    [trainId, userEmail, role, addedBy]
+    [projectId, userEmail, role, addedBy]
   )
 
   // If no rows returned, member already exists - fetch and return existing
   if (result.rows.length === 0) {
-    const existing = await pool.query<TrainMember>(
-      'SELECT * FROM train_members WHERE train_id = $1 AND user_email = $2',
-      [trainId, userEmail]
+    const existing = await pool.query<ProjectMember>(
+      'SELECT * FROM train_members WHERE project_id = $1 AND user_email = $2',
+      [projectId, userEmail]
     )
     return existing.rows[0]
   }
@@ -42,13 +42,13 @@ export async function addTrainMember(
 }
 
 /**
- * Remove a member from a train
+ * Remove a member from a project
  * Throws error if attempting to remove the last owner
  * Uses transaction with row locking to prevent race conditions
  */
-export async function removeTrainMember(
+export async function removeProjectMember(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   userEmail: string
 ): Promise<void> {
   const client = await pool.connect()
@@ -57,9 +57,9 @@ export async function removeTrainMember(
     await client.query('BEGIN')
 
     // Lock the member row for update
-    const memberResult = await client.query<TrainMember>(
-      'SELECT * FROM train_members WHERE train_id = $1 AND user_email = $2 FOR UPDATE',
-      [trainId, userEmail]
+    const memberResult = await client.query<ProjectMember>(
+      'SELECT * FROM train_members WHERE project_id = $1 AND user_email = $2 FOR UPDATE',
+      [projectId, userEmail]
     )
 
     if (memberResult.rows.length === 0) {
@@ -71,24 +71,24 @@ export async function removeTrainMember(
     if (member.role === 'owner') {
       // Lock all owner rows for this train to prevent concurrent modifications
       await client.query(
-        'SELECT 1 FROM train_members WHERE train_id = $1 AND role = $2 FOR UPDATE',
-        [trainId, 'owner']
+        'SELECT 1 FROM train_members WHERE project_id = $1 AND role = $2 FOR UPDATE',
+        [projectId, 'owner']
       )
 
       // Count owners
       const countResult = await client.query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM train_members WHERE train_id = $1 AND role = $2',
-        [trainId, 'owner']
+        'SELECT COUNT(*) as count FROM train_members WHERE project_id = $1 AND role = $2',
+        [projectId, 'owner']
       )
       const ownerCount = parseInt(countResult.rows[0]?.count ?? '0', 10)
 
       if (ownerCount <= 1) {
-        throw new Error('Cannot remove the last owner from a train')
+        throw new Error('Cannot remove the last owner from a project')
       }
     }
 
-    await client.query('DELETE FROM train_members WHERE train_id = $1 AND user_email = $2', [
-      trainId,
+    await client.query('DELETE FROM train_members WHERE project_id = $1 AND user_email = $2', [
+      projectId,
       userEmail,
     ])
 
@@ -102,30 +102,30 @@ export async function removeTrainMember(
 }
 
 /**
- * Get all members of a train
+ * Get all members of a project
  */
-export async function getTrainMembers(pool: Pool, trainId: string): Promise<TrainMember[]> {
-  const result = await pool.query<TrainMember>(
+export async function getProjectMembers(pool: Pool, projectId: string): Promise<ProjectMember[]> {
+  const result = await pool.query<ProjectMember>(
     `
     SELECT * FROM train_members
-    WHERE train_id = $1
+    WHERE project_id = $1
     ORDER BY role DESC, user_email ASC
     `,
-    [trainId]
+    [projectId]
   )
 
   return result.rows
 }
 
 /**
- * Get all trains where user is a member or owner
+ * Get all projects where user is a member or owner
  */
-export async function getUserTrains(pool: Pool, userEmail: string): Promise<Train[]> {
-  const result = await pool.query<Train>(
+export async function getUserTrains(pool: Pool, userEmail: string): Promise<Project[]> {
+  const result = await pool.query<Project>(
     `
     SELECT t.*
-    FROM trains t
-    INNER JOIN train_members tm ON tm.train_id = t.id
+    FROM projects t
+    INNER JOIN train_members tm ON tm.project_id = t.id
     WHERE tm.user_email = $1
     ORDER BY t.name ASC
     `,
@@ -136,22 +136,22 @@ export async function getUserTrains(pool: Pool, userEmail: string): Promise<Trai
 }
 
 /**
- * Get all trains where user is a member or owner, with associated accounts
+ * Get all projects where user is a member or owner, with associated accounts
  */
 export async function getUserTrainsWithAccounts(
   pool: Pool,
   userEmail: string
-): Promise<TrainWithAccounts[]> {
-  const trains = await getUserTrains(pool, userEmail)
+): Promise<ProjectWithAccounts[]> {
+  const projects = await getUserTrains(pool, userEmail)
 
   const trainsWithAccounts = await Promise.all(
-    trains.map(async train => {
+    projects.map(async train => {
       const accountsResult = await pool.query<AnthropicCredential>(
         `
         SELECT ac.*
         FROM anthropic_credentials ac
         INNER JOIN train_accounts ta ON ta.credential_id = ac.id
-        WHERE ta.train_id = $1
+        WHERE ta.project_id = $1
         ORDER BY ac.account_name ASC
         `,
         [train.id]
@@ -168,42 +168,42 @@ export async function getUserTrainsWithAccounts(
 }
 
 /**
- * Check if a user is an owner of a train
+ * Check if a user is an owner of a project
  */
-export async function isTrainOwner(
+export async function isProjectOwner(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   userEmail: string
 ): Promise<boolean> {
   const result = await pool.query<{ exists: boolean }>(
     `
     SELECT EXISTS(
       SELECT 1 FROM train_members
-      WHERE train_id = $1 AND user_email = $2 AND role = 'owner'
+      WHERE project_id = $1 AND user_email = $2 AND role = 'owner'
     ) as exists
     `,
-    [trainId, userEmail]
+    [projectId, userEmail]
   )
 
   return result.rows[0]?.exists ?? false
 }
 
 /**
- * Check if a user is a member (owner or member) of a train
+ * Check if a user is a member (owner or member) of a project
  */
 export async function isTrainMember(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   userEmail: string
 ): Promise<boolean> {
   const result = await pool.query<{ exists: boolean }>(
     `
     SELECT EXISTS(
       SELECT 1 FROM train_members
-      WHERE train_id = $1 AND user_email = $2
+      WHERE project_id = $1 AND user_email = $2
     ) as exists
     `,
-    [trainId, userEmail]
+    [projectId, userEmail]
   )
 
   return result.rows[0]?.exists ?? false
@@ -216,19 +216,19 @@ export async function isTrainMember(
  */
 export async function updateTrainMemberRole(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   userEmail: string,
-  newRole: TrainMemberRole
-): Promise<TrainMember> {
+  newRole: ProjectMemberRole
+): Promise<ProjectMember> {
   const client = await pool.connect()
 
   try {
     await client.query('BEGIN')
 
     // Lock the member row for update
-    const memberResult = await client.query<TrainMember>(
-      'SELECT * FROM train_members WHERE train_id = $1 AND user_email = $2 FOR UPDATE',
-      [trainId, userEmail]
+    const memberResult = await client.query<ProjectMember>(
+      'SELECT * FROM train_members WHERE project_id = $1 AND user_email = $2 FOR UPDATE',
+      [projectId, userEmail]
     )
 
     if (memberResult.rows.length === 0) {
@@ -240,14 +240,14 @@ export async function updateTrainMemberRole(
     if (member.role === 'owner' && newRole === 'member') {
       // Lock all owner rows for this train to prevent concurrent modifications
       await client.query(
-        'SELECT 1 FROM train_members WHERE train_id = $1 AND role = $2 FOR UPDATE',
-        [trainId, 'owner']
+        'SELECT 1 FROM train_members WHERE project_id = $1 AND role = $2 FOR UPDATE',
+        [projectId, 'owner']
       )
 
       // Count owners
       const countResult = await client.query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM train_members WHERE train_id = $1 AND role = $2',
-        [trainId, 'owner']
+        'SELECT COUNT(*) as count FROM train_members WHERE project_id = $1 AND role = $2',
+        [projectId, 'owner']
       )
       const ownerCount = parseInt(countResult.rows[0]?.count ?? '0', 10)
 
@@ -256,14 +256,14 @@ export async function updateTrainMemberRole(
       }
     }
 
-    const result = await client.query<TrainMember>(
+    const result = await client.query<ProjectMember>(
       `
       UPDATE train_members
       SET role = $3
-      WHERE train_id = $1 AND user_email = $2
+      WHERE project_id = $1 AND user_email = $2
       RETURNING *
       `,
-      [trainId, userEmail, newRole]
+      [projectId, userEmail, newRole]
     )
 
     await client.query('COMMIT')
@@ -277,16 +277,16 @@ export async function updateTrainMemberRole(
 }
 
 /**
- * Get the count of owners for a train
+ * Get the count of owners for a project
  */
-export async function getOwnerCount(pool: Pool, trainId: string): Promise<number> {
+export async function getOwnerCount(pool: Pool, projectId: string): Promise<number> {
   const result = await pool.query<{ count: string }>(
     `
     SELECT COUNT(*) as count
     FROM train_members
-    WHERE train_id = $1 AND role = 'owner'
+    WHERE project_id = $1 AND role = 'owner'
     `,
-    [trainId]
+    [projectId]
   )
 
   return parseInt(result.rows[0]?.count ?? '0', 10)

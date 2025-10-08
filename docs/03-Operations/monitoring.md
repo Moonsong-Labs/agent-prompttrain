@@ -192,7 +192,7 @@ SELECT
   status_code,
   error_type,
   COUNT(*) as count,
-  ARRAY_AGG(DISTINCT train_id) as affected_trains
+  ARRAY_AGG(DISTINCT project_id) as affected_trains
 FROM api_requests
 WHERE status_code >= 400
   AND created_at > NOW() - INTERVAL '24 hours'
@@ -220,7 +220,7 @@ app.get('/metrics', (req, res) => {
   const metrics = `
 # HELP claude_proxy_requests_total Total number of requests
 # TYPE claude_proxy_requests_total counter
-claude_proxy_requests_total{train_id="${trainId}"} ${requestCount}
+claude_proxy_requests_total{project_id="${projectId}"} ${requestCount}
 
 # HELP claude_proxy_tokens_total Total tokens used
 # TYPE claude_proxy_tokens_total counter
@@ -301,7 +301,7 @@ Enable JSON logging:
 // Structured log format
 logger.info({
   event: 'api_request',
-  trainId: req.get('msl-train-id'),
+  projectId: req.get('msl-train-id'),
   method: req.method,
   path: req.path,
   status: res.statusCode,

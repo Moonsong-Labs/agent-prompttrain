@@ -15,7 +15,7 @@ async function migrate() {
     console.log('Starting train ID migration (012)...')
     await client.query('BEGIN')
 
-    console.log('Renaming api_requests.domain to train_id...')
+    console.log('Renaming api_requests.domain to project_id...')
     await client.query(`
       DO $$
       BEGIN
@@ -24,13 +24,13 @@ async function migrate() {
           FROM information_schema.columns
           WHERE table_name = 'api_requests' AND column_name = 'domain'
         ) THEN
-          ALTER TABLE api_requests RENAME COLUMN domain TO train_id;
+          ALTER TABLE api_requests RENAME COLUMN domain TO project_id;
         END IF;
       END
       $$;
     `)
 
-    console.log('Renaming analysis_audit_log.domain to train_id...')
+    console.log('Renaming analysis_audit_log.domain to project_id...')
     await client.query(`
       DO $$
       BEGIN
@@ -39,7 +39,7 @@ async function migrate() {
           FROM information_schema.columns
           WHERE table_name = 'analysis_audit_log' AND column_name = 'domain'
         ) THEN
-          ALTER TABLE analysis_audit_log RENAME COLUMN domain TO train_id;
+          ALTER TABLE analysis_audit_log RENAME COLUMN domain TO project_id;
         END IF;
       END
       $$;
@@ -54,7 +54,7 @@ async function migrate() {
           FROM information_schema.columns
           WHERE table_name = 'hourly_stats' AND column_name = 'domain'
         ) THEN
-          ALTER MATERIALIZED VIEW hourly_stats RENAME COLUMN domain TO train_id;
+          ALTER MATERIALIZED VIEW hourly_stats RENAME COLUMN domain TO project_id;
         END IF;
       END
       $$;
@@ -99,10 +99,10 @@ async function migrate() {
     `)
 
     await client.query('COMMIT')
-    console.log('Train ID migration completed successfully.')
+    console.log('Project ID migration completed successfully.')
   } catch (error) {
     await client.query('ROLLBACK')
-    console.error('Train ID migration failed:', error)
+    console.error('Project ID migration failed:', error)
     process.exitCode = 1
   } finally {
     client.release()

@@ -1,5 +1,5 @@
 /**
- * Structured logging types for the Agent Prompt Train
+ * Structured logging types for the Agent Prompt Project
  */
 
 // Base log entry with common fields
@@ -10,7 +10,7 @@ export interface BaseLogEntry {
   message: string
   requestId?: string
   domain?: string
-  trainId?: string
+  projectId?: string
 }
 
 // HTTP request logging

@@ -3,17 +3,17 @@ import { html, raw } from 'hono/html'
 import { layout } from '../layout/index.js'
 import { container } from '../container.js'
 import {
-  listTrainsWithAccounts,
+  listProjectsWithAccounts,
   listTrainApiKeys,
-  createTrain,
+  createProject,
   createTrainApiKey,
-  setTrainDefaultAccount,
-  getTrainMembers,
-  addTrainMember,
-  deleteTrain,
-  isTrainOwner,
-  getTrainStats,
-  getTrainWithAccounts,
+  setProjectDefaultAccount,
+  getProjectMembers,
+  addProjectMember,
+  deleteProject,
+  isProjectOwner,
+  getProjectStats,
+  getProjectWithAccounts,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -45,15 +45,15 @@ trainsUIRoutes.get('/', async c => {
   }
 
   try {
-    const trains = await listTrainsWithAccounts(pool)
+    const projects = await listProjectsWithAccounts(pool)
 
     // Fetch stats and ownership for each train
     const trainData = await Promise.all(
-      trains.map(async train => {
+      projects.map(async train => {
         const [stats, members, isOwner] = await Promise.all([
-          getTrainStats(pool, train.id),
-          getTrainMembers(pool, train.id),
-          auth.isAuthenticated ? isTrainOwner(pool, train.id, auth.principal) : false,
+          getProjectStats(pool, train.id),
+          getProjectMembers(pool, train.id),
+          auth.isAuthenticated ? isProjectOwner(pool, train.id, auth.principal) : false,
         ])
 
         const firstOwner = members.find(m => m.role === 'owner')
@@ -73,12 +73,12 @@ trainsUIRoutes.get('/', async c => {
         <div
           style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;"
         >
-          <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0;">Train Management</h2>
+          <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0;">Project Management</h2>
           <button
             onclick="document.getElementById('create-train-modal').style.display='flex'"
             style="background: #10b981; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
           >
-            + Create New Train
+            + Create New Project
           </button>
         </div>
 
@@ -88,7 +88,7 @@ trainsUIRoutes.get('/', async c => {
                 style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.25rem;"
               >
                 <p style="margin: 0; color: #92400e;">
-                  <strong>⚠️ No trains found.</strong> Create a train to get started.
+                  <strong>⚠️ No projects found.</strong> Create a project to get started.
                 </p>
               </div>
             `
@@ -101,7 +101,7 @@ trainsUIRoutes.get('/', async c => {
                     <th
                       style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
                     >
-                      Train ID
+                      Project ID
                     </th>
                     <th
                       style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
@@ -151,10 +151,10 @@ trainsUIRoutes.get('/', async c => {
                       <tr style="border-bottom: 1px solid #e5e7eb;">
                         <td style="padding: 0.75rem 1rem;">
                           <a
-                            href="/dashboard/trains/${train.train_id}/view"
+                            href="/dashboard/projects/${train.project_id}/view"
                             style="color: #3b82f6; font-weight: 600; text-decoration: none; hover:text-decoration: underline;"
                           >
-                            ${train.train_id}
+                            ${train.project_id}
                           </a>
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">${train.name}</td>
@@ -187,8 +187,8 @@ trainsUIRoutes.get('/', async c => {
                           ${train.isOwner
                             ? html`
                                 <form
-                                  hx-delete="/dashboard/trains/${train.id}/delete"
-                                  hx-confirm="Are you sure you want to delete '${train.train_id}'? This action cannot be undone."
+                                  hx-delete="/dashboard/projects/${train.id}/delete"
+                                  hx-confirm="Are you sure you want to delete '${train.project_id}'? This action cannot be undone."
                                   hx-swap="outerHTML"
                                   hx-target="closest tr"
                                   style="margin: 0;"
@@ -211,7 +211,7 @@ trainsUIRoutes.get('/', async c => {
             `}
       </div>
 
-      <!-- Create Train Modal -->
+      <!-- Create Project Modal -->
       <div
         id="create-train-modal"
         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000;"
@@ -222,25 +222,25 @@ trainsUIRoutes.get('/', async c => {
           onclick="event.stopPropagation()"
         >
           <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1.5rem;">
-            Create New Train
+            Create New Project
           </h3>
           <form
-            hx-post="/dashboard/trains/create"
+            hx-post="/dashboard/projects/create"
             hx-swap="outerHTML"
             hx-target="#create-train-modal"
             style="display: grid; gap: 1rem;"
           >
             <div>
               <label
-                for="train_id"
+                for="project_id"
                 style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
               >
-                Train ID<span style="color: #dc2626;">*</span>
+                Project ID<span style="color: #dc2626;">*</span>
               </label>
               <input
                 type="text"
-                id="train_id"
-                name="train_id"
+                id="project_id"
+                name="project_id"
                 required
                 placeholder="e.g., marketing-prod"
                 style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
@@ -279,7 +279,7 @@ trainsUIRoutes.get('/', async c => {
                 type="submit"
                 style="background: #10b981; color: white; padding: 0.5rem 1.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer;"
               >
-                Create Train
+                Create Project
               </button>
             </div>
           </form>
@@ -305,7 +305,7 @@ trainsUIRoutes.get('/', async c => {
         'Trains - Error',
         html`
           <div class="error-banner">
-            <strong>Error:</strong> Failed to load trains: ${getErrorMessage(error)}
+            <strong>Error:</strong> Failed to load projects: ${getErrorMessage(error)}
           </div>
         `,
         '',
@@ -316,17 +316,17 @@ trainsUIRoutes.get('/', async c => {
 })
 
 /**
- * Train detail view page
+ * Project detail view page
  */
-trainsUIRoutes.get('/:trainId/view', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.get('/:projectId/view', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
   const auth = c.get('auth')
 
   if (!pool) {
     return c.html(
       layout(
-        'Train Details',
+        'Project Details',
         html` <div class="error-banner"><strong>Error:</strong> Database not configured.</div> `,
         '',
         c
@@ -335,13 +335,13 @@ trainsUIRoutes.get('/:trainId/view', async c => {
   }
 
   try {
-    const train = await getTrainWithAccounts(pool, trainId)
+    const train = await getProjectWithAccounts(pool, projectId)
 
     if (!train) {
       return c.html(
         layout(
-          'Train Not Found',
-          html` <div class="error-banner"><strong>Error:</strong> Train not found</div> `,
+          'Project Not Found',
+          html` <div class="error-banner"><strong>Error:</strong> Project not found</div> `,
           '',
           c
         )
@@ -349,14 +349,14 @@ trainsUIRoutes.get('/:trainId/view', async c => {
     }
 
     const isOwner = auth.isAuthenticated
-      ? await isTrainOwner(pool, train.id, auth.principal)
+      ? await isProjectOwner(pool, train.id, auth.principal)
       : false
 
     const content = html`
       <div style="margin-bottom: 2rem;">
         <div style="margin-bottom: 1.5rem;">
           <a
-            href="/dashboard/trains"
+            href="/dashboard/projects"
             style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;"
           >
             ← Back to Trains
@@ -368,7 +368,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
         >
           <div>
             <h2 style="font-size: 1.5rem; font-weight: bold; margin: 0 0 0.5rem 0;">
-              ${train.train_id}
+              ${train.project_id}
               <span
                 style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem;"
               >
@@ -379,17 +379,17 @@ trainsUIRoutes.get('/:trainId/view', async c => {
           </div>
         </div>
 
-        <!-- Train Information -->
+        <!-- Project Information -->
         <div
           style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
         >
           <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
-            Train Information
+            Project Information
           </h3>
           <div style="display: grid; gap: 0.75rem;">
             <div>
-              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Train ID</div>
-              <div style="font-size: 0.875rem;">${train.train_id}</div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Project ID</div>
+              <div style="font-size: 0.875rem;">${train.project_id}</div>
             </div>
             <div>
               <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Name</div>
@@ -410,7 +410,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
             Default Account
           </h3>
           <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
-            All trains have access to all credentials. The default account is used for API calls.
+            All projects have access to all credentials. The default account is used for API calls.
           </p>
 
           ${!train.accounts || train.accounts.length === 0
@@ -460,7 +460,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
                         ${isOwner && train.default_account_id !== cred.id
                           ? html`
                               <form
-                                hx-post="/dashboard/trains/${train.id}/set-default-account"
+                                hx-post="/dashboard/projects/${train.id}/set-default-account"
                                 hx-swap="outerHTML"
                                 hx-target="closest div[style*='margin-bottom: 1.5rem']"
                                 style="margin: 0;"
@@ -491,7 +491,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
           ${isOwner
             ? html`
                 <form
-                  hx-post="/dashboard/trains/${train.id}/add-member"
+                  hx-post="/dashboard/projects/${train.id}/add-member"
                   hx-swap="beforebegin"
                   style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
                 >
@@ -540,7 +540,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
 
           <div
             id="members-${train.id}"
-            hx-get="/dashboard/trains/${train.id}/members-list"
+            hx-get="/dashboard/projects/${train.id}/members-list"
             hx-trigger="load"
             hx-swap="innerHTML"
           >
@@ -561,7 +561,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
           ${isOwner
             ? html`
                 <form
-                  hx-post="/dashboard/trains/${train.id}/generate-api-key"
+                  hx-post="/dashboard/projects/${train.id}/generate-api-key"
                   hx-swap="beforebegin"
                   style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: end;"
                 >
@@ -592,7 +592,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
 
           <div
             id="api-keys-${train.id}"
-            hx-get="/dashboard/trains/${train.id}/api-keys-list"
+            hx-get="/dashboard/projects/${train.id}/api-keys-list"
             hx-trigger="load"
             hx-swap="innerHTML"
           >
@@ -608,7 +608,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
 
     return c.html(
       layout(
-        `Train: ${train.train_id}`,
+        `Project: ${train.project_id}`,
         content,
         raw(`<script>
           document.body.addEventListener('htmx:responseError', function(evt) {
@@ -621,7 +621,7 @@ trainsUIRoutes.get('/:trainId/view', async c => {
   } catch (error) {
     return c.html(
       layout(
-        'Train Error',
+        'Project Error',
         html`
           <div class="error-banner">
             <strong>Error:</strong> Failed to load train: ${getErrorMessage(error)}
@@ -637,8 +637,8 @@ trainsUIRoutes.get('/:trainId/view', async c => {
 /**
  * HTMX endpoint to load API keys for a specific train
  */
-trainsUIRoutes.get('/:trainId/api-keys-list', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
 
   if (!pool) {
@@ -650,7 +650,7 @@ trainsUIRoutes.get('/:trainId/api-keys-list', async c => {
   }
 
   try {
-    const apiKeys = await listTrainApiKeys(pool, trainId)
+    const apiKeys = await listTrainApiKeys(pool, projectId)
 
     if (apiKeys.length === 0) {
       return c.html(html`
@@ -717,8 +717,8 @@ trainsUIRoutes.get('/:trainId/api-keys-list', async c => {
 /**
  * HTMX endpoint to load members for a specific train
  */
-trainsUIRoutes.get('/:trainId/members-list', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.get('/:projectId/members-list', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
 
   if (!pool) {
@@ -730,7 +730,7 @@ trainsUIRoutes.get('/:trainId/members-list', async c => {
   }
 
   try {
-    const members = await getTrainMembers(pool, trainId)
+    const members = await getProjectMembers(pool, projectId)
 
     if (members.length === 0) {
       return c.html(html`
@@ -777,10 +777,10 @@ trainsUIRoutes.get('/:trainId/members-list', async c => {
 })
 
 /**
- * Generate a new API key for a train (HTMX form submission - owner only)
+ * Generate a new API key for a project (HTMX form submission - owner only)
  */
-trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.post('/:projectId/generate-api-key', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
   const auth = c.get('auth')
 
@@ -806,7 +806,7 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
   }
 
   // Check ownership
-  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
   if (!isOwner) {
     return c.html(html`
       <div
@@ -821,7 +821,7 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
     const formData = await c.req.parseBody()
     const name = (formData.name as string) || undefined
 
-    const generatedKey = await createTrainApiKey(pool, trainId, {
+    const generatedKey = await createTrainApiKey(pool, projectId, {
       name,
       created_by: auth.principal,
     })
@@ -881,10 +881,10 @@ trainsUIRoutes.post('/:trainId/generate-api-key', async c => {
 })
 
 /**
- * Set default account for a train (HTMX form submission - owner only)
+ * Set default account for a project (HTMX form submission - owner only)
  */
-trainsUIRoutes.post('/:trainId/set-default-account', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.post('/:projectId/set-default-account', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
   const auth = c.get('auth')
 
@@ -906,7 +906,7 @@ trainsUIRoutes.post('/:trainId/set-default-account', async c => {
   }
 
   // Check ownership
-  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
   if (!isOwner) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
@@ -919,7 +919,7 @@ trainsUIRoutes.post('/:trainId/set-default-account', async c => {
     const formData = await c.req.parseBody()
     const credentialId = formData.credential_id as string
 
-    await setTrainDefaultAccount(pool, trainId, credentialId)
+    await setProjectDefaultAccount(pool, projectId, credentialId)
 
     // Reload the credentials section
     return c.html(html`
@@ -942,10 +942,10 @@ trainsUIRoutes.post('/:trainId/set-default-account', async c => {
 })
 
 /**
- * Delete a train (HTMX form submission - owner only)
+ * Delete a project (HTMX form submission - owner only)
  */
-trainsUIRoutes.delete('/:trainId/delete', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.delete('/:projectId/delete', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
   const auth = c.get('auth')
 
@@ -968,26 +968,26 @@ trainsUIRoutes.delete('/:trainId/delete', async c => {
 
   try {
     // Check ownership
-    const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+    const isOwner = await isProjectOwner(pool, projectId, auth.principal)
     if (!isOwner) {
       return c.html(html`
         <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-          <strong>Error:</strong> Only train owners can delete trains
+          <strong>Error:</strong> Only train owners can delete projects
         </div>
       `)
     }
 
-    const success = await deleteTrain(pool, trainId)
+    const success = await deleteProject(pool, projectId)
 
     if (!success) {
       return c.html(html`
         <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-          Train not found
+          Project not found
         </div>
       `)
     }
 
-    // Return empty HTML to remove the train row via HTMX swap
+    // Return empty HTML to remove the project row via HTMX swap
     return c.html(html``)
   } catch (error) {
     return c.html(html`
@@ -999,10 +999,10 @@ trainsUIRoutes.delete('/:trainId/delete', async c => {
 })
 
 /**
- * Add a member to a train (HTMX form submission - owner only)
+ * Add a member to a project (HTMX form submission - owner only)
  */
-trainsUIRoutes.post('/:trainId/add-member', async c => {
-  const trainId = c.req.param('trainId')
+trainsUIRoutes.post('/:projectId/add-member', async c => {
+  const projectId = c.req.param('projectId')
   const pool = container.getPool()
   const auth = c.get('auth')
 
@@ -1024,7 +1024,7 @@ trainsUIRoutes.post('/:trainId/add-member', async c => {
   }
 
   // Check ownership
-  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
   if (!isOwner) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
@@ -1038,7 +1038,7 @@ trainsUIRoutes.post('/:trainId/add-member', async c => {
     const userEmail = formData.user_email as string
     const role = formData.role as 'owner' | 'member'
 
-    await addTrainMember(pool, trainId, userEmail, role, auth.principal)
+    await addProjectMember(pool, projectId, userEmail, role, auth.principal)
 
     return c.html(html`
       <div
@@ -1080,17 +1080,17 @@ trainsUIRoutes.post('/create', async c => {
 
   try {
     const formData = await c.req.parseBody()
-    const trainId = formData.train_id as string
+    const projectId = formData.project_id as string
     const name = formData.name as string
 
     // Validate train ID format
-    if (!/^[a-z0-9-]+$/.test(trainId)) {
+    if (!/^[a-z0-9-]+$/.test(projectId)) {
       client.release()
       return c.html(html`
         <div
           style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
         >
-          <strong>Error:</strong> Train ID must be lowercase alphanumeric with hyphens only
+          <strong>Error:</strong> Project ID must be lowercase alphanumeric with hyphens only
         </div>
         <div style="text-align: center;">
           <button
@@ -1107,14 +1107,14 @@ trainsUIRoutes.post('/create', async c => {
     await client.query('BEGIN')
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const train = await createTrain(client as any, {
-        train_id: trainId,
+      const train = await createProject(client as any, {
+        project_id: projectId,
         name: name,
       })
 
       // Add the creator as an owner
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await addTrainMember(client as any, train.id, auth.principal, 'owner', auth.principal)
+      await addProjectMember(client as any, train.id, auth.principal, 'owner', auth.principal)
 
       await client.query('COMMIT')
 
@@ -1122,7 +1122,7 @@ trainsUIRoutes.post('/create', async c => {
         <div
           style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
         >
-          <strong>✅ Success!</strong> Train "${train.train_id}" created successfully.
+          <strong>✅ Success!</strong> Project "${train.project_id}" created successfully.
         </div>
         <script>
           setTimeout(() => location.reload(), 1500)

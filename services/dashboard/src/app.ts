@@ -17,10 +17,10 @@ import { analyticsPartialRoutes } from './routes/partials/analytics.js'
 import { analyticsConversationPartialRoutes } from './routes/partials/analytics-conversation.js'
 import { csrfProtection } from './middleware/csrf.js'
 import credentialsRoutes from './routes/credentials.js'
-import trainsRoutes from './routes/trains.js'
+import trainsRoutes from './routes/projects.js'
 import apiKeysRoutes from './routes/api-keys.js'
-import trainMembersRoutes from './routes/train-members.js'
-import { getTrainByTrainId, isTrainMember } from '@agent-prompttrain/shared/database/queries'
+import trainMembersRoutes from './routes/project-members.js'
+import { getProjectByProjectId, isTrainMember } from '@agent-prompttrain/shared/database/queries'
 
 /**
  * Create and configure the Dashboard application
@@ -112,10 +112,10 @@ export async function createDashboardApp(): Promise<DashboardApp> {
    */
   async function validateTrainAccess(
     c: any,
-    trainId?: string
+    projectId?: string
   ): Promise<{ authorized: boolean; trainUuid?: string; error?: any }> {
-    if (!trainId) {
-      // No train filter - allow (shows all trains user has access to)
+    if (!projectId) {
+      // No train filter - allow (shows all projects user has access to)
       return { authorized: true }
     }
 
@@ -128,12 +128,12 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     }
 
     const pool = container.getPool()
-    const train = await getTrainByTrainId(pool, trainId)
+    const train = await getProjectByProjectId(pool, projectId)
 
     if (!train) {
       return {
         authorized: false,
-        error: c.json({ error: 'Train not found' }, 404),
+        error: c.json({ error: 'Project not found' }, 404),
       }
     }
 
@@ -151,17 +151,17 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   // API endpoints for dashboard data
   app.get('/api/requests', async c => {
     const storageService = container.getStorageService()
-    const trainId = c.req.query('trainId')
+    const projectId = c.req.query('projectId')
     const limit = parseInt(c.req.query('limit') || '100')
 
     // Validate train access
-    const accessCheck = await validateTrainAccess(c, trainId)
+    const accessCheck = await validateTrainAccess(c, projectId)
     if (!accessCheck.authorized) {
       return accessCheck.error
     }
 
     try {
-      const requests = await storageService.getRequestsByTrainId(trainId || '', limit)
+      const requests = await storageService.getRequestsByTrainId(projectId || '', limit)
       return c.json({
         status: 'ok',
         requests,
@@ -183,8 +183,8 @@ export async function createDashboardApp(): Promise<DashboardApp> {
         return c.json({ error: 'Request not found' }, 404)
       }
 
-      // Validate access to the train this request belongs to
-      const accessCheck = await validateTrainAccess(c, details.request.trainId)
+      // Validate access to the project this request belongs to
+      const accessCheck = await validateTrainAccess(c, details.request.projectId)
       if (!accessCheck.authorized) {
         return accessCheck.error
       }
@@ -201,17 +201,17 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   app.get('/api/storage-stats', async c => {
     const storageService = container.getStorageService()
-    const trainId = c.req.query('trainId')
+    const projectId = c.req.query('projectId')
     const since = c.req.query('since')
 
     // Validate train access
-    const accessCheck = await validateTrainAccess(c, trainId)
+    const accessCheck = await validateTrainAccess(c, projectId)
     if (!accessCheck.authorized) {
       return accessCheck.error
     }
 
     try {
-      const stats = await storageService.getStats(trainId, since ? new Date(since) : undefined)
+      const stats = await storageService.getStats(projectId, since ? new Date(since) : undefined)
       return c.json({
         status: 'ok',
         stats,
@@ -224,19 +224,19 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   app.get('/api/conversations', async c => {
     const storageService = container.getStorageService()
-    const trainId = c.req.query('trainId')
+    const projectId = c.req.query('projectId')
     const limit = parseInt(c.req.query('limit') || '50')
     const excludeSubtasks = c.req.query('excludeSubtasks') === 'true'
 
     // Validate train access
-    const accessCheck = await validateTrainAccess(c, trainId)
+    const accessCheck = await validateTrainAccess(c, projectId)
     if (!accessCheck.authorized) {
       return accessCheck.error
     }
 
     try {
       const conversations = await storageService.getConversationsWithFilter(
-        trainId,
+        projectId,
         limit,
         excludeSubtasks
       )
@@ -260,7 +260,7 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
       // Validate access - check the parent request's train if subtasks exist
       if (subtasks.length > 0) {
-        const accessCheck = await validateTrainAccess(c, subtasks[0].trainId)
+        const accessCheck = await validateTrainAccess(c, subtasks[0].projectId)
         if (!accessCheck.authorized) {
           return accessCheck.error
         }
@@ -287,9 +287,9 @@ export async function createDashboardApp(): Promise<DashboardApp> {
 
   // Mount credential and train management routes
   app.route('/api/credentials', credentialsRoutes)
-  app.route('/api/trains', trainsRoutes)
-  app.route('/api/trains', apiKeysRoutes) // Nested under trains
-  app.route('/api/trains', trainMembersRoutes) // Nested under trains
+  app.route('/api/projects', trainsRoutes)
+  app.route('/api/projects', apiKeysRoutes) // Nested under projects
+  app.route('/api/projects', trainMembersRoutes) // Nested under projects
 
   // Mount analysis partials routes
   app.route('/partials/analysis', analysisPartialsRoutes)

@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { RateLimitError, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
+import { RateLimitError, MSL_PROJECT_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 import { getRequestLogger } from './logger'
 
 // Rate limit configuration
@@ -82,8 +82,8 @@ const defaultTrainConfig: RateLimitConfig = {
   maxRequests: 5000, // 5000 requests per hour
   maxTokens: 5000000, // 5M tokens per hour
   keyGenerator: c => {
-    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
-    return `train:${trainId}`
+    const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER) || 'unknown'
+    return `train:${projectId}`
   },
 }
 
@@ -193,7 +193,7 @@ export function createRateLimiter(config: Partial<RateLimitConfig> = {}) {
   }
 }
 
-// Train-based rate limiter
+// Project-based rate limiter
 export function createTrainRateLimiter(config: Partial<RateLimitConfig> = {}) {
   const finalConfig = {
     ...defaultTrainConfig,
@@ -220,12 +220,12 @@ export function createTrainRateLimiter(config: Partial<RateLimitConfig> = {}) {
 
     if (entry.blocked && entry.blockExpiry && now < entry.blockExpiry) {
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Train rate limit exceeded', {
+      logger.warn('Project rate limit exceeded', {
         key,
         retryAfter,
       })
 
-      throw new RateLimitError('Train rate limit exceeded', retryAfter)
+      throw new RateLimitError('Project rate limit exceeded', retryAfter)
     }
 
     if (entry.requests >= finalConfig.maxRequests) {
@@ -233,13 +233,13 @@ export function createTrainRateLimiter(config: Partial<RateLimitConfig> = {}) {
       entry.blockExpiry = entry.windowStart + finalConfig.windowMs
 
       const retryAfter = Math.ceil((entry.blockExpiry - now) / 1000)
-      logger.warn('Train rate limit exceeded', {
+      logger.warn('Project rate limit exceeded', {
         key,
         requests: entry.requests,
         maxRequests: finalConfig.maxRequests,
       })
 
-      throw new RateLimitError('Train rate limit exceeded', retryAfter)
+      throw new RateLimitError('Project rate limit exceeded', retryAfter)
     }
 
     entry.requests++

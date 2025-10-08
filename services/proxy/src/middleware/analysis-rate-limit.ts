@@ -3,7 +3,7 @@ import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible'
 import { logger } from './logger.js'
 // import { container } from '../container.js'
 import { config } from '@agent-prompttrain/shared/config'
-import { MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
+import { MSL_PROJECT_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 // Different rate limiters for different operations
 let analysisCreationLimiter: RateLimiterMemory | RateLimiterRedis
@@ -42,7 +42,7 @@ export function initializeAnalysisRateLimiters() {
 export function rateLimitAnalysisCreation() {
   return async (c: Context, next: Next) => {
     const requestId = c.get('requestId')
-    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
+    const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER)
 
     if (!analysisCreationLimiter) {
       initializeAnalysisRateLimiters()
@@ -51,13 +51,13 @@ export function rateLimitAnalysisCreation() {
     try {
       // Use train identifier as the key for rate limiting
       // This ensures rate limits are per-train (tenant)
-      const key = trainId || 'unknown'
+      const key = projectId || 'unknown'
 
       await analysisCreationLimiter.consume(key)
 
       logger.debug('Analysis creation rate limit check passed', {
         requestId,
-        trainId,
+        projectId,
       })
 
       await next()
@@ -65,7 +65,7 @@ export function rateLimitAnalysisCreation() {
       // Rate limit exceeded
       logger.warn('Analysis creation rate limit exceeded', {
         requestId,
-        trainId,
+        projectId,
         metadata: {
           remainingPoints:
             (rejRes as { remainingPoints?: number; msBeforeNext?: number }).remainingPoints || 0,
@@ -107,7 +107,7 @@ export function rateLimitAnalysisCreation() {
 export function rateLimitAnalysisRetrieval() {
   return async (c: Context, next: Next) => {
     const requestId = c.get('requestId')
-    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
+    const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER)
 
     if (!analysisRetrievalLimiter) {
       initializeAnalysisRateLimiters()
@@ -115,13 +115,13 @@ export function rateLimitAnalysisRetrieval() {
 
     try {
       // Use train identifier as the key for rate limiting
-      const key = trainId || 'unknown'
+      const key = projectId || 'unknown'
 
       await analysisRetrievalLimiter.consume(key)
 
       logger.debug('Analysis retrieval rate limit check passed', {
         requestId,
-        trainId,
+        projectId,
       })
 
       await next()
@@ -129,7 +129,7 @@ export function rateLimitAnalysisRetrieval() {
       // Rate limit exceeded
       logger.warn('Analysis retrieval rate limit exceeded', {
         requestId,
-        trainId,
+        projectId,
         metadata: {
           remainingPoints:
             (rejRes as { remainingPoints?: number; msBeforeNext?: number }).remainingPoints || 0,
@@ -168,7 +168,7 @@ export function rateLimitAnalysisRetrieval() {
 }
 
 // Helper to get current rate limit status
-export async function getRateLimitStatus(trainId: string, limiterType: 'creation' | 'retrieval') {
+export async function getRateLimitStatus(projectId: string, limiterType: 'creation' | 'retrieval') {
   const limiter = limiterType === 'creation' ? analysisCreationLimiter : analysisRetrievalLimiter
 
   if (!limiter) {
@@ -176,7 +176,7 @@ export async function getRateLimitStatus(trainId: string, limiterType: 'creation
   }
 
   try {
-    const res = await limiter.get(trainId)
+    const res = await limiter.get(projectId)
     return {
       remainingPoints: res ? limiter.points - res.consumedPoints : limiter.points,
       totalPoints: limiter.points,
@@ -185,7 +185,7 @@ export async function getRateLimitStatus(trainId: string, limiterType: 'creation
   } catch (error) {
     logger.error('Error getting rate limit status', {
       error,
-      metadata: { trainId, limiterType },
+      metadata: { projectId, limiterType },
     })
     return null
   }

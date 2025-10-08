@@ -13,7 +13,7 @@ export interface LoggerOptions {
 
 export interface LogContext {
   requestId?: string
-  trainId?: string
+  projectId?: string
   metadata?: Record<string, any>
   error?: {
     message: string
@@ -66,11 +66,11 @@ export function createPinoLogger(options: LoggerOptions): PinoLogger {
 
 /**
  * Create a child logger with request context
- * This ensures all logs for a request include the requestId and trainId
+ * This ensures all logs for a request include the requestId and projectId
  */
 export function createRequestLogger(
   parentLogger: PinoLogger,
-  context: { requestId: string; trainId?: string }
+  context: { requestId: string; projectId?: string }
 ): PinoLogger {
   return parentLogger.child(context)
 }
@@ -149,8 +149,8 @@ function transformContext(context?: LogContext): Record<string, any> {
   if (context.requestId) {
     result.requestId = context.requestId
   }
-  if (context.trainId) {
-    result.trainId = context.trainId
+  if (context.projectId) {
+    result.projectId = context.projectId
   }
 
   // Flatten metadata into the log entry

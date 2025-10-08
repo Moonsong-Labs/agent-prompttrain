@@ -6,7 +6,7 @@ import { ClaudeApiClient } from './ClaudeApiClient'
 import { NotificationService } from './NotificationService'
 import { MetricsService } from './MetricsService'
 import { ClaudeMessagesRequest, generateConversationId, config } from '@agent-prompttrain/shared'
-import { getTrainSlackConfig } from '@agent-prompttrain/shared/database/queries'
+import { getProjectSlackConfig } from '@agent-prompttrain/shared/database/queries'
 import { logger } from '../middleware/logger'
 import { testSampleCollector } from './TestSampleCollector'
 import { StorageAdapter } from '../storage/StorageAdapter.js'
@@ -35,28 +35,28 @@ export class ProxyService {
       debug: (message: string, metadata?: Record<string, any>) => {
         logger.debug(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       info: (message: string, metadata?: Record<string, any>) => {
         logger.info(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
         logger.warn(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           error: error
             ? {
                 message: error.message,
@@ -70,7 +70,12 @@ export class ProxyService {
     }
 
     // Create domain entities
-    const request = new ProxyRequest(rawRequest, context.trainId, context.requestId, context.apiKey)
+    const request = new ProxyRequest(
+      rawRequest,
+      context.projectId,
+      context.requestId,
+      context.apiKey
+    )
 
     const response = new ProxyResponse(context.requestId, request.isStreaming)
 
@@ -102,7 +107,7 @@ export class ProxyService {
       try {
         // Use the new ConversationLinker through StorageAdapter
         const linkingResult = await this.storageAdapter.linkConversation(
-          context.trainId,
+          context.projectId,
           rawRequest.messages,
           rawRequest.system,
           context.requestId,
@@ -145,7 +150,7 @@ export class ProxyService {
       // Passthrough mode when client auth disabled and Bearer token present
       if (config.features.enableClientAuth === false && context.apiKey?.startsWith('Bearer ')) {
         log.debug('Using passthrough authentication (client auth disabled)', {
-          trainId: context.trainId,
+          projectId: context.projectId,
           hasToken: true,
         })
 
@@ -247,28 +252,28 @@ export class ProxyService {
       debug: (message: string, metadata?: Record<string, any>) => {
         logger.debug(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       info: (message: string, metadata?: Record<string, any>) => {
         logger.info(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
         logger.warn(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           metadata,
         })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           error: error
             ? {
                 message: error.message,
@@ -350,18 +355,30 @@ export class ProxyService {
   ): Promise<Response> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.debug(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.info(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.warn(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           error: error
             ? {
                 message: error.message,
@@ -449,18 +466,30 @@ export class ProxyService {
   ): Promise<void> {
     const log = {
       debug: (message: string, metadata?: Record<string, any>) => {
-        logger.debug(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.debug(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       info: (message: string, metadata?: Record<string, any>) => {
-        logger.info(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.info(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       warn: (message: string, metadata?: Record<string, any>) => {
-        logger.warn(message, { requestId: context.requestId, trainId: context.trainId, metadata })
+        logger.warn(message, {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata,
+        })
       },
       error: (message: string, error?: Error, metadata?: Record<string, any>) => {
         logger.error(message, {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           error: error
             ? {
                 message: error.message,
@@ -538,7 +567,7 @@ export class ProxyService {
 
       // Fetch Slack config from database and send notifications
       const pool = this.storageAdapter?.getPool()
-      const slackConfig = pool ? await getTrainSlackConfig(pool, context.trainId) : null
+      const slackConfig = pool ? await getProjectSlackConfig(pool, context.projectId) : null
       await this.notificationService.notify(request, response, context, auth, slackConfig)
     } catch (error) {
       // Track error metrics

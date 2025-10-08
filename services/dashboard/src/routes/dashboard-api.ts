@@ -11,12 +11,12 @@ import { requestUsageRoutes } from './request-usage.js'
 import { promptsRoute } from './prompts.js'
 import { promptDetailRoute } from './prompt-detail.js'
 import { credentialsUIRoutes } from './credentials-ui.js'
-import { trainsUIRoutes } from './trains-ui.js'
+import { trainsUIRoutes } from './projects-ui.js'
 
 export const dashboardRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    trainId?: string
+    projectId?: string
   }
 }>()
 
@@ -30,4 +30,4 @@ dashboardRoutes.route('/', requestUsageRoutes)
 dashboardRoutes.route('/prompts', promptsRoute)
 dashboardRoutes.route('/prompts', promptDetailRoute)
 dashboardRoutes.route('/credentials', credentialsUIRoutes)
-dashboardRoutes.route('/trains', trainsUIRoutes)
+dashboardRoutes.route('/projects', trainsUIRoutes)

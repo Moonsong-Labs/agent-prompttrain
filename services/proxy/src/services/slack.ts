@@ -10,7 +10,7 @@ export interface SlackConfig {
 
 export interface MessageInfo {
   requestId: string
-  trainId?: string
+  projectId?: string
   model?: string
   role: 'user' | 'assistant' | 'conversation'
   content: string
@@ -36,7 +36,7 @@ export function initializeSlack(config: Partial<SlackConfig>) {
   slackConfig = {
     webhook_url: config.webhook_url,
     channel: config.channel,
-    username: config.username || 'Agent Prompt Train',
+    username: config.username || 'Agent Prompt Project',
     icon_emoji: config.icon_emoji || ':robot_face:',
     enabled: config.enabled !== false,
   }
@@ -113,7 +113,7 @@ export function initializeTrainSlack(
   const config = {
     webhook_url: slackConfig.webhook_url,
     channel: slackConfig.channel,
-    username: slackConfig.username || 'Agent Prompt Train',
+    username: slackConfig.username || 'Agent Prompt Project',
     icon_emoji: slackConfig.icon_emoji || ':robot_face:',
     enabled: slackConfig.enabled !== false,
   }
@@ -133,7 +133,7 @@ export function initializeTrainSlack(
  * Send message to Slack
  */
 export async function sendToSlack(info: MessageInfo, trainWebhook?: IncomingWebhook | null) {
-  // Use trainId-specific webhook if available, otherwise fall back to global webhook
+  // Use projectId-specific webhook if available, otherwise fall back to global webhook
   const webhookToUse = trainWebhook || webhook
 
   // Check if webhook is properly configured and is an instance of IncomingWebhook
@@ -147,7 +147,7 @@ export async function sendToSlack(info: MessageInfo, trainWebhook?: IncomingWebh
   }
 
   // Skip Slack notifications for personal trainIds (privacy protection)
-  if (info.trainId && info.trainId.toLowerCase().includes('personal')) {
+  if (info.projectId && info.projectId.toLowerCase().includes('personal')) {
     return
   }
 
@@ -163,7 +163,7 @@ export async function sendToSlack(info: MessageInfo, trainWebhook?: IncomingWebh
     const text = content
 
     // Create footer with metadata
-    const metadata = [info.trainId || 'Unknown', info.model || 'Unknown', info.apiKey || '']
+    const metadata = [info.projectId || 'Unknown', info.model || 'Unknown', info.apiKey || '']
       .filter(Boolean)
       .join(' | ')
 
@@ -194,10 +194,10 @@ export async function sendToSlack(info: MessageInfo, trainWebhook?: IncomingWebh
 export async function sendErrorToSlack(
   requestId: string,
   error: string,
-  trainId?: string,
+  projectId?: string,
   trainWebhook?: IncomingWebhook | null
 ) {
-  // Use trainId-specific webhook if available, otherwise fall back to global webhook
+  // Use projectId-specific webhook if available, otherwise fall back to global webhook
   const webhookToUse = trainWebhook || webhook
 
   // Check if webhook is properly configured and is an instance of IncomingWebhook
@@ -211,7 +211,7 @@ export async function sendErrorToSlack(
   }
 
   // Skip Slack notifications for personal trainIds (privacy protection)
-  if (trainId && trainId.toLowerCase().includes('personal')) {
+  if (projectId && projectId.toLowerCase().includes('personal')) {
     return
   }
 
@@ -225,8 +225,8 @@ export async function sendErrorToSlack(
           text: error,
           fields: [
             {
-              title: 'Train ID',
-              value: trainId || 'Unknown',
+              title: 'Project ID',
+              value: projectId || 'Unknown',
               short: true,
             },
             {

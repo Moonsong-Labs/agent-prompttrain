@@ -14,14 +14,14 @@ export interface StorageServiceEnhancements {
 
   /**
    * Get paginated conversation summaries with filtering
-   * @param trainId Optional train filter
+   * @param projectId Optional train filter
    * @param limit Number of items per page
    * @param offset Offset for pagination
    * @param search Optional search query
    * @returns Paginated results and total count
    */
   getConversationSummariesPaginated?(
-    trainId?: string,
+    projectId?: string,
     limit?: number,
     offset?: number,
     search?: string

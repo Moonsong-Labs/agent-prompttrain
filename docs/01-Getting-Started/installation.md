@@ -77,7 +77,7 @@ bun run db:migrate:token-usage
 ```bash
 # Create credentials directory
 mkdir -p credentials/accounts
-mkdir -p credentials/train-client-keys
+mkdir -p credentials/project-client-keys
 
 # Generate a secure client API key (for proxy authentication)
 bun run scripts/generate-api-key.ts
@@ -91,8 +91,8 @@ cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 }
 JSON
 
-# Allow clients for a train identifier
-cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+# Allow clients for a project identifier
+cat > credentials/project-client-keys/your-train-id.client-keys.json <<'JSON'
 { "keys": ["cnp_live_generated_key"] }
 JSON
 ```
@@ -236,7 +236,7 @@ Open http://localhost:3001 in your browser. You should see the dashboard (in dev
 ```bash
 # Replace with your train ID and client API key
 curl -X POST http://localhost:3000/v1/messages \
-  -H "MSL-Train-Id: your-train-id" \
+  -H "MSL-Project-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_your_client_key" \
   -H "Content-Type: application/json" \
   -d '{

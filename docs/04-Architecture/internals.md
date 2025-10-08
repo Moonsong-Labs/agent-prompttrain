@@ -56,10 +56,10 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 // Simplified request flow
 async function handleRequest(c: Context) {
   // 1. Extract train ID from header
-  const trainId = c.get('trainId') ?? c.req.header('msl-train-id')
+  const projectId = c.get('projectId') ?? c.req.header('msl-train-id')
 
   // 2. Load credentials
-  const credentials = await loadCredentials(trainId)
+  const credentials = await loadCredentials(projectId)
 
   // 3. Validate client auth
   if (!validateClientAuth(c, credentials)) {
@@ -332,8 +332,8 @@ class AuthManager {
   ) {}
 
   // Layer 1: Client authentication
-  async validateClient(request: Request, trainId: string): Promise<boolean> {
-    const allowedKeys = await this.clientKeyStore.getKeys(trainId)
+  async validateClient(request: Request, projectId: string): Promise<boolean> {
+    const allowedKeys = await this.clientKeyStore.getKeys(projectId)
     if (!allowedKeys.length) {
       return true // No client auth required
     }
@@ -465,10 +465,10 @@ class CacheManager {
 
 ```typescript
 // Each train has isolated credentials
-const credentialPath = path.join(CREDENTIALS_DIR, `${trainId}.credentials.json`)
+const credentialPath = path.join(CREDENTIALS_DIR, `${projectId}.credentials.json`)
 
 // Validate train ID format to prevent path traversal
-if (!isValidTrainId(trainId)) {
+if (!isValidProjectId(projectId)) {
   throw new Error('Invalid train ID')
 }
 
@@ -504,8 +504,8 @@ function sanitizeRequest(request: any): any {
 class RateLimiter {
   private limits = new Map<string, RateLimit>()
 
-  async checkLimit(trainId: string): Promise<boolean> {
-    const limit = this.limits.get(trainId) || this.createLimit(trainId)
+  async checkLimit(projectId: string): Promise<boolean> {
+    const limit = this.limits.get(projectId) || this.createLimit(projectId)
 
     if (limit.tokens <= 0) {
       return false
@@ -515,13 +515,13 @@ class RateLimiter {
     return true
   }
 
-  private createLimit(trainId: string): RateLimit {
+  private createLimit(projectId: string): RateLimit {
     const limit = {
       tokens: 100,
       resetAt: Date.now() + 60000,
     }
 
-    this.limits.set(trainId, limit)
+    this.limits.set(projectId, limit)
 
     // Reset tokens periodically
     setTimeout(() => {

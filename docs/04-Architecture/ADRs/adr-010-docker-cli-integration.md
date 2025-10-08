@@ -77,7 +77,7 @@ We will provide **Docker-based Claude CLI integration** with pre-configured cont
 
    - CLI uses standard Bearer authentication
    - Proxy maps to the configured train credentials (defaults to the `default` train)
-   - Token tracked under the `default` train unless an explicit `MSL-Train-Id` is provided
+   - Token tracked under the `default` train unless an explicit `MSL-Project-Id` is provided
 
 3. **Usage Monitoring**:
 

@@ -2,7 +2,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import {
   ClaudeMessagesRequest,
-  MSL_TRAIN_ID_HEADER_LOWER,
+  MSL_PROJECT_ID_HEADER_LOWER,
   MSL_ACCOUNT_HEADER_LOWER,
 } from '@agent-prompttrain/shared'
 import { Context } from 'hono'
@@ -228,7 +228,7 @@ export class TestSampleCollector {
       'user-agent',
       'accept',
       'accept-encoding',
-      MSL_TRAIN_ID_HEADER_LOWER,
+      MSL_PROJECT_ID_HEADER_LOWER,
       MSL_ACCOUNT_HEADER_LOWER,
       'content-length',
       'anthropic-version',

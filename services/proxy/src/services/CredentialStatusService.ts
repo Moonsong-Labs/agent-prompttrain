@@ -7,7 +7,7 @@
 import { logger } from '../middleware/logger'
 
 export interface CredentialStatus {
-  trainId: string
+  projectId: string
   file: string
   type: 'api_key' | 'oauth'
   status: 'valid' | 'expired' | 'expiring_soon' | 'missing_refresh_token' | 'invalid' | 'error'
@@ -49,7 +49,7 @@ export class CredentialStatusService {
 
     // Summary
     lines.push(`Credential Status Summary:`)
-    lines.push(`  Total: ${statuses.length} trains`)
+    lines.push(`  Total: ${statuses.length} projects`)
     lines.push(`  Valid: ${byStatus.valid.length}`)
     if (byStatus.expired.length > 0) {
       lines.push(`  Expired: ${byStatus.expired.length}`)
@@ -78,7 +78,7 @@ export class CredentialStatusService {
         extras.push('slack')
       }
 
-      let line = `  ${status.trainId}: ${status.type} - ${status.status}`
+      let line = `  ${status.projectId}: ${status.type} - ${status.status}`
       if (status.expiresIn) {
         line += ` (expires in ${status.expiresIn})`
       }
@@ -92,7 +92,7 @@ export class CredentialStatusService {
       }
     }
 
-    // Warnings for trains that need attention
+    // Warnings for projects that need attention
     const needsAttention = statuses.filter(
       s =>
         s.status === 'expired' ||
@@ -104,7 +104,7 @@ export class CredentialStatusService {
     if (needsAttention.length > 0) {
       lines.push(`\n⚠️  Trains Needing Attention:`)
       for (const status of needsAttention) {
-        lines.push(`  - ${status.trainId}: ${status.message}`)
+        lines.push(`  - ${status.projectId}: ${status.message}`)
         if (status.status === 'expired' || status.status === 'missing_refresh_token') {
           lines.push(`    Run: bun run scripts/auth/oauth-login.ts credentials/${status.file}`)
         }

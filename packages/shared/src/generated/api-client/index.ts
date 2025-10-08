@@ -1,5 +1,5 @@
 /**
- * Auto-generated API client for Agent Prompt Train AI Analysis API
+ * Auto-generated API client for Agent Prompt Project AI Analysis API
  * Generated from: docs/api/openapi-analysis.yaml
  * Generated on: 2025-07-07T14:38:58.717Z
  */

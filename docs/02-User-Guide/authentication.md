@@ -20,7 +20,7 @@ The proxy requires clients to authenticate using per-train Bearer tokens stored 
 **Via Dashboard API**:
 
 ```bash
-curl -X POST http://localhost:3001/api/trains/your-train-id/api-keys \
+curl -X POST http://localhost:3001/api/projects/your-train-id/api-keys \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{"description": "Production API key for mobile app"}'
@@ -32,7 +32,7 @@ Response includes the full key (shown only once):
 {
   "api_key": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "train_id": "your-train-id",
+    "project_id": "your-train-id",
     "key": "cnp_live_abc123xyz789...",
     "key_preview": "cnp_live_a",
     "description": "Production API key for mobile app",
@@ -50,7 +50,7 @@ Client requests must include the API key:
 
 ```bash
 curl -X POST http://proxy:3000/v1/messages \
-  -H "MSL-Train-Id: your-train-id" \
+  -H "MSL-Project-Id: your-train-id" \
   -H "Authorization: Bearer cnp_live_abc123xyz789..." \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Hello"}], "model": "claude-3-5-sonnet-20241022"}'
@@ -59,7 +59,7 @@ curl -X POST http://proxy:3000/v1/messages \
 #### Listing API Keys
 
 ```bash
-curl http://localhost:3001/api/trains/your-train-id/api-keys \
+curl http://localhost:3001/api/projects/your-train-id/api-keys \
   -H "X-Dashboard-Key: your-dashboard-key"
 ```
 
@@ -83,7 +83,7 @@ Response shows all keys (without full key values):
 #### Revoking an API Key
 
 ```bash
-curl -X DELETE http://localhost:3001/api/trains/your-train-id/api-keys/550e8400-e29b-41d4-a716-446655440000 \
+curl -X DELETE http://localhost:3001/api/projects/your-train-id/api-keys/550e8400-e29b-41d4-a716-446655440000 \
   -H "X-Dashboard-Key: your-dashboard-key"
 ```
 
@@ -189,11 +189,11 @@ Next steps:
 Create a train via the dashboard API:
 
 ```bash
-curl -X POST http://localhost:3001/api/trains \
+curl -X POST http://localhost:3001/api/projects \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{
-    "train_id": "marketing-prod",
+    "project_id": "marketing-prod",
     "description": "Marketing team production train",
     "is_active": true
   }'
@@ -204,7 +204,7 @@ curl -X POST http://localhost:3001/api/trains \
 Link the OAuth credential to your train:
 
 ```bash
-curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key": "your-dashboard-key" \
   -d '{
@@ -259,7 +259,7 @@ curl http://localhost:3001/api/credentials/550e8400-e29b-41d4-a716-446655440000 
 #### List All Trains
 
 ```bash
-curl http://localhost:3001/api/trains \
+curl http://localhost:3001/api/projects \
   -H "X-Dashboard-Key: your-dashboard-key"
 ```
 
@@ -270,7 +270,7 @@ Response shows trains with linked credentials:
   "trains": [
     {
       "id": "550e8400-e29b-41d4-a716-446655440000",
-      "train_id": "marketing-prod",
+      "project_id": "marketing-prod",
       "description": "Marketing team production train",
       "is_active": true,
       "slack_webhook_url": null,
@@ -292,7 +292,7 @@ Response shows trains with linked credentials:
 #### Update Train Configuration
 
 ```bash
-curl -X PUT http://localhost:3001/api/trains/550e8400-e29b-41d4-a716-446655440000 \
+curl -X PUT http://localhost:3001/api/projects/550e8400-e29b-41d4-a716-446655440000 \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{
@@ -305,7 +305,7 @@ curl -X PUT http://localhost:3001/api/trains/550e8400-e29b-41d4-a716-44665544000
 #### Unlink Credential from Train
 
 ```bash
-curl -X DELETE http://localhost:3001/api/trains/marketing-prod/accounts/660e8400-e29b-41d4-a716-446655440001 \
+curl -X DELETE http://localhost:3001/api/projects/marketing-prod/accounts/660e8400-e29b-41d4-a716-446655440001 \
   -H "X-Dashboard-Key: your-dashboard-key"
 ```
 
@@ -334,13 +334,13 @@ Trains can link multiple credentials for automatic failover. When one credential
 
 ```bash
 # Link primary credential
-curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
 
 # Link backup credential
-curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{"credential_id": "770e8400-e29b-41d4-a716-446655440002"}'
@@ -391,24 +391,24 @@ Example multi-train setup:
 
 ```bash
 # Create marketing train
-curl -X POST http://localhost:3001/api/trains \
+curl -X POST http://localhost:3001/api/projects \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
-  -d '{"train_id": "marketing-prod", "description": "Marketing team"}'
+  -d '{"project_id": "marketing-prod", "description": "Marketing team"}'
 
 # Create engineering train
-curl -X POST http://localhost:3001/api/trains \
+curl -X POST http://localhost:3001/api/projects \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
-  -d '{"train_id": "eng-prod", "description": "Engineering team"}'
+  -d '{"project_id": "eng-prod", "description": "Engineering team"}'
 
 # Link same credential to both trains (shared Claude account)
-curl -X POST http://localhost:3001/api/trains/marketing-prod/accounts \
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
 
-curl -X POST http://localhost:3001/api/trains/eng-prod/accounts \
+curl -X POST http://localhost:3001/api/projects/eng-prod/accounts \
   -H "Content-Type: application/json" \
   -H "X-Dashboard-Key: your-dashboard-key" \
   -d '{"credential_id": "660e8400-e29b-41d4-a716-446655440001"}'
@@ -500,7 +500,7 @@ If you have existing filesystem-based credentials:
 
 **Solution**:
 
-1. Verify train ID in `MSL-Train-Id` header matches
+1. Verify train ID in `MSL-Project-Id` header matches
 2. Check API key is not revoked
 3. Regenerate API key if needed
 

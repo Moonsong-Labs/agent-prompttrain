@@ -85,7 +85,7 @@ export const config = {
       return joinPath(env.string('CREDENTIALS_DIR', 'credentials'), 'train-client-keys')
     },
     get defaultTrainId() {
-      return env.string('DEFAULT_TRAIN_ID', 'default')
+      return env.string('DEFAULT_PROJECT_ID', 'default')
     },
   },
 

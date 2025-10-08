@@ -1,9 +1,9 @@
 import { Pool } from 'pg'
 import type {
-  Train,
-  TrainWithAccounts,
-  CreateTrainRequest,
-  UpdateTrainRequest,
+  Project,
+  ProjectWithAccounts,
+  CreateProjectRequest,
+  UpdateProjectRequest,
   AnthropicCredential,
   SlackConfig,
 } from '../../types/credentials'
@@ -12,7 +12,7 @@ import { toSafeCredential } from './credential-queries-internal'
 /**
  * Create a new train with a randomly selected default account
  */
-export async function createTrain(pool: Pool, request: CreateTrainRequest): Promise<Train> {
+export async function createProject(pool: Pool, request: CreateProjectRequest): Promise<Project> {
   // Get a random credential to use as default
   const credentialResult = await pool.query<{ id: string }>(
     'SELECT id FROM anthropic_credentials ORDER BY RANDOM() LIMIT 1'
@@ -20,10 +20,10 @@ export async function createTrain(pool: Pool, request: CreateTrainRequest): Prom
 
   const defaultAccountId = credentialResult.rows[0]?.id || null
 
-  const result = await pool.query<Train>(
+  const result = await pool.query<Project>(
     `
-    INSERT INTO trains (
-      train_id,
+    INSERT INTO projects (
+      project_id,
       name,
       slack_enabled,
       slack_webhook_url,
@@ -35,7 +35,7 @@ export async function createTrain(pool: Pool, request: CreateTrainRequest): Prom
     RETURNING *
     `,
     [
-      request.train_id,
+      request.project_id,
       request.name,
       request.slack_enabled ?? false,
       request.slack_webhook_url || null,
@@ -52,33 +52,38 @@ export async function createTrain(pool: Pool, request: CreateTrainRequest): Prom
 /**
  * Get train by UUID
  */
-export async function getTrainById(pool: Pool, id: string): Promise<Train | null> {
-  const result = await pool.query<Train>('SELECT * FROM trains WHERE id = $1', [id])
+export async function getProjectById(pool: Pool, id: string): Promise<Project | null> {
+  const result = await pool.query<Project>('SELECT * FROM projects WHERE id = $1', [id])
   return result.rows[0] || null
 }
 
 /**
- * Get train by train_id
+ * Get train by project_id
  */
-export async function getTrainByTrainId(pool: Pool, trainId: string): Promise<Train | null> {
-  const result = await pool.query<Train>('SELECT * FROM trains WHERE train_id = $1', [trainId])
+export async function getProjectByProjectId(
+  pool: Pool,
+  projectId: string
+): Promise<Project | null> {
+  const result = await pool.query<Project>('SELECT * FROM projects WHERE project_id = $1', [
+    projectId,
+  ])
   return result.rows[0] || null
 }
 
 /**
  * Get train with all available accounts
- * All trains have access to all credentials
+ * All projects have access to all credentials
  */
-export async function getTrainWithAccounts(
+export async function getProjectWithAccounts(
   pool: Pool,
-  trainId: string
-): Promise<TrainWithAccounts | null> {
-  const train = await getTrainByTrainId(pool, trainId)
+  projectId: string
+): Promise<ProjectWithAccounts | null> {
+  const train = await getProjectByProjectId(pool, projectId)
   if (!train) {
     return null
   }
 
-  // All trains have access to all credentials
+  // All projects have access to all credentials
   const accountsResult = await pool.query<AnthropicCredential>(
     `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
@@ -90,29 +95,29 @@ export async function getTrainWithAccounts(
 }
 
 /**
- * List all trains
+ * List all projects
  */
-export async function listTrains(pool: Pool): Promise<Train[]> {
-  const result = await pool.query<Train>('SELECT * FROM trains ORDER BY name ASC')
+export async function listProjects(pool: Pool): Promise<Project[]> {
+  const result = await pool.query<Project>('SELECT * FROM projects ORDER BY name ASC')
   return result.rows
 }
 
 /**
- * List all trains with all available accounts
- * All trains have access to all credentials
+ * List all projects with all available accounts
+ * All projects have access to all credentials
  */
-export async function listTrainsWithAccounts(pool: Pool): Promise<TrainWithAccounts[]> {
-  const trains = await listTrains(pool)
+export async function listProjectsWithAccounts(pool: Pool): Promise<ProjectWithAccounts[]> {
+  const projects = await listProjects(pool)
 
-  // Get all credentials once (shared across all trains)
+  // Get all credentials once (shared across all projects)
   const accountsResult = await pool.query<AnthropicCredential>(
     `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
 
   const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
 
-  // All trains have access to all credentials
-  const trainsWithAccounts = trains.map(train => ({
+  // All projects have access to all credentials
+  const trainsWithAccounts = projects.map(train => ({
     ...train,
     accounts: allAccounts,
   }))
@@ -123,11 +128,11 @@ export async function listTrainsWithAccounts(pool: Pool): Promise<TrainWithAccou
 /**
  * Update train configuration
  */
-export async function updateTrain(
+export async function updateProject(
   pool: Pool,
   id: string,
-  request: UpdateTrainRequest
-): Promise<Train> {
+  request: UpdateProjectRequest
+): Promise<Project> {
   const updates: string[] = []
   const values: unknown[] = []
   let paramIndex = 1
@@ -158,9 +163,9 @@ export async function updateTrain(
   }
 
   if (updates.length === 0) {
-    const train = await getTrainById(pool, id)
+    const train = await getProjectById(pool, id)
     if (!train) {
-      throw new Error(`Train with ID ${id} not found`)
+      throw new Error(`Project with ID ${id} not found`)
     }
     return train
   }
@@ -168,59 +173,59 @@ export async function updateTrain(
   updates.push(`updated_at = NOW()`)
   values.push(id)
 
-  const result = await pool.query<Train>(
-    `UPDATE trains SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+  const result = await pool.query<Project>(
+    `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
     values
   )
 
   if (result.rows.length === 0) {
-    throw new Error(`Train with ID ${id} not found`)
+    throw new Error(`Project with ID ${id} not found`)
   }
 
   return result.rows[0]
 }
 
 /**
- * Delete a train
+ * Delete a project
  */
-export async function deleteTrain(pool: Pool, id: string): Promise<boolean> {
-  const result = await pool.query('DELETE FROM trains WHERE id = $1', [id])
+export async function deleteProject(pool: Pool, id: string): Promise<boolean> {
+  const result = await pool.query('DELETE FROM projects WHERE id = $1', [id])
   return (result.rowCount ?? 0) > 0
 }
 
 /**
- * Set the default account for a train
+ * Set the default account for a project
  */
-export async function setTrainDefaultAccount(
+export async function setProjectDefaultAccount(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   credentialId: string
-): Promise<Train> {
-  const result = await pool.query<Train>(
+): Promise<Project> {
+  const result = await pool.query<Project>(
     `
-    UPDATE trains
+    UPDATE projects
     SET default_account_id = $2, updated_at = NOW()
     WHERE id = $1
     RETURNING *
     `,
-    [trainId, credentialId]
+    [projectId, credentialId]
   )
 
   if (result.rows.length === 0) {
-    throw new Error(`Train with ID ${trainId} not found`)
+    throw new Error(`Project with ID ${projectId} not found`)
   }
 
   return result.rows[0]
 }
 
 /**
- * Get all credentials available to a train (all credentials)
+ * Get all credentials available to a project (all credentials)
  */
-export async function getTrainCredentials(
+export async function getProjectCredentials(
   pool: Pool,
-  _trainId: string
+  _projectId: string
 ): Promise<AnthropicCredential[]> {
-  // All trains have access to all credentials
+  // All projects have access to all credentials
   const result = await pool.query<AnthropicCredential>(
     `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
   )
@@ -229,13 +234,13 @@ export async function getTrainCredentials(
 }
 
 /**
- * Get Slack configuration for a train
+ * Get Slack configuration for a project
  */
-export async function getTrainSlackConfig(
+export async function getProjectSlackConfig(
   pool: Pool,
-  trainId: string
+  projectId: string
 ): Promise<SlackConfig | null> {
-  const train = await getTrainByTrainId(pool, trainId)
+  const train = await getProjectByProjectId(pool, projectId)
   if (!train) {
     return null
   }
@@ -256,20 +261,20 @@ export async function getTrainSlackConfig(
 /**
  * Get train statistics (last used, 24h request count)
  */
-export async function getTrainStats(
+export async function getProjectStats(
   pool: Pool,
-  trainId: string
+  projectId: string
 ): Promise<{ lastUsedAt: Date | null; requestCount24h: number }> {
   const result = await pool.query<{ last_used_at: Date | null }>(
     `
     SELECT
       MAX(tak.last_used_at) as last_used_at
-    FROM trains t
-    LEFT JOIN train_api_keys tak ON t.id = tak.train_id
+    FROM projects t
+    LEFT JOIN train_api_keys tak ON t.id = tak.project_id
     WHERE t.id = $1
     GROUP BY t.id
     `,
-    [trainId]
+    [projectId]
   )
 
   return {

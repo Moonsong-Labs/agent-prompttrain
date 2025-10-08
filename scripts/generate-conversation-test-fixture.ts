@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 interface RequestData {
   request_id: string
-  train_id: string
+  project_id: string
   conversation_id: string | null
   branch_id: string | null
   current_message_hash: string | null
@@ -35,7 +35,7 @@ interface TestFixture {
   expectedBranchPattern?: string
   parent: {
     request_id: string
-    trainId: string
+    projectId: string
     conversation_id: string | null
     branch_id: string | null
     current_message_hash: string | null
@@ -46,7 +46,7 @@ interface TestFixture {
   }
   child: {
     request_id: string
-    trainId: string
+    projectId: string
     body: any
   }
 }
@@ -55,7 +55,7 @@ async function fetchRequestData(pool: Pool, requestId: string): Promise<RequestD
   const query = `
     SELECT 
       request_id,
-      train_id,
+      project_id,
       conversation_id,
       branch_id,
       current_message_hash,
@@ -224,7 +224,7 @@ async function generateTestFixture(
     expectedLink: childData.conversation_id === parentData.conversation_id,
     parent: {
       request_id: parentData.request_id,
-      trainId: parentData.train_id,
+      projectId: parentData.project_id,
       conversation_id: parentData.conversation_id,
       branch_id: parentData.branch_id,
       current_message_hash: parentData.current_message_hash,
@@ -235,7 +235,7 @@ async function generateTestFixture(
     },
     child: {
       request_id: childData.request_id,
-      trainId: childData.train_id,
+      projectId: childData.project_id,
       body: childBody,
     },
   }

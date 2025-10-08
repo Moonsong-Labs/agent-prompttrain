@@ -16,7 +16,7 @@ export interface MetricsConfig {
 export interface TelemetryData {
   requestId: string
   timestamp: number
-  trainId: string
+  projectId: string
   apiKey?: string
   model: string
   inputTokens?: number
@@ -73,7 +73,7 @@ export class MetricsService {
 
     // logger.debug('Tracking metrics for request', {
     //   requestId: context.requestId,
-    //   trainId: context.trainId,
+    //   projectId: context.projectId,
     //   metrics: metrics,
     //   requestType: request.requestType,
     //   isStreaming: request.isStreaming
@@ -82,7 +82,7 @@ export class MetricsService {
     // Track tokens
     if (this.config.enableTokenTracking) {
       tokenTracker.track(
-        context.trainId,
+        context.projectId,
         metrics.inputTokens,
         metrics.outputTokens,
         request.requestType === 'quota' ? undefined : request.requestType,
@@ -93,7 +93,7 @@ export class MetricsService {
       if (this.tokenUsageService && accountId) {
         await this.tokenUsageService.recordUsage({
           accountId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           model: request.model,
           requestType: request.requestType,
           inputTokens: metrics.inputTokens,
@@ -125,7 +125,7 @@ export class MetricsService {
       await this.sendTelemetry({
         requestId: context.requestId,
         timestamp: Date.now(),
-        trainId: context.trainId,
+        projectId: context.projectId,
         apiKey: this.maskApiKey(context.apiKey),
         model: request.model,
         inputTokens: metrics.inputTokens,
@@ -140,7 +140,7 @@ export class MetricsService {
     // Log metrics
     logger.info('Request processed', {
       requestId: context.requestId,
-      trainId: context.trainId,
+      projectId: context.projectId,
       model: request.model,
       metadata: {
         inputTokens: metrics.inputTokens,
@@ -156,7 +156,7 @@ export class MetricsService {
       // Broadcast conversation update
       broadcastConversation({
         id: context.requestId,
-        trainId: context.trainId,
+        projectId: context.projectId,
         model: request.model,
         tokens: metrics.inputTokens + metrics.outputTokens,
         timestamp: new Date().toISOString(),
@@ -164,10 +164,10 @@ export class MetricsService {
 
       // Broadcast metrics update
       const stats = tokenTracker.getStats()
-      const trainStats = stats[context.trainId]
+      const trainStats = stats[context.projectId]
       if (trainStats) {
         broadcastMetrics({
-          trainId: context.trainId,
+          projectId: context.projectId,
           requests: trainStats.requestCount,
           tokens: trainStats.inputTokens + trainStats.outputTokens,
           activeUsers: Object.keys(stats).length,
@@ -193,7 +193,7 @@ export class MetricsService {
     // Track in token stats (error counts)
     if (this.config.enableTokenTracking) {
       tokenTracker.track(
-        context.trainId,
+        context.projectId,
         0,
         0,
         request.requestType === 'quota' ? undefined : request.requestType,
@@ -206,7 +206,7 @@ export class MetricsService {
       await this.sendTelemetry({
         requestId: context.requestId,
         timestamp: Date.now(),
-        trainId: context.trainId,
+        projectId: context.projectId,
         apiKey: this.maskApiKey(context.apiKey),
         model: request.model,
         duration: context.getElapsedTime(),
@@ -218,7 +218,7 @@ export class MetricsService {
 
     logger.error('Request error tracked', {
       requestId: context.requestId,
-      trainId: context.trainId,
+      projectId: context.projectId,
       metadata: {
         error: error.message,
         status,
@@ -229,10 +229,10 @@ export class MetricsService {
   /**
    * Get token statistics
    */
-  getStats(trainId?: string) {
+  getStats(projectId?: string) {
     const allStats = tokenTracker.getStats()
-    if (trainId) {
-      return allStats[trainId] || null
+    if (projectId) {
+      return allStats[projectId] || null
     }
     return allStats
   }
@@ -268,7 +268,7 @@ export class MetricsService {
       logger.debug('Skipping storage for non-storable request type', {
         requestId: context.requestId,
         requestType: request.requestType,
-        trainId: context.trainId,
+        projectId: context.projectId,
       })
       return
     }
@@ -284,7 +284,7 @@ export class MetricsService {
 
       await this.storageService.storeRequest({
         id: context.requestId,
-        trainId: context.trainId,
+        projectId: context.projectId,
         accountId: accountId,
         timestamp: new Date(context.startTime),
         method: context.method,
@@ -335,7 +335,7 @@ export class MetricsService {
         await this.storageService.processTaskToolInvocations(
           context.requestId,
           fullResponseBody,
-          context.trainId
+          context.projectId
         )
       }
     } catch (error) {

@@ -26,7 +26,7 @@ export interface TaskInvocation {
 }
 
 export interface LinkingRequest {
-  trainId: string
+  projectId: string
   messages: ClaudeMessage[]
   systemPrompt?: string | { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[]
   requestId: string
@@ -52,7 +52,7 @@ interface CompactInfo {
 }
 
 export interface ParentQueryCriteria {
-  trainId: string
+  projectId: string
   messageCount?: number
   parentMessageHash?: string
   currentMessageHash?: string
@@ -73,7 +73,7 @@ interface ParentRequest {
 export type QueryExecutor = (criteria: ParentQueryCriteria) => Promise<ParentRequest[]>
 
 export type CompactSearchExecutor = (
-  trainId: string,
+  projectId: string,
   summaryContent: string,
   afterTimestamp: Date,
   beforeTimestamp?: Date
@@ -82,7 +82,7 @@ export type CompactSearchExecutor = (
 export type RequestByIdExecutor = (requestId: string) => Promise<ParentRequest | null>
 
 export type SubtaskQueryExecutor = (
-  trainId: string,
+  projectId: string,
   timestamp: Date,
   debugMode?: boolean,
   subtaskPrompt?: string
@@ -120,12 +120,12 @@ export class ConversationLinker {
   ) {}
 
   async linkConversation(request: LinkingRequest): Promise<LinkingResult> {
-    const { trainId, messages, systemPrompt, requestId, timestamp } = request
+    const { projectId, messages, systemPrompt, requestId, timestamp } = request
     const linkingId = randomUUID()
     const traceMeta = { linkingId }
 
     this.logger.debug('Conversation linking process started', {
-      trainId,
+      projectId,
       metadata: {
         ...traceMeta,
         requestId,
@@ -157,7 +157,7 @@ export class ConversationLinker {
       const systemHash = systemPromptStr ? hashSystemPrompt(systemPromptStr) : null
 
       this.logger.debug('Computed initial hashes', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           currentMessageHash,
@@ -169,7 +169,7 @@ export class ConversationLinker {
       // Case 1: Single message handling
       if (messages.length === 1) {
         this.logger.debug('Processing single message', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             messageRole: messages[0].role,
@@ -198,7 +198,7 @@ export class ConversationLinker {
             const finalSequence = baseSequence + invocationIndex
 
             this.logger.info('Linked as subtask', {
-              trainId,
+              projectId,
               metadata: {
                 ...traceMeta,
                 outcome: 'subtask_created',
@@ -225,7 +225,7 @@ export class ConversationLinker {
         const compactInfo = this.detectCompactConversation(messages[0])
         if (compactInfo) {
           this.logger.debug('Detected compact conversation', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               isCompact: true,
@@ -235,7 +235,7 @@ export class ConversationLinker {
 
           // Case a: Compact conversation continuation
           const parent = await this.findCompactParent(
-            trainId,
+            projectId,
             compactInfo.summaryContent,
             timestamp,
             traceMeta
@@ -244,7 +244,7 @@ export class ConversationLinker {
             const branchId = this.generateCompactBranchId(timestamp)
 
             this.logger.info('Linked as compact conversation', {
-              trainId,
+              projectId,
               metadata: {
                 ...traceMeta,
                 outcome: 'compact_conversation',
@@ -267,7 +267,7 @@ export class ConversationLinker {
 
         // Case b: Skip - no parent
         this.logger.info('Created new conversation (single message)', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             outcome: 'new_conversation',
@@ -290,7 +290,7 @@ export class ConversationLinker {
       const deduplicatedMessages = this.deduplicateMessages(messages)
 
       this.logger.debug('Processing multiple messages', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           originalCount: messages.length,
@@ -301,7 +301,7 @@ export class ConversationLinker {
       // If after deduplication we have fewer than 3 messages, we can't compute parent hash
       if (deduplicatedMessages.length < MIN_MESSAGES_FOR_PARENT_HASH) {
         this.logger.info('Created new conversation (insufficient messages for parent)', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             outcome: 'new_conversation',
@@ -327,7 +327,7 @@ export class ConversationLinker {
         parentMessageHash = this.computeParentHashFromDeduplicated(deduplicatedMessages)
 
         this.logger.debug('Computed parent hash', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             parentMessageHash,
@@ -335,7 +335,7 @@ export class ConversationLinker {
         })
       } catch (error) {
         this.logger.error('Failed to compute parent hash', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             error: error instanceof Error ? error.message : String(error),
@@ -356,7 +356,7 @@ export class ConversationLinker {
       let parent: ParentRequest | null = null
 
       this.logger.debug('Starting parent matching with priority system', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           parentMessageHash,
@@ -367,7 +367,7 @@ export class ConversationLinker {
       // Priority i: Exact match (parent hash + system hash)
       if (systemHash) {
         const exactMatches = await this.findParentByHash(
-          trainId,
+          projectId,
           parentMessageHash,
           systemHash,
           requestId,
@@ -378,7 +378,7 @@ export class ConversationLinker {
 
         if (parent) {
           this.logger.debug('Found parent via exact match', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               parentId: parent.request_id,
@@ -391,12 +391,12 @@ export class ConversationLinker {
       // Priority ii: Summarization request - ignore system hash
       if (!parent && this.isSummarizationRequest(systemPromptStr)) {
         this.logger.debug('Attempting summarization match (ignoring system hash)', {
-          trainId,
+          projectId,
           metadata: traceMeta,
         })
 
         const summarizationMatches = await this.findParentByHash(
-          trainId,
+          projectId,
           parentMessageHash,
           null,
           requestId,
@@ -407,7 +407,7 @@ export class ConversationLinker {
 
         if (parent) {
           this.logger.debug('Found parent via summarization match', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               parentId: parent.request_id,
@@ -420,12 +420,12 @@ export class ConversationLinker {
       // Priority iii: Fallback - match by message hash only
       if (!parent) {
         this.logger.debug('Attempting fallback match (message hash only)', {
-          trainId,
+          projectId,
           metadata: traceMeta,
         })
 
         const fallbackMatches = await this.findParentByHash(
-          trainId,
+          projectId,
           parentMessageHash,
           null,
           requestId,
@@ -436,7 +436,7 @@ export class ConversationLinker {
 
         if (parent) {
           this.logger.debug('Found parent via fallback match', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               parentId: parent.request_id,
@@ -451,7 +451,7 @@ export class ConversationLinker {
       // parent request failed to be stored due to transient storage issues.
       if (!parent && deduplicatedMessages.length > 4) {
         this.logger.debug('Attempting grandparent fallback', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             deduplicatedCount: deduplicatedMessages.length,
@@ -464,7 +464,7 @@ export class ConversationLinker {
           // Look for a request whose current_message_hash matches our computed grandparent hash
           // Using findParentByHash which searches by currentMessageHash = parentMessageHash parameter
           const grandparentMatches = await this.findParentByHash(
-            trainId,
+            projectId,
             grandparentHash,
             null, // No system hash filter for grandparent lookup
             requestId,
@@ -476,7 +476,7 @@ export class ConversationLinker {
             const grandparent = this.selectBestParent(grandparentMatches, traceMeta)
             if (grandparent) {
               this.logger.debug('Found grandparent match', {
-                trainId,
+                projectId,
                 metadata: {
                   ...traceMeta,
                   grandparentId: grandparent.request_id,
@@ -499,7 +499,7 @@ export class ConversationLinker {
           }
         } catch (error) {
           this.logger.error('Grandparent fallback failed', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               error: error instanceof Error ? error.message : String(error),
@@ -521,7 +521,7 @@ export class ConversationLinker {
           branchId = parent.branch_id
 
           this.logger.debug('Preserving compact branch', {
-            trainId,
+            projectId,
             metadata: {
               ...traceMeta,
               branchId,
@@ -532,7 +532,7 @@ export class ConversationLinker {
           // Only look for children within the same conversation
           // If parent has no conversation_id (legacy data), skip the conversation filter
           const existingChildren = await this.findChildrenOfParent(
-            trainId,
+            projectId,
             parent.current_message_hash,
             requestId,
             timestamp,
@@ -545,7 +545,7 @@ export class ConversationLinker {
 
           if (isNewBranch) {
             this.logger.debug('Creating new branch', {
-              trainId,
+              projectId,
               metadata: {
                 ...traceMeta,
                 branchId,
@@ -556,7 +556,7 @@ export class ConversationLinker {
         }
 
         this.logger.info('Linked to existing conversation', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             outcome: 'linked_to_parent',
@@ -579,7 +579,7 @@ export class ConversationLinker {
 
       // No parent found - new conversation
       this.logger.info('Created new conversation', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           outcome: 'new_conversation',
@@ -897,7 +897,7 @@ export class ConversationLinker {
   }
 
   private async findCompactParent(
-    trainId: string,
+    projectId: string,
     summaryContent: string,
     requestTimestamp: Date | undefined,
     traceMeta: { linkingId: string }
@@ -905,7 +905,7 @@ export class ConversationLinker {
     try {
       if (!this.compactSearchExecutor) {
         this.logger.debug('No compact search executor available', {
-          trainId,
+          projectId,
           metadata: traceMeta,
         })
         // Without compact search capability, we can't find the parent
@@ -921,7 +921,7 @@ export class ConversationLinker {
       afterTimestamp.setDate(afterTimestamp.getDate() - COMPACT_SEARCH_DAYS)
 
       this.logger.debug('Searching for compact parent', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           searchWindow: `${COMPACT_SEARCH_DAYS} days`,
@@ -933,7 +933,7 @@ export class ConversationLinker {
       // requestTimestamp: the current request time (upper bound - latest time to search)
       // This creates a time window: [requestTime - N days, requestTime]
       const result = await this.compactSearchExecutor(
-        trainId,
+        projectId,
         normalizedSummary,
         afterTimestamp,
         requestTimestamp
@@ -941,7 +941,7 @@ export class ConversationLinker {
 
       if (result) {
         this.logger.debug('Found compact parent', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             parentId: result.request_id,
@@ -950,7 +950,7 @@ export class ConversationLinker {
         })
       } else {
         this.logger.debug('No compact parent found', {
-          trainId,
+          projectId,
           metadata: traceMeta,
         })
       }
@@ -958,7 +958,7 @@ export class ConversationLinker {
       return result
     } catch (error) {
       this.logger.error('Error finding compact parent', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           error: error instanceof Error ? error.message : String(error),
@@ -995,7 +995,7 @@ export class ConversationLinker {
   }
 
   private async findParentByHash(
-    trainId: string,
+    projectId: string,
     parentMessageHash: string,
     systemHash: string | null,
     excludeRequestId: string,
@@ -1004,7 +1004,7 @@ export class ConversationLinker {
   ): Promise<ParentRequest[]> {
     try {
       const criteria: ParentQueryCriteria = {
-        trainId,
+        projectId,
         currentMessageHash: parentMessageHash,
         systemHash,
         excludeRequestId,
@@ -1012,7 +1012,7 @@ export class ConversationLinker {
       }
 
       this.logger.debug('Searching for parent by hash', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           parentMessageHash,
@@ -1024,7 +1024,7 @@ export class ConversationLinker {
       const results = await this.queryExecutor(criteria)
 
       this.logger.debug(`Found ${results.length} potential parents`, {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           count: results.length,
@@ -1035,7 +1035,7 @@ export class ConversationLinker {
       return results
     } catch (error) {
       this.logger.error('Error finding parent by hash', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           error: error instanceof Error ? error.message : String(error),
@@ -1046,7 +1046,7 @@ export class ConversationLinker {
   }
 
   private async findChildrenOfParent(
-    trainId: string,
+    projectId: string,
     parentMessageHash: string,
     excludeRequestId: string,
     beforeTimestamp: Date | undefined,
@@ -1055,7 +1055,7 @@ export class ConversationLinker {
   ): Promise<ParentRequest[]> {
     try {
       const criteria: ParentQueryCriteria = {
-        trainId,
+        projectId,
         parentMessageHash,
         excludeRequestId,
         beforeTimestamp,
@@ -1063,7 +1063,7 @@ export class ConversationLinker {
       }
 
       this.logger.debug('Searching for children of parent', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           parentMessageHash,
@@ -1075,7 +1075,7 @@ export class ConversationLinker {
 
       if (results.length > 0) {
         this.logger.debug('Found existing children - branch point detected', {
-          trainId,
+          projectId,
           metadata: {
             ...traceMeta,
             childCount: results.length,
@@ -1087,7 +1087,7 @@ export class ConversationLinker {
       return results
     } catch (error) {
       this.logger.error('Error finding children of parent', {
-        trainId,
+        projectId,
         metadata: {
           ...traceMeta,
           error: error instanceof Error ? error.message : String(error),
@@ -1175,7 +1175,7 @@ export class ConversationLinker {
     }
 
     this.logger.debug('Attempting to detect subtask', {
-      trainId: request.trainId,
+      projectId: request.projectId,
       metadata: traceMeta,
     })
 
@@ -1184,7 +1184,7 @@ export class ConversationLinker {
     const userContent = this.extractContentText(message.content)
     if (!userContent) {
       this.logger.debug('No text content found in user message', {
-        trainId: request.trainId,
+        projectId: request.projectId,
         metadata: traceMeta,
       })
       return { isSubtask: false }
@@ -1193,7 +1193,7 @@ export class ConversationLinker {
     const timestamp = request.timestamp || new Date()
     // Pass the user content as the prompt filter for optimized querying
     const recentInvocations = await this.subtaskQueryExecutor(
-      request.trainId,
+      request.projectId,
       timestamp,
       false, // debugMode - controlled by the executor
       userContent // Pass the prompt for SQL-level filtering
@@ -1202,14 +1202,14 @@ export class ConversationLinker {
     // Check if we have task context with recent invocations
     if (!recentInvocations || recentInvocations.length === 0) {
       this.logger.debug('No recent Task invocations found', {
-        trainId: request.trainId,
+        projectId: request.projectId,
         metadata: traceMeta,
       })
       return { isSubtask: false }
     }
 
     this.logger.debug('Found recent Task invocations', {
-      trainId: request.trainId,
+      projectId: request.projectId,
       metadata: {
         ...traceMeta,
         invocationCount: recentInvocations.length,
@@ -1243,7 +1243,7 @@ export class ConversationLinker {
 
     if (matchingInvocation) {
       this.logger.debug('Found matching Task invocation', {
-        trainId: request.trainId,
+        projectId: request.projectId,
         metadata: {
           ...traceMeta,
           parentTaskRequestId: matchingInvocation.requestId,
@@ -1261,7 +1261,7 @@ export class ConversationLinker {
     }
 
     this.logger.debug('No matching Task invocation found', {
-      trainId: request.trainId,
+      projectId: request.projectId,
       metadata: {
         ...traceMeta,
         userContentPreview: userContent.substring(0, 100),

@@ -21,11 +21,11 @@ Authorization: Bearer cnp_live_YOUR_KEY
 
 ### Train & Account Headers
 
-Use the `MSL-Train-Id` header to associate requests with a project/train, and optionally
+Use the `MSL-Project-Id` header to associate requests with a project/train, and optionally
 `MSL-Account` to select a specific Anthropic account credential:
 
 ```bash
-MSL-Train-Id: train-alpha
+MSL-Project-Id: train-alpha
 MSL-Account: account-primary  # optional
 ```
 
@@ -102,7 +102,7 @@ data: {"type":"message_stop"}
 GET /token-stats
 ```
 
-Returns token usage statistics per train ID.
+Returns token usage statistics per project ID.
 
 **Response:**
 
@@ -166,14 +166,14 @@ Authorization: Bearer YOUR_DASHBOARD_KEY
 #### List Requests
 
 ```http
-GET /api/requests?limit=50&offset=0&trainId=train-alpha
+GET /api/requests?limit=50&offset=0&projectId=train-alpha
 ```
 
 **Query Parameters:**
 
 - `limit` - Number of results (default: 50, max: 100)
 - `offset` - Pagination offset
-- `trainId` - Filter by train
+- `projectId` - Filter by train
 - `model` - Filter by model
 - `from` - Start date (ISO 8601)
 - `to` - End date (ISO 8601)
@@ -186,7 +186,7 @@ GET /api/requests?limit=50&offset=0&trainId=train-alpha
     {
       "request_id": "uuid",
       "timestamp": "2024-01-15T10:00:00Z",
-      "trainId": "train-alpha",
+      "projectId": "train-alpha",
       "model": "claude-3-opus-20240229",
       "input_tokens": 100,
       "output_tokens": 200,
@@ -213,7 +213,7 @@ GET /api/requests/:id
 {
   "request_id": "uuid",
   "timestamp": "2024-01-15T10:00:00Z",
-  "trainId": "train-alpha",
+  "projectId": "train-alpha",
   "request": {
     "messages": [...],
     "model": "claude-3-opus-20240229"
@@ -233,12 +233,12 @@ GET /api/requests/:id
 #### List Conversations
 
 ```http
-GET /api/conversations?trainId=train-alpha&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
+GET /api/conversations?projectId=train-alpha&accountId=acc_123&limit=50&offset=0&dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z
 ```
 
 **Query Parameters:**
 
-- `trainId` - Filter by train (optional)
+- `projectId` - Filter by train (optional)
 - `accountId` - Filter by account (optional)
 - `limit` - Number of conversations per page (default: 50)
 - `offset` - Number of conversations to skip for pagination (default: 0)
@@ -252,7 +252,7 @@ GET /api/conversations?trainId=train-alpha&accountId=acc_123&limit=50&offset=0&d
   "conversations": [
     {
       "conversationId": "uuid",
-      "trainId": "train-alpha",
+      "projectId": "train-alpha",
       "accountId": "acc_123",
       "firstMessageTime": "2024-01-15T09:00:00Z",
       "lastMessageTime": "2024-01-15T10:00:00Z",
@@ -284,14 +284,14 @@ GET /api/conversations?trainId=train-alpha&accountId=acc_123&limit=50&offset=0&d
 #### Get Dashboard Statistics
 
 ```http
-GET /api/dashboard/stats?trainId=train-alpha&accountId=acc_123
+GET /api/dashboard/stats?projectId=train-alpha&accountId=acc_123
 ```
 
 Optimized endpoint for dashboard overview page that returns aggregated statistics in a single query.
 
 **Query Parameters:**
 
-- `trainId` - Filter by train (optional)
+- `projectId` - Filter by train (optional)
 - `accountId` - Filter by account (optional)
 
 **Response:**
@@ -482,7 +482,7 @@ Get token usage for the current sliding window (default 5 hours).
 
 - `accountId` - Account identifier (required)
 - `window` - Window size in minutes (default: 300)
-- `trainId` - Filter by train (optional)
+- `projectId` - Filter by train (optional)
 - `model` - Filter by model (optional)
 
 **Response:**
@@ -490,7 +490,7 @@ Get token usage for the current sliding window (default 5 hours).
 ```json
 {
   "accountId": "acc_123",
-  "trainId": "train-alpha",
+  "projectId": "train-alpha",
   "model": "claude-3-opus-20240229",
   "windowStart": "2024-01-15T05:00:00Z",
   "windowEnd": "2024-01-15T10:00:00Z",
@@ -515,7 +515,7 @@ Get daily token usage statistics.
 
 - `accountId` - Account identifier (required)
 - `days` - Number of days to retrieve (default: 30)
-- `trainId` - Filter by train (optional)
+- `projectId` - Filter by train (optional)
 - `aggregate` - Aggregate across models (default: false)
 
 **Response:**
@@ -526,7 +526,7 @@ Get daily token usage statistics.
     {
       "date": "2024-01-15",
       "accountId": "acc_123",
-      "trainId": "train-alpha",
+      "projectId": "train-alpha",
       "totalInputTokens": 100000,
       "totalOutputTokens": 150000,
       "totalTokens": 250000,
@@ -547,7 +547,7 @@ Get rate limit configurations.
 **Query Parameters:**
 
 - `accountId` - Filter by account
-- `trainId` - Filter by train
+- `projectId` - Filter by train
 - `model` - Filter by model
 
 **Response:**
@@ -558,7 +558,7 @@ Get rate limit configurations.
     {
       "id": 1,
       "accountId": "acc_123",
-      "trainId": null,
+      "projectId": null,
       "model": "claude-3-opus-20240229",
       "windowMinutes": 300,
       "tokenLimit": 140000,
@@ -613,7 +613,7 @@ Streams real-time updates for requests.
 
 ```
 event: request
-data: {"request_id":"uuid","trainId":"train-alpha","timestamp":"2024-01-15T10:00:00Z"}
+data: {"request_id":"uuid","projectId":"train-alpha","timestamp":"2024-01-15T10:00:00Z"}
 
 event: stats
 data: {"total_requests":1000,"active_trains":5}

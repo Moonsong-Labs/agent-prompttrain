@@ -26,7 +26,7 @@ export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 export const ANTHROPIC_API_KEY_REGEX = /^sk-ant-[a-zA-Z0-9-_]+$/
 
 /**
- * Agent Prompt Train API key pattern
+ * Agent Prompt Project API key pattern
  * Matches: cnp_live_xxxxx or cnp_test_xxxxx
  */
 export const CNP_API_KEY_REGEX = /^cnp_(live|test)_[a-zA-Z0-9_]+$/
@@ -43,7 +43,7 @@ export const JWT_TOKEN_REGEX = /^eyJ[a-zA-Z0-9-_]+\.eyJ[a-zA-Z0-9-_]+\.[a-zA-Z0-
 export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 
 /**
- * Train identifier pattern
+ * Project identifier pattern
  * Matches: letters, numbers, dots, dashes, underscores, and colons
  */
 export const TRAIN_ID_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/

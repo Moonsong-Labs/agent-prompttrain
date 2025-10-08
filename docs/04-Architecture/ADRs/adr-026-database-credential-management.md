@@ -1,4 +1,4 @@
-# ADR-026: Database-Based Credential and Train Management
+# ADR-026: Database-Based Credential and Project Management
 
 ## Status
 
@@ -63,7 +63,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 
 ### Option 3: Full Migration to Database Storage
 
-**Description**: Migrate all credential and train management to PostgreSQL with no filesystem fallback
+**Description**: Migrate all credential and project management to PostgreSQL with no filesystem fallback
 
 **Pros**:
 
@@ -82,7 +82,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 
 ## Decision
 
-We will **fully migrate to database-based credential and train management (Option 3)** with the following architecture:
+We will **fully migrate to database-based credential and project management (Option 3)** with the following architecture:
 
 ### Database Schema
 
@@ -95,17 +95,17 @@ Four new tables manage the credential and train lifecycle:
 
 2. **`trains`**: Represents isolated Claude API access configurations
    - Primary key: `id` (UUID)
-   - Business key: `train_id` (e.g., "cnp-dev-001")
+   - Business key: `project_id` (e.g., "cnp-dev-001")
    - Configuration: `slack_webhook_url`, `is_active`
 
 3. **`train_accounts`**: Many-to-many junction table linking trains to credentials
-   - Composite primary key: `(train_id, credential_id)`
+   - Composite primary key: `(project_id, credential_id)`
    - Tracks: `linked_at`
-   - Enables multiple credentials per train (for failover) and credential reuse across trains
+   - Enables multiple credentials per project (for failover) and credential reuse across trains
 
 4. **`train_api_keys`**: Client API keys for accessing specific trains
    - Primary key: `id` (UUID)
-   - Foreign key: `train_id`
+   - Foreign key: `project_id`
    - Stores: `key_hash` (SHA-256), `key_preview` (first 10 chars), `description`
    - Tracks: `created_at`, `last_used_at`, `revoked_at`
 
@@ -133,14 +133,14 @@ Four new tables manage the credential and train lifecycle:
 
 - `GET /api/credentials` - List credentials (safe format, no tokens)
 - `GET /api/credentials/:id` - Get credential details
-- `GET /api/trains` - List all trains with linked accounts
-- `POST /api/trains` - Create new train
-- `PUT /api/trains/:id` - Update train configuration
-- `POST /api/trains/:id/accounts` - Link credential to train
-- `DELETE /api/trains/:id/accounts/:credentialId` - Unlink credential
-- `GET /api/trains/:trainId/api-keys` - List API keys
-- `POST /api/trains/:trainId/api-keys` - Generate new API key
-- `DELETE /api/trains/:trainId/api-keys/:keyId` - Revoke API key
+- `GET /api/projects` - List all trains with linked accounts
+- `POST /api/projects` - Create new train
+- `PUT /api/projects/:id` - Update train configuration
+- `POST /api/projects/:id/accounts` - Link credential to train
+- `DELETE /api/projects/:id/accounts/:credentialId` - Unlink credential
+- `GET /api/projects/:projectId/api-keys` - List API keys
+- `POST /api/projects/:projectId/api-keys` - Generate new API key
+- `DELETE /api/projects/:projectId/api-keys/:keyId` - Revoke API key
 
 **Naming Conventions**: Snake_case for JSON (external API contract), camelCase for internal TypeScript.
 

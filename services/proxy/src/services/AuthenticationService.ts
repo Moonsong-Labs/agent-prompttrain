@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import { createHash } from 'crypto'
-import { getTrainCredentials } from '@agent-prompttrain/shared/database/queries'
+import { getProjectCredentials } from '@agent-prompttrain/shared/database/queries'
 import { AuthenticationError, type AnthropicCredential } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { getApiKey } from '../credentials'
@@ -22,15 +22,15 @@ export class AuthenticationService {
 
   async authenticate(context: RequestContext): Promise<AuthResult> {
     const requestedAccount = context.account
-    const trainId = context.trainId
+    const projectId = context.projectId
 
     // Get all credentials linked to this train
-    const credentials = await getTrainCredentials(this.pool, trainId)
+    const credentials = await getProjectCredentials(this.pool, projectId)
 
     if (!credentials.length) {
       throw new AuthenticationError('No credentials configured for this train', {
         requestId: context.requestId,
-        trainId,
+        projectId,
         hint: 'Link at least one credential to this train via the dashboard',
       })
     }
@@ -39,7 +39,7 @@ export class AuthenticationService {
     if (requestedAccount) {
       logger.warn('Account specified in request, using deterministic selection', {
         requestId: context.requestId,
-        trainId,
+        projectId,
         account: requestedAccount,
         credentials: credentials.map(c => ({ id: c.account_id, name: c.account_name })),
       } as any)
@@ -48,14 +48,14 @@ export class AuthenticationService {
         throw new AuthenticationError('Requested account not linked to train', {
           requestId: context.requestId,
           account: requestedAccount,
-          trainId,
+          projectId,
         })
       }
       return this.buildAuthResult(credential, context)
     }
 
     // Otherwise, use deterministic selection
-    const orderedCredentials = this.rankCredentials(trainId, credentials)
+    const orderedCredentials = this.rankCredentials(projectId, credentials)
 
     for (const credential of orderedCredentials) {
       try {
@@ -73,12 +73,12 @@ export class AuthenticationService {
 
     throw new AuthenticationError('No valid credentials available for authentication', {
       requestId: context.requestId,
-      trainId,
+      projectId,
     })
   }
 
   private rankCredentials(
-    trainId: string,
+    projectId: string,
     credentials: AnthropicCredential[]
   ): AnthropicCredential[] {
     if (credentials.length <= 1) {
@@ -86,7 +86,7 @@ export class AuthenticationService {
     }
 
     const scored = credentials.map(credential => {
-      const hashInput = `${trainId}::${credential.account_name}`
+      const hashInput = `${projectId}::${credential.account_name}`
       const digest = createHash('sha256').update(hashInput).digest()
       const score = digest.readBigUInt64BE(0)
       return { credential, score }
@@ -118,7 +118,7 @@ export class AuthenticationService {
 
     logger.info('Using OAuth credentials for account', {
       requestId: context.requestId,
-      trainId: context.trainId,
+      projectId: context.projectId,
       metadata: {
         accountName: credential.account_name,
         accountId: credential.account_id,

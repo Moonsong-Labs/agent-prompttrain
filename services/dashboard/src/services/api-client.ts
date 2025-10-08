@@ -16,7 +16,7 @@ interface StatsResponse {
 
 interface RequestSummary {
   requestId: string
-  trainId: string
+  projectId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -61,14 +61,14 @@ interface RequestDetails extends RequestSummary {
 
 interface TrainIdsResponse {
   trainIds?: Array<{
-    trainId: string
+    projectId: string
     requestCount: number
   }>
 }
 
 interface TokenUsageWindow {
   accountId: string
-  trainId: string
+  projectId: string
   model: string
   windowStart: string
   windowEnd: string
@@ -83,7 +83,7 @@ interface TokenUsageWindow {
 interface DailyUsage {
   date: string
   accountId: string
-  trainId: string
+  projectId: string
   totalInputTokens: number
   totalOutputTokens: number
   totalTokens: number
@@ -93,7 +93,7 @@ interface DailyUsage {
 interface RateLimitConfig {
   id: number
   accountId?: string
-  trainId?: string
+  projectId?: string
   model?: string
   windowMinutes: number
   tokenLimit: number
@@ -107,7 +107,7 @@ interface ConversationSummary {
   trainIds: string[]
   accountIds: string[]
   // Backward compatibility - deprecated
-  trainId: string
+  projectId: string
   accountId?: string
   firstMessageTime: string
   lastMessageTime: string
@@ -155,11 +155,11 @@ export class ProxyApiClient {
   /**
    * Get aggregated statistics
    */
-  async getStats(params?: { trainId?: string; since?: string }): Promise<StatsResponse> {
+  async getStats(params?: { projectId?: string; since?: string }): Promise<StatsResponse> {
     try {
       const url = new URL('/api/stats', this.baseUrl)
-      if (params?.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params?.since) {
         url.searchParams.set('since', params.since)
@@ -188,14 +188,14 @@ export class ProxyApiClient {
    * Get recent requests
    */
   async getRequests(params?: {
-    trainId?: string
+    projectId?: string
     limit?: number
     offset?: number
   }): Promise<RequestsResponse> {
     try {
       const url = new URL('/api/requests', this.baseUrl)
-      if (params?.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params?.limit) {
         url.searchParams.set('limit', params.limit.toString())
@@ -215,7 +215,7 @@ export class ProxyApiClient {
       const mapped: RequestsResponse = {
         requests: (json.requests || []).map((req: any) => ({
           requestId: req.requestId,
-          trainId: req.trainId,
+          projectId: req.projectId,
           model: req.model,
           timestamp: req.timestamp,
           inputTokens: req.inputTokens,
@@ -260,7 +260,7 @@ export class ProxyApiClient {
       const json = (await response.json()) as any
       const details: RequestDetails = {
         requestId: json.requestId,
-        trainId: json.trainId,
+        projectId: json.projectId,
         model: json.model,
         timestamp: json.timestamp,
         inputTokens: json.inputTokens,
@@ -325,7 +325,7 @@ export class ProxyApiClient {
   async getTokenUsageWindow(params: {
     accountId: string
     window?: number // Window in minutes (default 300 = 5 hours)
-    trainId?: string
+    projectId?: string
     model?: string
   }): Promise<TokenUsageWindow> {
     try {
@@ -334,8 +334,8 @@ export class ProxyApiClient {
       if (params.window) {
         url.searchParams.set('window', params.window.toString())
       }
-      if (params.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params.model) {
         url.searchParams.set('model', params.model)
@@ -351,7 +351,7 @@ export class ProxyApiClient {
       const json = (await response.json()) as any
       return {
         accountId: json.accountId,
-        trainId: json.trainId,
+        projectId: json.projectId,
         model: json.model,
         windowStart: json.windowStart,
         windowEnd: json.windowEnd,
@@ -377,7 +377,7 @@ export class ProxyApiClient {
   async getDailyTokenUsage(params: {
     accountId: string
     days?: number
-    trainId?: string
+    projectId?: string
     aggregate?: boolean
   }): Promise<{ usage: DailyUsage[] }> {
     try {
@@ -386,8 +386,8 @@ export class ProxyApiClient {
       if (params.days) {
         url.searchParams.set('days', params.days.toString())
       }
-      if (params.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params.aggregate !== undefined) {
         url.searchParams.set('aggregate', params.aggregate.toString())
@@ -403,7 +403,7 @@ export class ProxyApiClient {
       const json = (await response.json()) as { usage: DailyUsage[] }
       json.usage = json.usage.map(entry => ({
         ...entry,
-        trainId: entry.trainId,
+        projectId: entry.projectId,
       }))
       return json
     } catch (error) {
@@ -550,7 +550,7 @@ export class ProxyApiClient {
       remainingTokens: number
       percentageUsed: number
       trainIds: Array<{
-        trainId: string
+        projectId: string
         outputTokens: number
         requests: number
       }>
@@ -582,7 +582,7 @@ export class ProxyApiClient {
         remainingTokens: account.remainingTokens,
         percentageUsed: account.percentageUsed,
         trainIds: (account.trainIds || []).map((item: any) => ({
-          trainId: item.trainId,
+          projectId: item.projectId,
           outputTokens: item.outputTokens,
           requests: item.requests,
         })),
@@ -606,7 +606,7 @@ export class ProxyApiClient {
    */
   async getRateLimitConfigs(params?: {
     accountId?: string
-    trainId?: string
+    projectId?: string
     model?: string
   }): Promise<{ configs: RateLimitConfig[] }> {
     try {
@@ -614,8 +614,8 @@ export class ProxyApiClient {
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
       }
-      if (params?.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params?.model) {
         url.searchParams.set('model', params.model)
@@ -631,7 +631,7 @@ export class ProxyApiClient {
       const json = (await response.json()) as any
       json.configs = (json.configs || []).map((cfg: any) => ({
         ...cfg,
-        trainId: cfg.trainId,
+        projectId: cfg.projectId,
       }))
       return json
     } catch (error) {
@@ -647,7 +647,7 @@ export class ProxyApiClient {
    * Get conversations with account information
    */
   async getConversations(params?: {
-    trainId?: string
+    projectId?: string
     accountId?: string
     limit?: number
     offset?: number
@@ -666,8 +666,8 @@ export class ProxyApiClient {
   }> {
     try {
       const url = new URL('/api/conversations', this.baseUrl)
-      if (params?.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -710,7 +710,7 @@ export class ProxyApiClient {
   /**
    * Get aggregated dashboard statistics
    */
-  async getDashboardStats(params?: { trainId?: string; accountId?: string }): Promise<{
+  async getDashboardStats(params?: { projectId?: string; accountId?: string }): Promise<{
     totalConversations: number
     activeUsers: number
     totalRequests: number
@@ -733,8 +733,8 @@ export class ProxyApiClient {
   }> {
     try {
       const url = new URL('/api/dashboard/stats', this.baseUrl)
-      if (params?.trainId) {
-        url.searchParams.set('trainId', params.trainId)
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
       }
       if (params?.accountId) {
         url.searchParams.set('accountId', params.accountId)
@@ -790,7 +790,7 @@ export class ProxyApiClient {
       },
       requests: requests.map(req => ({
         request_id: req.requestId,
-        trainId: req.trainId,
+        projectId: req.projectId,
         model: req.model,
         total_tokens: req.totalTokens,
         input_tokens: req.inputTokens,

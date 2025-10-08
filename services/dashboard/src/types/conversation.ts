@@ -37,11 +37,11 @@ export interface ConversationSummary {
   total_tokens: number
   branches: string[]
   requests: ConversationRequest[]
-  trainId?: string
+  projectId?: string
 }
 
 export interface ApiRequest extends ConversationRequest {
-  trainId: string
+  projectId: string
   status_code?: number
   request_body?: any
   response_body?: any

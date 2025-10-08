@@ -53,7 +53,7 @@ The `client-auth` middleware accepts any token listed in the file for the given 
 
 ## Request Headers
 
-- `MSL-Train-Id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_project"` ensures outgoing Anthropic calls stay tagged.
+- `MSL-Project-Id`: identifies the project/train for analytics and storage. Configure upstream clients (or the proxy itself) to send this header. `ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:my_project"` ensures outgoing Anthropic calls stay tagged.
 - `MSL-Account`: optional; selects a specific account credential file. If omitted, the proxy deterministically maps the train to one of the configured accounts.
 
 Neither header is forwarded to Anthropic.
@@ -82,13 +82,13 @@ Neither header is forwarded to Anthropic.
 
 3. Tag outbound Anthropic calls:
    ```bash
-   export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:train-alpha"
+   export ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:train-alpha"
    ```
 
 4. Choose an account per request when needed:
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
-     -H "MSL-Train-Id: train-alpha" \
+     -H "MSL-Project-Id: train-alpha" \
      -H "MSL-Account: account-primary" \
      -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \

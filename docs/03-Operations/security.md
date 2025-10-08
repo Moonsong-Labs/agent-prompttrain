@@ -30,7 +30,7 @@ bun run auth:generate-key
 # Output: cnp_live_1a2b3c4d5e6f...
 
 # Add it to the train client key list
-cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+cat > credentials/project-client-keys/your-train-id.client-keys.json <<'JSON'
 { "keys": ["cnp_live_1a2b3c4d5e6f..."] }
 JSON
 ```
@@ -95,10 +95,10 @@ Best practices for key rotation:
 ```bash
 # Update client key list - proxy reloads automatically
 jq '.keys = ["cnp_live_new_key"]' \
-  credentials/train-client-keys/your-train-id.client-keys.json \
-  > credentials/train-client-keys/your-train-id.client-keys.json.tmp
-mv credentials/train-client-keys/your-train-id.client-keys.json.tmp \
-   credentials/train-client-keys/your-train-id.client-keys.json
+  credentials/project-client-keys/your-train-id.client-keys.json \
+  > credentials/project-client-keys/your-train-id.client-keys.json.tmp
+mv credentials/project-client-keys/your-train-id.client-keys.json.tmp \
+   credentials/project-client-keys/your-train-id.client-keys.json
 ```
 
 3. Monitor old key usage before removal
@@ -181,7 +181,7 @@ location / {
 The proxy logs all requests with:
 
 - Timestamp
-- Train ID
+- Project ID
 - Request ID
 - IP address
 - Response status
@@ -191,10 +191,10 @@ The proxy logs all requests with:
 1. **Failed Authentication Attempts**:
 
 ```sql
-SELECT COUNT(*), ip_address, train_id
+SELECT COUNT(*), ip_address, project_id
 FROM api_requests
 WHERE response_status = 401
-GROUP BY ip_address, train_id
+GROUP BY ip_address, project_id
 HAVING COUNT(*) > 10;
 ```
 
@@ -202,9 +202,9 @@ HAVING COUNT(*) > 10;
 
 ```sql
 -- Detect token usage spikes
-SELECT train_id, DATE(timestamp), SUM(total_tokens)
+SELECT project_id, DATE(timestamp), SUM(total_tokens)
 FROM api_requests
-GROUP BY train_id, DATE(timestamp)
+GROUP BY project_id, DATE(timestamp)
 HAVING SUM(total_tokens) > average_daily_usage * 2;
 ```
 

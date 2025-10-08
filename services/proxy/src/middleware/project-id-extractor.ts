@@ -1,21 +1,21 @@
 import { Context, Next } from 'hono'
 import { logger } from './logger.js'
 import { config } from '@agent-prompttrain/shared/config'
-import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
+import { MSL_PROJECT_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
- * Train ID extractor middleware (fallback)
- * Sets train ID from MSL-Train-Id header only if not already set by client auth
+ * Project ID extractor middleware (fallback)
+ * Sets train ID from MSL-Project-Id header only if not already set by client auth
  * This acts as a fallback for routes that don't use API key authentication
  */
-export function trainIdExtractorMiddleware() {
+export function projectIdExtractorMiddleware() {
   return async (c: Context, next: Next) => {
-    // Check if trainId was already set by client auth middleware
-    const existingTrainId = c.get('trainId')
+    // Check if projectId was already set by client auth middleware
+    const existingTrainId = c.get('projectId')
 
     if (!existingTrainId) {
       // Only extract from header if not already set by authentication
-      const rawHeader = c.req.header(MSL_TRAIN_ID_HEADER_LOWER)
+      const rawHeader = c.req.header(MSL_PROJECT_ID_HEADER_LOWER)
       const fallbackTrainId = config.auth.defaultTrainId || 'default'
 
       if (!rawHeader || !rawHeader.trim()) {
@@ -25,9 +25,9 @@ export function trainIdExtractorMiddleware() {
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
           metadata: { fallbackTrainId },
         })
-        c.set('trainId', fallbackTrainId)
+        c.set('projectId', fallbackTrainId)
       } else {
-        c.set('trainId', rawHeader.trim())
+        c.set('projectId', rawHeader.trim())
       }
     }
 

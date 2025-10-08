@@ -50,7 +50,7 @@ describe('AI Analysis API Integration Tests', () => {
     proxyApp = new Hono()
     proxyApp.use('*', async (c, next) => {
       c.set('pool', mockPool as Pool)
-      c.set('trainId', 'test.example.com')
+      c.set('projectId', 'test.example.com')
       c.set('requestId', 'test-request-id')
       await next()
     })

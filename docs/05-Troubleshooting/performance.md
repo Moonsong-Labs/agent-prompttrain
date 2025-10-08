@@ -63,7 +63,7 @@ psql -c "SELECT count(*) FROM pg_stat_activity;"
 ```sql
 -- Add missing indexes
 CREATE INDEX CONCURRENTLY idx_api_requests_created_at ON api_requests(created_at);
-CREATE INDEX CONCURRENTLY idx_api_requests_train_id ON api_requests(train_id);
+CREATE INDEX CONCURRENTLY idx_api_requests_project_id ON api_requests(project_id);
 CREATE INDEX CONCURRENTLY idx_api_requests_conversation ON api_requests(conversation_id, created_at);
 
 -- Update statistics
@@ -247,7 +247,7 @@ max_wal_size = 4GB
 ```sql
 -- Find high token usage requests
 SELECT
-  train_id,
+  project_id,
   model,
   request_type,
   AVG(input_tokens + output_tokens) as avg_tokens,
@@ -255,7 +255,7 @@ SELECT
   COUNT(*) as count
 FROM api_requests
 WHERE created_at > NOW() - INTERVAL '24 hours'
-GROUP BY train_id, model, request_type
+GROUP BY project_id, model, request_type
 ORDER BY avg_tokens DESC;
 
 -- Identify token usage patterns
@@ -352,7 +352,7 @@ upstream claude_proxy {
 
 1. **Response Time Percentiles**
    - P50, P95, P99 latencies
-   - By endpoint and train_id
+   - By endpoint and project_id
 
 2. **Throughput**
    - Requests per second
@@ -360,7 +360,7 @@ upstream claude_proxy {
 
 3. **Error Rates**
    - By error type
-   - By train_id
+   - By project_id
 
 4. **Resource Usage**
    - CPU and memory usage

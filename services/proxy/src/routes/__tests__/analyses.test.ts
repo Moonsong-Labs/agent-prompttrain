@@ -16,7 +16,7 @@ describe('Proxy Analysis Routes', () => {
   let app: Hono<{
     Variables: {
       pool?: Pool
-      trainId?: string
+      projectId?: string
       requestId?: string
     }
   }>
@@ -47,7 +47,7 @@ describe('Proxy Analysis Routes', () => {
     app = new Hono()
     app.use('*', async (c, next) => {
       c.set('pool', mockPool as unknown as Pool)
-      c.set('trainId', 'test-train')
+      c.set('projectId', 'test-train')
       c.set('requestId', 'test-request-id')
       await next()
     })

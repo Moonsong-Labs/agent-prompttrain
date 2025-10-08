@@ -20,19 +20,19 @@ async function migrate() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS train_members (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        train_id UUID NOT NULL REFERENCES trains(id) ON DELETE CASCADE,
+        project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         user_email VARCHAR(255) NOT NULL,
         role VARCHAR(20) NOT NULL CHECK (role IN ('owner', 'member')),
         added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         added_by VARCHAR(255) NOT NULL,
-        UNIQUE(train_id, user_email)
+        UNIQUE(project_id, user_email)
       )
     `)
 
     console.log('Creating indexes on train_members...')
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_members_train_id
-      ON train_members(train_id)
+      ON train_members(project_id)
     `)
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_members_user_email
@@ -40,20 +40,20 @@ async function migrate() {
     `)
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_train_members_role
-      ON train_members(train_id, role)
+      ON train_members(project_id, role)
     `)
 
-    // Backfill existing trains with default owner
-    console.log('Backfilling existing trains with default owner...')
+    // Backfill existing projects with default owner
+    console.log('Backfilling existing projects with default owner...')
     const defaultOwnerEmail = 'todo@localhost'
 
     await client.query(
       `
-      INSERT INTO train_members (train_id, user_email, role, added_by)
+      INSERT INTO train_members (project_id, user_email, role, added_by)
       SELECT id, $1, 'owner', 'system'
-      FROM trains
+      FROM projects
       WHERE NOT EXISTS (
-        SELECT 1 FROM train_members WHERE train_members.train_id = trains.id
+        SELECT 1 FROM train_members WHERE train_members.project_id = projects.id
       )
     `,
       [defaultOwnerEmail]
@@ -64,11 +64,11 @@ async function migrate() {
       [defaultOwnerEmail]
     )
     console.log(
-      `Backfilled ${backfillResult.rows[0].count} existing trains with owner: ${defaultOwnerEmail}`
+      `Backfilled ${backfillResult.rows[0].count} existing projects with owner: ${defaultOwnerEmail}`
     )
 
     await client.query('COMMIT')
-    console.log('Train members migration completed successfully.')
+    console.log('Project members migration completed successfully.')
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Migration failed:', error)
