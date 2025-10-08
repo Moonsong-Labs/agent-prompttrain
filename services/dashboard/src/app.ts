@@ -17,9 +17,9 @@ import { analyticsPartialRoutes } from './routes/partials/analytics.js'
 import { analyticsConversationPartialRoutes } from './routes/partials/analytics-conversation.js'
 import { csrfProtection } from './middleware/csrf.js'
 import credentialsRoutes from './routes/credentials.js'
-import trainsRoutes from './routes/projects.js'
+import projectsRoutes from './routes/projects.js'
 import apiKeysRoutes from './routes/api-keys.js'
-import trainMembersRoutes from './routes/project-members.js'
+import projectMembersRoutes from './routes/project-members.js'
 import { getProjectByProjectId, isTrainMember } from '@agent-prompttrain/shared/database/queries'
 
 /**
@@ -285,11 +285,11 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   // Mount analysis API routes
   app.route('/api', analysisRoutes)
 
-  // Mount credential and train management routes
+  // Mount credential and project management routes
   app.route('/api/credentials', credentialsRoutes)
-  app.route('/api/projects', trainsRoutes)
+  app.route('/api/projects', projectsRoutes)
   app.route('/api/projects', apiKeysRoutes) // Nested under projects
-  app.route('/api/projects', trainMembersRoutes) // Nested under projects
+  app.route('/api/projects', projectMembersRoutes) // Nested under projects
 
   // Mount analysis partials routes
   app.route('/partials/analysis', analysisPartialsRoutes)
