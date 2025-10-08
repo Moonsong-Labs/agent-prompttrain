@@ -20,7 +20,7 @@ import credentialsRoutes from './routes/credentials.js'
 import projectsRoutes from './routes/projects.js'
 import apiKeysRoutes from './routes/api-keys.js'
 import projectMembersRoutes from './routes/project-members.js'
-import { getProjectByProjectId, isTrainMember } from '@agent-prompttrain/shared/database/queries'
+import { getProjectByProjectId, isProjectMember } from '@agent-prompttrain/shared/database/queries'
 
 /**
  * Create and configure the Dashboard application
@@ -107,61 +107,23 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     return c.json(health, health.status === 'healthy' ? 200 : 503)
   })
 
-  /**
-   * Helper function to validate train access
-   */
-  async function validateTrainAccess(
-    c: any,
-    projectId?: string
-  ): Promise<{ authorized: boolean; trainUuid?: string; error?: any }> {
-    if (!projectId) {
-      // No train filter - allow (shows all projects user has access to)
-      return { authorized: true }
-    }
-
-    const auth = c.get('auth')
-    if (!auth.isAuthenticated) {
-      return {
-        authorized: false,
-        error: c.json({ error: 'Unauthorized' }, 401),
-      }
-    }
-
-    const pool = container.getPool()
-    const train = await getProjectByProjectId(pool, projectId)
-
-    if (!train) {
-      return {
-        authorized: false,
-        error: c.json({ error: 'Project not found' }, 404),
-      }
-    }
-
-    const isMember = await isTrainMember(pool, train.id, auth.principal)
-    if (!isMember) {
-      return {
-        authorized: false,
-        error: c.json({ error: 'Access denied: You are not a member of this train' }, 403),
-      }
-    }
-
-    return { authorized: true, trainUuid: train.id }
-  }
-
   // API endpoints for dashboard data
   app.get('/api/requests', async c => {
     const storageService = container.getStorageService()
     const projectId = c.req.query('projectId')
     const limit = parseInt(c.req.query('limit') || '100')
+    const auth = c.get('auth')
 
-    // Validate train access
-    const accessCheck = await validateTrainAccess(c, projectId)
-    if (!accessCheck.authorized) {
-      return accessCheck.error
+    if (!auth || !auth.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
 
     try {
-      const requests = await storageService.getRequestsByTrainId(projectId || '', limit)
+      const requests = await storageService.getRequestsByTrainId(
+        projectId || '',
+        auth.principal,
+        limit
+      )
       return c.json({
         status: 'ok',
         requests,
@@ -176,6 +138,11 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   app.get('/api/requests/:requestId', async c => {
     const storageService = container.getStorageService()
     const requestId = c.req.param('requestId')
+    const auth = c.get('auth')
+
+    if (!auth || !auth.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
 
     try {
       const details = await storageService.getRequestDetails(requestId)
@@ -183,10 +150,20 @@ export async function createDashboardApp(): Promise<DashboardApp> {
         return c.json({ error: 'Request not found' }, 404)
       }
 
-      // Validate access to the project this request belongs to
-      const accessCheck = await validateTrainAccess(c, details.request.projectId)
-      if (!accessCheck.authorized) {
-        return accessCheck.error
+      // Check privacy access
+      const pool = container.getPool()
+      const project = await getProjectByProjectId(pool, details.request.projectId)
+
+      if (!project) {
+        return c.json({ error: 'Project not found' }, 404)
+      }
+
+      // Allow access if project is public OR user is a member
+      if (project.is_private) {
+        const isMember = await isProjectMember(pool, project.id, auth.principal)
+        if (!isMember) {
+          return c.json({ error: 'Access denied' }, 403)
+        }
       }
 
       return c.json({
@@ -203,11 +180,27 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const storageService = container.getStorageService()
     const projectId = c.req.query('projectId')
     const since = c.req.query('since')
+    const auth = c.get('auth')
 
-    // Validate train access
-    const accessCheck = await validateTrainAccess(c, projectId)
-    if (!accessCheck.authorized) {
-      return accessCheck.error
+    if (!auth || !auth.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    // Check privacy access if projectId is specified
+    if (projectId) {
+      const pool = container.getPool()
+      const project = await getProjectByProjectId(pool, projectId)
+
+      if (!project) {
+        return c.json({ error: 'Project not found' }, 404)
+      }
+
+      if (project.is_private) {
+        const isMember = await isProjectMember(pool, project.id, auth.principal)
+        if (!isMember) {
+          return c.json({ error: 'Access denied' }, 403)
+        }
+      }
     }
 
     try {
@@ -227,15 +220,15 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const projectId = c.req.query('projectId')
     const limit = parseInt(c.req.query('limit') || '50')
     const excludeSubtasks = c.req.query('excludeSubtasks') === 'true'
+    const auth = c.get('auth')
 
-    // Validate train access
-    const accessCheck = await validateTrainAccess(c, projectId)
-    if (!accessCheck.authorized) {
-      return accessCheck.error
+    if (!auth || !auth.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
 
     try {
-      const conversations = await storageService.getConversationsWithFilter(
+      const conversations = await storageService.getConversationSummaries(
+        auth.principal,
         projectId,
         limit,
         excludeSubtasks
@@ -254,15 +247,29 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   app.get('/api/requests/:requestId/subtasks', async c => {
     const storageService = container.getStorageService()
     const requestId = c.req.param('requestId')
+    const auth = c.get('auth')
+
+    if (!auth || !auth.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
 
     try {
       const subtasks = await storageService.getSubtasksForRequest(requestId)
 
-      // Validate access - check the parent request's train if subtasks exist
+      // Check privacy access if subtasks exist
       if (subtasks.length > 0) {
-        const accessCheck = await validateTrainAccess(c, subtasks[0].projectId)
-        if (!accessCheck.authorized) {
-          return accessCheck.error
+        const pool = container.getPool()
+        const project = await getProjectByProjectId(pool, subtasks[0].projectId)
+
+        if (!project) {
+          return c.json({ error: 'Project not found' }, 404)
+        }
+
+        if (project.is_private) {
+          const isMember = await isProjectMember(pool, project.id, auth.principal)
+          if (!isMember) {
+            return c.json({ error: 'Access denied' }, 403)
+          }
         }
       }
 

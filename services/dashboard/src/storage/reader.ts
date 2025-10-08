@@ -113,8 +113,12 @@ export class StorageReader {
   /**
    * Get requests by train identifier
    */
-  async getRequestsByTrainId(projectId: string, limit: number = 100): Promise<ApiRequest[]> {
-    const cacheKey = `requests:${projectId}:${limit}`
+  async getRequestsByTrainId(
+    projectId: string,
+    userEmail: string,
+    limit: number = 100
+  ): Promise<ApiRequest[]> {
+    const cacheKey = `requests:${projectId}:${userEmail}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -127,20 +131,26 @@ export class StorageReader {
 
     try {
       const query = projectId
-        ? `SELECT * FROM api_requests 
-           WHERE project_id = $1 
-           ORDER BY timestamp DESC 
+        ? `SELECT ar.* FROM api_requests ar
+           JOIN projects p ON ar.project_id = p.project_id
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+           WHERE ar.project_id = $1
+           AND (p.is_private = false OR pm.user_email IS NOT NULL)
+           ORDER BY ar.timestamp DESC
            LIMIT $2`
-        : `SELECT * FROM api_requests 
-           ORDER BY timestamp DESC 
+        : `SELECT ar.* FROM api_requests ar
+           JOIN projects p ON ar.project_id = p.project_id
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+           WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
+           ORDER BY ar.timestamp DESC
            LIMIT $1`
 
-      const values = projectId ? [projectId, limit] : [limit]
+      const values = projectId ? [projectId, limit, userEmail] : [limit, userEmail]
       const rows = await this.executeQuery<any>(query, values, 'getRequestsByTrainId')
 
       const requests = rows.map(row => ({
         request_id: row.request_id,
-        projectId: row.projectId,
+        projectId: row.project_id,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -212,7 +222,7 @@ export class StorageReader {
       const row = requestRows[0]
       const request: ApiRequest = {
         request_id: row.request_id,
-        projectId: row.projectId,
+        projectId: row.project_id,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -365,6 +375,7 @@ export class StorageReader {
    * Get conversations grouped by conversation_id
    */
   async getConversations(
+    userEmail: string,
     projectId?: string,
     limit: number = 50
   ): Promise<
@@ -378,7 +389,7 @@ export class StorageReader {
       requests: ApiRequest[]
     }[]
   > {
-    const cacheKey = `conversations:${projectId || 'all'}:${limit}`
+    const cacheKey = `conversations:${projectId || 'all'}:${userEmail}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -393,33 +404,39 @@ export class StorageReader {
       // First get unique conversations with branch information
       const conversationQuery = projectId
         ? `SELECT
-             conversation_id,
+             ar.conversation_id,
              COUNT(*) as request_count,
-             MAX(message_count) as message_count,
-             MIN(timestamp) as first_message,
-             MAX(timestamp) as last_message,
-             SUM(total_tokens) as total_tokens,
-             array_agg(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL) as branches
-           FROM api_requests
-           WHERE project_id = $1 AND conversation_id IS NOT NULL
-           GROUP BY conversation_id
-           ORDER BY MAX(timestamp) DESC
+             MAX(ar.message_count) as message_count,
+             MIN(ar.timestamp) as first_message,
+             MAX(ar.timestamp) as last_message,
+             SUM(ar.total_tokens) as total_tokens,
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+           FROM api_requests ar
+           JOIN projects p ON ar.project_id = p.project_id
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+           WHERE ar.project_id = $1 AND ar.conversation_id IS NOT NULL
+           AND (p.is_private = false OR pm.user_email IS NOT NULL)
+           GROUP BY ar.conversation_id
+           ORDER BY MAX(ar.timestamp) DESC
            LIMIT $2`
         : `SELECT
-             conversation_id,
+             ar.conversation_id,
              COUNT(*) as request_count,
-             MAX(message_count) as message_count,
-             MIN(timestamp) as first_message,
-             MAX(timestamp) as last_message,
-             SUM(total_tokens) as total_tokens,
-             array_agg(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL) as branches
-           FROM api_requests
-           WHERE conversation_id IS NOT NULL
-           GROUP BY conversation_id
-           ORDER BY MAX(timestamp) DESC
+             MAX(ar.message_count) as message_count,
+             MIN(ar.timestamp) as first_message,
+             MAX(ar.timestamp) as last_message,
+             SUM(ar.total_tokens) as total_tokens,
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+           FROM api_requests ar
+           JOIN projects p ON ar.project_id = p.project_id
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+           WHERE ar.conversation_id IS NOT NULL
+           AND (p.is_private = false OR pm.user_email IS NOT NULL)
+           GROUP BY ar.conversation_id
+           ORDER BY MAX(ar.timestamp) DESC
            LIMIT $1`
 
-      const conversationValues = projectId ? [projectId, limit] : [limit]
+      const conversationValues = projectId ? [projectId, limit, userEmail] : [limit, userEmail]
       const conversationRows = await this.executeQuery<any>(
         conversationQuery,
         conversationValues,
@@ -476,7 +493,7 @@ export class StorageReader {
       requestsRows.forEach(row => {
         const request: ApiRequest = {
           request_id: row.request_id,
-          projectId: row.projectId,
+          projectId: row.project_id,
           timestamp: row.timestamp,
           model: row.model,
           input_tokens: row.input_tokens || 0,
@@ -616,7 +633,7 @@ export class StorageReader {
       // Map requests
       const requests: ApiRequest[] = requestsRows.map(row => ({
         request_id: row.request_id,
-        projectId: row.projectId,
+        projectId: row.project_id,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -673,11 +690,12 @@ export class StorageReader {
    * More efficient for displaying conversation lists
    */
   async getConversationSummaries(
+    userEmail: string,
     projectId?: string,
     limit: number = 100,
     excludeSubtasks: boolean = false
   ): Promise<any[]> {
-    const cacheKey = `conversation-summaries:${projectId || 'all'}:${limit}:${excludeSubtasks}`
+    const cacheKey = `conversation-summaries:${projectId || 'all'}:${userEmail}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -691,7 +709,15 @@ export class StorageReader {
     try {
       // Get conversation summaries with branch information
       const query = projectId
-        ? `WITH conversation_summary AS (
+        ? `WITH filtered_requests AS (
+             SELECT ar.*
+             FROM api_requests ar
+             JOIN projects p ON ar.project_id = p.project_id
+             LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+             WHERE ar.project_id = $1
+             AND (p.is_private = false OR pm.user_email IS NOT NULL)
+           ),
+           conversation_summary AS (
              SELECT
                conversation_id,
                MIN(timestamp) as started_at,
@@ -702,12 +728,12 @@ export class StorageReader {
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
                bool_or(is_subtask) as has_subtasks
-             FROM api_requests
-             WHERE project_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+             FROM filtered_requests
+             WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
            ),
            conversation_branches AS (
-             SELECT 
+             SELECT
                conversation_id,
                jsonb_agg(
                  jsonb_build_object(
@@ -720,31 +746,38 @@ export class StorageReader {
                  ) ORDER BY branch_start
                ) as branches
              FROM (
-               SELECT 
+               SELECT
                  conversation_id,
                  branch_id,
                  MIN(timestamp) as branch_start,
                  MAX(timestamp) as branch_end,
                  MAX(message_count) as message_count,
                  SUM(total_tokens) as branch_tokens,
-                 (SELECT request_id FROM api_requests r2 
-                  WHERE r2.conversation_id = api_requests.conversation_id 
-                  AND r2.branch_id = api_requests.branch_id 
+                 (SELECT request_id FROM filtered_requests r2
+                  WHERE r2.conversation_id = filtered_requests.conversation_id
+                  AND r2.branch_id = filtered_requests.branch_id
                   ORDER BY r2.timestamp DESC LIMIT 1) as latest_request_id
-              FROM api_requests
-              WHERE project_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+              FROM filtered_requests
+              WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
                GROUP BY conversation_id, branch_id
              ) b
              GROUP BY conversation_id
            )
-           SELECT 
+           SELECT
              cs.*,
              cb.branches
            FROM conversation_summary cs
            LEFT JOIN conversation_branches cb ON cs.conversation_id = cb.conversation_id
            ORDER BY cs.last_message_at DESC
            LIMIT $2`
-        : `WITH conversation_summary AS (
+        : `WITH filtered_requests AS (
+             SELECT ar.*
+             FROM api_requests ar
+             JOIN projects p ON ar.project_id = p.project_id
+             LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+             WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
+           ),
+           conversation_summary AS (
              SELECT
                conversation_id,
                MIN(timestamp) as started_at,
@@ -755,12 +788,12 @@ export class StorageReader {
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
                bool_or(is_subtask) as has_subtasks
-             FROM api_requests
+             FROM filtered_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
            ),
            conversation_branches AS (
-             SELECT 
+             SELECT
                conversation_id,
                jsonb_agg(
                  jsonb_build_object(
@@ -773,24 +806,24 @@ export class StorageReader {
                  ) ORDER BY branch_start
                ) as branches
              FROM (
-               SELECT 
+               SELECT
                  conversation_id,
                  branch_id,
                  MIN(timestamp) as branch_start,
                  MAX(timestamp) as branch_end,
                  MAX(message_count) as message_count,
                  SUM(total_tokens) as branch_tokens,
-                 (SELECT request_id FROM api_requests r2 
-                  WHERE r2.conversation_id = api_requests.conversation_id 
-                  AND r2.branch_id = api_requests.branch_id 
+                 (SELECT request_id FROM filtered_requests r2
+                  WHERE r2.conversation_id = filtered_requests.conversation_id
+                  AND r2.branch_id = filtered_requests.branch_id
                   ORDER BY r2.timestamp DESC LIMIT 1) as latest_request_id
-              FROM api_requests
+              FROM filtered_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
               GROUP BY conversation_id, branch_id
            ) b
            GROUP BY conversation_id
          )
-         SELECT 
+         SELECT
            cs.*,
            cb.branches
          FROM conversation_summary cs
@@ -798,7 +831,7 @@ export class StorageReader {
          ORDER BY cs.last_message_at DESC
          LIMIT $1`
 
-      const values = projectId ? [projectId, limit] : [limit]
+      const values = projectId ? [projectId, limit, userEmail] : [limit, userEmail]
       const rows = await this.executeQuery<any>(query, values, 'getConversationSummaries')
 
       // Only cache if TTL > 0
@@ -829,7 +862,7 @@ export class StorageReader {
 
       return rows.map(row => ({
         request_id: row.request_id,
-        projectId: row.projectId,
+        projectId: row.project_id,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,

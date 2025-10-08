@@ -10,7 +10,7 @@ import type {
 import { toSafeCredential } from './credential-queries-internal'
 
 /**
- * Create a new train with a randomly selected default account
+ * Create a new project with a randomly selected default account
  */
 export async function createProject(pool: Pool, request: CreateProjectRequest): Promise<Project> {
   // Get a random credential to use as default
@@ -30,8 +30,9 @@ export async function createProject(pool: Pool, request: CreateProjectRequest): 
       slack_channel,
       slack_username,
       slack_icon_emoji,
+      is_private,
       default_account_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
     `,
     [
@@ -42,6 +43,7 @@ export async function createProject(pool: Pool, request: CreateProjectRequest): 
       request.slack_channel || null,
       request.slack_username || null,
       request.slack_icon_emoji || null,
+      request.is_private ?? false,
       defaultAccountId,
     ]
   )
@@ -160,6 +162,10 @@ export async function updateProject(
   if (request.slack_icon_emoji !== undefined) {
     updates.push(`slack_icon_emoji = $${paramIndex++}`)
     values.push(request.slack_icon_emoji)
+  }
+  if (request.is_private !== undefined) {
+    updates.push(`is_private = $${paramIndex++}`)
+    values.push(request.is_private)
   }
 
   if (updates.length === 0) {

@@ -6,12 +6,12 @@ import {
   updateProject,
   setProjectDefaultAccount,
   addProjectMember,
-  getUserTrainsWithAccounts,
+  getUserProjectsWithAccounts,
   deleteProject,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateProjectRequest, UpdateProjectRequest } from '@agent-prompttrain/shared'
 import type { AuthContext } from '../middleware/auth.js'
-import { requireTrainOwner, requireTrainMembership } from '../middleware/project-ownership.js'
+import { requireProjectOwner, requireProjectMembership } from '../middleware/project-ownership.js'
 
 const projects = new Hono<{ Variables: { auth: AuthContext } }>()
 
@@ -21,7 +21,7 @@ projects.get('/', async c => {
     const pool = container.getPool()
     const auth = c.get('auth')
 
-    const trainsList = await getUserTrainsWithAccounts(pool, auth.principal)
+    const trainsList = await getUserProjectsWithAccounts(pool, auth.principal)
     return c.json({ projects: trainsList })
   } catch (error) {
     console.error('Failed to list projects:', error)
@@ -30,7 +30,7 @@ projects.get('/', async c => {
 })
 
 // GET /api/projects/:projectId - Get train details with accounts (member only)
-projects.get('/:projectId', requireTrainMembership, async c => {
+projects.get('/:projectId', requireProjectMembership, async c => {
   try {
     const pool = container.getPool()
 
@@ -85,7 +85,7 @@ projects.post('/', async c => {
 })
 
 // PUT /api/projects/:id - Update train (owner only)
-projects.put('/:id', requireTrainOwner, async c => {
+projects.put('/:id', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
 
@@ -105,7 +105,7 @@ projects.put('/:id', requireTrainOwner, async c => {
 })
 
 // PUT /api/projects/:id/default-account - Set default account (owner only)
-projects.put('/:id/default-account', requireTrainOwner, async c => {
+projects.put('/:id/default-account', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
 
@@ -122,7 +122,7 @@ projects.put('/:id/default-account', requireTrainOwner, async c => {
 })
 
 // DELETE /api/projects/:id - Delete train (owner only)
-projects.delete('/:id', requireTrainOwner, async c => {
+projects.delete('/:id', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
     const id = c.req.param('id')
