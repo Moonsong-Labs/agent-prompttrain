@@ -5,7 +5,7 @@ import { getErrorMessage } from '@agent-prompttrain/shared'
 
 interface ApiRequest {
   request_id: string
-  trainId: string
+  projectId: string
   timestamp: string
   model: string
   input_tokens: number
@@ -113,8 +113,8 @@ export class StorageReader {
   /**
    * Get requests by train identifier
    */
-  async getRequestsByTrainId(trainId: string, limit: number = 100): Promise<ApiRequest[]> {
-    const cacheKey = `requests:${trainId}:${limit}`
+  async getRequestsByTrainId(projectId: string, limit: number = 100): Promise<ApiRequest[]> {
+    const cacheKey = `requests:${projectId}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -126,21 +126,21 @@ export class StorageReader {
     }
 
     try {
-      const query = trainId
+      const query = projectId
         ? `SELECT * FROM api_requests 
-           WHERE train_id = $1 
+           WHERE project_id = $1 
            ORDER BY timestamp DESC 
            LIMIT $2`
         : `SELECT * FROM api_requests 
            ORDER BY timestamp DESC 
            LIMIT $1`
 
-      const values = trainId ? [trainId, limit] : [limit]
+      const values = projectId ? [projectId, limit] : [limit]
       const rows = await this.executeQuery<any>(query, values, 'getRequestsByTrainId')
 
       const requests = rows.map(row => ({
         request_id: row.request_id,
-        trainId: row.trainId,
+        projectId: row.projectId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -168,7 +168,7 @@ export class StorageReader {
       return requests
     } catch (error) {
       logger.error('Failed to get requests by train ID', {
-        metadata: { trainId, error: getErrorMessage(error) },
+        metadata: { projectId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -193,7 +193,7 @@ export class StorageReader {
       // Get request
       const requestQuery = `
         SELECT
-          request_id, train_id, timestamp, model, input_tokens, output_tokens,
+          request_id, project_id, timestamp, model, input_tokens, output_tokens,
           total_tokens, duration_ms, error, request_type, tool_call_count,
           conversation_id, branch_id, parent_request_id, body, response_body
         FROM api_requests
@@ -212,7 +212,7 @@ export class StorageReader {
       const row = requestRows[0]
       const request: ApiRequest = {
         request_id: row.request_id,
-        trainId: row.trainId,
+        projectId: row.projectId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -264,8 +264,8 @@ export class StorageReader {
   /**
    * Get aggregated statistics
    */
-  async getStats(trainId?: string, since?: Date): Promise<StorageStats> {
-    const cacheKey = `stats:${trainId || 'all'}:${since?.toISOString() || 'all'}`
+  async getStats(projectId?: string, since?: Date): Promise<StorageStats> {
+    const cacheKey = `stats:${projectId || 'all'}:${since?.toISOString() || 'all'}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -281,9 +281,9 @@ export class StorageReader {
       const values = []
       let paramCount = 0
 
-      if (trainId) {
-        conditions.push(`train_id = $${++paramCount}`)
-        values.push(trainId)
+      if (projectId) {
+        conditions.push(`project_id = $${++paramCount}`)
+        values.push(projectId)
       }
 
       if (since) {
@@ -302,7 +302,7 @@ export class StorageReader {
           COALESCE(SUM(tool_call_count), 0) as total_tool_calls,
           COALESCE(AVG(duration_ms), 0) as avg_response_time_ms,
           COUNT(*) FILTER (WHERE error IS NOT NULL) as error_count,
-          COUNT(DISTINCT train_id) as unique_train_ids
+          COUNT(DISTINCT project_id) as unique_train_ids
         FROM api_requests
         ${whereClause}
       `
@@ -355,7 +355,7 @@ export class StorageReader {
       return stats
     } catch (error) {
       logger.error('Failed to get storage stats', {
-        metadata: { trainId, error: getErrorMessage(error) },
+        metadata: { projectId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -365,7 +365,7 @@ export class StorageReader {
    * Get conversations grouped by conversation_id
    */
   async getConversations(
-    trainId?: string,
+    projectId?: string,
     limit: number = 50
   ): Promise<
     {
@@ -378,7 +378,7 @@ export class StorageReader {
       requests: ApiRequest[]
     }[]
   > {
-    const cacheKey = `conversations:${trainId || 'all'}:${limit}`
+    const cacheKey = `conversations:${projectId || 'all'}:${limit}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -391,7 +391,7 @@ export class StorageReader {
 
     try {
       // First get unique conversations with branch information
-      const conversationQuery = trainId
+      const conversationQuery = projectId
         ? `SELECT
              conversation_id,
              COUNT(*) as request_count,
@@ -401,7 +401,7 @@ export class StorageReader {
              SUM(total_tokens) as total_tokens,
              array_agg(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL) as branches
            FROM api_requests
-           WHERE train_id = $1 AND conversation_id IS NOT NULL
+           WHERE project_id = $1 AND conversation_id IS NOT NULL
            GROUP BY conversation_id
            ORDER BY MAX(timestamp) DESC
            LIMIT $2`
@@ -419,7 +419,7 @@ export class StorageReader {
            ORDER BY MAX(timestamp) DESC
            LIMIT $1`
 
-      const conversationValues = trainId ? [trainId, limit] : [limit]
+      const conversationValues = projectId ? [projectId, limit] : [limit]
       const conversationRows = await this.executeQuery<any>(
         conversationQuery,
         conversationValues,
@@ -432,9 +432,9 @@ export class StorageReader {
         return []
       }
 
-      const requestsQuery = trainId
+      const requestsQuery = projectId
         ? `SELECT
-             request_id, train_id, timestamp, model,
+             request_id, project_id, timestamp, model,
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
@@ -446,10 +446,10 @@ export class StorageReader {
                  NULL
              END as last_message
            FROM api_requests
-           WHERE train_id = $1 AND conversation_id = ANY($2::uuid[])
+           WHERE project_id = $1 AND conversation_id = ANY($2::uuid[])
            ORDER BY conversation_id, timestamp ASC`
         : `SELECT
-             request_id, train_id, timestamp, model,
+             request_id, project_id, timestamp, model,
              input_tokens, output_tokens, total_tokens, duration_ms,
              error, request_type, tool_call_count, conversation_id,
              current_message_hash, parent_message_hash, branch_id, message_count,
@@ -464,7 +464,7 @@ export class StorageReader {
            WHERE conversation_id = ANY($1::uuid[])
            ORDER BY conversation_id, timestamp ASC`
 
-      const requestsValues = trainId ? [trainId, conversationIds] : [conversationIds]
+      const requestsValues = projectId ? [projectId, conversationIds] : [conversationIds]
       const requestsRows = await this.executeQuery<any>(
         requestsQuery,
         requestsValues,
@@ -476,7 +476,7 @@ export class StorageReader {
       requestsRows.forEach(row => {
         const request: ApiRequest = {
           request_id: row.request_id,
-          trainId: row.trainId,
+          projectId: row.projectId,
           timestamp: row.timestamp,
           model: row.model,
           input_tokens: row.input_tokens || 0,
@@ -521,7 +521,7 @@ export class StorageReader {
       return conversations
     } catch (error) {
       logger.error('Failed to get conversations', {
-        metadata: { trainId, error: getErrorMessage(error) },
+        metadata: { projectId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -589,7 +589,7 @@ export class StorageReader {
           WHERE conversation_id = $1
         )
         SELECT
-          request_id, train_id, timestamp, model,
+          request_id, project_id, timestamp, model,
           input_tokens, output_tokens, total_tokens, duration_ms,
           error, request_type, tool_call_count, conversation_id,
           current_message_hash, parent_message_hash, branch_id, message_count,
@@ -616,7 +616,7 @@ export class StorageReader {
       // Map requests
       const requests: ApiRequest[] = requestsRows.map(row => ({
         request_id: row.request_id,
-        trainId: row.trainId,
+        projectId: row.projectId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -673,11 +673,11 @@ export class StorageReader {
    * More efficient for displaying conversation lists
    */
   async getConversationSummaries(
-    trainId?: string,
+    projectId?: string,
     limit: number = 100,
     excludeSubtasks: boolean = false
   ): Promise<any[]> {
-    const cacheKey = `conversation-summaries:${trainId || 'all'}:${limit}:${excludeSubtasks}`
+    const cacheKey = `conversation-summaries:${projectId || 'all'}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     // Only use cache if TTL > 0
@@ -690,7 +690,7 @@ export class StorageReader {
 
     try {
       // Get conversation summaries with branch information
-      const query = trainId
+      const query = projectId
         ? `WITH conversation_summary AS (
              SELECT
                conversation_id,
@@ -703,7 +703,7 @@ export class StorageReader {
                array_agg(DISTINCT model) as models_used,
                bool_or(is_subtask) as has_subtasks
              FROM api_requests
-             WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+             WHERE project_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
            ),
            conversation_branches AS (
@@ -732,7 +732,7 @@ export class StorageReader {
                   AND r2.branch_id = api_requests.branch_id 
                   ORDER BY r2.timestamp DESC LIMIT 1) as latest_request_id
               FROM api_requests
-              WHERE train_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
+              WHERE project_id = $1 AND conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
                GROUP BY conversation_id, branch_id
              ) b
              GROUP BY conversation_id
@@ -798,7 +798,7 @@ export class StorageReader {
          ORDER BY cs.last_message_at DESC
          LIMIT $1`
 
-      const values = trainId ? [trainId, limit] : [limit]
+      const values = projectId ? [projectId, limit] : [limit]
       const rows = await this.executeQuery<any>(query, values, 'getConversationSummaries')
 
       // Only cache if TTL > 0
@@ -808,7 +808,7 @@ export class StorageReader {
       return rows
     } catch (error) {
       logger.error('Failed to get conversation summaries', {
-        metadata: { trainId, error: getErrorMessage(error) },
+        metadata: { projectId, error: getErrorMessage(error) },
       })
       throw error
     }
@@ -829,7 +829,7 @@ export class StorageReader {
 
       return rows.map(row => ({
         request_id: row.request_id,
-        trainId: row.trainId,
+        projectId: row.projectId,
         timestamp: row.timestamp,
         model: row.model,
         input_tokens: row.input_tokens || 0,
@@ -864,11 +864,11 @@ export class StorageReader {
    * Get conversations with option to exclude sub-tasks
    */
   async getConversationsWithFilter(
-    trainId?: string,
+    projectId?: string,
     limit: number = 50,
     excludeSubtasks: boolean = false
   ): Promise<any[]> {
-    const cacheKey = `conversations:${trainId || 'all'}:${limit}:${excludeSubtasks}`
+    const cacheKey = `conversations:${projectId || 'all'}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
     if (cacheTTL > 0) {
@@ -883,9 +883,9 @@ export class StorageReader {
       const values = []
       let paramIndex = 1
 
-      if (trainId) {
-        whereClause.push(`train_id = $${paramIndex}`)
-        values.push(trainId)
+      if (projectId) {
+        whereClause.push(`project_id = $${paramIndex}`)
+        values.push(projectId)
         paramIndex++
       }
 
@@ -900,7 +900,7 @@ export class StorageReader {
                MIN(timestamp) as first_message_time,
                MAX(timestamp) as last_message_time,
                COUNT(*) as request_count,
-               array_agg(DISTINCT train_id) as train_ids,
+               array_agg(DISTINCT project_id) as train_ids,
                array_agg(DISTINCT model) as models,
                SUM(input_tokens) as total_input_tokens,
                SUM(output_tokens) as total_output_tokens,
@@ -929,7 +929,7 @@ export class StorageReader {
     } catch (error) {
       logger.error('Failed to get conversations with filter', {
         metadata: {
-          trainId,
+          projectId,
           excludeSubtasks,
           error: getErrorMessage(error),
         },

@@ -39,7 +39,7 @@ describe('Client Authentication Middleware', () => {
   it('allows requests when token matches configured key', async () => {
     const token = 'cnp_live_valid'
     mockVerifyApiKeyAndGetTrain.mockImplementation(() => ({
-      trainId: 'team-alpha',
+      projectId: 'team-alpha',
       apiKeyId: 1,
     }))
 
@@ -84,7 +84,7 @@ describe('Client Authentication Middleware', () => {
 
   it('falls back to default train when header missing but still enforces keys', async () => {
     mockVerifyApiKeyAndGetTrain.mockImplementation(() => ({
-      trainId: 'default',
+      projectId: 'default',
       apiKeyId: 1,
     }))
 

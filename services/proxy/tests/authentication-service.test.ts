@@ -8,10 +8,10 @@ import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
 import * as credentials from '../src/credentials'
 
-const createRequestContext = (trainId: string, account?: string) =>
+const createRequestContext = (projectId: string, account?: string) =>
   new RequestContext(
     'req-123',
-    trainId,
+    projectId,
     'POST',
     '/v1/messages',
     Date.now(),
@@ -30,8 +30,8 @@ describe('AuthenticationService', () => {
   beforeEach(async () => {
     mockPool = {} as Pool
 
-    // Mock getTrainCredentials
-    mockGetTrainCredentials = spyOn(queries, 'getTrainCredentials').mockImplementation(
+    // Mock getProjectCredentials
+    mockGetTrainCredentials = spyOn(queries, 'getProjectCredentials').mockImplementation(
       () => [] as any
     )
 
@@ -182,7 +182,7 @@ describe('AuthenticationService deterministic account selection', () => {
   beforeEach(async () => {
     mockPool = {} as Pool
 
-    mockGetTrainCredentials = spyOn(queries, 'getTrainCredentials').mockImplementation(
+    mockGetTrainCredentials = spyOn(queries, 'getProjectCredentials').mockImplementation(
       () => [] as any
     )
 
@@ -196,8 +196,8 @@ describe('AuthenticationService deterministic account selection', () => {
     mockGetApiKey.mockRestore()
   })
 
-  const computePreferredAccount = (trainId: string, accounts: string[]): string => {
-    const key = trainId.trim() || 'default'
+  const computePreferredAccount = (projectId: string, accounts: string[]): string => {
+    const key = projectId.trim() || 'default'
     const ordered = [...new Set(accounts)].sort()
 
     const scored = ordered.map(accountName => {
@@ -247,11 +247,11 @@ describe('AuthenticationService deterministic account selection', () => {
 
     const service = new AuthenticationService(mockPool)
 
-    const trainId = 'train-alpha'
-    const expectedAccount = computePreferredAccount(trainId, ['primary', 'secondary'])
+    const projectId = 'train-alpha'
+    const expectedAccount = computePreferredAccount(projectId, ['primary', 'secondary'])
 
-    const context1 = new RequestContext('req-1', trainId, 'POST', '/v1/messages', Date.now(), {})
-    const context2 = new RequestContext('req-2', trainId, 'POST', '/v1/messages', Date.now(), {})
+    const context1 = new RequestContext('req-1', projectId, 'POST', '/v1/messages', Date.now(), {})
+    const context2 = new RequestContext('req-2', projectId, 'POST', '/v1/messages', Date.now(), {})
 
     const result1 = await service.authenticate(context1)
     const result2 = await service.authenticate(context2)
@@ -260,7 +260,7 @@ describe('AuthenticationService deterministic account selection', () => {
     expect(result2.accountName).toBe(expectedAccount)
   })
 
-  it('produces deterministic ordering across trains', async () => {
+  it('produces deterministic ordering across projects', async () => {
     const credentials: AnthropicCredential[] = [
       {
         id: 'primary',
@@ -290,11 +290,11 @@ describe('AuthenticationService deterministic account selection', () => {
 
     const service = new AuthenticationService(mockPool)
 
-    const trains = ['train-alpha', 'train-beta', 'train-gamma']
+    const projects = ['train-alpha', 'train-beta', 'train-gamma']
     const accounts = ['primary', 'secondary']
 
     const selections = await Promise.all(
-      trains.map(id =>
+      projects.map(id =>
         service.authenticate(
           new RequestContext('req-' + id, id, 'POST', '/v1/messages', Date.now(), {})
         )
@@ -302,7 +302,7 @@ describe('AuthenticationService deterministic account selection', () => {
     )
 
     selections.forEach((selection, index) => {
-      const expected = computePreferredAccount(trains[index], accounts)
+      const expected = computePreferredAccount(projects[index], accounts)
       expect(selection.accountName).toBe(expected)
     })
   })

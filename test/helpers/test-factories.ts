@@ -262,7 +262,7 @@ export const scenarioFactory = {
   telemetryData: (overrides = {}) => ({
     requestId: faker.string.uuid(),
     timestamp: Date.now(),
-    trainId: `train-${faker.string.alphanumeric(8).toLowerCase()}`,
+    projectId: `train-${faker.string.alphanumeric(8).toLowerCase()}`,
     apiKey: `sk-ant-api03-${faker.string.alphanumeric(8)}`,
     model: 'claude-3-opus-20240229',
     inputTokens: faker.number.int({ min: 10, max: 1000 }),

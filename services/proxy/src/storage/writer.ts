@@ -6,7 +6,7 @@ import { logger } from '../middleware/logger.js'
 
 interface StorageRequest {
   requestId: string
-  trainId: string
+  projectId: string
   accountId?: string // Account identifier from credentials
   timestamp: Date
   method: string
@@ -129,7 +129,7 @@ export class StorageWriter {
 
       const query = `
         INSERT INTO api_requests (
-          request_id, train_id, account_id, timestamp, method, path, headers, body, 
+          request_id, project_id, account_id, timestamp, method, path, headers, body, 
           api_key_hash, model, request_type, current_message_hash, 
           parent_message_hash, conversation_id, branch_id, system_hash, message_count,
           parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id
@@ -139,7 +139,7 @@ export class StorageWriter {
 
       const values = [
         request.requestId,
-        request.trainId,
+        request.projectId,
         request.accountId || null,
         request.timestamp,
         request.method,
@@ -295,7 +295,7 @@ export class StorageWriter {
    * Used by ConversationLinker
    */
   async findParentRequests(criteria: {
-    trainId: string
+    projectId: string
     messageCount?: number
     parentMessageHash?: string
     currentMessageHash?: string
@@ -313,7 +313,7 @@ export class StorageWriter {
     }>
   > {
     try {
-      // Note: We intentionally do NOT filter by train_id here
+      // Note: We intentionally do NOT filter by project_id here
       // This allows conversations to continue even when switching between accounts
       // The conversation is identified by message hashes, not by train/account
       const conditions: string[] = []
@@ -394,7 +394,7 @@ export class StorageWriter {
    * Used for compact conversation detection
    */
   async findParentByResponseContent(
-    trainId: string,
+    projectId: string,
     summaryContent: string,
     afterTimestamp: Date,
     beforeTimestamp?: Date
@@ -413,7 +413,7 @@ export class StorageWriter {
         .replace(/\n\nSummary:/i, '\n</analysis>\n\n<summary>')
         .trim()
 
-      // Note: We intentionally do NOT filter by train_id here
+      // Note: We intentionally do NOT filter by project_id here
       // This allows compact conversations to continue even when switching between accounts
       const query = `
         SELECT
@@ -447,7 +447,7 @@ export class StorageWriter {
       if (result.rows.length > 0) {
         logger.info('Found parent conversation by response content match', {
           metadata: {
-            trainId,
+            projectId,
             parentRequestId: result.rows[0].request_id,
             conversationId: result.rows[0].conversation_id,
           },
@@ -458,7 +458,7 @@ export class StorageWriter {
     } catch (error) {
       logger.error('Failed to find parent by response content', {
         metadata: {
-          trainId,
+          projectId,
           error: error instanceof Error ? error.message : String(error),
         },
       })

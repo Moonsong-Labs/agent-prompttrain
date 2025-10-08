@@ -3,7 +3,7 @@ import {
   getErrorMessage,
   getErrorStack,
   getErrorCode,
-  MSL_TRAIN_ID_HEADER_LOWER,
+  MSL_PROJECT_ID_HEADER_LOWER,
 } from '@agent-prompttrain/shared'
 
 // Log levels
@@ -20,7 +20,7 @@ interface LogEntry {
   level: LogLevel
   requestId: string
   message: string
-  trainId?: string
+  projectId?: string
   method?: string
   path?: string
   statusCode?: number
@@ -208,7 +208,7 @@ export function loggingMiddleware() {
     const startTime = Date.now()
 
     // Extract request info
-    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
+    const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER) || 'unknown'
     const method = c.req.method
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
@@ -216,7 +216,7 @@ export function loggingMiddleware() {
     // Log incoming request
     logger.info('Incoming request', {
       requestId,
-      trainId,
+      projectId,
       method,
       path,
       metadata: {
@@ -233,7 +233,7 @@ export function loggingMiddleware() {
       const duration = Date.now() - startTime
       logger.info('Request completed', {
         requestId,
-        trainId,
+        projectId,
         method,
         path,
         statusCode: c.res.status,
@@ -247,7 +247,7 @@ export function loggingMiddleware() {
       const duration = Date.now() - startTime
       logger.error('Request failed', {
         requestId,
-        trainId,
+        projectId,
         method,
         path,
         statusCode: c.res.status || 500,
@@ -272,22 +272,22 @@ export function getRequestLogger(c: Context): {
   error: (message: string, error?: Error, metadata?: Record<string, any>) => void
 } {
   const requestId = c.get('requestId') || 'unknown'
-  const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || 'unknown'
+  const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER) || 'unknown'
 
   return {
     debug: (message: string, metadata?: Record<string, any>) => {
-      logger.debug(message, { requestId, trainId, metadata })
+      logger.debug(message, { requestId, projectId, metadata })
     },
     info: (message: string, metadata?: Record<string, any>) => {
-      logger.info(message, { requestId, trainId, metadata })
+      logger.info(message, { requestId, projectId, metadata })
     },
     warn: (message: string, metadata?: Record<string, any>) => {
-      logger.warn(message, { requestId, trainId, metadata })
+      logger.warn(message, { requestId, projectId, metadata })
     },
     error: (message: string, error?: Error, metadata?: Record<string, any>) => {
       logger.error(message, {
         requestId,
-        trainId,
+        projectId,
         error: error
           ? {
               message: error.message,

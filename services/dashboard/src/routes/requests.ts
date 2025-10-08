@@ -7,7 +7,7 @@ import { layout } from '../layout/index.js'
 export const requestsRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
-    trainId?: string
+    projectId?: string
   }
 }>()
 
@@ -16,7 +16,7 @@ export const requestsRoutes = new Hono<{
  */
 requestsRoutes.get('/requests', async c => {
   const apiClient = c.get('apiClient')
-  const trainId = c.req.query('trainId')
+  const projectId = c.req.query('projectId')
 
   if (!apiClient) {
     return c.html(
@@ -39,13 +39,13 @@ requestsRoutes.get('/requests', async c => {
     activeTrainIds: 0,
   }
   let recentRequests: any[] = []
-  let trainIds: Array<{ trainId: string; requestCount: number }> = []
+  let trainIds: Array<{ projectId: string; requestCount: number }> = []
   let error: string | null = null
 
   // Fetch data from Proxy API with individual error handling
   const results = await Promise.allSettled([
-    apiClient.getStats({ trainId }),
-    apiClient.getRequests({ trainId, limit: 20 }),
+    apiClient.getStats({ projectId }),
+    apiClient.getRequests({ projectId, limit: 20 }),
     apiClient.getTrainIds(),
   ])
 
@@ -90,19 +90,19 @@ requestsRoutes.get('/requests', async c => {
       <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
     </div>
 
-    <!-- Train Filter -->
+    <!-- Project Filter -->
     <div class="mb-6">
-      <label class="text-sm text-gray-600">Filter by Train ID:</label>
+      <label class="text-sm text-gray-600">Filter by Project ID:</label>
       <select
-        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?trainId=' + this.value : '')"
+        onchange="window.location.href = '/dashboard/requests' + (this.value ? '?projectId=' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
-        <option value="">All Train IDs</option>
+        <option value="">All Project IDs</option>
         ${raw(
           trainIds
             .map(
               d =>
-                `<option value="${d.trainId}" ${trainId === d.trainId ? 'selected' : ''}>${d.trainId} (${d.requestCount})</option>`
+                `<option value="${d.projectId}" ${projectId === d.projectId ? 'selected' : ''}>${d.projectId} (${d.requestCount})</option>`
             )
             .join('')
         )}
@@ -127,7 +127,7 @@ requestsRoutes.get('/requests', async c => {
         <div class="stat-meta">Based on token usage</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Train IDs</div>
+        <div class="stat-label">Active Project IDs</div>
         <div class="stat-value">${stats.activeTrainIds}</div>
         <div class="stat-meta">Unique train identifiers</div>
       </div>
@@ -138,7 +138,7 @@ requestsRoutes.get('/requests', async c => {
       <div class="section-header">
         Recent Requests
         <a
-          href="/dashboard/requests${trainId ? '?trainId=' + trainId : ''}"
+          href="/dashboard/requests${projectId ? '?projectId=' + projectId : ''}"
           class="btn btn-secondary"
           style="float: right; font-size: 0.75rem; padding: 0.25rem 0.75rem;"
           >Refresh</a
@@ -152,7 +152,7 @@ requestsRoutes.get('/requests', async c => {
                 <thead>
                   <tr>
                     <th>Time</th>
-                    <th>Train ID</th>
+                    <th>Project ID</th>
                     <th>Model</th>
                     <th>Tokens</th>
                     <th>Status</th>
@@ -166,7 +166,7 @@ requestsRoutes.get('/requests', async c => {
                         req => `
                 <tr>
                   <td class="text-sm">${formatRelativeTime(req.timestamp)}</td>
-                  <td class="text-sm">${escapeHtml(req.trainId || 'unknown')}</td>
+                  <td class="text-sm">${escapeHtml(req.projectId || 'unknown')}</td>
                   <td class="text-sm">${req.model || 'N/A'}</td>
                   <td class="text-sm">${formatNumber(req.totalTokens || 0)}</td>
                   <td class="text-sm">${req.responseStatus || 'N/A'}</td>

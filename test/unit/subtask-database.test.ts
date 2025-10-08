@@ -112,7 +112,7 @@ describe('Sub-task Database Logic', () => {
 
       const request = {
         requestId: 'new-subtask-uuid',
-        trainId: 'test.com',
+        projectId: 'test.com',
         timestamp: new Date('2024-01-20T12:00:00Z'),
         method: 'POST',
         path: '/v1/messages',
@@ -168,7 +168,7 @@ describe('Sub-task Database Logic', () => {
 
       const request = {
         requestId: 'standalone-uuid',
-        trainId: 'test.com',
+        projectId: 'test.com',
         timestamp: new Date(),
         method: 'POST',
         path: '/v1/messages',
@@ -203,7 +203,7 @@ describe('Sub-task Database Logic', () => {
     it('should skip sub-task detection for non-first messages', async () => {
       const request = {
         requestId: 'continuation-uuid',
-        trainId: 'test.com',
+        projectId: 'test.com',
         timestamp: new Date(),
         method: 'POST',
         path: '/v1/messages',
@@ -271,7 +271,7 @@ describe('Sub-task Database Logic', () => {
 
       const request = {
         requestId: 'subtask-with-reminder',
-        trainId: 'test.com',
+        projectId: 'test.com',
         timestamp: new Date(),
         method: 'POST',
         path: '/v1/messages',

@@ -101,7 +101,7 @@ SLOW_QUERY_THRESHOLD_MS=1000 DEBUG_SQL=true bun run dev
 ```
 [DEBUG] SQL Query {
   metadata: {
-    query: "SELECT * FROM api_requests WHERE train_id = $1",
+    query: "SELECT * FROM api_requests WHERE project_id = $1",
     values: ["example.com"],
     caller: "at ConversationLinker.findParentByHash"
   }

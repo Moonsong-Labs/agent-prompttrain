@@ -1,5 +1,5 @@
 /**
- * Database models for credential and train management
+ * Database models for credential and project management
  */
 
 export interface AnthropicCredential {
@@ -29,9 +29,9 @@ export interface AnthropicCredentialSafe {
   token_status: 'valid' | 'expiring_soon' | 'expired'
 }
 
-export interface Train {
+export interface Project {
   id: string
-  train_id: string
+  project_id: string
   name: string
   default_account_id: string | null
   slack_enabled: boolean
@@ -43,20 +43,20 @@ export interface Train {
   updated_at: Date
 }
 
-export interface TrainWithAccounts extends Train {
+export interface ProjectWithAccounts extends Project {
   accounts: AnthropicCredentialSafe[]
 }
 
-export interface TrainAccount {
+export interface ProjectAccount {
   id: string
-  train_id: string
+  project_id: string
   credential_id: string
   created_at: Date
 }
 
-export interface TrainApiKey {
+export interface ProjectApiKey {
   id: string
-  train_id: string
+  project_id: string
   api_key: string
   key_prefix: string
   key_suffix: string
@@ -68,9 +68,9 @@ export interface TrainApiKey {
   revoked_by: string | null
 }
 
-export interface TrainApiKeySafe {
+export interface ProjectApiKeySafe {
   id: string
-  train_id: string
+  project_id: string
   key_preview: string // prefix + "****" + suffix
   name: string | null
   created_by: string | null
@@ -97,8 +97,8 @@ export interface UpdateCredentialTokensRequest {
   oauth_expires_at: Date
 }
 
-export interface CreateTrainRequest {
-  train_id: string
+export interface CreateProjectRequest {
+  project_id: string
   name: string
   slack_enabled?: boolean
   slack_webhook_url?: string
@@ -107,7 +107,7 @@ export interface CreateTrainRequest {
   slack_icon_emoji?: string
 }
 
-export interface UpdateTrainRequest {
+export interface UpdateProjectRequest {
   name?: string
   slack_enabled?: boolean
   slack_webhook_url?: string

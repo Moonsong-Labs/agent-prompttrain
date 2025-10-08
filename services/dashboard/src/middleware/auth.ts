@@ -76,12 +76,12 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
 }
 
 /**
- * Optional: Train ID-scoped authentication
+ * Optional: Project ID-scoped authentication
  * Allows restricting dashboard access to specific train identifiers
  */
 export const trainScopedAuth = async (c: Context, next: Next) => {
   const authenticatedTrainId = c.get('authenticatedTrainId')
-  const requestedTrainId = c.req.query('trainId')
+  const requestedTrainId = c.req.query('projectId')
 
   if (requestedTrainId && authenticatedTrainId && authenticatedTrainId !== 'admin') {
     if (authenticatedTrainId !== requestedTrainId) {

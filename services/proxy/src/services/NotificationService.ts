@@ -52,11 +52,11 @@ export class NotificationService {
 
       // Check if user message changed
       const userContent = request.getUserContentForNotification()
-      const previousContent = this.getPreviousMessage(context.trainId)
+      const previousContent = this.getPreviousMessage(context.projectId)
       const userMessageChanged = userContent !== previousContent
 
       if (userContent) {
-        this.setPreviousMessage(context.trainId, userContent)
+        this.setPreviousMessage(context.projectId, userContent)
       }
 
       // Only send notifications when user message changes
@@ -215,7 +215,7 @@ export class NotificationService {
       await sendToSlack(
         {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           model: request.model,
           role: 'conversation',
           content: conversationMessage,
@@ -230,7 +230,7 @@ export class NotificationService {
       // Don't fail the request if notification fails
       logger.error('Failed to send notification', {
         requestId: context.requestId,
-        trainId: context.trainId,
+        projectId: context.projectId,
         error: error instanceof Error ? { message: error.message } : { message: String(error) },
       })
     }
@@ -245,13 +245,13 @@ export class NotificationService {
     }
 
     try {
-      // Get Slack config for the train
+      // Get Slack config for the project
       const accountWebhook = null
 
       await sendToSlack(
         {
           requestId: context.requestId,
-          trainId: context.trainId,
+          projectId: context.projectId,
           role: 'assistant',
           content: `Error: ${error.message}`,
           timestamp: new Date().toISOString(),
@@ -287,7 +287,7 @@ export class NotificationService {
 
     // Build metadata
     const metadata = {
-      trainId: context.trainId,
+      projectId: context.projectId,
       model: request.model,
       streaming: request.isStreaming ? 'Yes' : 'No',
       inputTokens: metrics.inputTokens,
@@ -324,16 +324,16 @@ export class NotificationService {
   }
 
   /**
-   * Get previous message for a train ID
+   * Get previous message for a project ID
    */
-  private getPreviousMessage(trainId: string): string {
-    return this.previousMessages.get(trainId) || ''
+  private getPreviousMessage(projectId: string): string {
+    return this.previousMessages.get(projectId) || ''
   }
 
   /**
-   * Set previous message for a train ID
+   * Set previous message for a project ID
    */
-  private setPreviousMessage(trainId: string, message: string): void {
+  private setPreviousMessage(projectId: string, message: string): void {
     // Implement cache size limit
     if (this.previousMessages.size >= this.maxCacheSize) {
       const firstKey = this.previousMessages.keys().next().value
@@ -341,6 +341,6 @@ export class NotificationService {
         this.previousMessages.delete(firstKey)
       }
     }
-    this.previousMessages.set(trainId, message)
+    this.previousMessages.set(projectId, message)
   }
 }

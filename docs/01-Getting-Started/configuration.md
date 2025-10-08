@@ -12,16 +12,16 @@ This guide covers all configuration options for Agent Prompt Train.
 
 ### Proxy Service
 
-| Variable               | Required | Default       | Description                                    |
-| ---------------------- | -------- | ------------- | ---------------------------------------------- |
-| `PORT`                 | No       | 3000          | Proxy service port                             |
-| `STORAGE_ENABLED`      | No       | false         | Enable request/response storage                |
-| `DEBUG`                | No       | false         | Enable debug logging (masks sensitive data)    |
-| `ENABLE_CLIENT_AUTH`   | No       | true          | Require client API key authentication          |
-| `CREDENTIALS_DIR`      | No       | ./credentials | Base directory for account and train key files |
-| `SLACK_WEBHOOK_URL`    | No       | -             | Slack webhook for notifications                |
-| `COLLECT_TEST_SAMPLES` | No       | false         | Collect request samples for testing            |
-| `TEST_SAMPLES_DIR`     | No       | test-samples  | Directory for test samples                     |
+| Variable               | Required | Default       | Description                                      |
+| ---------------------- | -------- | ------------- | ------------------------------------------------ |
+| `PORT`                 | No       | 3000          | Proxy service port                               |
+| `STORAGE_ENABLED`      | No       | false         | Enable request/response storage                  |
+| `DEBUG`                | No       | false         | Enable debug logging (masks sensitive data)      |
+| `ENABLE_CLIENT_AUTH`   | No       | true          | Require client API key authentication            |
+| `CREDENTIALS_DIR`      | No       | ./credentials | Base directory for account and project key files |
+| `SLACK_WEBHOOK_URL`    | No       | -             | Slack webhook for notifications                  |
+| `COLLECT_TEST_SAMPLES` | No       | false         | Collect request samples for testing              |
+| `TEST_SAMPLES_DIR`     | No       | test-samples  | Directory for test samples                       |
 
 ### Dashboard Service
 
@@ -35,7 +35,7 @@ This guide covers all configuration options for Agent Prompt Train.
 | `INTERNAL_API_KEY`              | Yes               | -       | Service-to-service authentication key               |
 | `DASHBOARD_DEV_USER_EMAIL`      | Yes (Development) | -       | Development bypass email (never use in production!) |
 
-## Accounts & Train Client Keys
+## Accounts & Project Client Keys
 
 ### Account Credential Files
 
@@ -67,16 +67,16 @@ Store Anthropic credentials under `credentials/accounts/<account-name>.credentia
 }
 ```
 
-### Train Client Keys
+### Project Client Keys
 
-Proxy access tokens live under `credentials/train-client-keys/<train-id>.client-keys.json`:
+Proxy access tokens live under `credentials/project-client-keys/<project-id>.client-keys.json`:
 
 ```json
 { "keys": ["cnp_live_service_a", "cnp_live_ci_runner"] }
 ```
 
-- `MSL-Train-Id` header selects the train and unlocks analytics.
-- `MSL-Account` chooses the account credential file; when omitted, the proxy deterministically maps the train to an account using a stable hash.
+- `MSL-Project-Id` header selects the project and unlocks analytics.
+- `MSL-Account` chooses the account credential file; when omitted, the proxy deterministically maps the project to an account using a stable hash.
 
 ## Database Configuration
 
@@ -115,7 +115,7 @@ bun run db:migrate:optimize
 
 When `ENABLE_CLIENT_AUTH=true` (default):
 
-- Clients must provide a Bearer token listed in `credentials/train-client-keys/<train>.client-keys.json`
+- Clients must provide a Bearer token listed in `credentials/project-client-keys/<project>.client-keys.json`
 - Generate secure keys: `bun run auth:generate-key`
 
 To disable client authentication (not recommended for production):
@@ -135,19 +135,19 @@ bun run auth:oauth-status
 # Refresh all tokens
 bun run auth:oauth-refresh
 
-# Refresh specific train ID
+# Refresh specific project ID
 bun run scripts/auth/oauth-refresh.ts team-alpha
 ```
 
-### Train Identification
+### Project Identification
 
 Set the custom header once via environment variable so the proxy tags outgoing requests correctly:
 
 ```bash
-export ANTHROPIC_CUSTOM_HEADERS="MSL-Train-Id:my_product"
+export ANTHROPIC_CUSTOM_HEADERS="MSL-Project-Id:my_product"
 ```
 
-Clients must forward the same `MSL-Train-Id` header on every request; the proxy no longer infers identity from the `Host` header.
+Clients must forward the same `MSL-Project-Id` header on every request; the proxy no longer infers identity from the `Host` header.
 
 ## Performance Tuning
 

@@ -15,9 +15,9 @@ import { createMcpApiRoutes } from './routes/mcp-api.js'
 import { initializeSlack } from './services/slack.js'
 import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
-import { trainIdExtractorMiddleware } from './middleware/train-id-extractor.js'
+import { projectIdExtractorMiddleware } from './middleware/project-id-extractor.js'
 import { clientAuthMiddleware } from './middleware/client-auth.js'
-import { HonoVariables, HonoBindings, MSL_TRAIN_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
+import { HonoVariables, HonoBindings, MSL_PROJECT_ID_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Create and configure the Proxy application
@@ -58,7 +58,7 @@ export async function createProxyApp(): Promise<
       requestId,
       path: c.req.path,
       method: c.req.method,
-      trainId: c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER),
+      projectId: c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER),
       metadata: {},
     })
 
@@ -84,14 +84,14 @@ export async function createProxyApp(): Promise<
 
   // Client authentication for proxy routes
   // Apply before rate limiting to protect against unauthenticated requests
-  // This sets trainId from API key authentication
+  // This sets projectId from API key authentication
   if (config.features.enableClientAuth !== false) {
     app.use('/v1/*', clientAuthMiddleware())
   }
 
-  // Train ID extraction fallback for all routes
-  // Only sets trainId if not already set by client auth
-  app.use('*', trainIdExtractorMiddleware())
+  // Project ID extraction fallback for all routes
+  // Only sets projectId if not already set by client auth
+  app.use('*', projectIdExtractorMiddleware())
 
   // Rate limiting
   if (config.features.enableMetrics) {
@@ -113,8 +113,8 @@ export async function createProxyApp(): Promise<
 
   // Token stats endpoint
   app.get('/token-stats', c => {
-    const trainId = c.req.query('trainId')
-    const stats = container.getMetricsService().getStats(trainId)
+    const projectId = c.req.query('projectId')
+    const stats = container.getMetricsService().getStats(projectId)
     return c.json(stats)
   })
 

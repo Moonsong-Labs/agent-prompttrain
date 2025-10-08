@@ -7,18 +7,18 @@ import { container } from '../container.js'
 
 // Query parameter schemas
 const statsQuerySchema = z.object({
-  trainId: z.string().optional(),
+  projectId: z.string().optional(),
   since: z.string().datetime().optional(),
 })
 
 const requestsQuerySchema = z.object({
-  trainId: z.string().optional(),
+  projectId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('100'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
 })
 
 const conversationsQuerySchema = z.object({
-  trainId: z.string().optional(),
+  projectId: z.string().optional(),
   accountId: z.string().optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).default('50'),
   offset: z.string().regex(/^\d+$/).transform(Number).default('0'),
@@ -43,7 +43,7 @@ interface StatsResponse {
 
 interface RequestSummary {
   requestId: string
-  trainId: string
+  projectId: string
   model: string
   timestamp: string
   inputTokens: number
@@ -107,9 +107,9 @@ apiRoutes.get('/stats', async c => {
     const values = []
     let paramCount = 0
 
-    if (params.trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(params.trainId)
+    if (params.projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(params.projectId)
     }
 
     if (params.since) {
@@ -133,7 +133,7 @@ apiRoutes.get('/stats', async c => {
         COALESCE(SUM(cache_read_input_tokens), 0) as total_cache_read_tokens,
         COALESCE(AVG(duration_ms), 0) as avg_response_time,
         COUNT(*) FILTER (WHERE error IS NOT NULL) as error_count,
-        COUNT(DISTINCT train_id) as active_trains
+        COUNT(DISTINCT project_id) as active_trains
       FROM api_requests
       ${whereClause}
     `
@@ -207,16 +207,16 @@ apiRoutes.get('/dashboard/stats', async c => {
 
   try {
     const query = c.req.query()
-    const trainId = query.trainId
+    const projectId = query.projectId
     const accountId = query.accountId
 
     const conditions: string[] = []
     const values: any[] = []
     let paramCount = 0
 
-    if (trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(trainId)
+    if (projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(projectId)
     }
 
     if (accountId) {
@@ -360,9 +360,9 @@ apiRoutes.get('/requests', async c => {
     const values = []
     let paramCount = 0
 
-    if (params.trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(params.trainId)
+    if (params.projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(params.projectId)
     }
 
     // Add limit and offset
@@ -374,7 +374,7 @@ apiRoutes.get('/requests', async c => {
     const requestsQuery = `
       SELECT 
         request_id,
-        train_id,
+        project_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -395,7 +395,7 @@ apiRoutes.get('/requests', async c => {
 
     const requests: RequestSummary[] = result.rows.map(row => ({
       requestId: row.request_id,
-      trainId: row.train_id,
+      projectId: row.project_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -454,7 +454,7 @@ apiRoutes.get('/requests/:id', async c => {
     const requestQuery = `
       SELECT 
         request_id,
-        train_id,
+        project_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -492,7 +492,7 @@ apiRoutes.get('/requests/:id', async c => {
 
     const details: RequestDetails = {
       requestId: row.request_id,
-      trainId: row.train_id,
+      projectId: row.project_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -546,23 +546,23 @@ apiRoutes.get('/train-ids', async c => {
 
     if (!pool) {
       // Return empty list when database is not configured
-      logger.debug('Train IDs API called but database not configured')
+      logger.debug('Project IDs API called but database not configured')
       return c.json({ trainIds: [] })
     }
   }
 
   try {
     const query = `
-      SELECT DISTINCT train_id, COUNT(*) as request_count
+      SELECT DISTINCT project_id, COUNT(*) as request_count
       FROM api_requests
       WHERE timestamp > NOW() - INTERVAL '7 days'
-      GROUP BY train_id
+      GROUP BY project_id
       ORDER BY request_count DESC
     `
 
     const result = await pool.query(query)
     const trainIds = result.rows.map(row => ({
-      trainId: row.train_id,
+      projectId: row.project_id,
       requestCount: parseInt(row.request_count),
     }))
 
@@ -596,9 +596,9 @@ apiRoutes.get('/conversations', async c => {
     const values: any[] = []
     let paramCount = 0
 
-    if (params.trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(params.trainId)
+    if (params.projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(params.projectId)
     }
 
     if (params.accountId) {
@@ -639,7 +639,7 @@ apiRoutes.get('/conversations', async c => {
         SELECT 
           r.request_id,
           r.conversation_id,
-          r.train_id,
+          r.project_id,
           r.account_id,
           r.timestamp,
           r.input_tokens,
@@ -658,7 +658,7 @@ apiRoutes.get('/conversations', async c => {
       conversation_summary AS (
         SELECT
           conversation_id,
-          ARRAY_AGG(DISTINCT train_id) FILTER (WHERE train_id IS NOT NULL) as train_ids,
+          ARRAY_AGG(DISTINCT project_id) FILTER (WHERE project_id IS NOT NULL) as train_ids,
           ARRAY_AGG(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) as account_ids,
           MIN(timestamp) as first_message_time,
           MAX(timestamp) as last_message_time,
@@ -726,8 +726,8 @@ apiRoutes.get('/conversations', async c => {
         conversationId: row.conversation_id,
         trainIds: row.train_ids || [],
         accountIds: row.account_ids || [],
-        // Keep backward compatibility with single trainId/accountId (use first one)
-        trainId: (row.train_ids && row.train_ids[0]) || '',
+        // Keep backward compatibility with single projectId/accountId (use first one)
+        projectId: (row.train_ids && row.train_ids[0]) || '',
         accountId: (row.account_ids && row.account_ids[0]) || null,
         firstMessageTime: row.first_message_time,
         lastMessageTime: row.last_message_time,
@@ -772,14 +772,14 @@ apiRoutes.get('/conversations', async c => {
 // Token usage query schemas
 const tokenUsageWindowSchema = z.object({
   accountId: z.string(),
-  trainId: z.string().optional(),
+  projectId: z.string().optional(),
   model: z.string().optional(),
   window: z.string().regex(/^\d+$/).transform(Number).default('300'), // Default 5 hours (300 minutes)
 })
 
 const tokenUsageDailySchema = z.object({
   accountId: z.string(),
-  trainId: z.string().optional(),
+  projectId: z.string().optional(),
   days: z.string().regex(/^\d+$/).transform(Number).default('30'),
   aggregate: z
     .string()
@@ -805,7 +805,7 @@ apiRoutes.get('/token-usage/current', async c => {
     const usage = await tokenUsageService.getUsageWindow(
       params.accountId,
       windowHours,
-      params.trainId,
+      params.projectId,
       params.model
     )
 
@@ -837,9 +837,9 @@ apiRoutes.get('/token-usage/daily', async c => {
       ? await tokenUsageService.getAggregatedDailyUsage(
           params.accountId,
           params.days,
-          params.trainId
+          params.projectId
         )
-      : await tokenUsageService.getDailyUsage(params.accountId, params.days, params.trainId)
+      : await tokenUsageService.getDailyUsage(params.accountId, params.days, params.projectId)
 
     return c.json({ usage })
   } catch (error) {
@@ -964,13 +964,13 @@ apiRoutes.get('/token-usage/accounts', async c => {
       train_usage AS (
         SELECT 
           account_id,
-          train_id,
+          project_id,
           SUM(output_tokens) as train_output_tokens,
           COUNT(*) as train_requests
         FROM api_requests
         WHERE account_id IS NOT NULL
           AND timestamp >= NOW() - INTERVAL '5 hours'
-        GROUP BY account_id, train_id
+        GROUP BY account_id, project_id
       )
       SELECT 
         au.account_id,
@@ -981,11 +981,11 @@ apiRoutes.get('/token-usage/accounts', async c => {
         COALESCE(
           json_agg(
             json_build_object(
-              'trainId', tu.train_id,
+              'projectId', tu.project_id,
               'outputTokens', tu.train_output_tokens,
               'requests', tu.train_requests
             ) ORDER BY tu.train_output_tokens DESC
-          ) FILTER (WHERE tu.train_id IS NOT NULL),
+          ) FILTER (WHERE tu.project_id IS NOT NULL),
           '[]'::json
         ) as train_ids
       FROM account_usage au
@@ -1096,7 +1096,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const trainId = query.trainId
+    const projectId = query.projectId
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1113,9 +1113,9 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     values.push(days)
 
     // Optional train filter
-    if (trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(trainId)
+    if (projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(projectId)
     }
 
     const whereClause = conditions.join(' AND ')
@@ -1123,7 +1123,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     // Query to get hourly request counts grouped by train ID
     const hourlyQuery = `
       SELECT
-        train_id,
+        project_id,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COUNT(*) as request_count
       FROM
@@ -1131,10 +1131,10 @@ apiRoutes.get('/usage/requests/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        train_id,
+        project_id,
         hour
       ORDER BY
-        train_id,
+        project_id,
         hour
     `
 
@@ -1144,7 +1144,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     const data: Record<string, Array<{ hour: string; count: number }>> = {}
 
     result.rows.forEach(row => {
-      const trainKey = row.train_id || 'unknown'
+      const trainKey = row.project_id || 'unknown'
       if (!data[trainKey]) {
         data[trainKey] = []
       }
@@ -1157,7 +1157,7 @@ apiRoutes.get('/usage/requests/hourly', async c => {
     return c.json({
       data,
       query: {
-        trainId: trainId || null,
+        projectId: projectId || null,
         days,
       },
     })
@@ -1185,7 +1185,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
 
   try {
     const query = c.req.query()
-    const trainId = query.trainId
+    const projectId = query.projectId
     const days = parseInt(query.days || '7')
 
     // Validate days parameter
@@ -1202,9 +1202,9 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     values.push(days)
 
     // Optional train filter
-    if (trainId) {
-      conditions.push(`train_id = $${++paramCount}`)
-      values.push(trainId)
+    if (projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(projectId)
     }
 
     const whereClause = conditions.join(' AND ')
@@ -1212,7 +1212,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     // Query to get hourly token sums grouped by train ID (output tokens only)
     const hourlyQuery = `
       SELECT
-        train_id,
+        project_id,
         DATE_TRUNC('hour', timestamp AT TIME ZONE 'UTC') as hour,
         COALESCE(SUM(output_tokens), 0) as token_count
       FROM
@@ -1220,10 +1220,10 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
       WHERE
         ${whereClause}
       GROUP BY
-        train_id,
+        project_id,
         hour
       ORDER BY
-        train_id,
+        project_id,
         hour
     `
 
@@ -1233,7 +1233,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     const data: Record<string, Array<{ hour: string; count: number }>> = {}
 
     for (const row of rows) {
-      const trainName = row.train_id || 'unknown'
+      const trainName = row.project_id || 'unknown'
       if (!data[trainName]) {
         data[trainName] = []
       }
@@ -1247,7 +1247,7 @@ apiRoutes.get('/usage/tokens/hourly', async c => {
     return c.json({
       data,
       query: {
-        trainId: trainId || null,
+        projectId: projectId || null,
         days,
       },
     })

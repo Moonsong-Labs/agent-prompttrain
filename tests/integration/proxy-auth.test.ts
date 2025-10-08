@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import type { Server } from 'node:http'
-const TRAIN_HEADER = 'MSL-Train-Id'
+const TRAIN_HEADER = 'MSL-Project-Id'
 const TRAIN_HEADER_LOWER = TRAIN_HEADER.toLowerCase()
 
 // Mock proxy server that mimics the authentication behavior
@@ -12,7 +12,7 @@ function createMockProxyServer() {
   // Helper function to check client auth
   const checkClientAuth = (c: any) => {
     const authorization = c.req.header('Authorization')
-    const trainId = c.get('trainId')
+    const projectId = c.get('projectId')
     // Client auth is enabled by default unless explicitly set to 'false'
     const clientAuthEnabled =
       !process.env.ENABLE_CLIENT_AUTH || process.env.ENABLE_CLIENT_AUTH !== 'false'
@@ -59,7 +59,7 @@ function createMockProxyServer() {
         {
           error: {
             type: 'authentication_error',
-            message: `No client API key configured for train "${trainId}". Please add "client_api_key" to your credential file or disable client authentication.`,
+            message: `No client API key configured for train "${projectId}". Please add "client_api_key" to your credential file or disable client authentication.`,
           },
         },
         401,
@@ -72,10 +72,10 @@ function createMockProxyServer() {
     return null // Auth passed
   }
 
-  // Mock middleware that derives a train ID from the MSL-Train-Id header for tests
+  // Mock middleware that derives a project ID from the MSL-Project-Id header for tests
   app.use('*', async (c, next) => {
-    const trainId = c.req.header(TRAIN_HEADER_LOWER) || 'unknown'
-    c.set('trainId', trainId)
+    const projectId = c.req.header(TRAIN_HEADER_LOWER) || 'unknown'
+    c.set('projectId', projectId)
     await next()
   })
 

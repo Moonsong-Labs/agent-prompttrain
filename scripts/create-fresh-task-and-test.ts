@@ -23,7 +23,7 @@ async function createFreshTaskAndTest() {
     await pool.query(
       `
       INSERT INTO api_requests (
-        request_id, train_id, timestamp, method, path, headers, body,
+        request_id, project_id, timestamp, method, path, headers, body,
         api_key_hash, model, request_type, conversation_id,
         task_tool_invocation, response_status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -72,7 +72,7 @@ async function createFreshTaskAndTest() {
 
     await writer.storeRequest({
       requestId: subtaskRequestId,
-      trainId: 'test.localhost',
+      projectId: 'test.localhost',
       timestamp: subtaskTimestamp,
       method: 'POST',
       path: '/v1/messages',

@@ -38,7 +38,7 @@ nano .env
 ```bash
 # Create credentials directory
 mkdir -p credentials/accounts
-mkdir -p credentials/train-client-keys
+mkdir -p credentials/project-client-keys
 
 # Generate client API key
 bun run scripts/generate-api-key.ts
@@ -53,7 +53,7 @@ cat > credentials/accounts/account-primary.credentials.json <<'JSON'
 JSON
 
 # Allow proxy clients for a train
-cat > credentials/train-client-keys/your-train-id.client-keys.json <<'JSON'
+cat > credentials/project-client-keys/your-train-id.client-keys.json <<'JSON'
 { "keys": ["cnp_live_generated_key"] }
 JSON
 ```

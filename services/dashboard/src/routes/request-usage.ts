@@ -7,7 +7,7 @@ import { logger } from '../middleware/logger.js'
 
 // Type definitions
 interface TrainIdInfo {
-  trainId: string
+  projectId: string
   requestCount: number
 }
 
@@ -19,7 +19,7 @@ interface HourlyDataPoint {
 interface HourlyUsageResponse {
   data: Record<string, HourlyDataPoint[]>
   query: {
-    trainId: string | null
+    projectId: string | null
     days: number
   }
 }
@@ -40,7 +40,7 @@ function formatNumber(num: number): string {
 }
 
 // Generate consistent color from train identifier
-function getTrainColor(trainId: string): string {
+function getTrainColor(projectId: string): string {
   // Predefined palette of diverse, aesthetically pleasing colors
   const colorPalette = [
     '#FF6B6B', // Soft red
@@ -67,8 +67,8 @@ function getTrainColor(trainId: string): string {
 
   // Generate hash from train identifier
   let hash = 0
-  for (let i = 0; i < trainId.length; i++) {
-    const char = trainId.charCodeAt(i)
+  for (let i = 0; i < projectId.length; i++) {
+    const char = projectId.charCodeAt(i)
     hash = (hash << 5) - hash + char
     hash = hash & hash // Convert to 32-bit integer
   }
@@ -79,11 +79,11 @@ function getTrainColor(trainId: string): string {
 }
 
 /**
- * Train usage dashboard page
+ * Project usage dashboard page
  */
 requestUsageRoutes.get('/usage', async c => {
   const apiClient = c.get('apiClient')
-  const selectedTrainId = c.req.query('trainId')
+  const selectedTrainId = c.req.query('projectId')
 
   if (!apiClient) {
     return c.html(
@@ -103,13 +103,13 @@ requestUsageRoutes.get('/usage', async c => {
     const trainIdsResponse = await apiClient.get<TrainIdsResponse>('/api/train-ids')
     const trainIds = trainIdsResponse.trainIds ?? []
 
-    // Use selected trainId or null to include all trains
+    // Use selected projectId or null to include all projects
     const displayTrainId = selectedTrainId || null
 
     // Fetch hourly usage data
     const usageParams = new URLSearchParams({ days: '7' })
     if (displayTrainId) {
-      usageParams.append('trainId', displayTrainId)
+      usageParams.append('projectId', displayTrainId)
     }
     const usageResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/requests/hourly?${usageParams}`
@@ -129,20 +129,20 @@ requestUsageRoutes.get('/usage', async c => {
         <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
       </div>
 
-      <h2 style="margin: 0 0 1.5rem 0;">Train Usage - Hourly Statistics</h2>
+      <h2 style="margin: 0 0 1.5rem 0;">Project Usage - Hourly Statistics</h2>
 
-      <!-- Train Selector -->
+      <!-- Project Selector -->
       <div class="section">
-        <div class="section-header">Select Train ID</div>
+        <div class="section-header">Select Project ID</div>
         <div class="section-content">
           <select
             id="train-selector"
-            name="trainId"
+            name="projectId"
             style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 0.375rem; font-size: 14px;"
-            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?trainId=' + encodeURIComponent(this.value) : '')"
+            onchange="window.location.href = '/dashboard/usage' + (this.value ? '?projectId=' + encodeURIComponent(this.value) : '')"
           >
             <option value="" ${!selectedTrainId ? 'selected' : ''}>
-              All Train IDs (${formatNumber(trainIds.reduce((sum, d) => sum + d.requestCount, 0))}
+              All Project IDs (${formatNumber(trainIds.reduce((sum, d) => sum + d.requestCount, 0))}
               requests)
             </option>
             ${trainIds.length > 0
@@ -151,10 +151,10 @@ requestUsageRoutes.get('/usage', async c => {
                     .map(
                       (d: TrainIdInfo) =>
                         `<option
-                          value="${d.trainId}"
-                          ${d.trainId === displayTrainId ? 'selected' : ''}
+                          value="${d.projectId}"
+                          ${d.projectId === displayTrainId ? 'selected' : ''}
                         >
-                          ${d.trainId} (${formatNumber(d.requestCount)} requests)
+                          ${d.projectId} (${formatNumber(d.requestCount)} requests)
                         </option>`
                     )
                     .join('')
@@ -170,7 +170,7 @@ requestUsageRoutes.get('/usage', async c => {
           Hourly Request Count - Last 7 Days
           ${displayTrainId
             ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
-            : html`<span class="text-sm text-gray-500">(All Train IDs)</span>`}
+            : html`<span class="text-sm text-gray-500">(All Project IDs)</span>`}
         </div>
         <div class="section-content">
           ${(displayTrainId && Array.isArray(chartData) && chartData.length > 0) ||
@@ -189,7 +189,7 @@ requestUsageRoutes.get('/usage', async c => {
                     const displayTrainId = ${JSON.stringify(displayTrainId)};
                     const trainColors = ${JSON.stringify(
                       trainIds.reduce((acc: Record<string, string>, d: TrainIdInfo) => {
-                        acc[d.trainId] = getTrainColor(d.trainId)
+                        acc[d.projectId] = getTrainColor(d.projectId)
                         return acc
                       }, {})
                     )};
@@ -227,7 +227,7 @@ requestUsageRoutes.get('/usage', async c => {
                       const isSingleTrain = displayTrainId !== null;
                       
                       if (isSingleTrain) {
-                        // Single trainId view
+                        // Single projectId view
                         const dataMap = new Map();
                         chartData.forEach(point => {
                           const hourKey = new Date(point.hour).toISOString();
@@ -243,17 +243,17 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                         }
                       } else {
-                        // Multi-trainId stacked view
+                        // Multi-projectId stacked view
                         const trainDataMaps = {};
                         const allTrainIds = Object.keys(chartData);
                         
                         // Build data maps for each train ID
-                        allTrainIds.forEach(trainId => {
-                          trainDataMaps[trainId] = new Map();
-                          if (chartData[trainId]) {
-                            chartData[trainId].forEach(point => {
+                        allTrainIds.forEach(projectId => {
+                          trainDataMaps[projectId] = new Map();
+                          if (chartData[projectId]) {
+                            chartData[projectId].forEach(point => {
                               const hourKey = new Date(point.hour).toISOString();
-                              trainDataMaps[trainId].set(hourKey, point.count);
+                              trainDataMaps[projectId].set(hourKey, point.count);
                             });
                           }
                         });
@@ -262,10 +262,10 @@ requestUsageRoutes.get('/usage', async c => {
                         for (let i = 0; i < 168; i++) {
                           const time = new Date(startTime.getTime() + i * 60 * 60 * 1000);
                           const hourKey = time.toISOString();
-                          const dataPoint = { time: time, trains: {} };
+                          const dataPoint = { time: time, projects: {} };
                           
-                          allTrainIds.forEach(trainId => {
-                            dataPoint.trains[trainId] = trainDataMaps[trainId].get(hourKey) || 0;
+                          allTrainIds.forEach(projectId => {
+                            dataPoint.projects[projectId] = trainDataMaps[projectId].get(hourKey) || 0;
                           });
                           
                           hourlyTimeline.push(dataPoint);
@@ -280,7 +280,7 @@ requestUsageRoutes.get('/usage', async c => {
                         // For stacked view, max is the sum of all trainIds at any hour
                         maxCount = Math.max(
                           ...hourlyTimeline.map(d =>
-                            Object.values(d.trains).reduce((sum, count) => sum + count, 0)
+                            Object.values(d.projects).reduce((sum, count) => sum + count, 0)
                           ),
                           1
                         );
@@ -321,7 +321,7 @@ requestUsageRoutes.get('/usage', async c => {
                       
                       // Draw bars
                       if (isSingleTrain) {
-                        // Single trainId - simple bars
+                        // Single projectId - simple bars
                         hourlyTimeline.forEach((point, index) => {
                           if (point.count > 0) {
                             const x = padding.left + index * barWidth;
@@ -333,20 +333,20 @@ requestUsageRoutes.get('/usage', async c => {
                           }
                         });
                       } else {
-                        // Multi-trainId - stacked bars
+                        // Multi-projectId - stacked bars
                         const allTrainIds = Object.keys(chartData);
                         
                         hourlyTimeline.forEach((point, index) => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allTrainIds.forEach(trainId => {
-                            const count = point.trains[trainId] || 0;
+                          allTrainIds.forEach(projectId => {
+                            const count = point.projects[projectId] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
                               const y = padding.top + chartHeight - stackHeight - segmentHeight;
                               
-                              ctx.fillStyle = trainColors[trainId];
+                              ctx.fillStyle = trainColors[projectId];
                               ctx.fillRect(x, y, barWidth - 1, segmentHeight);
                               
                               stackHeight += segmentHeight;
@@ -422,17 +422,17 @@ requestUsageRoutes.get('/usage', async c => {
                           if (isSingleTrain) {
                             tooltipHTML += '<div style="color: #10b981;">Requests: ' + formatNumber(point.count) + '</div>';
                           } else {
-                            const total = Object.values(point.trains).reduce((sum, count) => sum + count, 0);
+                            const total = Object.values(point.projects).reduce((sum, count) => sum + count, 0);
                             tooltipHTML += '<div style="color: #10b981; margin-bottom: 4px;">Total: ' + formatNumber(total) + ' requests</div>';
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.trains).forEach(([trainId, count]) => {
+                              Object.entries(point.projects).forEach(([projectId, count]) => {
                                 if (count > 0) {
-                                  const color = trainColors[trainId];
+                                  const color = trainColors[projectId];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
                                   tooltipHTML += '<div style="width: 10px; height: 10px; background: ' + color + '; margin-right: 6px; border-radius: 2px;"></div>';
-                                  tooltipHTML += '<div style="flex: 1;">' + trainId + '</div>';
+                                  tooltipHTML += '<div style="flex: 1;">' + projectId + '</div>';
                                   tooltipHTML += '<div style="margin-left: 8px;">' + formatNumber(count) + '</div>';
                                   tooltipHTML += '</div>';
                                 }
@@ -470,14 +470,14 @@ requestUsageRoutes.get('/usage', async c => {
                   </script>
                 `)}
 
-                <!-- Legend for multi-trainId view -->
+                <!-- Legend for multi-projectId view -->
                 ${!displayTrainId
                   ? html`
                       <div
                         style="margin-top: 20px; padding: 16px; background: #f9fafb; border-radius: 8px;"
                       >
                         <div style="font-weight: 600; margin-bottom: 12px; color: #1f2937;">
-                          Train IDs:
+                          Project IDs:
                         </div>
                         <div style="display: flex; flex-wrap: wrap; gap: 16px;">
                           ${raw(
@@ -487,10 +487,10 @@ requestUsageRoutes.get('/usage', async c => {
                                   <div style="display: flex; align-items: center; gap: 8px;">
                                     <div
                                       style="width: 16px; height: 16px; border-radius: 4px; background: ${getTrainColor(
-                                        d.trainId
+                                        d.projectId
                                       )};"
                                     ></div>
-                                    <span style="font-size: 14px; color: #4b5563;">${d.trainId}</span>
+                                    <span style="font-size: 14px; color: #4b5563;">${d.projectId}</span>
                                   </div>
                                 `
                               )
@@ -503,10 +503,10 @@ requestUsageRoutes.get('/usage', async c => {
               `
             : displayTrainId
               ? html`<p class="text-gray-500">
-                  No request data available for the selected trainId in the last 7 days.
+                  No request data available for the selected projectId in the last 7 days.
                 </p>`
               : html`<p class="text-gray-500">
-                  No request data available for any trainId in the last 7 days.
+                  No request data available for any projectId in the last 7 days.
                 </p>`}
         </div>
       </div>
@@ -521,7 +521,7 @@ requestUsageRoutes.get('/usage', async c => {
             let activeHours = 0
 
             if (displayTrainId && Array.isArray(chartData)) {
-              // Single trainId stats
+              // Single projectId stats
               totalRequests = chartData.reduce(
                 (sum: number, point: HourlyDataPoint) => sum + point.count,
                 0
@@ -534,7 +534,7 @@ requestUsageRoutes.get('/usage', async c => {
               )
               activeHours = chartData.length
             } else {
-              // Multi-trainId stats
+              // Multi-projectId stats
               const hourlyTotals = new Map<string, number>()
 
               Object.values(chartData).forEach((trainData: HourlyDataPoint[]) => {
@@ -594,7 +594,7 @@ requestUsageRoutes.get('/usage', async c => {
           Hourly Output Token Usage - Last 7 Days
           ${displayTrainId
             ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
-            : html`<span class="text-sm text-gray-500">(All Train IDs)</span>`}
+            : html`<span class="text-sm text-gray-500">(All Project IDs)</span>`}
         </div>
         <div class="section-content">
           ${(displayTrainId && Array.isArray(tokenChartData) && tokenChartData.length > 0) ||
@@ -615,7 +615,7 @@ requestUsageRoutes.get('/usage', async c => {
                     const tokenDisplayTrainId = ${JSON.stringify(displayTrainId)};
                     const tokenTrainColors = ${JSON.stringify(
                       trainIds.reduce((acc: Record<string, string>, d: TrainIdInfo) => {
-                        acc[d.trainId] = getTrainColor(d.trainId)
+                        acc[d.projectId] = getTrainColor(d.projectId)
                         return acc
                       }, {})
                     )};
@@ -653,7 +653,7 @@ requestUsageRoutes.get('/usage', async c => {
                     const isSingleTrain = tokenDisplayTrainId !== null;
                       
                       if (isSingleTrain) {
-                        // Single trainId view
+                        // Single projectId view
                         const dataMap = new Map();
                         tokenChartData.forEach(point => {
                           const hourKey = new Date(point.hour).toISOString();
@@ -669,17 +669,17 @@ requestUsageRoutes.get('/usage', async c => {
                           });
                         }
                       } else {
-                        // Multi-trainId stacked view
+                        // Multi-projectId stacked view
                         const trainDataMaps = {};
                         const allTrainIds = Object.keys(tokenChartData);
                         
                         // Build data maps for each train ID
-                        allTrainIds.forEach(trainId => {
-                          trainDataMaps[trainId] = new Map();
-                          if (tokenChartData[trainId]) {
-                            tokenChartData[trainId].forEach(point => {
+                        allTrainIds.forEach(projectId => {
+                          trainDataMaps[projectId] = new Map();
+                          if (tokenChartData[projectId]) {
+                            tokenChartData[projectId].forEach(point => {
                               const hourKey = new Date(point.hour).toISOString();
-                              trainDataMaps[trainId].set(hourKey, point.count);
+                              trainDataMaps[projectId].set(hourKey, point.count);
                             });
                           }
                         });
@@ -688,10 +688,10 @@ requestUsageRoutes.get('/usage', async c => {
                         for (let i = 0; i < 168; i++) {
                           const time = new Date(startTime.getTime() + i * 60 * 60 * 1000);
                           const hourKey = time.toISOString();
-                          const dataPoint = { time: time, trains: {} };
+                          const dataPoint = { time: time, projects: {} };
                           
-                          allTrainIds.forEach(trainId => {
-                            dataPoint.trains[trainId] = trainDataMaps[trainId].get(hourKey) || 0;
+                          allTrainIds.forEach(projectId => {
+                            dataPoint.projects[projectId] = trainDataMaps[projectId].get(hourKey) || 0;
                           });
                           
                           hourlyTimeline.push(dataPoint);
@@ -706,7 +706,7 @@ requestUsageRoutes.get('/usage', async c => {
                         // For stacked view, max is the sum of all trainIds at any hour
                         maxCount = Math.max(
                           ...hourlyTimeline.map(d =>
-                            Object.values(d.trains).reduce((sum, count) => sum + count, 0)
+                            Object.values(d.projects).reduce((sum, count) => sum + count, 0)
                           ),
                           1
                         );
@@ -747,7 +747,7 @@ requestUsageRoutes.get('/usage', async c => {
                       
                       // Draw bars
                       if (isSingleTrain) {
-                        // Single trainId - simple bars
+                        // Single projectId - simple bars
                         hourlyTimeline.forEach((point, index) => {
                           if (point.count > 0) {
                             const x = padding.left + index * barWidth;
@@ -759,20 +759,20 @@ requestUsageRoutes.get('/usage', async c => {
                           }
                         });
                       } else {
-                        // Multi-trainId - stacked bars
+                        // Multi-projectId - stacked bars
                         const allTrainIds = Object.keys(tokenChartData);
                         
                         hourlyTimeline.forEach((point, index) => {
                           const x = padding.left + index * barWidth;
                           let stackHeight = 0;
                           
-                          allTrainIds.forEach(trainId => {
-                            const count = point.trains[trainId] || 0;
+                          allTrainIds.forEach(projectId => {
+                            const count = point.projects[projectId] || 0;
                             if (count > 0) {
                               const segmentHeight = count * yScale;
                               const y = padding.top + chartHeight - stackHeight - segmentHeight;
                               
-                              ctx.fillStyle = tokenTrainColors[trainId];
+                              ctx.fillStyle = tokenTrainColors[projectId];
                               ctx.fillRect(x, y, barWidth - 1, segmentHeight);
                               
                               stackHeight += segmentHeight;
@@ -848,17 +848,17 @@ requestUsageRoutes.get('/usage', async c => {
                           if (isSingleTrain) {
                             tooltipHTML += '<div style="color: #60a5fa;">Output Tokens: ' + formatTokenNumber(point.count) + '</div>';
                           } else {
-                            const total = Object.values(point.trains).reduce((sum, count) => sum + count, 0);
+                            const total = Object.values(point.projects).reduce((sum, count) => sum + count, 0);
                             tooltipHTML += '<div style="color: #60a5fa; margin-bottom: 4px;">Total: ' + formatTokenNumber(total) + ' tokens</div>';
                             
                             if (total > 0) {
                               tooltipHTML += '<div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 4px; padding-top: 4px;">';
-                              Object.entries(point.trains).forEach(([trainId, count]) => {
+                              Object.entries(point.projects).forEach(([projectId, count]) => {
                                 if (count > 0) {
-                                  const color = tokenTrainColors[trainId];
+                                  const color = tokenTrainColors[projectId];
                                   tooltipHTML += '<div style="display: flex; align-items: center; margin: 2px 0;">';
                                   tooltipHTML += '<div style="width: 10px; height: 10px; background: ' + color + '; margin-right: 6px; border-radius: 2px;"></div>';
-                                  tooltipHTML += '<div style="flex: 1;">' + trainId + '</div>';
+                                  tooltipHTML += '<div style="flex: 1;">' + projectId + '</div>';
                                   tooltipHTML += '<div style="margin-left: 8px;">' + formatTokenNumber(count) + '</div>';
                                   tooltipHTML += '</div>';
                                 }
@@ -898,16 +898,16 @@ requestUsageRoutes.get('/usage', async c => {
               `
             : displayTrainId
               ? html`<p class="text-gray-500">
-                  No token usage data available for the selected trainId in the last 7 days.
+                  No token usage data available for the selected projectId in the last 7 days.
                 </p>`
               : html`<p class="text-gray-500">
-                  No token usage data available for any trainId in the last 7 days.
+                  No token usage data available for any projectId in the last 7 days.
                 </p>`}
         </div>
       </div>
     `
 
-    return c.html(layout('Train Usage', content))
+    return c.html(layout('Project Usage', content))
   } catch (error) {
     logger.error('Failed to load request usage page', { error: getErrorMessage(error) })
     return c.html(
@@ -915,7 +915,7 @@ requestUsageRoutes.get('/usage', async c => {
         'Error',
         html`
           <div class="error-banner">
-            <strong>Error:</strong> Failed to load trainId stats data. Please try again later.
+            <strong>Error:</strong> Failed to load projectId stats data. Please try again later.
           </div>
           <div class="mt-4">
             <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
@@ -931,20 +931,20 @@ requestUsageRoutes.get('/usage', async c => {
  */
 requestUsageRoutes.get('/usage/chart', async c => {
   const apiClient = c.get('apiClient')
-  const trainId = c.req.query('trainId')
+  const projectId = c.req.query('projectId')
 
-  if (!apiClient || !trainId) {
+  if (!apiClient || !projectId) {
     return c.html(html`<div class="error-banner">Invalid request</div>`)
   }
 
   try {
     // Fetch hourly usage data for the specific train
-    const usageParams = new URLSearchParams({ days: '7', trainId })
+    const usageParams = new URLSearchParams({ days: '7', projectId })
     const usageResponse = await apiClient.get<HourlyUsageResponse>(
       `/api/usage/requests/hourly?${usageParams}`
     )
     const usageData = usageResponse.data || {}
-    const chartData = usageData[trainId] || []
+    const chartData = usageData[projectId] || []
 
     return c.html(html`
       <div id="chart-container">
@@ -960,14 +960,14 @@ requestUsageRoutes.get('/usage/chart', async c => {
                 <script>
                   // Same chart rendering logic as above
                   const chartData = ${JSON.stringify(chartData)};
-                  const trainId = ${JSON.stringify(trainId)};
+                  const projectId = ${JSON.stringify(projectId)};
                   
                   // ... (same chart drawing code as in the main route)
                 </script>
               `)}
             `
           : html`<p class="text-gray-500">
-              No request data available for ${trainId} in the last 7 days.
+              No request data available for ${projectId} in the last 7 days.
             </p>`}
       </div>
     `)

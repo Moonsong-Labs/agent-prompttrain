@@ -1,8 +1,8 @@
 import { Pool } from 'pg'
 import { randomBytes } from 'crypto'
 import type {
-  TrainApiKey,
-  TrainApiKeySafe,
+  ProjectApiKey,
+  ProjectApiKeySafe,
   CreateApiKeyRequest,
   GeneratedApiKey,
 } from '../../types/credentials'
@@ -23,7 +23,7 @@ function generateApiKey(): string {
 }
 
 /**
- * Generate a new API key for a train
+ * Generate a new API key for a project
  */
 export async function createTrainApiKey(
   pool: Pool,
@@ -34,10 +34,10 @@ export async function createTrainApiKey(
   const keySuffix = apiKey.slice(-4)
   const keyPreview = `${KEY_PREFIX}****${keySuffix}`
 
-  const result = await pool.query<TrainApiKey>(
+  const result = await pool.query<ProjectApiKey>(
     `
-    INSERT INTO train_api_keys (
-      train_id,
+    INSERT INTO project_api_keys (
+      project_id,
       api_key,
       key_prefix,
       key_suffix,
@@ -63,17 +63,17 @@ export async function createTrainApiKey(
 
 /**
  * Verify an API key and return the associated train ID
- * This is the primary authentication method - identifies the train from the API key
+ * This is the primary authentication method - identifies the project from the API key
  */
 export async function verifyApiKeyAndGetTrain(
   pool: Pool,
   apiKey: string
-): Promise<{ trainApiKey: TrainApiKey; trainId: string } | null> {
-  const result = await pool.query<TrainApiKey & { train_id: string }>(
+): Promise<{ trainApiKey: ProjectApiKey; projectId: string } | null> {
+  const result = await pool.query<ProjectApiKey & { project_id: string }>(
     `
-    SELECT tak.*, t.train_id
-    FROM train_api_keys tak
-    INNER JOIN trains t ON t.id = tak.train_id
+    SELECT tak.*, t.project_id
+    FROM project_api_keys tak
+    INNER JOIN projects t ON t.id = tak.project_id
     WHERE tak.api_key = $1
       AND tak.revoked_at IS NULL
     `,
@@ -87,33 +87,33 @@ export async function verifyApiKeyAndGetTrain(
   const row = result.rows[0]
 
   // Update last_used_at
-  await pool.query('UPDATE train_api_keys SET last_used_at = NOW() WHERE id = $1', [row.id])
+  await pool.query('UPDATE project_api_keys SET last_used_at = NOW() WHERE id = $1', [row.id])
 
   return {
     trainApiKey: row,
-    trainId: row.train_id,
+    projectId: row.project_id,
   }
 }
 
 /**
- * Verify an API key for a train (legacy method - prefer verifyApiKeyAndGetTrain)
+ * Verify an API key for a project (legacy method - prefer verifyApiKeyAndGetTrain)
  * @deprecated Use verifyApiKeyAndGetTrain instead
  */
 export async function verifyTrainApiKey(
   pool: Pool,
-  trainId: string,
+  projectId: string,
   apiKey: string
-): Promise<TrainApiKey | null> {
-  const result = await pool.query<TrainApiKey>(
+): Promise<ProjectApiKey | null> {
+  const result = await pool.query<ProjectApiKey>(
     `
     SELECT tak.*
-    FROM train_api_keys tak
-    INNER JOIN trains t ON t.id = tak.train_id
-    WHERE t.train_id = $1
+    FROM project_api_keys tak
+    INNER JOIN projects t ON t.id = tak.project_id
+    WHERE t.project_id = $1
       AND tak.api_key = $2
       AND tak.revoked_at IS NULL
     `,
-    [trainId, apiKey]
+    [projectId, apiKey]
   )
 
   if (result.rows.length === 0) {
@@ -123,20 +123,23 @@ export async function verifyTrainApiKey(
   const key = result.rows[0]
 
   // Update last_used_at
-  await pool.query('UPDATE train_api_keys SET last_used_at = NOW() WHERE id = $1', [key.id])
+  await pool.query('UPDATE project_api_keys SET last_used_at = NOW() WHERE id = $1', [key.id])
 
   return key
 }
 
 /**
- * List all API keys for a train (safe version)
+ * List all API keys for a project (safe version)
  */
-export async function listTrainApiKeys(pool: Pool, trainUuid: string): Promise<TrainApiKeySafe[]> {
-  const result = await pool.query<TrainApiKey>(
+export async function listTrainApiKeys(
+  pool: Pool,
+  trainUuid: string
+): Promise<ProjectApiKeySafe[]> {
+  const result = await pool.query<ProjectApiKey>(
     `
     SELECT *
-    FROM train_api_keys
-    WHERE train_id = $1
+    FROM project_api_keys
+    WHERE project_id = $1
     ORDER BY created_at DESC
     `,
     [trainUuid]
@@ -151,8 +154,8 @@ export async function listTrainApiKeys(pool: Pool, trainUuid: string): Promise<T
 export async function getTrainApiKeySafe(
   pool: Pool,
   keyId: string
-): Promise<TrainApiKeySafe | null> {
-  const result = await pool.query<TrainApiKey>('SELECT * FROM train_api_keys WHERE id = $1', [
+): Promise<ProjectApiKeySafe | null> {
+  const result = await pool.query<ProjectApiKey>('SELECT * FROM project_api_keys WHERE id = $1', [
     keyId,
   ])
 
@@ -173,7 +176,7 @@ export async function revokeTrainApiKey(
 ): Promise<boolean> {
   const result = await pool.query(
     `
-    UPDATE train_api_keys
+    UPDATE project_api_keys
     SET revoked_at = NOW(), revoked_by = $2
     WHERE id = $1 AND revoked_at IS NULL
     RETURNING id
@@ -188,17 +191,17 @@ export async function revokeTrainApiKey(
  * Delete an API key
  */
 export async function deleteTrainApiKey(pool: Pool, keyId: string): Promise<boolean> {
-  const result = await pool.query('DELETE FROM train_api_keys WHERE id = $1', [keyId])
+  const result = await pool.query('DELETE FROM project_api_keys WHERE id = $1', [keyId])
   return (result.rowCount ?? 0) > 0
 }
 
 /**
  * Convert full API key to safe version (without full key)
  */
-function toSafeApiKey(key: TrainApiKey): TrainApiKeySafe {
+function toSafeApiKey(key: ProjectApiKey): ProjectApiKeySafe {
   return {
     id: key.id,
-    train_id: key.train_id,
+    project_id: key.project_id,
     key_preview: `${key.key_prefix}****${key.key_suffix}`,
     name: key.name,
     created_by: key.created_by,

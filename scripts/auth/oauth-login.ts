@@ -157,9 +157,9 @@ async function performOAuthLogin(): Promise<void> {
     console.log(`   Account Name: ${credential.account_name}`)
     console.log(`   Expires At: ${credential.oauth_expires_at}`)
     console.log('\nNext steps:')
-    console.log('1. Create or update a train via the dashboard')
-    console.log('2. Link this credential to the train')
-    console.log('3. Generate API keys for the train')
+    console.log('1. Create or update a project via the dashboard')
+    console.log('2. Link this credential to the project')
+    console.log('3. Generate API keys for the project')
   } catch (err) {
     console.error('OAuth login failed:', err)
     process.exit(1)

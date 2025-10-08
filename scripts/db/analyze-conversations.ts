@@ -13,7 +13,7 @@ config()
 
 interface Request {
   request_id: string
-  trainId: string
+  projectId: string
   timestamp: Date
   current_message_hash: string | null
   parent_message_hash: string | null
@@ -24,7 +24,7 @@ interface Request {
 }
 
 interface ConversationAnalysis {
-  trainId: string
+  projectId: string
   rootRequests: number
   totalRequests: number
   conversationChains: Array<{
@@ -59,7 +59,7 @@ class ConversationAnalyzer {
       // Build indices
       this.buildIndices(requests)
 
-      // Analyze by trainId
+      // Analyze by projectId
       console.log('\n2. Analyzing conversations by train ID...')
       const trainIdAnalyses = this.analyzeByTrainId(requests)
 
@@ -67,8 +67,8 @@ class ConversationAnalyzer {
       console.log('\n3. Analysis Results:')
       console.log('='.repeat(80))
 
-      for (const [trainId, analysis] of Array.from(trainIdAnalyses.entries())) {
-        console.log(`\nTrain ID: ${trainId}`)
+      for (const [projectId, analysis] of Array.from(trainIdAnalyses.entries())) {
+        console.log(`\nTrain ID: ${projectId}`)
         console.log('-'.repeat(40))
         console.log(`Total requests: ${analysis.totalRequests}`)
         console.log(`Root requests (no parent): ${analysis.rootRequests}`)
@@ -129,7 +129,7 @@ class ConversationAnalyzer {
     const query = `
       SELECT 
         request_id,
-        train_id AS "trainId",
+        project_id AS "projectId",
         timestamp,
         current_message_hash,
         parent_message_hash,
@@ -163,27 +163,27 @@ class ConversationAnalyzer {
   private analyzeByTrainId(requests: Request[]): Map<string, ConversationAnalysis> {
     const trainIdMap = new Map<string, Request[]>()
 
-    // Group by trainId
+    // Group by projectId
     for (const request of requests) {
-      if (!trainIdMap.has(request.trainId)) {
-        trainIdMap.set(request.trainId, [])
+      if (!trainIdMap.has(request.projectId)) {
+        trainIdMap.set(request.projectId, [])
       }
-      trainIdMap.get(request.trainId)!.push(request)
+      trainIdMap.get(request.projectId)!.push(request)
     }
 
-    // Analyze each trainId
+    // Analyze each projectId
     const analyses = new Map<string, ConversationAnalysis>()
 
-    for (const [trainId, trainIdRequests] of Array.from(trainIdMap.entries())) {
-      analyses.set(trainId, this.analyzeTrain(trainId, trainIdRequests))
+    for (const [projectId, trainIdRequests] of Array.from(trainIdMap.entries())) {
+      analyses.set(projectId, this.analyzeTrain(projectId, trainIdRequests))
     }
 
     return analyses
   }
 
-  private analyzeTrain(trainId: string, requests: Request[]): ConversationAnalysis {
+  private analyzeTrain(projectId: string, requests: Request[]): ConversationAnalysis {
     const analysis: ConversationAnalysis = {
-      trainId,
+      projectId,
       rootRequests: 0,
       totalRequests: requests.length,
       conversationChains: [],
@@ -204,7 +204,7 @@ class ConversationAnalyzer {
       } else {
         // Count how many requests have this as parent
         const parentRequests = this.requestsByHash.get(request.parent_message_hash) || []
-        const sameTrainParents = parentRequests.filter(p => p.trainId === trainId)
+        const sameTrainParents = parentRequests.filter(p => p.projectId === projectId)
 
         if (sameTrainParents.length === 0) {
           analysis.orphanedRequests++

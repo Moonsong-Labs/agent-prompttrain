@@ -33,7 +33,7 @@ const formatMemoryUsage = () => {
 
 interface DbRequest {
   request_id: string
-  train_id: string
+  project_id: string
   timestamp: Date
   conversation_id: string | null
   branch_id: string | null
@@ -136,7 +136,7 @@ class ConversationRebuilderFinal {
             // Use StorageAdapter to determine conversation linkage
             // Pass the request's timestamp for historical processing
             const linkingResult = await this.storageAdapter.linkConversation(
-              request.train_id,
+              request.project_id,
               request.body.messages,
               request.body.system,
               request.request_id,
@@ -335,7 +335,7 @@ class ConversationRebuilderFinal {
     let query = `
       SELECT 
         r.request_id,
-        r.train_id,
+        r.project_id,
         r.timestamp,
         r.conversation_id,
         r.branch_id,
@@ -362,7 +362,7 @@ class ConversationRebuilderFinal {
     } else {
       // Apply domain filter only if not filtering by request IDs
       if (this.trainIdFilter) {
-        query += ` AND r.train_id = $${params.length + 1}`
+        query += ` AND r.project_id = $${params.length + 1}`
         params.push(this.trainIdFilter)
       }
     }
@@ -500,7 +500,7 @@ function parseArgs() {
 
   const flags = {
     dryRun: !args.includes('--execute'),
-    trainId: null as string | null,
+    projectId: null as string | null,
     limit: null as number | null,
     debug: args.includes('--debug'),
     yes: args.includes('--yes'),
@@ -510,14 +510,14 @@ function parseArgs() {
   // Parse train-id flag (preferred)
   const trainIdIndex = args.indexOf('--train-id')
   if (trainIdIndex !== -1 && args[trainIdIndex + 1]) {
-    flags.trainId = args[trainIdIndex + 1]
+    flags.projectId = args[trainIdIndex + 1]
   }
 
   // Backward compatibility: parse legacy --domain flag
   const domainIndex = args.indexOf('--domain')
-  if (!flags.trainId && domainIndex !== -1 && args[domainIndex + 1]) {
+  if (!flags.projectId && domainIndex !== -1 && args[domainIndex + 1]) {
     console.warn('⚠️  --domain is deprecated. Please use --train-id instead.')
-    flags.trainId = args[domainIndex + 1]
+    flags.projectId = args[domainIndex + 1]
   }
 
   // Parse limit flag
@@ -568,8 +568,8 @@ async function main() {
 
   if (flags.requests) {
     console.log(`🎯 Processing specific requests: ${flags.requests.join(', ')}`)
-  } else if (flags.trainId) {
-    console.log(`🌐 Filtering by train ID: ${flags.trainId}`)
+  } else if (flags.projectId) {
+    console.log(`🌐 Filtering by train ID: ${flags.projectId}`)
   }
 
   if (flags.limit) {
@@ -617,7 +617,7 @@ async function main() {
     const rebuilder = new ConversationRebuilderFinal(
       pool,
       flags.dryRun,
-      flags.trainId,
+      flags.projectId,
       flags.limit,
       flags.debug,
       flags.requests

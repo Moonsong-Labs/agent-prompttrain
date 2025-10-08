@@ -6,7 +6,7 @@ import { verifyApiKeyAndGetTrain } from '@agent-prompttrain/shared/database/quer
 /**
  * Client API Authentication Middleware
  * Validates train-scoped API keys for proxy access
- * Identifies the train from the API key (no MSL-Train-Id header required)
+ * Identifies the project from the API key (no MSL-Project-Id header required)
  */
 export function clientAuthMiddleware() {
   return async (c: Context, next: Next) => {
@@ -87,12 +87,12 @@ export function clientAuthMiddleware() {
         )
       }
 
-      // Set the train ID in context based on the API key
-      c.set('trainId', verification.trainId)
+      // Set the project ID in context based on the API key
+      c.set('projectId', verification.projectId)
 
       logger.debug('Client auth middleware: Authentication successful', {
         requestId,
-        trainId: verification.trainId,
+        projectId: verification.projectId,
       })
 
       // Authentication successful, proceed to next middleware

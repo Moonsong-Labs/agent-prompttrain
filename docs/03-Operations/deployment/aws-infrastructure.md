@@ -1,10 +1,10 @@
 # AWS Infrastructure Deployment
 
-This guide covers deploying Agent Prompt Train on AWS EC2 infrastructure with support for multiple environments.
+This guide covers deploying Agent Prompt Troject on AWS EC2 infrastructure with support for multiple environments.
 
 ## Environment Architecture
 
-Agent Prompt Train supports two primary environments:
+Agent Prompt Troject supports two primary environments:
 
 - **Production (`prod`)** - Live production services
 - **Staging (`staging`)** - Pre-production testing environment
@@ -35,9 +35,9 @@ Each EC2 instance should have the following structure in the ubuntu user's home 
 │   ├── accounts/                 # Anthropic account credential files
 │   │   ├── account-primary.credentials.json
 │   │   └── account-secondary.credentials.json
-│   └── train-client-keys/        # Proxy client API key allowlists
-│       ├── train-alpha.client-keys.json
-│       └── train-beta.client-keys.json
+│   └── project-client-keys/        # Proxy client API key allowlists
+│       ├── project-alpha.client-keys.json
+│       └── project-beta.client-keys.json
 ```
 
 ### Required AWS Tags

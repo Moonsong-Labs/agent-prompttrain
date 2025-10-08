@@ -139,7 +139,7 @@ describe('Validation Utilities', () => {
     })
   })
 
-  describe('Train ID Validation', () => {
+  describe('Project ID Validation', () => {
     it('should validate train identifiers', () => {
       const validTrainIds = [
         'train-alpha',
@@ -149,9 +149,9 @@ describe('Validation Utilities', () => {
         'alpha123',
       ]
 
-      validTrainIds.forEach(trainId => {
-        expect(isValidTrainId(trainId)).toBe(true)
-        expect(() => trainIdSchema.parse(trainId)).not.toThrow()
+      validTrainIds.forEach(projectId => {
+        expect(isValidTrainId(projectId)).toBe(true)
+        expect(() => trainIdSchema.parse(projectId)).not.toThrow()
       })
     })
 
@@ -165,8 +165,8 @@ describe('Validation Utilities', () => {
         '-leadingdash',
       ]
 
-      invalidTrainIds.forEach(trainId => {
-        expect(isValidTrainId(trainId)).toBe(false)
+      invalidTrainIds.forEach(projectId => {
+        expect(isValidTrainId(projectId)).toBe(false)
       })
     })
   })

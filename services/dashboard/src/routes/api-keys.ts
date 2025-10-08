@@ -4,9 +4,9 @@ import {
   listTrainApiKeys,
   createTrainApiKey,
   revokeTrainApiKey,
-  getTrainByTrainId,
+  getProjectByProjectId,
   getTrainApiKeySafe,
-  isTrainOwner,
+  isProjectOwner,
   isTrainMember,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateApiKeyRequest } from '@agent-prompttrain/shared'
@@ -14,8 +14,8 @@ import type { AuthContext } from '../middleware/auth.js'
 
 const apiKeys = new Hono<{ Variables: { auth: AuthContext } }>()
 
-// GET /api/trains/:trainId/api-keys - List train API keys (members only, filtered by ownership)
-apiKeys.get('/:trainId/api-keys', async c => {
+// GET /api/projects/:projectId/api-keys - List project API keys (members only, filtered by ownership)
+apiKeys.get('/:projectId/api-keys', async c => {
   try {
     const pool = container.getPool()
     const auth = c.get('auth')
@@ -24,11 +24,11 @@ apiKeys.get('/:trainId/api-keys', async c => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const trainId = c.req.param('trainId')
-    const train = await getTrainByTrainId(pool, trainId)
+    const projectId = c.req.param('projectId')
+    const train = await getProjectByProjectId(pool, projectId)
 
     if (!train) {
-      return c.json({ error: 'Train not found' }, 404)
+      return c.json({ error: 'Project not found' }, 404)
     }
 
     // Check train membership
@@ -38,7 +38,7 @@ apiKeys.get('/:trainId/api-keys', async c => {
     }
 
     // Check if user is train owner
-    const isOwner = await isTrainOwner(pool, train.id, auth.principal)
+    const isOwner = await isProjectOwner(pool, train.id, auth.principal)
 
     const allKeys = await listTrainApiKeys(pool, train.id)
 
@@ -52,8 +52,8 @@ apiKeys.get('/:trainId/api-keys', async c => {
   }
 })
 
-// POST /api/trains/:trainId/api-keys - Generate new API key (members only)
-apiKeys.post('/:trainId/api-keys', async c => {
+// POST /api/projects/:projectId/api-keys - Generate new API key (members only)
+apiKeys.post('/:projectId/api-keys', async c => {
   try {
     const pool = container.getPool()
     const auth = c.get('auth')
@@ -62,11 +62,11 @@ apiKeys.post('/:trainId/api-keys', async c => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const trainId = c.req.param('trainId')
-    const train = await getTrainByTrainId(pool, trainId)
+    const projectId = c.req.param('projectId')
+    const train = await getProjectByProjectId(pool, projectId)
 
     if (!train) {
-      return c.json({ error: 'Train not found' }, 404)
+      return c.json({ error: 'Project not found' }, 404)
     }
 
     // Check train membership
@@ -90,8 +90,8 @@ apiKeys.post('/:trainId/api-keys', async c => {
   }
 })
 
-// DELETE /api/trains/:trainId/api-keys/:keyId - Revoke API key (owner or key creator only)
-apiKeys.delete('/:trainId/api-keys/:keyId', async c => {
+// DELETE /api/projects/:projectId/api-keys/:keyId - Revoke API key (owner or key creator only)
+apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
   try {
     const pool = container.getPool()
     const auth = c.get('auth')
@@ -100,12 +100,12 @@ apiKeys.delete('/:trainId/api-keys/:keyId', async c => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const trainId = c.req.param('trainId')
+    const projectId = c.req.param('projectId')
     const keyId = c.req.param('keyId')
 
-    const train = await getTrainByTrainId(pool, trainId)
+    const train = await getProjectByProjectId(pool, projectId)
     if (!train) {
-      return c.json({ error: 'Train not found' }, 404)
+      return c.json({ error: 'Project not found' }, 404)
     }
 
     // Check train membership
@@ -121,12 +121,12 @@ apiKeys.delete('/:trainId/api-keys/:keyId', async c => {
     }
 
     // Check if key belongs to this train
-    if (apiKey.train_id !== train.id) {
+    if (apiKey.project_id !== train.id) {
       return c.json({ error: 'API key does not belong to this train' }, 403)
     }
 
     // Check if user is train owner OR key creator
-    const isOwner = await isTrainOwner(pool, train.id, auth.principal)
+    const isOwner = await isProjectOwner(pool, train.id, auth.principal)
     const isKeyCreator = apiKey.created_by === auth.principal
 
     if (!isOwner && !isKeyCreator) {

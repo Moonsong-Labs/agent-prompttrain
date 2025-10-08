@@ -14,16 +14,16 @@ class TokenTracker {
   private startTime: number = Date.now()
 
   /**
-   * Track token usage for a trainId
+   * Track token usage for a projectId
    */
   track(
-    trainId: string,
+    projectId: string,
     inputTokens: number = 0,
     outputTokens: number = 0,
     requestType?: 'query_evaluation' | 'inference',
     toolCallCount: number = 0
   ) {
-    const current = this.stats.get(trainId) || {
+    const current = this.stats.get(projectId) || {
       inputTokens: 0,
       outputTokens: 0,
       requestCount: 0,
@@ -33,7 +33,7 @@ class TokenTracker {
       lastUpdated: Date.now(),
     }
 
-    this.stats.set(trainId, {
+    this.stats.set(projectId, {
       inputTokens: current.inputTokens + inputTokens,
       outputTokens: current.outputTokens + outputTokens,
       requestCount: current.requestCount + 1,
@@ -90,7 +90,7 @@ class TokenTracker {
     )
     console.log('='.repeat(90))
     console.log(
-      'Train ID'.padEnd(25) +
+      'Project ID'.padEnd(25) +
         'Reqs'.padStart(6) +
         'Query'.padStart(7) +
         'Infer'.padStart(7) +
@@ -111,10 +111,10 @@ class TokenTracker {
     // Sort trainIds alphabetically
     const sortedTrainIds = Array.from(this.stats.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
-    for (const [trainId, stats] of sortedTrainIds) {
+    for (const [projectId, stats] of sortedTrainIds) {
       const total = stats.inputTokens + stats.outputTokens
       console.log(
-        trainId.padEnd(25) +
+        projectId.padEnd(25) +
           stats.requestCount.toString().padStart(6) +
           stats.queryEvaluationCount.toString().padStart(7) +
           stats.inferenceCount.toString().padStart(7) +
@@ -177,8 +177,8 @@ class TokenTracker {
    */
   getStats(): Record<string, TrainTokenStats> {
     const result: Record<string, TrainTokenStats> = {}
-    for (const [trainId, stats] of this.stats) {
-      result[trainId] = { ...stats }
+    for (const [projectId, stats] of this.stats) {
+      result[projectId] = { ...stats }
     }
     return result
   }

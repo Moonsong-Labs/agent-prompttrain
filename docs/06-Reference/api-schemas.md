@@ -125,7 +125,7 @@ interface TokenStatsResponse {
     total: number
   }
   by_train: {
-    [trainId: string]: {
+    [projectId: string]: {
       requests: number
       tokens: {
         input: number
@@ -254,7 +254,7 @@ interface ConversationsResponse {
 interface Conversation {
   conversation_id: string
   account_id: string
-  trainId: string
+  projectId: string
   first_message_at: string // ISO 8601
   last_message_at: string // ISO 8601
   message_count: number
@@ -285,7 +285,7 @@ interface RequestSummary {
 ```typescript
 interface RequestDetailsResponse {
   id: string
-  trainId: string
+  projectId: string
   account_id: string
   method: string
   path: string
@@ -399,7 +399,7 @@ interface SlackAttachment {
 ```sql
 CREATE TABLE api_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  train_id VARCHAR(255) NOT NULL,
+  project_id VARCHAR(255) NOT NULL,
   account_id VARCHAR(255),
   method VARCHAR(10) NOT NULL,
   path VARCHAR(255) NOT NULL,
@@ -478,10 +478,10 @@ function isValidUUID(id: string): boolean {
   return uuidRegex.test(id)
 }
 
-// Validate train identifier
-function isValidTrainId(trainId: string): boolean {
+// Validate project identifier
+function isValidProjectId(projectId: string): boolean {
   const trainIdRegex = /^[a-zA-Z0-9._:-]+$/
-  return trainIdRegex.test(trainId)
+  return trainIdRegex.test(projectId)
 }
 
 // Validate model

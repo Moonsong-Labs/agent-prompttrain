@@ -76,8 +76,8 @@ export {
 } from './constants/model-limits.js'
 
 export {
-  MSL_TRAIN_ID_HEADER,
-  MSL_TRAIN_ID_HEADER_LOWER,
+  MSL_PROJECT_ID_HEADER,
+  MSL_PROJECT_ID_HEADER_LOWER,
   MSL_ACCOUNT_HEADER,
   MSL_ACCOUNT_HEADER_LOWER,
 } from './constants/http-headers.js'

@@ -25,15 +25,15 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
   - API key authentication
   - OAuth 2.0 with automatic token refresh
   - Client API key authentication for proxy access
-- **Train & account routing** via `MSL-Train-Id` and optional `MSL-Account` headers
+- **Project & account routing** via `MSL-Project-Id` and optional `MSL-Account` headers
 - **Timing-safe credential verification**
-- **Secure credential storage** with separate files per train ID
+- **Secure credential storage** with separate files per project ID
 
 ### 📊 Token Tracking & Usage
 
 - **Comprehensive token usage tracking**:
   - Per-account tracking
-  - Per-train tracking
+  - Per-project tracking
   - 5-hour rolling window monitoring
   - Historical daily usage data
 - **Request type classification**:
@@ -136,13 +136,13 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
 
 ## Feature Comparison
 
-| Feature               | Agent Prompt Train    | Direct Claude API |
-| --------------------- | --------------------- | ----------------- |
-| Token Tracking        | ✅ Comprehensive      | ❌ Limited        |
-| Usage Analytics       | ✅ Built-in Dashboard | ❌ Manual         |
-| Conversation Tracking | ✅ Automatic          | ❌ Manual         |
-| Multi-Domain Support  | ✅ Native             | ❌ Manual         |
-| Request Storage       | ✅ Automatic          | ❌ None           |
-| Cost Analysis         | ✅ Per-account/train  | ❌ Account-only   |
-| Debug Capabilities    | ✅ Enhanced           | ❌ Basic          |
-| Deployment Options    | ✅ Multiple           | ❌ N/A            |
+| Feature               | Agent Prompt Train     | Direct Claude API |
+| --------------------- | ---------------------- | ----------------- |
+| Token Tracking        | ✅ Comprehensive       | ❌ Limited        |
+| Usage Analytics       | ✅ Built-in Dashboard  | ❌ Manual         |
+| Conversation Tracking | ✅ Automatic           | ❌ Manual         |
+| Multi-Domain Support  | ✅ Native              | ❌ Manual         |
+| Request Storage       | ✅ Automatic           | ❌ None           |
+| Cost Analysis         | ✅ Per-account/project | ❌ Account-only   |
+| Debug Capabilities    | ✅ Enhanced            | ❌ Basic          |
+| Deployment Options    | ✅ Multiple            | ❌ N/A            |

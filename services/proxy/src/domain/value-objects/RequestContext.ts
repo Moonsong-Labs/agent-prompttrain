@@ -1,6 +1,6 @@
 import { Context } from 'hono'
 import { config } from '@agent-prompttrain/shared/config'
-import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
+import { MSL_PROJECT_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
  * Value object containing request context information
@@ -9,7 +9,7 @@ import { MSL_TRAIN_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prom
 export class RequestContext {
   constructor(
     public readonly requestId: string,
-    public readonly trainId: string,
+    public readonly projectId: string,
     public readonly method: string,
     public readonly path: string,
     public readonly startTime: number,
@@ -30,7 +30,8 @@ export class RequestContext {
       )
     }
     const fallbackTrainId = config.auth.defaultTrainId || 'default'
-    const trainId = c.get('trainId') || c.req.header(MSL_TRAIN_ID_HEADER_LOWER) || fallbackTrainId
+    const projectId =
+      c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER) || fallbackTrainId
     const rawTrainAccount = c.get('trainAccount') || c.req.header(MSL_ACCOUNT_HEADER_LOWER)
     const trainAccount =
       rawTrainAccount && rawTrainAccount.trim() ? rawTrainAccount.trim() : undefined
@@ -50,7 +51,7 @@ export class RequestContext {
 
     return new RequestContext(
       requestId,
-      trainId,
+      projectId,
       c.req.method,
       c.req.path,
       Date.now(),
@@ -74,7 +75,7 @@ export class RequestContext {
   toTelemetry() {
     return {
       requestId: this.requestId,
-      trainId: this.trainId,
+      projectId: this.projectId,
       method: this.method,
       path: this.path,
       duration: this.getElapsedTime(),

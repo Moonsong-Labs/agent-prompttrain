@@ -3,7 +3,7 @@ import { logger } from '../middleware/logger.js'
 
 export interface TokenUsageData {
   accountId: string
-  trainId: string
+  projectId: string
   model: string
   requestType?: string
   inputTokens: number
@@ -16,7 +16,7 @@ export interface TokenUsageData {
 
 export interface TokenUsageWindow {
   accountId: string
-  trainId: string
+  projectId: string
   model: string
   windowStart: Date
   windowEnd: Date
@@ -31,7 +31,7 @@ export interface TokenUsageWindow {
 export interface DailyUsage {
   date: string
   accountId: string
-  trainId: string
+  projectId: string
   model?: string
   totalInputTokens: number
   totalOutputTokens: number
@@ -62,14 +62,14 @@ export class TokenUsageService {
   async getUsageWindow(
     accountId: string,
     windowHours: number = 5,
-    trainId?: string,
+    projectId?: string,
     model?: string
   ): Promise<TokenUsageWindow> {
     try {
       let query = `
         SELECT 
           $1::varchar as account_id,
-          COALESCE($2::varchar, 'all') as train_id,
+          COALESCE($2::varchar, 'all') as project_id,
           COALESCE($3::varchar, 'all') as model,
           NOW() - ($4 * INTERVAL '1 hour') as window_start,
           NOW() as window_end,
@@ -85,10 +85,10 @@ export class TokenUsageService {
           AND timestamp < NOW()
       `
 
-      const values: any[] = [accountId, trainId || '', model || '', windowHours]
+      const values: any[] = [accountId, projectId || '', model || '', windowHours]
 
-      if (trainId) {
-        query += ` AND train_id = $2`
+      if (projectId) {
+        query += ` AND project_id = $2`
       }
 
       if (model) {
@@ -101,7 +101,7 @@ export class TokenUsageService {
         // Return empty usage
         return {
           accountId,
-          trainId: trainId || 'all',
+          projectId: projectId || 'all',
           model: model || 'all',
           windowStart: new Date(Date.now() - windowHours * 60 * 60 * 1000),
           windowEnd: new Date(),
@@ -117,7 +117,7 @@ export class TokenUsageService {
       const row = result.rows[0]
       return {
         accountId: row.account_id,
-        trainId: row.train_id || 'all',
+        projectId: row.project_id || 'all',
         model: row.model || 'all',
         windowStart: row.window_start,
         windowEnd: row.window_end,
@@ -259,14 +259,14 @@ export class TokenUsageService {
   async getDailyUsage(
     accountId: string,
     days: number = 30,
-    trainId?: string
+    projectId?: string
   ): Promise<DailyUsage[]> {
     try {
       let query = `
         SELECT 
           DATE(timestamp AT TIME ZONE 'UTC') as date,
           account_id,
-          train_id,
+          project_id,
           model,
           SUM(input_tokens) as total_input_tokens,
           SUM(output_tokens) as total_output_tokens,
@@ -279,14 +279,14 @@ export class TokenUsageService {
 
       const values: any[] = [accountId, days]
 
-      if (trainId) {
-        query += ` AND train_id = $3`
-        values.push(trainId)
+      if (projectId) {
+        query += ` AND project_id = $3`
+        values.push(projectId)
       }
 
       query += `
-        GROUP BY date, account_id, train_id, model
-        ORDER BY date DESC, train_id, model
+        GROUP BY date, account_id, project_id, model
+        ORDER BY date DESC, project_id, model
       `
 
       const result = await this.pool.query(query, values)
@@ -294,7 +294,7 @@ export class TokenUsageService {
       return result.rows.map(row => ({
         date: row.date.toISOString().split('T')[0],
         accountId: row.account_id,
-        trainId: row.train_id,
+        projectId: row.project_id,
         model: row.model,
         totalInputTokens: parseInt(row.total_input_tokens),
         totalOutputTokens: parseInt(row.total_output_tokens),
@@ -319,14 +319,14 @@ export class TokenUsageService {
   async getAggregatedDailyUsage(
     accountId: string,
     days: number = 30,
-    trainId?: string
+    projectId?: string
   ): Promise<DailyUsage[]> {
     try {
       let query = `
         SELECT 
           DATE(timestamp AT TIME ZONE 'UTC') as date,
           account_id,
-          trainId,
+          projectId,
           SUM(input_tokens) as total_input_tokens,
           SUM(output_tokens) as total_output_tokens,
           SUM(input_tokens + output_tokens) as total_tokens,
@@ -338,14 +338,14 @@ export class TokenUsageService {
 
       const values: any[] = [accountId, days]
 
-      if (trainId) {
-        query += ` AND train_id = $3`
-        values.push(trainId)
+      if (projectId) {
+        query += ` AND project_id = $3`
+        values.push(projectId)
       }
 
       query += `
-        GROUP BY date, account_id, train_id
-        ORDER BY date DESC, train_id
+        GROUP BY date, account_id, project_id
+        ORDER BY date DESC, project_id
       `
 
       const result = await this.pool.query(query, values)
@@ -353,7 +353,7 @@ export class TokenUsageService {
       return result.rows.map(row => ({
         date: row.date.toISOString().split('T')[0],
         accountId: row.account_id,
-        trainId: row.train_id,
+        projectId: row.project_id,
         totalInputTokens: parseInt(row.total_input_tokens),
         totalOutputTokens: parseInt(row.total_output_tokens),
         totalTokens: parseInt(row.total_tokens),

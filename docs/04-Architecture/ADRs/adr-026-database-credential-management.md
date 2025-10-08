@@ -1,4 +1,4 @@
-# ADR-026: Database-Based Credential and Train Management
+# ADR-026: Database-Based Credential and Project Management
 
 ## Status
 
@@ -6,10 +6,10 @@ Accepted
 
 ## Context
 
-The Agent Prompt Train proxy initially used filesystem-based credential storage, where OAuth credentials were stored as JSON files in the `credentials/accounts/` directory, and train configuration was distributed across multiple configuration files. This approach worked for early development but created several operational challenges:
+The Agent Prompt Train proxy initially used filesystem-based credential storage, where OAuth credentials were stored as JSON files in the `credentials/accounts/` directory, and project configuration was distributed across multiple configuration files. This approach worked for early development but created several operational challenges:
 
 1. **Credential Management Complexity**: Adding, updating, or rotating OAuth credentials required direct filesystem access and service restarts
-2. **Train Configuration Fragmentation**: Train settings (like Slack webhooks) were tied to credentials rather than trains, requiring duplication when multiple teams shared the same credential
+2. **Train Configuration Fragmentation**: Project settings (like Slack webhooks) were tied to credentials rather than trains, requiring duplication when multiple teams shared the same credential
 3. **No Multi-Tenancy Support**: The filesystem approach made it difficult to support multiple independent "trains" (isolated Claude API access configurations) with different account associations
 4. **Manual API Key Management**: Client API keys for accessing trains were managed through files, with no programmatic way to generate or revoke keys
 5. **Audit and Compliance Gaps**: No tracking of when credentials were used, who generated API keys, or when accounts were linked/unlinked from trains
@@ -22,7 +22,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 - **Security**: Track credential usage, API key lifecycle, and provide secure token refresh
 - **Scalability**: Prepare for future features like credential rotation policies, usage quotas, and audit logs
 - **Developer Experience**: Provide dashboard UI and REST APIs for all credential operations
-- **Zero Downtime**: Changes to credentials or train configuration shouldn't require service restarts
+- **Zero Downtime**: Changes to credentials or project configuration shouldn't require service restarts
 
 ## Considered Options
 
@@ -63,7 +63,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 
 ### Option 3: Full Migration to Database Storage
 
-**Description**: Migrate all credential and train management to PostgreSQL with no filesystem fallback
+**Description**: Migrate all credential and project management to PostgreSQL with no filesystem fallback
 
 **Pros**:
 
@@ -82,7 +82,7 @@ The Agent Prompt Train proxy initially used filesystem-based credential storage,
 
 ## Decision
 
-We will **fully migrate to database-based credential and train management (Option 3)** with the following architecture:
+We will **fully migrate to database-based credential and project management (Option 3)** with the following architecture:
 
 ### Database Schema
 
@@ -95,17 +95,17 @@ Four new tables manage the credential and train lifecycle:
 
 2. **`trains`**: Represents isolated Claude API access configurations
    - Primary key: `id` (UUID)
-   - Business key: `train_id` (e.g., "cnp-dev-001")
+   - Business key: `project_id` (e.g., "cnp-dev-001")
    - Configuration: `slack_webhook_url`, `is_active`
 
-3. **`train_accounts`**: Many-to-many junction table linking trains to credentials
-   - Composite primary key: `(train_id, credential_id)`
+3. **`project_accounts`**: Many-to-many junction table linking trains to credentials
+   - Composite primary key: `(project_id, credential_id)`
    - Tracks: `linked_at`
-   - Enables multiple credentials per train (for failover) and credential reuse across trains
+   - Enables multiple credentials per project (for failover) and credential reuse across trains
 
-4. **`train_api_keys`**: Client API keys for accessing specific trains
+4. **`project_api_keys`**: Client API keys for accessing specific trains
    - Primary key: `id` (UUID)
-   - Foreign key: `train_id`
+   - Foreign key: `project_id`
    - Stores: `key_hash` (SHA-256), `key_preview` (first 10 chars), `description`
    - Tracks: `created_at`, `last_used_at`, `revoked_at`
 
@@ -113,7 +113,7 @@ Four new tables manage the credential and train lifecycle:
 
 **OAuth-Only Authentication**: Removed legacy API key support from `AuthenticationService`. All authentication now uses OAuth tokens with automatic refresh.
 
-**Train-Scoped Configuration**: Moved Slack webhooks and other configuration from credentials to trains, allowing multiple trains to share the same credential with different settings.
+**Train-Scoped Configuration**: Moved Slack webhooks and other configuration from credentials to trains, allowing multiple projects to share the same credential with different settings.
 
 **Credential Failover**: Trains can link multiple credentials. The proxy automatically fails over to the next credential if one expires or encounters errors.
 
@@ -133,14 +133,14 @@ Four new tables manage the credential and train lifecycle:
 
 - `GET /api/credentials` - List credentials (safe format, no tokens)
 - `GET /api/credentials/:id` - Get credential details
-- `GET /api/trains` - List all trains with linked accounts
-- `POST /api/trains` - Create new train
-- `PUT /api/trains/:id` - Update train configuration
-- `POST /api/trains/:id/accounts` - Link credential to train
-- `DELETE /api/trains/:id/accounts/:credentialId` - Unlink credential
-- `GET /api/trains/:trainId/api-keys` - List API keys
-- `POST /api/trains/:trainId/api-keys` - Generate new API key
-- `DELETE /api/trains/:trainId/api-keys/:keyId` - Revoke API key
+- `GET /api/projects` - List all trains with linked accounts
+- `POST /api/projects` - Create new train
+- `PUT /api/projects/:id` - Update project configuration
+- `POST /api/projects/:id/accounts` - Link credential to train
+- `DELETE /api/projects/:id/accounts/:credentialId` - Unlink credential
+- `GET /api/projects/:projectId/api-keys` - List API keys
+- `POST /api/projects/:projectId/api-keys` - Generate new API key
+- `DELETE /api/projects/:projectId/api-keys/:keyId` - Revoke API key
 
 **Naming Conventions**: Snake_case for JSON (external API contract), camelCase for internal TypeScript.
 
@@ -150,8 +150,8 @@ Four new tables manage the credential and train lifecycle:
 
 - **Zero-Downtime Credential Updates**: Add, update, or rotate credentials without restarting services
 - **Dashboard UI Ready**: All credential operations exposed via REST APIs for future UI implementation
-- **Multi-Tenancy Support**: Multiple trains with independent configurations sharing the same credentials
-- **Audit Trail**: Complete history of credential usage, API key generation/revocation, and train configuration changes
+- **Multi-Tenancy Support**: Multiple projects with independent configurations sharing the same credentials
+- **Audit Trail**: Complete history of credential usage, API key generation/revocation, and project configuration changes
 - **Simplified Operations**: No git commits or deployments needed for credential management
 - **Security Improvements**: API key hashing, credential usage tracking, programmatic revocation
 - **Scalability**: Foundation for future features like usage quotas, rotation policies, and compliance reporting
@@ -178,7 +178,7 @@ Four new tables manage the credential and train lifecycle:
 **Shared Package** (`packages/shared/src/database/queries/`):
 
 - `credential-queries.ts` - CRUD operations for credentials
-- `train-queries.ts` - Train management and account linking
+- `project-queries.ts` - Project management and account linking
 - `api-key-queries.ts` - API key generation and verification
 - All queries use parameterized SQL to prevent injection attacks
 
@@ -189,7 +189,7 @@ Four new tables manage the credential and train lifecycle:
 
 **Database Migration**:
 
-- `scripts/db/migrations/013-credential-train-management.ts`
+- `scripts/db/migrations/013-credential-project-management.ts`
 - Idempotent: safe to run multiple times
 - Creates all tables with proper indexes
 
@@ -205,11 +205,11 @@ Four new tables manage the credential and train lifecycle:
 
 **Migration Steps for Existing Users**:
 
-1. Run database migration: `bun run scripts/db/migrations/013-credential-train-management.ts`
+1. Run database migration: `bun run scripts/db/migrations/013-credential-project-management.ts`
 2. Re-add OAuth credentials: `bun run scripts/auth/oauth-login.ts`
 3. Create trains via dashboard API
 4. Link credentials to trains
-5. Generate train API keys
+5. Generate project API keys
 6. Remove old `credentials/` directory files
 
 ### Security Considerations
@@ -236,7 +236,7 @@ Four new tables manage the credential and train lifecycle:
 ## References
 
 - Implementation Guide: `/IMPLEMENTATION_GUIDE.md`
-- Database Migration: `scripts/db/migrations/013-credential-train-management.ts`
+- Database Migration: `scripts/db/migrations/013-credential-project-management.ts`
 - OAuth Login Script: `scripts/auth/oauth-login.ts`
 - Dashboard API Routes: `services/dashboard/src/routes/{credentials,trains,api-keys}.ts`
 - Proxy Authentication: `services/proxy/src/services/AuthenticationService.ts`

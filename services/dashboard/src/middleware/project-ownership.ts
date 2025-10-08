@@ -1,18 +1,18 @@
 import type { MiddlewareHandler } from 'hono'
-import { isTrainOwner, isTrainMember } from '@agent-prompttrain/shared/database/queries'
+import { isProjectOwner, isTrainMember } from '@agent-prompttrain/shared/database/queries'
 import { container } from '../container.js'
 import type { AuthContext } from './auth.js'
 
 /**
  * Middleware to require train ownership
- * Returns 403 if the authenticated user is not an owner of the train
+ * Returns 403 if the authenticated user is not an owner of the project
  */
 export const requireTrainOwner: MiddlewareHandler<{
   Variables: { auth: AuthContext }
 }> = async (c, next) => {
-  const trainId = c.req.param('id')
-  if (!trainId) {
-    return c.json({ error: 'Train ID is required' }, 400)
+  const projectId = c.req.param('id')
+  if (!projectId) {
+    return c.json({ error: 'Project ID is required' }, 400)
   }
 
   const auth = c.get('auth')
@@ -22,7 +22,7 @@ export const requireTrainOwner: MiddlewareHandler<{
   }
 
   const pool = container.getPool()
-  const isOwner = await isTrainOwner(pool, trainId, auth.principal)
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
 
   if (!isOwner) {
     return c.json({ error: 'Only train owners can perform this action' }, 403)
@@ -33,14 +33,14 @@ export const requireTrainOwner: MiddlewareHandler<{
 
 /**
  * Middleware to require train membership (owner or member)
- * Returns 403 if the authenticated user is not a member of the train
+ * Returns 403 if the authenticated user is not a member of the project
  */
 export const requireTrainMembership: MiddlewareHandler<{
   Variables: { auth: AuthContext }
 }> = async (c, next) => {
-  const trainId = c.req.param('id')
-  if (!trainId) {
-    return c.json({ error: 'Train ID is required' }, 400)
+  const projectId = c.req.param('id')
+  if (!projectId) {
+    return c.json({ error: 'Project ID is required' }, 400)
   }
 
   const auth = c.get('auth')
@@ -50,7 +50,7 @@ export const requireTrainMembership: MiddlewareHandler<{
   }
 
   const pool = container.getPool()
-  const isMember = await isTrainMember(pool, trainId, auth.principal)
+  const isMember = await isTrainMember(pool, projectId, auth.principal)
 
   if (!isMember) {
     return c.json({ error: 'Access denied: You are not a member of this train' }, 403)

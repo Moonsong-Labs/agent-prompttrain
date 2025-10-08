@@ -28,8 +28,8 @@ authentication_error: invalid x-api-key
    # Check if credential files exist
    ls -la credentials/
 
-   # Verify the credential file for your trainId
-   cat credentials/your-trainId.credentials.json
+   # Verify the credential file for your projectId
+   cat credentials/your-projectId.credentials.json
    ```
 
 3. **Test API Key Directly**
@@ -54,13 +54,13 @@ authentication_error: invalid x-api-key
    ls -la credentials/
 
    # Check credential file format
-   cat credentials/your-trainId.credentials.json
+   cat credentials/your-projectId.credentials.json
    ```
 
-   **Note:** The proxy will warn once when a trainId doesn't have a credential file:
+   **Note:** The proxy will warn once when a projectId doesn't have a credential file:
 
    ```
-   WARN: No credential file found for train: train-alpha
+   WARN: No credential file found for project: project-alpha
    ```
 
    This helps identify missing credential configurations.

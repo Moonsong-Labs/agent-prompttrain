@@ -82,7 +82,7 @@ Prevents abuse through tiered rate limits:
 | Analysis Creation  | 15 requests   | 1 minute |
 | Analysis Retrieval | 100 requests  | 1 minute |
 
-Rate limits are enforced per train ID/tenant and return appropriate headers:
+Rate limits are enforced per project ID/tenant and return appropriate headers:
 
 ```
 Retry-After: 60
@@ -119,7 +119,7 @@ CREATE TABLE analysis_audit_log (
     outcome VARCHAR(50),         -- SUCCESS, FAILURE_RATE_LIMIT, etc.
     conversation_id UUID,
     branch_id VARCHAR(255),
-    train_id VARCHAR(255),
+    project_id VARCHAR(255),
     request_id VARCHAR(255),
     user_context JSONB,
     metadata JSONB,
@@ -171,18 +171,18 @@ Monitor for suspicious activity:
 
 ```sql
 -- Failed authentication attempts
-SELECT COUNT(*), train_id, DATE(timestamp)
+SELECT COUNT(*), project_id, DATE(timestamp)
 FROM analysis_audit_log
 WHERE outcome = 'FAILURE_AUTH'
-GROUP BY train_id, DATE(timestamp)
+GROUP BY project_id, DATE(timestamp)
 HAVING COUNT(*) > 10;
 
 -- Rate limit violations
-SELECT train_id, COUNT(*) as violations
+SELECT project_id, COUNT(*) as violations
 FROM analysis_audit_log
 WHERE outcome = 'FAILURE_RATE_LIMIT'
   AND timestamp > NOW() - INTERVAL '1 hour'
-GROUP BY train_id
+GROUP BY project_id
 ORDER BY violations DESC;
 
 -- Regeneration abuse patterns
