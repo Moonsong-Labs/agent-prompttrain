@@ -264,12 +264,11 @@ export async function getTrainStats(
     `
     SELECT
       MAX(tak.last_used_at) as last_used_at,
-      COUNT(DISTINCT ar.request_id) FILTER (
+      COALESCE(COUNT(DISTINCT ar.request_id) FILTER (
         WHERE ar.timestamp > NOW() - INTERVAL '24 hours'
-      ) as request_count_24h
+      ), 0) as request_count_24h
     FROM trains t
     LEFT JOIN train_api_keys tak ON t.id = tak.train_id
-    LEFT JOIN api_requests ar ON ar.api_key_id = tak.key_prefix
     WHERE t.id = $1
     GROUP BY t.id
     `,
