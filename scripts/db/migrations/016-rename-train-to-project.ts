@@ -16,9 +16,9 @@ async function migrate() {
     await client.query('BEGIN')
 
     // Rename tables
-    console.log('Renaming projects table to projects...')
+    console.log('Renaming trains table to projects...')
     await client.query(`
-      ALTER TABLE IF EXISTS projects RENAME TO projects
+      ALTER TABLE IF EXISTS trains RENAME TO projects
     `)
 
     console.log('Renaming train_accounts table to project_accounts...')
