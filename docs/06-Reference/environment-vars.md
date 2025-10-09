@@ -22,6 +22,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 | ------------------------------- | --------------------------------------------------------------------------------- | --------------------------------- | ------------------------- |
 | `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)         | -                                 | ✅ (Production)           |
 | `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)               | -                                 | ✅ (Production)           |
+| `DASHBOARD_ALB_OIDC_ENABLED`    | Enable AWS ALB OIDC authentication via x-amzn-oidc-data header                    | `false`                           | ❌                        |
 | `INTERNAL_API_KEY`              | Service-to-service authentication key (required for `SERVICE_MODE=api` or `full`) | -                                 | ✅ (when API mode active) |
 | `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                               | -                                 | ✅ (Development)          |
 | `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                              | `true`                            | ❌                        |
@@ -236,6 +237,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/claude_nexus
 DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
 DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
 INTERNAL_API_KEY=your-internal-key
+
+# AWS ALB OIDC authentication (alternative to oauth2-proxy)
+# Enable if using AWS ALB with OIDC authentication
+DASHBOARD_ALB_OIDC_ENABLED=false
 
 # Dashboard authentication (Development)
 # Development bypass (never use in production!)

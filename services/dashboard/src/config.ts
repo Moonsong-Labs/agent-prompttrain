@@ -48,6 +48,18 @@ export const getSsoAllowedDomains = (): string[] => {
 }
 
 /**
+ * Enable AWS ALB OIDC authentication via x-amzn-oidc-data header
+ * When enabled, the dashboard will decode the JWT from ALB and extract the email claim
+ */
+export const getAlbOidcEnabled = (): boolean => {
+  const raw = process.env.DASHBOARD_ALB_OIDC_ENABLED
+  if (!raw) {
+    return false
+  }
+  return raw.toLowerCase() === 'true' || raw === '1'
+}
+
+/**
  * Export configuration flags for easy access
  */
 export const dashboardConfig = {
@@ -55,4 +67,5 @@ export const dashboardConfig = {
   isDevMode: isDevMode(),
   ssoHeaders: getSsoHeaderNames(),
   ssoAllowedDomains: getSsoAllowedDomains(),
+  albOidcEnabled: getAlbOidcEnabled(),
 } as const
