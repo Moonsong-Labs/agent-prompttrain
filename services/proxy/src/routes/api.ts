@@ -481,15 +481,6 @@ apiRoutes.get('/requests/:id', async c => {
 
     const row = requestResult.rows[0]
 
-    // Get streaming chunks if any
-    const chunksQuery = `
-      SELECT chunk_index, timestamp, data
-      FROM streaming_chunks 
-      WHERE request_id = $1 
-      ORDER BY chunk_index
-    `
-    const chunksResult = await pool.query(chunksQuery, [requestId])
-
     const details: RequestDetails = {
       requestId: row.request_id,
       projectId: row.project_id,
@@ -508,12 +499,7 @@ apiRoutes.get('/requests/:id', async c => {
       requestBody: row.request_body,
       responseBody: row.response_body,
       usageData: row.usage_data,
-      streamingChunks: chunksResult.rows.map(chunk => ({
-        chunkIndex: chunk.chunk_index,
-        timestamp: chunk.timestamp,
-        data: chunk.data,
-        tokenCount: 0, // token_count not in schema
-      })),
+      streamingChunks: [], // Streaming chunks feature removed
     }
 
     return c.json(details)

@@ -237,24 +237,11 @@ export class StorageReader {
         parent_request_id: row.parent_request_id,
       }
 
-      // Get streaming chunks
-      const chunksQuery = `
-        SELECT chunk_index, timestamp, data, token_count
-        FROM streaming_chunks 
-        WHERE request_id = $1 
-        ORDER BY chunk_index
-      `
-      const chunksRows = await this.executeQuery<any>(
-        chunksQuery,
-        [requestId],
-        'getRequestDetails-chunks'
-      )
-
       const details: RequestDetails = {
         request,
         request_body: row.body,
         response_body: row.response_body,
-        chunks: chunksRows,
+        chunks: [], // Streaming chunks feature removed
       }
 
       // Only cache if TTL > 0

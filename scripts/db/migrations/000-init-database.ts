@@ -62,25 +62,8 @@ async function initDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_api_requests_request_type ON api_requests(request_type)`
     )
 
-    // Create streaming_chunks table
-    console.log('Creating streaming_chunks table...')
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS streaming_chunks (
-        id SERIAL PRIMARY KEY,
-        request_id UUID NOT NULL REFERENCES api_requests(request_id) ON DELETE CASCADE,
-        chunk_index INTEGER NOT NULL,
-        timestamp TIMESTAMPTZ NOT NULL,
-        data TEXT NOT NULL,
-        token_count INTEGER DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(request_id, chunk_index)
-      )
-    `)
-
-    // Create index for streaming_chunks
-    await pool.query(
-      `CREATE INDEX IF NOT EXISTS idx_streaming_chunks_request_id ON streaming_chunks(request_id, chunk_index)`
-    )
+    // Note: streaming_chunks table removed in migration 013
+    // The table was never actively used (write infrastructure existed but was never called)
 
     // Create materialized view for dashboard stats
     console.log('Creating hourly_stats materialized view...')
