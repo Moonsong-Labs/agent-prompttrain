@@ -213,37 +213,44 @@ export function loggingMiddleware() {
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
 
+    // Skip logging for health check endpoint
+    const isHealthCheck = path === '/health'
+
     // Log incoming request
-    logger.info('Incoming request', {
-      requestId,
-      projectId,
-      method,
-      path,
-      metadata: {
-        userAgent,
-        ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
-        headers: logger['config'].level === LogLevel.DEBUG ? c.req.header() : undefined,
-      },
-    })
+    if (!isHealthCheck) {
+      logger.info('Incoming request', {
+        requestId,
+        projectId,
+        method,
+        path,
+        metadata: {
+          userAgent,
+          ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
+          headers: logger['config'].level === LogLevel.DEBUG ? c.req.header() : undefined,
+        },
+      })
+    }
 
     try {
       await next()
 
       // Log successful response
-      const duration = Date.now() - startTime
-      logger.info('Request completed', {
-        requestId,
-        projectId,
-        method,
-        path,
-        statusCode: c.res.status,
-        duration,
-        metadata: {
-          contentLength: c.res.headers.get('content-length'),
-        },
-      })
+      if (!isHealthCheck) {
+        const duration = Date.now() - startTime
+        logger.info('Request completed', {
+          requestId,
+          projectId,
+          method,
+          path,
+          statusCode: c.res.status,
+          duration,
+          metadata: {
+            contentLength: c.res.headers.get('content-length'),
+          },
+        })
+      }
     } catch (error) {
-      // Log error
+      // Log error (always log errors, even for health checks)
       const duration = Date.now() - startTime
       logger.error('Request failed', {
         requestId,
