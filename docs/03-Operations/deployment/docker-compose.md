@@ -99,7 +99,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      SERVICE_MODE: 'full' # Options: full, proxy, api
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_nexus
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       STORAGE_ENABLED: 'true'
       DEBUG: 'false'
     volumes:
@@ -183,9 +185,11 @@ PROXY_SERVER_TIMEOUT=660000
 # Override per service
 proxy:
   environment:
+    - SERVICE_MODE=full # full, proxy, or api
     - NODE_ENV=production
     - LOG_LEVEL=info
     - ENABLE_CLIENT_AUTH=true
+    - INTERNAL_API_KEY=${INTERNAL_API_KEY} # Required for api/full modes
 
 dashboard:
   environment:
@@ -197,6 +201,59 @@ dashboard:
 ```
 
 ## Advanced Deployment
+
+### Service Mode Configurations
+
+The proxy service supports three operational modes via the `SERVICE_MODE` environment variable. See [ADR-028](../../04-Architecture/ADRs/adr-028-proxy-service-operational-modes.md) for detailed information.
+
+#### Full Mode (Default)
+
+All-in-one deployment with both proxy and API endpoints:
+
+```yaml
+proxy:
+  environment:
+    SERVICE_MODE: 'full'
+    DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_nexus
+    INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    STORAGE_ENABLED: 'true'
+```
+
+**Use case**: Development, simple production deployments, or when resource optimization isn't critical.
+
+#### Proxy Mode
+
+Minimal deployment serving only Claude Code endpoints:
+
+```yaml
+proxy:
+  environment:
+    SERVICE_MODE: 'proxy'
+    # DATABASE_URL optional (only needed for request tracking)
+    STORAGE_ENABLED: 'false' # Can disable if no tracking needed
+    ENABLE_CLIENT_AUTH: 'true'
+```
+
+**Available endpoints**: `/v1/messages`, `/mcp`, `/health`, `/token-stats`, `/oauth-metrics`
+
+**Use case**: Lightweight proxy-only deployments, testing, or when dashboard is deployed separately.
+
+#### API Mode
+
+Backend service serving only Dashboard API endpoints:
+
+```yaml
+proxy:
+  environment:
+    SERVICE_MODE: 'api'
+    DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claude_nexus # Required
+    INTERNAL_API_KEY: ${INTERNAL_API_KEY} # Required
+    STORAGE_ENABLED: 'true'
+```
+
+**Available endpoints**: `/api/*`, `/health`
+
+**Use case**: Dedicated API backend when proxy functionality is deployed separately or not needed.
 
 ### Using Profiles
 

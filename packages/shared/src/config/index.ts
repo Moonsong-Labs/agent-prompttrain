@@ -224,6 +224,17 @@ export const config = {
     },
   },
 
+  // Service mode configuration
+  service: {
+    get mode() {
+      const mode = env.string('SERVICE_MODE', 'full')
+      if (mode !== 'full' && mode !== 'proxy' && mode !== 'api') {
+        throw new Error(`Invalid SERVICE_MODE value: "${mode}". Must be one of: full, proxy, api`)
+      }
+      return mode as 'full' | 'proxy' | 'api'
+    },
+  },
+
   // Feature flags
   features: {
     get debug() {
@@ -346,6 +357,17 @@ export const config = {
   },
 }
 
+// Helper functions for service mode checking
+export function isProxyMode(): boolean {
+  const mode = config.service.mode
+  return mode === 'proxy' || mode === 'full'
+}
+
+export function isApiMode(): boolean {
+  const mode = config.service.mode
+  return mode === 'api' || mode === 'full'
+}
+
 // Validate required configuration
 export function validateConfig(): void {
   const errors: string[] = []
@@ -361,6 +383,26 @@ export function validateConfig(): void {
     !config.slack.webhookUrl.startsWith('https://')
   ) {
     errors.push('Invalid Slack webhook URL')
+  }
+
+  // Validate service mode requirements
+  const mode = config.service.mode
+
+  if (mode === 'api') {
+    // API mode requires database
+    if (!config.database.url && !config.database.host) {
+      errors.push('SERVICE_MODE=api requires DATABASE_URL or database configuration')
+    }
+  }
+
+  // API mode and full mode both serve API endpoints, so both require INTERNAL_API_KEY
+  if (mode === 'api' || mode === 'full') {
+    const internalApiKey = process.env.INTERNAL_API_KEY?.trim() || ''
+    if (!internalApiKey) {
+      errors.push(
+        `SERVICE_MODE=${mode} requires INTERNAL_API_KEY to be set for dashboard API access`
+      )
+    }
   }
 
   if (errors.length > 0) {
