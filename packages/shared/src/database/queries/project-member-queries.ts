@@ -10,7 +10,7 @@ import { toSafeCredential } from './credential-queries.js'
 
 /**
  * Add a member to a project
- * Does not modify role if member already exists (use updateTrainMemberRole for that)
+ * Does not modify role if member already exists (use updateProjectMemberRole for that)
  */
 export async function addProjectMember(
   pool: Pool,
@@ -69,7 +69,7 @@ export async function removeProjectMember(
     const member = memberResult.rows[0]
 
     if (member.role === 'owner') {
-      // Lock all owner rows for this train to prevent concurrent modifications
+      // Lock all owner rows for this project to prevent concurrent modifications
       await client.query(
         'SELECT 1 FROM project_members WHERE project_id = $1 AND role = $2 FOR UPDATE',
         [projectId, 'owner']
@@ -120,7 +120,7 @@ export async function getProjectMembers(pool: Pool, projectId: string): Promise<
 /**
  * Get all projects where user is a member or owner
  */
-export async function getUserTrains(pool: Pool, userEmail: string): Promise<Project[]> {
+export async function getUserProjects(pool: Pool, userEmail: string): Promise<Project[]> {
   const result = await pool.query<Project>(
     `
     SELECT t.*
@@ -138,11 +138,11 @@ export async function getUserTrains(pool: Pool, userEmail: string): Promise<Proj
 /**
  * Get all projects where user is a member or owner, with associated accounts
  */
-export async function getUserTrainsWithAccounts(
+export async function getUserProjectsWithAccounts(
   pool: Pool,
   userEmail: string
 ): Promise<ProjectWithAccounts[]> {
-  const projects = await getUserTrains(pool, userEmail)
+  const projects = await getUserProjects(pool, userEmail)
 
   // All projects have access to all credentials
   const accountsResult = await pool.query<AnthropicCredential>(
@@ -150,12 +150,12 @@ export async function getUserTrainsWithAccounts(
   )
   const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
 
-  const trainsWithAccounts = projects.map(train => ({
-    ...train,
+  const projectsWithAccounts = projects.map(project => ({
+    ...project,
     accounts: allAccounts,
   }))
 
-  return trainsWithAccounts
+  return projectsWithAccounts
 }
 
 /**
@@ -182,7 +182,7 @@ export async function isProjectOwner(
 /**
  * Check if a user is a member (owner or member) of a project
  */
-export async function isTrainMember(
+export async function isProjectMember(
   pool: Pool,
   projectId: string,
   userEmail: string
@@ -205,7 +205,7 @@ export async function isTrainMember(
  * Throws error if attempting to demote the last owner
  * Uses transaction with row locking to prevent race conditions
  */
-export async function updateTrainMemberRole(
+export async function updateProjectMemberRole(
   pool: Pool,
   projectId: string,
   userEmail: string,
@@ -229,7 +229,7 @@ export async function updateTrainMemberRole(
     const member = memberResult.rows[0]
 
     if (member.role === 'owner' && newRole === 'member') {
-      // Lock all owner rows for this train to prevent concurrent modifications
+      // Lock all owner rows for this project to prevent concurrent modifications
       await client.query(
         'SELECT 1 FROM project_members WHERE project_id = $1 AND role = $2 FOR UPDATE',
         [projectId, 'owner']

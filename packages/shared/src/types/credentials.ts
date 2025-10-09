@@ -39,6 +39,7 @@ export interface Project {
   slack_channel: string | null
   slack_username: string | null
   slack_icon_emoji: string | null
+  is_private: boolean
   created_at: Date
   updated_at: Date
 }
@@ -105,6 +106,7 @@ export interface CreateProjectRequest {
   slack_channel?: string
   slack_username?: string
   slack_icon_emoji?: string
+  is_private?: boolean
 }
 
 export interface UpdateProjectRequest {
@@ -114,6 +116,7 @@ export interface UpdateProjectRequest {
   slack_channel?: string
   slack_username?: string
   slack_icon_emoji?: string
+  is_private?: boolean
 }
 
 export interface CreateApiKeyRequest {

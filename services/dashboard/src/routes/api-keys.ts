@@ -7,7 +7,7 @@ import {
   getProjectByProjectId,
   getTrainApiKeySafe,
   isProjectOwner,
-  isTrainMember,
+  isProjectMember,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateApiKeyRequest } from '@agent-prompttrain/shared'
 import type { AuthContext } from '../middleware/auth.js'
@@ -31,13 +31,13 @@ apiKeys.get('/:projectId/api-keys', async c => {
       return c.json({ error: 'Project not found' }, 404)
     }
 
-    // Check train membership
-    const isMember = await isTrainMember(pool, train.id, auth.principal)
+    // Check project membership
+    const isMember = await isProjectMember(pool, train.id, auth.principal)
     if (!isMember) {
-      return c.json({ error: 'Access denied: You are not a member of this train' }, 403)
+      return c.json({ error: 'Access denied: You are not a member of this project' }, 403)
     }
 
-    // Check if user is train owner
+    // Check if user is project owner
     const isOwner = await isProjectOwner(pool, train.id, auth.principal)
 
     const allKeys = await listTrainApiKeys(pool, train.id)
@@ -69,10 +69,10 @@ apiKeys.post('/:projectId/api-keys', async c => {
       return c.json({ error: 'Project not found' }, 404)
     }
 
-    // Check train membership
-    const isMember = await isTrainMember(pool, train.id, auth.principal)
+    // Check project membership
+    const isMember = await isProjectMember(pool, train.id, auth.principal)
     if (!isMember) {
-      return c.json({ error: 'Access denied: You are not a member of this train' }, 403)
+      return c.json({ error: 'Access denied: You are not a member of this project' }, 403)
     }
 
     const body = await c.req.json<CreateApiKeyRequest>()
@@ -108,10 +108,10 @@ apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'Project not found' }, 404)
     }
 
-    // Check train membership
-    const isMember = await isTrainMember(pool, train.id, auth.principal)
+    // Check project membership
+    const isMember = await isProjectMember(pool, train.id, auth.principal)
     if (!isMember) {
-      return c.json({ error: 'Access denied: You are not a member of this train' }, 403)
+      return c.json({ error: 'Access denied: You are not a member of this project' }, 403)
     }
 
     // Get the API key to check ownership
@@ -120,18 +120,18 @@ apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'API key not found or already revoked' }, 404)
     }
 
-    // Check if key belongs to this train
+    // Check if key belongs to this project
     if (apiKey.project_id !== train.id) {
-      return c.json({ error: 'API key does not belong to this train' }, 403)
+      return c.json({ error: 'API key does not belong to this project' }, 403)
     }
 
-    // Check if user is train owner OR key creator
+    // Check if user is project owner OR key creator
     const isOwner = await isProjectOwner(pool, train.id, auth.principal)
     const isKeyCreator = apiKey.created_by === auth.principal
 
     if (!isOwner && !isKeyCreator) {
       return c.json(
-        { error: 'Access denied: Only train owners or key creators can revoke API keys' },
+        { error: 'Access denied: Only project owners or key creators can revoke API keys' },
         403
       )
     }

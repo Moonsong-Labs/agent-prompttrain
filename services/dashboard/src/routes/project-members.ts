@@ -3,16 +3,16 @@ import { container } from '../container.js'
 import {
   addProjectMember,
   removeProjectMember,
-  updateTrainMemberRole,
+  updateProjectMemberRole,
   getProjectById,
 } from '@agent-prompttrain/shared/database/queries'
 import type { AddProjectMemberRequest, UpdateProjectMemberRequest } from '@agent-prompttrain/shared'
-import { requireTrainOwner } from '../middleware/project-ownership.js'
+import { requireProjectOwner } from '../middleware/project-ownership.js'
 
 const trainMembers = new Hono()
 
 // POST /api/projects/:id/members - Add member (owner only)
-trainMembers.post('/:id/members', requireTrainOwner, async c => {
+trainMembers.post('/:id/members', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
     const projectId = c.req.param('id')
@@ -54,7 +54,7 @@ trainMembers.post('/:id/members', requireTrainOwner, async c => {
 })
 
 // DELETE /api/projects/:id/members/:email - Remove member (owner only)
-trainMembers.delete('/:id/members/:email', requireTrainOwner, async c => {
+trainMembers.delete('/:id/members/:email', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
     const projectId = c.req.param('id')
@@ -81,7 +81,7 @@ trainMembers.delete('/:id/members/:email', requireTrainOwner, async c => {
 })
 
 // PATCH /api/projects/:id/members/:email - Update member role (owner only)
-trainMembers.patch('/:id/members/:email', requireTrainOwner, async c => {
+trainMembers.patch('/:id/members/:email', requireProjectOwner, async c => {
   try {
     const pool = container.getPool()
     const projectId = c.req.param('id')
@@ -102,7 +102,7 @@ trainMembers.patch('/:id/members/:email', requireTrainOwner, async c => {
       return c.json({ error: 'role must be "owner" or "member"' }, 400)
     }
 
-    const member = await updateTrainMemberRole(pool, projectId, userEmail, body.role)
+    const member = await updateProjectMemberRole(pool, projectId, userEmail, body.role)
     return c.json({ member })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {

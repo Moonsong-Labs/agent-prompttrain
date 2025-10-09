@@ -142,7 +142,7 @@ describe('Validation Utilities', () => {
   describe('Project ID Validation', () => {
     it('should validate train identifiers', () => {
       const validTrainIds = [
-        'train-alpha',
+        'project-alpha',
         'train.alpha',
         'train_alpha',
         'train-beta:preview',

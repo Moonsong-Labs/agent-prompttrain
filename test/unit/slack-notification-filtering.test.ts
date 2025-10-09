@@ -16,7 +16,7 @@ describe('NotificationService - Request Type Filtering', () => {
           ],
           max_tokens: 100,
         },
-        'train-alpha',
+        'project-alpha',
         'test-123'
       )
 
@@ -29,7 +29,7 @@ describe('NotificationService - Request Type Filtering', () => {
           messages: [{ role: 'user', content: 'What is 2+2?' }],
           max_tokens: 10,
         },
-        'train-alpha',
+        'project-alpha',
         'test-456'
       )
 
@@ -42,7 +42,7 @@ describe('NotificationService - Request Type Filtering', () => {
           messages: [{ role: 'user', content: 'quota' }],
           max_tokens: 1,
         },
-        'train-alpha',
+        'project-alpha',
         'test-789'
       )
 

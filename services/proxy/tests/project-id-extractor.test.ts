@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import { Hono } from 'hono'
 import { projectIdExtractorMiddleware } from '../src/middleware/project-id-extractor'
 
-const TRAIN_HEADER = 'MSL-Project-Id'
-const TRAIN_HEADER_LOWER = TRAIN_HEADER.toLowerCase()
+const PROJECT_HEADER = 'MSL-Project-Id'
+const PROJECT_HEADER_LOWER = PROJECT_HEADER.toLowerCase()
 
 describe('projectIdExtractorMiddleware', () => {
   let app: Hono
@@ -18,7 +18,7 @@ describe('projectIdExtractorMiddleware', () => {
     })
   })
 
-  it('falls back to default train when header missing', async () => {
+  it('falls back to default project when header missing', async () => {
     const res = await app.request('/test')
 
     expect(res.status).toBe(200)
@@ -29,7 +29,7 @@ describe('projectIdExtractorMiddleware', () => {
   it('extracts projectId from MSL-Project-Id header', async () => {
     const res = await app.request('/test', {
       headers: {
-        [TRAIN_HEADER]: 'team-alpha',
+        [PROJECT_HEADER]: 'team-alpha',
       },
     })
 
@@ -41,7 +41,7 @@ describe('projectIdExtractorMiddleware', () => {
   it('trims whitespace from header value', async () => {
     const res = await app.request('/test', {
       headers: {
-        [TRAIN_HEADER]: '  team-beta  ',
+        [PROJECT_HEADER]: '  team-beta  ',
       },
     })
 
@@ -53,7 +53,7 @@ describe('projectIdExtractorMiddleware', () => {
   it('treats header names case-insensitively', async () => {
     const res = await app.request('/test', {
       headers: {
-        [TRAIN_HEADER_LOWER]: 'alpha-lowercase',
+        [PROJECT_HEADER_LOWER]: 'alpha-lowercase',
       },
     })
 

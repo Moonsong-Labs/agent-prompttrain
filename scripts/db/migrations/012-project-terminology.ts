@@ -221,6 +221,14 @@ async function migrate() {
           ALTER TABLE projects ADD COLUMN slack_icon_emoji VARCHAR(255);
         END IF;
 
+        -- Add is_private column
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'projects' AND column_name = 'is_private'
+        ) THEN
+          ALTER TABLE projects ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT false;
+        END IF;
+
         -- Drop description column if it exists
         IF EXISTS (
           SELECT 1 FROM information_schema.columns

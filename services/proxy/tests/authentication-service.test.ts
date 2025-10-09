@@ -76,7 +76,7 @@ describe('AuthenticationService', () => {
 
     mockGetTrainCredentials.mockImplementation(() => credentials)
 
-    const context = createRequestContext('train-alpha', 'acc_secondary')
+    const context = createRequestContext('project-alpha', 'acc_secondary')
     const auth = await service.authenticate(context)
 
     expect(auth.accountName).toBe('account-secondary')
@@ -103,7 +103,7 @@ describe('AuthenticationService', () => {
 
     mockGetTrainCredentials.mockImplementation(() => credentials)
 
-    const context = createRequestContext('train-alpha', 'acc_primary')
+    const context = createRequestContext('project-alpha', 'acc_primary')
     const auth = await service.authenticate(context)
 
     expect(auth.accountName).toBe('account-primary')
@@ -128,7 +128,7 @@ describe('AuthenticationService', () => {
 
     mockGetTrainCredentials.mockImplementation(() => credentials)
 
-    const context = createRequestContext('train-alpha', '../escape')
+    const context = createRequestContext('project-alpha', '../escape')
     await expect(service.authenticate(context)).rejects.toBeInstanceOf(AuthenticationError)
   })
 
@@ -149,7 +149,7 @@ describe('AuthenticationService', () => {
 
     mockGetTrainCredentials.mockImplementation(() => credentials)
 
-    const context = createRequestContext('train-alpha')
+    const context = createRequestContext('project-alpha')
     const auth = await service.authenticate(context)
 
     expect(auth.accountName).toBe('account-primary')
@@ -247,7 +247,7 @@ describe('AuthenticationService deterministic account selection', () => {
 
     const service = new AuthenticationService(mockPool)
 
-    const projectId = 'train-alpha'
+    const projectId = 'project-alpha'
     const expectedAccount = computePreferredAccount(projectId, ['primary', 'secondary'])
 
     const context1 = new RequestContext('req-1', projectId, 'POST', '/v1/messages', Date.now(), {})
@@ -290,7 +290,7 @@ describe('AuthenticationService deterministic account selection', () => {
 
     const service = new AuthenticationService(mockPool)
 
-    const projects = ['train-alpha', 'train-beta', 'train-gamma']
+    const projects = ['project-alpha', 'train-beta', 'train-gamma']
     const accounts = ['primary', 'secondary']
 
     const selections = await Promise.all(
