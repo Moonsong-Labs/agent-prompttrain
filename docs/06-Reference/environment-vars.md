@@ -18,16 +18,17 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Authentication
 
-| Variable                        | Description                                                                | Default                           | Required         |
-| ------------------------------- | -------------------------------------------------------------------------- | --------------------------------- | ---------------- |
-| `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)  | -                                 | ✅ (Production)  |
-| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)        | -                                 | ✅ (Production)  |
-| `INTERNAL_API_KEY`              | Service-to-service authentication key                                      | -                                 | ✅               |
-| `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                        | -                                 | ✅ (Development) |
-| `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                       | `true`                            | ❌               |
-| `ACCOUNTS_DIR`                  | Directory containing account credential files (`*.credentials.json`)       | `credentials/accounts`            | ❌               |
-| `TRAIN_CLIENT_KEYS_DIR`         | Directory containing per-train client API key lists (`*.client-keys.json`) | `credentials/project-client-keys` | ❌               |
-| `DEFAULT_PROJECT_ID`            | Fallback identifier when a request omits `MSL-Project-Id`                  | `default`                         | ❌               |
+| Variable                        | Description                                                                       | Default                           | Required                  |
+| ------------------------------- | --------------------------------------------------------------------------------- | --------------------------------- | ------------------------- |
+| `DASHBOARD_SSO_HEADERS`         | oauth2-proxy headers for user authentication (e.g., X-Auth-Request-Email)         | -                                 | ✅ (Production)           |
+| `DASHBOARD_SSO_ALLOWED_DOMAINS` | Allowed email domains for dashboard access (e.g., your-company.com)               | -                                 | ✅ (Production)           |
+| `DASHBOARD_ALB_OIDC_ENABLED`    | Enable AWS ALB OIDC authentication via x-amzn-oidc-data header                    | `false`                           | ❌                        |
+| `INTERNAL_API_KEY`              | Service-to-service authentication key (required for `SERVICE_MODE=api` or `full`) | -                                 | ✅ (when API mode active) |
+| `DASHBOARD_DEV_USER_EMAIL`      | Development bypass email (never use in production!)                               | -                                 | ✅ (Development)          |
+| `ENABLE_CLIENT_AUTH`            | Enable client API key authentication                                              | `true`                            | ❌                        |
+| `ACCOUNTS_DIR`                  | Directory containing account credential files (`*.credentials.json`)              | `credentials/accounts`            | ❌                        |
+| `TRAIN_CLIENT_KEYS_DIR`         | Directory containing per-train client API key lists (`*.client-keys.json`)        | `credentials/project-client-keys` | ❌                        |
+| `DEFAULT_PROJECT_ID`            | Fallback identifier when a request omits `MSL-Project-Id`                         | `default`                         | ❌                        |
 
 ### Train Identification
 
@@ -63,11 +64,28 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Proxy Service
 
-| Variable     | Description            | Default       |
-| ------------ | ---------------------- | ------------- |
-| `PROXY_PORT` | Port for proxy service | `3000`        |
-| `NODE_ENV`   | Node environment       | `development` |
-| `LOG_LEVEL`  | Logging level          | `info`        |
+| Variable       | Description                                                                                                                                                                                                     | Default       | Required |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
+| `SERVICE_MODE` | Service operational mode: `full` (all endpoints), `proxy` (Claude Code endpoints only), `api` (Dashboard API endpoints only). See [ADR-028](../04-Architecture/ADRs/adr-028-proxy-service-operational-modes.md) | `full`        | ❌       |
+| `PROXY_PORT`   | Port for proxy service                                                                                                                                                                                          | `3000`        | ❌       |
+| `NODE_ENV`     | Node environment                                                                                                                                                                                                | `development` | ❌       |
+| `LOG_LEVEL`    | Logging level                                                                                                                                                                                                   | `info`        | ❌       |
+
+**SERVICE_MODE Details:**
+
+- **`full`** (default): All endpoints available
+  - Claude Code endpoints: `/v1/messages`, `/mcp`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
+  - Dashboard API endpoints: `/api/*`
+  - Health endpoint: `/health`
+  - **Requirements**: `DATABASE_URL`, `INTERNAL_API_KEY`
+
+- **`proxy`**: Only Claude Code endpoints
+  - Available: `/v1/messages`, `/mcp`, `/health`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
+  - **Requirements**: None (database optional for tracking)
+
+- **`api`**: Only Dashboard API endpoints
+  - Available: `/api/*`, `/health`
+  - **Requirements**: `DATABASE_URL`, `INTERNAL_API_KEY` (enforced at startup)
 
 ### Dashboard Service
 
@@ -219,6 +237,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/claude_nexus
 DASHBOARD_SSO_HEADERS=X-Auth-Request-Email
 DASHBOARD_SSO_ALLOWED_DOMAINS=your-company.com
 INTERNAL_API_KEY=your-internal-key
+
+# AWS ALB OIDC authentication (alternative to oauth2-proxy)
+# Enable if using AWS ALB with OIDC authentication
+DASHBOARD_ALB_OIDC_ENABLED=false
 
 # Dashboard authentication (Development)
 # Development bypass (never use in production!)

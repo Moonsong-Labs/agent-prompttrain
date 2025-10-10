@@ -46,27 +46,12 @@ interface StorageResponse {
   toolCallCount?: number
 }
 
-interface StreamingChunk {
-  requestId: string
-  chunkIndex: number
-  timestamp: Date
-  data: string
-  tokenCount?: number
-}
-
 /**
  * Storage writer service for persisting requests to the database
  * Write-only operations for the proxy service
  */
 export class StorageWriter {
-  private batchQueue: any[] = []
-  private batchTimer?: NodeJS.Timeout
-  private readonly BATCH_SIZE = 100
-  private readonly BATCH_INTERVAL = 1000 // 1 second
-
-  constructor(private pool: Pool) {
-    this.startBatchProcessor()
-  }
+  constructor(private pool: Pool) {}
 
   /**
    * Store a request (write-only)
@@ -219,71 +204,6 @@ export class StorageWriter {
       logger.error('Failed to store response', {
         requestId: response.requestId,
         metadata: {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-    }
-  }
-
-  /**
-   * Store streaming chunks (batch operation)
-   */
-  async storeStreamingChunk(chunk: StreamingChunk): Promise<void> {
-    this.batchQueue.push(chunk)
-
-    if (this.batchQueue.length >= this.BATCH_SIZE) {
-      await this.flushBatch()
-    }
-  }
-
-  /**
-   * Start batch processor for streaming chunks
-   */
-  private startBatchProcessor(): void {
-    this.batchTimer = setInterval(async () => {
-      if (this.batchQueue.length > 0) {
-        await this.flushBatch()
-      }
-    }, this.BATCH_INTERVAL)
-  }
-
-  /**
-   * Flush batch of streaming chunks
-   */
-  private async flushBatch(): Promise<void> {
-    if (this.batchQueue.length === 0) {
-      return
-    }
-
-    const chunks = [...this.batchQueue]
-    this.batchQueue = []
-
-    try {
-      const values = chunks.map(chunk => [
-        chunk.requestId,
-        chunk.chunkIndex,
-        chunk.timestamp,
-        chunk.data,
-        chunk.tokenCount || 0,
-      ])
-
-      // Use COPY for bulk insert
-      const query = `
-        INSERT INTO streaming_chunks (
-          request_id, chunk_index, timestamp, data, token_count
-        ) VALUES ${values
-          .map(
-            (_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
-          )
-          .join(', ')}
-        ON CONFLICT DO NOTHING
-      `
-
-      await this.pool.query(query, values.flat())
-    } catch (error) {
-      logger.error('Failed to store streaming chunks batch', {
-        metadata: {
-          count: chunks.length,
           error: error instanceof Error ? error.message : String(error),
         },
       })
@@ -787,10 +707,7 @@ export class StorageWriter {
    * Cleanup
    */
   async cleanup(): Promise<void> {
-    if (this.batchTimer) {
-      clearInterval(this.batchTimer)
-    }
-    await this.flushBatch()
+    // No cleanup needed
   }
 }
 
@@ -855,12 +772,12 @@ export async function initializeDatabase(pool: Pool): Promise<void> {
       logger.info('Database schema created successfully')
     } else {
       // Verify all required tables exist
-      const requiredTables = ['api_requests', 'streaming_chunks']
+      const requiredTables = ['api_requests']
       const tableCheck = await pool.query(
         `
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name = ANY($1)
       `,
         [requiredTables]

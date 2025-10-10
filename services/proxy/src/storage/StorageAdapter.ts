@@ -275,47 +275,6 @@ export class StorageAdapter {
   }
 
   /**
-   * Store streaming chunk
-   */
-  async storeStreamingChunk(requestId: string, chunkIndex: number, data: any): Promise<void> {
-    try {
-      // Get the UUID for this request ID
-      const mapping = this.requestIdMap.get(requestId)
-      if (!mapping) {
-        // This can happen if the request was cleaned up due to age
-        logger.debug(
-          'No UUID mapping found for request ID in storeStreamingChunk - may have been cleaned up',
-          {
-            requestId,
-            metadata: {
-              mapSize: this.requestIdMap.size,
-              reason: 'likely_cleaned_up',
-            },
-          }
-        )
-        return
-      }
-      const uuid = mapping.uuid
-
-      await this.writer.storeStreamingChunk({
-        requestId: uuid,
-        chunkIndex,
-        timestamp: new Date(),
-        data: JSON.stringify(data),
-        tokenCount: data.usage?.output_tokens,
-      })
-    } catch (error) {
-      logger.error('Failed to store streaming chunk', {
-        requestId,
-        metadata: {
-          chunkIndex,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-    }
-  }
-
-  /**
    * Find conversation ID by parent message hash
    * @param parentHash - The parent message hash to search for
    * @param beforeTimestamp - Timestamp to only consider conversations before this time

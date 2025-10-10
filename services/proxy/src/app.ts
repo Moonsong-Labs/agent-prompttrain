@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { container, initializeContainer } from './container.js'
-import { config, validateConfig } from '@agent-prompttrain/shared/config'
+import { config, validateConfig, isProxyMode, isApiMode } from '@agent-prompttrain/shared/config'
 import { loggingMiddleware, logger } from './middleware/logger.js'
 import { requestIdMiddleware } from './middleware/request-id.js'
 import { validationMiddleware } from './middleware/validation.js'
@@ -82,96 +82,116 @@ export async function createProxyApp(): Promise<
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Client authentication for proxy routes
-  // Apply before rate limiting to protect against unauthenticated requests
-  // This sets projectId from API key authentication
-  if (config.features.enableClientAuth !== false) {
-    app.use('/v1/*', clientAuthMiddleware())
-  }
-
-  // Project ID extraction fallback for all routes
-  // Only sets projectId if not already set by client auth
-  app.use('*', projectIdExtractorMiddleware())
-
-  // Rate limiting
-  if (config.features.enableMetrics) {
-    app.use('/v1/*', createRateLimiter())
-    app.use('/v1/*', createTrainRateLimiter())
-  }
-
-  // Validation for API routes
-  app.use('/v1/*', validationMiddleware())
-
-  // Health check routes
-  if (config.features.enableHealthChecks) {
-    const healthRoutes = createHealthRoutes({
-      pool: container.getDbPool(),
-      version: process.env.npm_package_version,
-    })
-    app.route('/health', healthRoutes)
-  }
-
-  // Token stats endpoint
-  app.get('/token-stats', c => {
-    const projectId = c.req.query('projectId')
-    const stats = container.getMetricsService().getStats(projectId)
-    return c.json(stats)
-  })
-
-  // OAuth refresh metrics endpoint
-  app.get('/oauth-metrics', async c => {
-    const { getRefreshMetrics } = await import('./credentials.js')
-    const metrics = getRefreshMetrics()
-    return c.json(metrics)
-  })
-
-  // Dashboard API routes with authentication
-  app.use('/api/*', apiAuthMiddleware())
-  app.use('/api/*', async (c, next) => {
-    // Inject pool into context for API routes
-    const pool = container.getDbPool()
-    if (!pool) {
-      logger.error('Database pool not available for API request', {
-        path: c.req.path,
-      })
-      return c.json(
-        {
-          error: {
-            code: 'service_unavailable',
-            message: 'Database service is not available',
-          },
-        },
-        503
-      )
+  // ============================================
+  // PROXY MODE ENDPOINTS (Claude Code / Client)
+  // ============================================
+  if (isProxyMode()) {
+    // Client authentication for proxy routes
+    // Apply before rate limiting to protect against unauthenticated requests
+    // This sets projectId from API key authentication
+    if (config.features.enableClientAuth !== false) {
+      app.use('/v1/*', clientAuthMiddleware())
     }
-    c.set('pool', pool)
-    await next()
-  })
-  app.route('/api', apiRoutes)
 
-  // Spark API routes (protected by same auth as dashboard API)
-  app.route('/api', sparkApiRoutes)
+    // Project ID extraction fallback for proxy endpoints only
+    // Only sets projectId if not already set by client auth
+    app.use('/v1/*', projectIdExtractorMiddleware())
 
-  // AI Analysis routes (protected by same auth as dashboard API)
-  app.route('/api/analyses', analysisRoutes)
-
-  // MCP routes
-  if (config.mcp.enabled) {
-    // Apply client authentication to MCP routes
-    app.use('/mcp/*', clientAuthMiddleware())
-
-    // Apply rate limiting to MCP routes
+    // Rate limiting
     if (config.features.enableMetrics) {
-      app.use('/mcp/*', createRateLimiter())
-      app.use('/mcp/*', createTrainRateLimiter())
+      app.use('/v1/*', createRateLimiter())
+      app.use('/v1/*', createTrainRateLimiter())
     }
 
+    // Validation for API routes
+    app.use('/v1/*', validationMiddleware())
+  }
+
+  // ============================================
+  // SHARED ENDPOINTS (Available in all modes)
+  // ============================================
+
+  // Health check routes - always available in all service modes
+  const healthRoutes = createHealthRoutes({
+    pool: container.getDbPool(),
+    version: process.env.npm_package_version,
+  })
+  app.route('/health', healthRoutes)
+
+  if (isProxyMode()) {
+    // Token stats endpoint (proxy mode)
+    app.get('/token-stats', c => {
+      const projectId = c.req.query('projectId')
+      const stats = container.getMetricsService().getStats(projectId)
+      return c.json(stats)
+    })
+
+    // OAuth refresh metrics endpoint (proxy mode)
+    app.get('/oauth-metrics', async c => {
+      const { getRefreshMetrics } = await import('./credentials.js')
+      const metrics = getRefreshMetrics()
+      return c.json(metrics)
+    })
+  }
+
+  // ============================================
+  // API MODE ENDPOINTS (Dashboard)
+  // ============================================
+  if (isApiMode()) {
+    // Dashboard API routes with authentication
+    app.use('/api/*', apiAuthMiddleware())
+    app.use('/api/*', async (c, next) => {
+      // Inject pool into context for API routes
+      const pool = container.getDbPool()
+      if (!pool) {
+        logger.error('Database pool not available for API request', {
+          path: c.req.path,
+        })
+        return c.json(
+          {
+            error: {
+              code: 'service_unavailable',
+              message: 'Database service is not available',
+            },
+          },
+          503
+        )
+      }
+      c.set('pool', pool)
+      await next()
+    })
+    app.route('/api', apiRoutes)
+
+    // Spark API routes (protected by same auth as dashboard API)
+    app.route('/api', sparkApiRoutes)
+
+    // AI Analysis routes (protected by same auth as dashboard API)
+    app.route('/api/analyses', analysisRoutes)
+  }
+
+  // ============================================
+  // MCP ROUTES (Conditional based on mode and MCP_ENABLED)
+  // ============================================
+  if (config.mcp.enabled) {
     const mcpHandler = container.getMcpHandler()
     const promptRegistry = container.getPromptRegistry()
     const syncService = container.getGitHubSyncService()
     const syncScheduler = container.getSyncScheduler()
 
-    if (mcpHandler) {
+    // MCP JSON-RPC endpoints (proxy mode - for Claude Code)
+    if (isProxyMode() && mcpHandler) {
+      // Apply client authentication to MCP routes
+      app.use('/mcp/*', clientAuthMiddleware())
+
+      // Project ID extraction for MCP routes
+      app.use('/mcp/*', projectIdExtractorMiddleware())
+
+      // Apply rate limiting to MCP routes
+      if (config.features.enableMetrics) {
+        app.use('/mcp/*', createRateLimiter())
+        app.use('/mcp/*', createTrainRateLimiter())
+      }
+
       // MCP JSON-RPC endpoint (now protected by auth)
       app.post('/mcp', c => mcpHandler.handle(c))
 
@@ -190,8 +210,8 @@ export async function createProxyApp(): Promise<
       })
     }
 
-    // MCP Dashboard API routes (protected by dashboard auth)
-    if (promptRegistry) {
+    // MCP Dashboard API routes (api mode - for dashboard management)
+    if (isApiMode() && promptRegistry) {
       const mcpApiRoutes = createMcpApiRoutes(
         promptRegistry,
         syncService || null,
@@ -199,90 +219,125 @@ export async function createProxyApp(): Promise<
       )
       app.route('/api/mcp', mcpApiRoutes)
       logger.info('MCP API routes registered at /api/mcp')
-    } else {
+    } else if (config.mcp.enabled && !promptRegistry) {
       logger.warn('MCP API routes not registered - prompt registry not available')
     }
   }
 
-  // Client setup files
-  app.get('/client-setup/:filename', async c => {
-    const filename = c.req.param('filename')
+  if (isProxyMode()) {
+    // Client setup files (proxy mode)
+    app.get('/client-setup/:filename', async c => {
+      const filename = c.req.param('filename')
 
-    // Validate filename to prevent directory traversal
-    if (!filename || filename.includes('..') || filename.includes('/')) {
-      return c.text('Invalid filename', 400)
-    }
-
-    try {
-      const fs = await import('fs')
-      const path = await import('path')
-      const { fileURLToPath } = await import('url')
-
-      // Get the directory of this source file
-      const __filename = fileURLToPath(import.meta.url)
-      const __dirname = path.dirname(__filename)
-
-      // Navigate from services/proxy/src to project root, then to client-setup
-      const projectRoot = path.join(__dirname, '..', '..', '..')
-      const filePath = path.join(projectRoot, 'client-setup', filename)
-
-      if (!fs.existsSync(filePath)) {
-        return c.text('File not found', 404)
+      // Validate filename to prevent directory traversal
+      if (!filename || filename.includes('..') || filename.includes('/')) {
+        return c.text('Invalid filename', 400)
       }
 
-      const content = fs.readFileSync(filePath, 'utf-8')
-      const contentType = filename.endsWith('.json')
-        ? 'application/json'
-        : filename.endsWith('.js')
-          ? 'application/javascript'
-          : filename.endsWith('.sh')
-            ? 'text/x-shellscript'
-            : 'text/plain'
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const { fileURLToPath } = await import('url')
 
-      return c.text(content, 200, {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600',
-      })
-    } catch (error) {
-      logger.error('Failed to serve client setup file', {
-        metadata: {
-          filename,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-      return c.text('Internal server error', 500)
-    }
-  })
+        // Get the directory of this source file
+        const __filename = fileURLToPath(import.meta.url)
+        const __dirname = path.dirname(__filename)
 
-  // Main API routes
-  const messageController = container.getMessageController()
-  app.post('/v1/messages', c => messageController.handle(c))
-  app.options('/v1/messages', c => messageController.handleOptions(c))
+        // Navigate from services/proxy/src to project root, then to client-setup
+        const projectRoot = path.join(__dirname, '..', '..', '..')
+        const filePath = path.join(projectRoot, 'client-setup', filename)
+
+        if (!fs.existsSync(filePath)) {
+          return c.text('File not found', 404)
+        }
+
+        const content = fs.readFileSync(filePath, 'utf-8')
+        const contentType = filename.endsWith('.json')
+          ? 'application/json'
+          : filename.endsWith('.js')
+            ? 'application/javascript'
+            : filename.endsWith('.sh')
+              ? 'text/x-shellscript'
+              : 'text/plain'
+
+        return c.text(content, 200, {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=3600',
+        })
+      } catch (error) {
+        logger.error('Failed to serve client setup file', {
+          metadata: {
+            filename,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+        return c.text('Internal server error', 500)
+      }
+    })
+
+    // Main API routes (proxy mode - Claude API forwarding)
+    const messageController = container.getMessageController()
+    app.post('/v1/messages', c => messageController.handle(c))
+    app.options('/v1/messages', c => messageController.handleOptions(c))
+  }
 
   // Root endpoint
   app.get('/', c => {
-    const endpoints: Record<string, unknown> = {
-      api: '/v1/messages',
-      health: '/health',
-      stats: '/token-stats',
-      'client-setup': '/client-setup/*',
-      'dashboard-api': {
-        stats: '/api/stats',
-        requests: '/api/requests',
-        'request-details': '/api/requests/:id',
-        trainIds: '/api/train-ids',
-      },
+    const endpoints: Record<string, unknown> = {}
+    const mode = config.service.mode
+
+    // Add mode-specific endpoints
+    if (isProxyMode()) {
+      endpoints.api = '/v1/messages'
+      endpoints.stats = '/token-stats'
+      endpoints['oauth-metrics'] = '/oauth-metrics'
+      endpoints['client-setup'] = '/client-setup/*'
     }
 
+    if (isApiMode()) {
+      endpoints['dashboard-api'] = {
+        stats: '/api/stats',
+        'dashboard-stats': '/api/dashboard/stats',
+        requests: '/api/requests',
+        'request-details': '/api/requests/:id',
+        projectIds: '/api/train-ids',
+        conversations: '/api/conversations',
+        'token-usage': {
+          current: '/api/token-usage/current',
+          daily: '/api/token-usage/daily',
+          'time-series': '/api/token-usage/time-series',
+          accounts: '/api/token-usage/accounts',
+        },
+        usage: {
+          'requests-hourly': '/api/usage/requests/hourly',
+          'tokens-hourly': '/api/usage/tokens/hourly',
+        },
+        analytics: {
+          'token-usage-sliding-window': '/api/analytics/token-usage/sliding-window',
+        },
+        spark: '/api/spark/*',
+        analyses: '/api/analyses/*',
+      }
+    }
+
+    // Always available
+    endpoints.health = '/health'
+
     if (config.mcp.enabled) {
-      endpoints.mcp = {
-        discovery: '/mcp',
-        rpc: '/mcp',
-        'dashboard-api': {
+      const mcpEndpoints: Record<string, unknown> = {}
+      if (isProxyMode()) {
+        mcpEndpoints.discovery = '/mcp'
+        mcpEndpoints.rpc = '/mcp'
+      }
+      if (isApiMode()) {
+        mcpEndpoints['dashboard-api'] = {
           prompts: '/api/mcp/prompts',
           sync: '/api/mcp/sync',
           'sync-status': '/api/mcp/sync/status',
-        },
+        }
+      }
+      if (Object.keys(mcpEndpoints).length > 0) {
+        endpoints.mcp = mcpEndpoints
       }
     }
 
@@ -290,6 +345,7 @@ export async function createProxyApp(): Promise<
       service: 'agent-prompttrain',
       version: process.env.npm_package_version || 'unknown',
       status: 'operational',
+      mode,
       endpoints,
     })
   })
@@ -335,12 +391,17 @@ async function initializeExternalServices(): Promise<void> {
     metadata: {
       version: process.env.npm_package_version || 'unknown',
       environment: config.server.env,
+      serviceMode: config.service.mode,
       features: {
         storage: config.storage.enabled,
         slack: config.slack.enabled,
         telemetry: config.telemetry.enabled,
         healthChecks: config.features.enableHealthChecks,
         mcp: config.mcp.enabled,
+      },
+      endpoints: {
+        proxyMode: isProxyMode(),
+        apiMode: isApiMode(),
       },
       mcp: config.mcp.enabled
         ? {
