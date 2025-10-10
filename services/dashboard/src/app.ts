@@ -227,12 +227,29 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     }
 
     try {
-      const conversations = await storageService.getConversationSummaries(
+      const rawConversations = await storageService.getConversationSummaries(
         auth.principal,
         projectId,
         limit,
         excludeSubtasks
       )
+
+      // Transform snake_case database fields to camelCase for API response
+      const conversations = rawConversations.map(conv => ({
+        conversationId: conv.conversation_id,
+        projectId: conv.project_id,
+        trainIds: [conv.project_id], // Backward compatibility
+        accountIds: [], // TODO: fetch from requests
+        firstMessageTime: conv.started_at,
+        lastMessageTime: conv.last_message_at,
+        messageCount: conv.total_messages || 0,
+        totalTokens: conv.total_tokens || 0,
+        branchCount: conv.branch_count || 1,
+        modelsUsed: conv.models_used || [],
+        hasSubtasks: conv.has_subtasks || false,
+        branches: conv.branches || [],
+      }))
+
       return c.json({
         status: 'ok',
         conversations,

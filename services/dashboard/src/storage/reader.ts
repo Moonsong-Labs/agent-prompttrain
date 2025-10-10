@@ -720,7 +720,8 @@ export class StorageReader {
                SUM(total_tokens) as total_tokens,
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
-               bool_or(is_subtask) as has_subtasks
+               bool_or(is_subtask) as has_subtasks,
+               MAX(project_id) as project_id
              FROM filtered_requests
              WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
@@ -780,7 +781,8 @@ export class StorageReader {
                SUM(total_tokens) as total_tokens,
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
-               bool_or(is_subtask) as has_subtasks
+               bool_or(is_subtask) as has_subtasks,
+               MAX(project_id) as project_id
              FROM filtered_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
