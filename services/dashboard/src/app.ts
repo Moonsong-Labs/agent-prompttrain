@@ -222,6 +222,14 @@ export async function createDashboardApp(): Promise<DashboardApp> {
     const excludeSubtasks = c.req.query('excludeSubtasks') === 'true'
     const auth = c.get('auth')
 
+    logger.info('[PRIVACY DEBUG] /api/conversations endpoint called', {
+      projectId,
+      limit,
+      excludeSubtasks,
+      authPrincipal: auth?.principal,
+      isAuthenticated: auth?.isAuthenticated,
+    })
+
     if (!auth || !auth.isAuthenticated) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
@@ -249,6 +257,15 @@ export async function createDashboardApp(): Promise<DashboardApp> {
         hasSubtasks: conv.has_subtasks || false,
         branches: conv.branches || [],
       }))
+
+      logger.info('[PRIVACY DEBUG] Returning conversations', {
+        count: conversations.length,
+        projectIds: [...new Set(conversations.map(c => c.projectId))],
+        sampleConversations: conversations.slice(0, 3).map(c => ({
+          conversationId: c.conversationId,
+          projectId: c.projectId,
+        })),
+      })
 
       return c.json({
         status: 'ok',
