@@ -14,6 +14,7 @@ import {
   isProjectOwner,
   getProjectStats,
   getProjectWithAccounts,
+  getProjectById,
   updateProject,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
@@ -1291,8 +1292,8 @@ trainsUIRoutes.post('/:projectId/toggle-privacy', async c => {
       `)
     }
 
-    // Get current project state
-    const project = await getProjectWithAccounts(pool, projectId)
+    // Get current project state using the numeric ID
+    const project = await getProjectById(pool, projectId)
     if (!project) {
       return c.html(html`
         <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
@@ -1303,7 +1304,7 @@ trainsUIRoutes.post('/:projectId/toggle-privacy', async c => {
 
     // Toggle privacy
     const newPrivacySetting = !project.is_private
-    await updateProject(pool, project.id, { is_private: newPrivacySetting })
+    await updateProject(pool, projectId, { is_private: newPrivacySetting })
 
     // Return updated privacy settings section
     return c.html(html`
@@ -1316,7 +1317,7 @@ trainsUIRoutes.post('/:projectId/toggle-privacy', async c => {
         </h3>
         <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.25rem;">
           <form
-            hx-post="/dashboard/projects/${project.id}/toggle-privacy"
+            hx-post="/dashboard/projects/${projectId}/toggle-privacy"
             hx-swap="outerHTML"
             hx-target="#privacy-settings"
             style="display: flex; align-items: center; justify-content: space-between;"
