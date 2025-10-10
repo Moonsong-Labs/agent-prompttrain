@@ -82,9 +82,11 @@ export class StorageReader {
     // Special logging for privacy debugging
     if (queryName === 'getConversationSummaries') {
       logger.info('[PRIVACY DEBUG] SQL Execution', {
-        queryName,
-        paramCount: params.length,
-        params: params.map((p, i) => `$${i + 1}: ${typeof p === 'string' ? p : String(p)}`),
+        metadata: {
+          queryName,
+          paramCount: params.length,
+          params: params.map((p, i) => `$${i + 1}: ${typeof p === 'string' ? p : String(p)}`),
+        },
       })
     }
 
@@ -702,19 +704,23 @@ export class StorageReader {
 
     // Log the function call parameters
     logger.info('[PRIVACY DEBUG] getConversationSummaries called', {
-      userEmail,
-      projectId,
-      limit,
-      excludeSubtasks,
-      cacheKey,
+      metadata: {
+        userEmail,
+        projectId,
+        limit,
+        excludeSubtasks,
+        cacheKey,
+      },
     })
 
     // CRITICAL DEBUG: Check if user email is being normalized
     logger.info('[PRIVACY DEBUG] Email normalization check', {
-      originalEmail: userEmail,
-      lowercaseEmail: userEmail.toLowerCase(),
-      trimmedEmail: userEmail.trim(),
-      trimmedLowercaseEmail: userEmail.trim().toLowerCase(),
+      metadata: {
+        originalEmail: userEmail,
+        lowercaseEmail: userEmail.toLowerCase(),
+        trimmedEmail: userEmail.trim(),
+        trimmedLowercaseEmail: userEmail.trim().toLowerCase(),
+      },
     })
 
     // Only use cache if TTL > 0
@@ -722,8 +728,10 @@ export class StorageReader {
       const cached = this.cache.get<any[]>(cacheKey)
       if (cached) {
         logger.info('[PRIVACY DEBUG] Returning cached conversations', {
-          count: cached.length,
-          cacheKey,
+          metadata: {
+            count: cached.length,
+            cacheKey,
+          },
         })
         return cached
       }
@@ -740,15 +748,17 @@ export class StorageReader {
           [userEmail]
         )
         logger.info('[PRIVACY DEBUG] User project memberships', {
-          userEmail,
-          membershipCount: membershipCheck.rowCount,
-          memberships: membershipCheck.rows.map(m => ({
-            project_id: m.project_id,
-            string_id: m.string_id,
-            user_email: m.user_email,
-            role: m.role,
-            is_private: m.is_private,
-          })),
+          metadata: {
+            userEmail,
+            membershipCount: membershipCheck.rowCount,
+            memberships: membershipCheck.rows.map(m => ({
+              project_id: m.project_id,
+              string_id: m.string_id,
+              user_email: m.user_email,
+              role: m.role,
+              is_private: m.is_private,
+            })),
+          },
         })
 
         // Also check what private projects exist with conversations
@@ -763,8 +773,10 @@ export class StorageReader {
            LIMIT 10`
         )
         logger.info('[PRIVACY DEBUG] Private projects with conversations', {
-          count: privateProjectsCheck.rowCount,
-          projects: privateProjectsCheck.rows,
+          metadata: {
+            count: privateProjectsCheck.rowCount,
+            projects: privateProjectsCheck.rows,
+          },
         })
       }
 
@@ -898,28 +910,32 @@ export class StorageReader {
 
       // Log the SQL query and parameters for debugging
       logger.info('[PRIVACY DEBUG] Executing conversation query', {
-        hasProjectId: !!projectId,
-        queryType: projectId ? 'WITH_PROJECT' : 'ALL_CONVERSATIONS',
-        parameters: {
-          $1: values[0],
-          $2: values[1],
-          $3: values[2],
+        metadata: {
+          hasProjectId: !!projectId,
+          queryType: projectId ? 'WITH_PROJECT' : 'ALL_CONVERSATIONS',
+          parameters: {
+            $1: values[0],
+            $2: values[1],
+            $3: values[2],
+          },
+          userEmail,
+          sqlPreview: query.substring(0, 500) + '...',
+          fullQuery: process.env.DEBUG === 'true' ? query : undefined,
         },
-        userEmail,
-        sqlPreview: query.substring(0, 500) + '...',
-        fullQuery: process.env.DEBUG === 'true' ? query : undefined,
       })
 
       const rows = await this.executeQuery<any>(query, values, 'getConversationSummaries')
 
       // Log the results
       logger.info('[PRIVACY DEBUG] Query results', {
-        rowCount: rows.length,
-        firstRowProjectId: rows[0]?.project_id,
-        conversations: rows.slice(0, 3).map(r => ({
-          conversation_id: r.conversation_id,
-          project_id: r.project_id,
-        })),
+        metadata: {
+          rowCount: rows.length,
+          firstRowProjectId: rows[0]?.project_id,
+          conversations: rows.slice(0, 3).map(r => ({
+            conversation_id: r.conversation_id,
+            project_id: r.project_id,
+          })),
+        },
       })
 
       // Only cache if TTL > 0
