@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
 import { getErrorMessage, getModelContextLimit, getBatteryColor } from '@agent-prompttrain/shared'
+import { listProjects } from '@agent-prompttrain/shared/database/queries'
 import {
   formatNumber,
   formatDuration,
@@ -9,6 +10,7 @@ import {
   formatRelativeTime,
 } from '../utils/formatters.js'
 import { layout } from '../layout/index.js'
+import { container } from '../container.js'
 
 export const overviewRoutes = new Hono<{
   Variables: {
@@ -50,18 +52,28 @@ overviewRoutes.get('/', async c => {
     // Calculate offset for pagination
     const offset = (currentPage - 1) * itemsPerPage
 
-    // Fetch dashboard stats and the requested page of conversations in parallel
-    const [statsResult, conversationsResult] = await Promise.all([
+    // Get database pool for fetching project privacy info
+    const pool = container.getPool()
+
+    // Fetch dashboard stats, conversations, and projects in parallel
+    const [statsResult, conversationsResult, projects] = await Promise.all([
       apiClient.getDashboardStats({ projectId }),
       apiClient.getConversations({
         projectId,
         limit: itemsPerPage,
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
       }),
+      pool ? listProjects(pool) : Promise.resolve([]),
     ])
 
     const apiConversations = conversationsResult.conversations
     const dashboardStats = statsResult
+
+    // Create a map of project privacy settings
+    const projectPrivacyMap = new Map<string, boolean>()
+    projects.forEach(project => {
+      projectPrivacyMap.set(project.project_id, project.is_private)
+    })
 
     // Create flat list of conversations (simplified for now)
     const conversationBranches: Array<{
@@ -78,6 +90,7 @@ overviewRoutes.get('/', async c => {
       firstMessage: Date
       lastMessage: Date
       projectId: string
+      isPrivate: boolean
       latestRequestId?: string
       latestModel?: string
       latestContextTokens?: number
@@ -103,6 +116,7 @@ overviewRoutes.get('/', async c => {
         firstMessage: new Date(conv.firstMessageTime),
         lastMessage: new Date(conv.lastMessageTime),
         projectId: conv.projectId, // Keep for backward compat
+        isPrivate: projectPrivacyMap.get(conv.projectId) || false,
         latestRequestId: conv.latestRequestId,
         latestModel: conv.latestModel,
         latestContextTokens: conv.latestContextTokens,
@@ -346,7 +360,10 @@ overviewRoutes.get('/', async c => {
                                     : '<span class="text-gray-400">N/A</span>'
                                 }
                               </td>
-                              <td class="text-sm">${escapeHtml(branch.projectId)}</td>
+                              <td class="text-sm">
+                                ${escapeHtml(branch.projectId)}
+                                ${branch.isPrivate ? '<span style="margin-left: 0.25rem;" title="Private project">🔒</span>' : ''}
+                              </td>
                               <td class="text-sm">${branch.messageCount}</td>
                               <td class="text-sm">${formatNumber(branch.tokens)}</td>
                               <td class="text-sm">${

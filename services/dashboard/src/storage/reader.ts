@@ -397,7 +397,9 @@ export class StorageReader {
              MIN(ar.timestamp) as first_message,
              MAX(ar.timestamp) as last_message,
              SUM(ar.total_tokens) as total_tokens,
-             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches,
+             bool_or(p.is_private) as is_private,
+             MAX(ar.project_id) as project_id
            FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
            LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
@@ -413,7 +415,9 @@ export class StorageReader {
              MIN(ar.timestamp) as first_message,
              MAX(ar.timestamp) as last_message,
              SUM(ar.total_tokens) as total_tokens,
-             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches,
+             bool_or(p.is_private) as is_private,
+             MAX(ar.project_id) as project_id
            FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
            LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
@@ -516,6 +520,8 @@ export class StorageReader {
         total_tokens: parseInt(row.total_tokens),
         branches: row.branches || [],
         requests: requestsByConversation[row.conversation_id] || [],
+        is_private: row.is_private || false,
+        project_id: row.project_id,
       }))
 
       // Only cache if TTL > 0
