@@ -157,7 +157,17 @@ trainsUIRoutes.get('/', async c => {
                             ${train.project_id}
                           </a>
                         </td>
-                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">${train.name}</td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                          ${train.name}
+                          ${train.is_private
+                            ? html`<span
+                                style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; padding: 0.125rem 0.5rem; background: #fef3c7; color: #92400e; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;"
+                                title="Private project - only visible to members"
+                              >
+                                🔒 Private
+                              </span>`
+                            : ''}
+                        </td>
                         <td style="padding: 0.75rem 1rem; text-align: center;">
                           <span
                             style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
@@ -267,6 +277,24 @@ trainsUIRoutes.get('/', async c => {
               />
             </div>
 
+            <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 0.25rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  name="is_private"
+                  value="true"
+                  style="width: 1rem; height: 1rem; cursor: pointer;"
+                />
+                <span style="font-size: 0.875rem; font-weight: 600; color: #374151;">
+                  Make this project private
+                </span>
+              </label>
+              <p style="margin: 0.5rem 0 0 1.5rem; font-size: 0.75rem; color: #6b7280;">
+                Private projects are only visible to invited members. You can manage members after
+                creating the project.
+              </p>
+            </div>
+
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 0.5rem;">
               <button
                 type="button"
@@ -374,6 +402,14 @@ trainsUIRoutes.get('/:projectId/view', async c => {
               >
                 ACTIVE
               </span>
+              ${train.is_private
+                ? html`<span
+                    style="background: #fef3c7; color: #92400e; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem;"
+                    title="Private project - only visible to members"
+                  >
+                    🔒 Private
+                  </span>`
+                : ''}
             </h2>
             <p style="color: #6b7280; margin: 0; font-size: 0.875rem;">${train.name}</p>
           </div>
@@ -394,6 +430,12 @@ trainsUIRoutes.get('/:projectId/view', async c => {
             <div>
               <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Name</div>
               <div style="font-size: 0.875rem;">${train.name}</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Privacy</div>
+              <div style="font-size: 0.875rem;">
+                ${train.is_private ? '🔒 Private' : '🌐 Public'}
+              </div>
             </div>
             <div>
               <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Created</div>
@@ -853,7 +895,8 @@ trainsUIRoutes.post('/:projectId/generate-api-key', async c => {
           >
         </div>
         <button
-          onclick="navigator.clipboard.writeText('${generatedKey.api_key}'); this.textContent='✅ Copied!'; setTimeout(() => this.textContent='Copy to Clipboard', 2000)"
+          data-api-key="${generatedKey.api_key}"
+          onclick="navigator.clipboard.writeText(this.getAttribute('data-api-key')); this.textContent='✅ Copied!'; setTimeout(() => this.textContent='Copy to Clipboard', 2000)"
           style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; margin-right: 0.5rem;"
         >
           Copy to Clipboard
@@ -1082,6 +1125,7 @@ trainsUIRoutes.post('/create', async c => {
     const formData = await c.req.parseBody()
     const projectId = formData.project_id as string
     const name = formData.name as string
+    const isPrivate = formData.is_private === 'true'
 
     // Validate train ID format
     if (!/^[a-z0-9-]+$/.test(projectId)) {
@@ -1110,6 +1154,7 @@ trainsUIRoutes.post('/create', async c => {
       const train = await createProject(client as any, {
         project_id: projectId,
         name: name,
+        is_private: isPrivate,
       })
 
       // Add the creator as an owner
