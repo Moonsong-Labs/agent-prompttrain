@@ -14,6 +14,8 @@ import {
   isProjectOwner,
   getProjectStats,
   getProjectWithAccounts,
+  getProjectById,
+  updateProject,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
@@ -157,7 +159,17 @@ trainsUIRoutes.get('/', async c => {
                             ${train.project_id}
                           </a>
                         </td>
-                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">${train.name}</td>
+                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                          ${train.name}
+                          ${train.is_private
+                            ? html`<span
+                                style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; padding: 0.125rem 0.5rem; background: #fef3c7; color: #92400e; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;"
+                                title="Private project - only visible to members"
+                              >
+                                🔒 Private
+                              </span>`
+                            : ''}
+                        </td>
                         <td style="padding: 0.75rem 1rem; text-align: center;">
                           <span
                             style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
@@ -267,6 +279,24 @@ trainsUIRoutes.get('/', async c => {
               />
             </div>
 
+            <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 0.25rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  name="is_private"
+                  value="true"
+                  style="width: 1rem; height: 1rem; cursor: pointer;"
+                />
+                <span style="font-size: 0.875rem; font-weight: 600; color: #374151;">
+                  Make this project private
+                </span>
+              </label>
+              <p style="margin: 0.5rem 0 0 1.5rem; font-size: 0.75rem; color: #6b7280;">
+                Private projects are only visible to invited members. You can manage members after
+                creating the project.
+              </p>
+            </div>
+
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 0.5rem;">
               <button
                 type="button"
@@ -374,6 +404,14 @@ trainsUIRoutes.get('/:projectId/view', async c => {
               >
                 ACTIVE
               </span>
+              ${train.is_private
+                ? html`<span
+                    style="background: #fef3c7; color: #92400e; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem;"
+                    title="Private project - only visible to members"
+                  >
+                    🔒 Private
+                  </span>`
+                : ''}
             </h2>
             <p style="color: #6b7280; margin: 0; font-size: 0.875rem;">${train.name}</p>
           </div>
@@ -396,11 +434,74 @@ trainsUIRoutes.get('/:projectId/view', async c => {
               <div style="font-size: 0.875rem;">${train.name}</div>
             </div>
             <div>
+              <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Privacy</div>
+              <div style="font-size: 0.875rem;">
+                ${train.is_private ? '🔒 Private' : '🌐 Public'}
+              </div>
+            </div>
+            <div>
               <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600;">Created</div>
               <div style="font-size: 0.875rem;">${new Date(train.created_at).toLocaleString()}</div>
             </div>
           </div>
         </div>
+
+        <!-- Privacy Settings Section (Owner Only) -->
+        ${isOwner
+          ? html`
+              <div
+                style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+                id="privacy-settings"
+              >
+                <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
+                  Privacy Settings
+                </h3>
+                <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.25rem;">
+                  <form
+                    hx-post="/dashboard/projects/${train.id}/toggle-privacy"
+                    hx-swap="outerHTML"
+                    hx-target="#privacy-settings"
+                    style="display: flex; align-items: center; justify-content: space-between;"
+                  >
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">
+                        Project Privacy: ${train.is_private ? '🔒 Private' : '🌐 Public'}
+                      </div>
+                      <div style="font-size: 0.75rem; color: #6b7280;">
+                        ${train.is_private
+                          ? 'Only project members can view conversations and requests from this project.'
+                          : 'All authenticated users can view conversations and requests from this project.'}
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      style="background: ${train.is_private
+                        ? '#10b981'
+                        : '#f59e0b'}; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                      onclick="return confirm('Are you sure you want to make this project ${train.is_private
+                        ? 'public'
+                        : 'private'}? This will affect who can see conversations and requests.');"
+                    >
+                      Make ${train.is_private ? 'Public' : 'Private'}
+                    </button>
+                  </form>
+                </div>
+                ${train.is_private
+                  ? html`
+                      <div
+                        style="background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem; margin-top: 0.75rem;"
+                      >
+                        <p style="margin: 0; color: #92400e; font-size: 0.75rem;">
+                          <strong>⚠️ Note:</strong> While this project is private, only members
+                          listed below can view its conversations and requests. The project name and
+                          member list remain visible to all authenticated users.
+                        </p>
+                      </div>
+                    `
+                  : ''}
+              </div>
+            `
+          : ''}
 
         <!-- Default Account Section -->
         <div
@@ -853,7 +954,8 @@ trainsUIRoutes.post('/:projectId/generate-api-key', async c => {
           >
         </div>
         <button
-          onclick="navigator.clipboard.writeText('${generatedKey.api_key}'); this.textContent='✅ Copied!'; setTimeout(() => this.textContent='Copy to Clipboard', 2000)"
+          data-api-key="${generatedKey.api_key}"
+          onclick="navigator.clipboard.writeText(this.getAttribute('data-api-key')); this.textContent='✅ Copied!'; setTimeout(() => this.textContent='Copy to Clipboard', 2000)"
           style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; margin-right: 0.5rem;"
         >
           Copy to Clipboard
@@ -1082,6 +1184,7 @@ trainsUIRoutes.post('/create', async c => {
     const formData = await c.req.parseBody()
     const projectId = formData.project_id as string
     const name = formData.name as string
+    const isPrivate = formData.is_private === 'true'
 
     // Validate train ID format
     if (!/^[a-z0-9-]+$/.test(projectId)) {
@@ -1110,6 +1213,7 @@ trainsUIRoutes.post('/create', async c => {
       const train = await createProject(client as any, {
         project_id: projectId,
         name: name,
+        is_private: isPrivate,
       })
 
       // Add the creator as an owner
@@ -1149,5 +1253,124 @@ trainsUIRoutes.post('/create', async c => {
     `)
   } finally {
     client.release()
+  }
+})
+
+/**
+ * Toggle project privacy (HTMX form submission - owner only)
+ */
+trainsUIRoutes.post('/:projectId/toggle-privacy', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  // Check authentication
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  try {
+    // Check ownership
+    const isOwner = await isProjectOwner(pool, projectId, auth.principal)
+    if (!isOwner) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only project owners can change privacy settings
+        </div>
+      `)
+    }
+
+    // Get current project state using the numeric ID
+    const project = await getProjectById(pool, projectId)
+    if (!project) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Project not found
+        </div>
+      `)
+    }
+
+    // Toggle privacy
+    const newPrivacySetting = !project.is_private
+    await updateProject(pool, projectId, { is_private: newPrivacySetting })
+
+    // Return updated privacy settings section
+    return c.html(html`
+      <div
+        style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+        id="privacy-settings"
+      >
+        <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
+          Privacy Settings
+        </h3>
+        <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.25rem;">
+          <form
+            hx-post="/dashboard/projects/${projectId}/toggle-privacy"
+            hx-swap="outerHTML"
+            hx-target="#privacy-settings"
+            style="display: flex; align-items: center; justify-content: space-between;"
+          >
+            <div>
+              <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">
+                Project Privacy: ${newPrivacySetting ? '🔒 Private' : '🌐 Public'}
+              </div>
+              <div style="font-size: 0.75rem; color: #6b7280;">
+                ${newPrivacySetting
+                  ? 'Only project members can view conversations and requests from this project.'
+                  : 'All authenticated users can view conversations and requests from this project.'}
+              </div>
+            </div>
+            <button
+              type="submit"
+              style="background: ${newPrivacySetting
+                ? '#10b981'
+                : '#f59e0b'}; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+              onclick="return confirm('Are you sure you want to make this project ${newPrivacySetting
+                ? 'public'
+                : 'private'}? This will affect who can see conversations and requests.');"
+            >
+              Make ${newPrivacySetting ? 'Public' : 'Private'}
+            </button>
+          </form>
+        </div>
+        ${newPrivacySetting
+          ? html`
+              <div
+                style="background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem; margin-top: 0.75rem;"
+              >
+                <p style="margin: 0; color: #92400e; font-size: 0.75rem;">
+                  <strong>⚠️ Note:</strong> While this project is private, only members listed below
+                  can view its conversations and requests. The project name and member list remain
+                  visible to all authenticated users.
+                </p>
+              </div>
+            `
+          : ''}
+        <div
+          style="background: #d1fae5; color: #065f46; padding: 0.75rem; border-radius: 0.25rem; margin-top: 0.75rem;"
+        >
+          <strong>✅ Success!</strong> Project privacy has been updated to
+          ${newPrivacySetting ? 'Private' : 'Public'}.
+        </div>
+      </div>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
   }
 })

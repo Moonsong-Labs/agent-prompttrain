@@ -79,6 +79,17 @@ export class StorageReader {
   private async executeQuery<T>(query: string, params: any[], queryName: string): Promise<T[]> {
     const startTime = Date.now()
 
+    // Special logging for privacy debugging
+    if (queryName === 'getConversationSummaries') {
+      logger.info('[PRIVACY DEBUG] SQL Execution', {
+        metadata: {
+          queryName,
+          paramCount: params.length,
+          params: params.map((p, i) => `$${i + 1}: ${typeof p === 'string' ? p : String(p)}`),
+        },
+      })
+    }
+
     try {
       const result = await this.pool.query(query, params)
       const duration = Date.now() - startTime
@@ -133,14 +144,14 @@ export class StorageReader {
       const query = projectId
         ? `SELECT ar.* FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
-           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($3)
            WHERE ar.project_id = $1
            AND (p.is_private = false OR pm.user_email IS NOT NULL)
            ORDER BY ar.timestamp DESC
            LIMIT $2`
         : `SELECT ar.* FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
-           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($2)
            WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
            ORDER BY ar.timestamp DESC
            LIMIT $1`
@@ -397,10 +408,12 @@ export class StorageReader {
              MIN(ar.timestamp) as first_message,
              MAX(ar.timestamp) as last_message,
              SUM(ar.total_tokens) as total_tokens,
-             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches,
+             bool_or(p.is_private) as is_private,
+             MAX(ar.project_id) as project_id
            FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
-           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($3)
            WHERE ar.project_id = $1 AND ar.conversation_id IS NOT NULL
            AND (p.is_private = false OR pm.user_email IS NOT NULL)
            GROUP BY ar.conversation_id
@@ -413,10 +426,12 @@ export class StorageReader {
              MIN(ar.timestamp) as first_message,
              MAX(ar.timestamp) as last_message,
              SUM(ar.total_tokens) as total_tokens,
-             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches
+             array_agg(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id IS NOT NULL) as branches,
+             bool_or(p.is_private) as is_private,
+             MAX(ar.project_id) as project_id
            FROM api_requests ar
            JOIN projects p ON ar.project_id = p.project_id
-           LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+           LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($2)
            WHERE ar.conversation_id IS NOT NULL
            AND (p.is_private = false OR pm.user_email IS NOT NULL)
            GROUP BY ar.conversation_id
@@ -516,6 +531,8 @@ export class StorageReader {
         total_tokens: parseInt(row.total_tokens),
         branches: row.branches || [],
         requests: requestsByConversation[row.conversation_id] || [],
+        is_private: row.is_private || false,
+        project_id: row.project_id,
       }))
 
       // Only cache if TTL > 0
@@ -685,22 +702,91 @@ export class StorageReader {
     const cacheKey = `conversation-summaries:${projectId || 'all'}:${userEmail}:${limit}:${excludeSubtasks}`
     const cacheTTL = parseInt(process.env.DASHBOARD_CACHE_TTL || '30')
 
+    // Log the function call parameters
+    logger.info('[PRIVACY DEBUG] getConversationSummaries called', {
+      metadata: {
+        userEmail,
+        projectId,
+        limit,
+        excludeSubtasks,
+        cacheKey,
+      },
+    })
+
+    // CRITICAL DEBUG: Check if user email is being normalized
+    logger.info('[PRIVACY DEBUG] Email normalization check', {
+      metadata: {
+        originalEmail: userEmail,
+        lowercaseEmail: userEmail.toLowerCase(),
+        trimmedEmail: userEmail.trim(),
+        trimmedLowercaseEmail: userEmail.trim().toLowerCase(),
+      },
+    })
+
     // Only use cache if TTL > 0
     if (cacheTTL > 0) {
       const cached = this.cache.get<any[]>(cacheKey)
       if (cached) {
+        logger.info('[PRIVACY DEBUG] Returning cached conversations', {
+          metadata: {
+            count: cached.length,
+            cacheKey,
+          },
+        })
         return cached
       }
     }
 
     try {
+      // DEBUG: Check project membership for debugging
+      if (!projectId && userEmail) {
+        const membershipCheck = await this.pool.query(
+          `SELECT pm.*, p.project_id as string_id, p.is_private
+           FROM project_members pm
+           JOIN projects p ON pm.project_id = p.id
+           WHERE LOWER(pm.user_email) = LOWER($1)`,
+          [userEmail]
+        )
+        logger.info('[PRIVACY DEBUG] User project memberships', {
+          metadata: {
+            userEmail,
+            membershipCount: membershipCheck.rowCount,
+            memberships: membershipCheck.rows.map(m => ({
+              project_id: m.project_id,
+              string_id: m.string_id,
+              user_email: m.user_email,
+              role: m.role,
+              is_private: m.is_private,
+            })),
+          },
+        })
+
+        // Also check what private projects exist with conversations
+        const privateProjectsCheck = await this.pool.query(
+          `SELECT DISTINCT p.project_id, p.is_private,
+           COUNT(DISTINCT ar.conversation_id) as conversation_count,
+           ARRAY_AGG(DISTINCT LEFT(ar.conversation_id::text, 8)) as sample_conversations
+           FROM projects p
+           INNER JOIN api_requests ar ON ar.project_id = p.project_id
+           WHERE p.is_private = true AND ar.conversation_id IS NOT NULL
+           GROUP BY p.project_id, p.is_private
+           LIMIT 10`
+        )
+        logger.info('[PRIVACY DEBUG] Private projects with conversations', {
+          metadata: {
+            count: privateProjectsCheck.rowCount,
+            projects: privateProjectsCheck.rows,
+          },
+        })
+      }
+
       // Get conversation summaries with branch information
       const query = projectId
         ? `WITH filtered_requests AS (
              SELECT ar.*
              FROM api_requests ar
              JOIN projects p ON ar.project_id = p.project_id
-             LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $3
+             LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($3)
              WHERE ar.project_id = $1
              AND (p.is_private = false OR pm.user_email IS NOT NULL)
            ),
@@ -714,7 +800,8 @@ export class StorageReader {
                SUM(total_tokens) as total_tokens,
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
-               bool_or(is_subtask) as has_subtasks
+               bool_or(is_subtask) as has_subtasks,
+               MAX(project_id) as project_id
              FROM filtered_requests
              WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
@@ -761,7 +848,7 @@ export class StorageReader {
              SELECT ar.*
              FROM api_requests ar
              JOIN projects p ON ar.project_id = p.project_id
-             LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_email = $2
+             LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($2)
              WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
            ),
            conversation_summary AS (
@@ -774,7 +861,8 @@ export class StorageReader {
                SUM(total_tokens) as total_tokens,
                COUNT(DISTINCT branch_id) as branch_count,
                array_agg(DISTINCT model) as models_used,
-               bool_or(is_subtask) as has_subtasks
+               bool_or(is_subtask) as has_subtasks,
+               MAX(project_id) as project_id
              FROM filtered_requests
               WHERE conversation_id IS NOT NULL ${excludeSubtasks ? 'AND (is_subtask IS NULL OR is_subtask = false)' : ''}
              GROUP BY conversation_id
@@ -819,7 +907,36 @@ export class StorageReader {
          LIMIT $1`
 
       const values = projectId ? [projectId, limit, userEmail] : [limit, userEmail]
+
+      // Log the SQL query and parameters for debugging
+      logger.info('[PRIVACY DEBUG] Executing conversation query', {
+        metadata: {
+          hasProjectId: !!projectId,
+          queryType: projectId ? 'WITH_PROJECT' : 'ALL_CONVERSATIONS',
+          parameters: {
+            $1: values[0],
+            $2: values[1],
+            $3: values[2],
+          },
+          userEmail,
+          sqlPreview: query.substring(0, 500) + '...',
+          fullQuery: process.env.DEBUG === 'true' ? query : undefined,
+        },
+      })
+
       const rows = await this.executeQuery<any>(query, values, 'getConversationSummaries')
+
+      // Log the results
+      logger.info('[PRIVACY DEBUG] Query results', {
+        metadata: {
+          rowCount: rows.length,
+          firstRowProjectId: rows[0]?.project_id,
+          conversations: rows.slice(0, 3).map(r => ({
+            conversation_id: r.conversation_id,
+            project_id: r.project_id,
+          })),
+        },
+      })
 
       // Only cache if TTL > 0
       if (cacheTTL > 0) {

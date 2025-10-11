@@ -126,6 +126,7 @@ interface ConversationSummary {
   parentTaskRequestId?: string
   parentConversationId?: string
   subtaskMessageCount?: number
+  isPrivate?: boolean
 }
 
 /**
