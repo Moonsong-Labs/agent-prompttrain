@@ -335,7 +335,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
         </div>
       `
 
-      return c.html(layout('Token Usage Overview', content))
+      return c.html(layout('Token Usage Overview', content, '', c))
     } catch (error) {
       console.error('Failed to fetch accounts data:', getErrorMessage(error))
       return c.html(
@@ -348,7 +348,9 @@ tokenUsageRoutes.get('/token-usage', async c => {
             <div class="mb-6">
               <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
             </div>
-          `
+          `,
+          '',
+          c
         )
       )
     }
@@ -1092,7 +1094,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
       </div>
     `
 
-    return c.html(layout('Token Usage', content))
+    return c.html(layout('Token Usage', content, '', c))
   } catch (error) {
     return c.html(
       layout(
@@ -1104,7 +1106,9 @@ tokenUsageRoutes.get('/token-usage', async c => {
           <div class="mb-6">
             <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
           </div>
-        `
+        `,
+        '',
+        c
       )
     )
   }

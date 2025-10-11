@@ -142,7 +142,7 @@ requestUsageRoutes.get('/usage', async c => {
             onchange="window.location.href = '/dashboard/usage' + (this.value ? '?projectId=' + encodeURIComponent(this.value) : '')"
           >
             <option value="" ${!selectedTrainId ? 'selected' : ''}>
-              All Project IDs (${formatNumber(trainIds.reduce((sum, d) => sum + d.requestCount, 0))}
+              All Projects (${formatNumber(trainIds.reduce((sum, d) => sum + d.requestCount, 0))}
               requests)
             </option>
             ${trainIds.length > 0
@@ -170,7 +170,7 @@ requestUsageRoutes.get('/usage', async c => {
           Hourly Request Count - Last 7 Days
           ${displayTrainId
             ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
-            : html`<span class="text-sm text-gray-500">(All Project IDs)</span>`}
+            : html`<span class="text-sm text-gray-500">(All Projects)</span>`}
         </div>
         <div class="section-content">
           ${(displayTrainId && Array.isArray(chartData) && chartData.length > 0) ||
@@ -594,7 +594,7 @@ requestUsageRoutes.get('/usage', async c => {
           Hourly Output Token Usage - Last 7 Days
           ${displayTrainId
             ? html`<span class="text-sm text-gray-500">(${displayTrainId})</span>`
-            : html`<span class="text-sm text-gray-500">(All Project IDs)</span>`}
+            : html`<span class="text-sm text-gray-500">(All Projects)</span>`}
         </div>
         <div class="section-content">
           ${(displayTrainId && Array.isArray(tokenChartData) && tokenChartData.length > 0) ||
@@ -907,7 +907,7 @@ requestUsageRoutes.get('/usage', async c => {
       </div>
     `
 
-    return c.html(layout('Project Usage', content))
+    return c.html(layout('Project Usage', content, '', c))
   } catch (error) {
     logger.error('Failed to load request usage page', { error: getErrorMessage(error) })
     return c.html(

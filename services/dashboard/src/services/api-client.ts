@@ -141,9 +141,10 @@ export class ProxyApiClient {
     this.apiKey = apiKey || process.env.DASHBOARD_API_KEY || process.env.INTERNAL_API_KEY
   }
 
-  private getHeaders(): Record<string, string> {
+  private getHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...extraHeaders,
     }
 
     if (this.apiKey) {
@@ -654,6 +655,7 @@ export class ProxyApiClient {
     offset?: number
     dateFrom?: string
     dateTo?: string
+    userEmail?: string // Add userEmail for privacy filtering
   }): Promise<{
     conversations: ConversationSummary[]
     pagination?: {
@@ -686,8 +688,14 @@ export class ProxyApiClient {
         url.searchParams.set('dateTo', params.dateTo)
       }
 
+      const headers: Record<string, string> = {}
+      // Pass the authenticated user email in the header for privacy filtering
+      if (params?.userEmail) {
+        headers['X-Auth-Principal'] = params.userEmail
+      }
+
       const response = await fetch(url.toString(), {
-        headers: this.getHeaders(),
+        headers: this.getHeaders(headers),
       })
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)

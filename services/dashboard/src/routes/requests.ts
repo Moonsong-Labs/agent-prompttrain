@@ -97,7 +97,7 @@ requestsRoutes.get('/requests', async c => {
         onchange="window.location.href = '/dashboard/requests' + (this.value ? '?projectId=' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
-        <option value="">All Project IDs</option>
+        <option value="">All Projects</option>
         ${raw(
           trainIds
             .map(
@@ -185,5 +185,5 @@ requestsRoutes.get('/requests', async c => {
     </div>
   `
 
-  return c.html(layout('Requests', content))
+  return c.html(layout('Requests', content, '', c))
 })

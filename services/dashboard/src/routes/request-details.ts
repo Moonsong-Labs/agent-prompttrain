@@ -10,6 +10,10 @@ import { renderSparkRecommendationInline } from '../components/spark-recommendat
 export const requestDetailsRoutes = new Hono<{
   Variables: {
     projectId?: string
+    auth?: {
+      principal: string
+      dashboardKey: string
+    }
   }
 }>()
 
@@ -18,6 +22,7 @@ export const requestDetailsRoutes = new Hono<{
  */
 requestDetailsRoutes.get('/request/:id', async c => {
   const requestId = c.req.param('id')
+  const auth = c.get('auth')
 
   // Use storage service directly instead of API client
   const { container } = await import('../container.js')
@@ -30,9 +35,35 @@ requestDetailsRoutes.get('/request/:id', async c => {
       return c.html(
         layout(
           'Error',
-          html` <div class="error-banner"><strong>Error:</strong> Request not found.</div> `
+          html` <div class="error-banner"><strong>Error:</strong> Request not found.</div> `,
+          '',
+          c
         )
       )
+    }
+
+    // Check if user has access to this request's project
+    if (auth?.principal) {
+      const hasAccess = await storageService.checkUserProjectAccess(
+        auth.principal,
+        requestDetails.request.projectId
+      )
+
+      if (!hasAccess) {
+        return c.html(
+          layout(
+            'Error',
+            html`
+              <div class="error-banner">
+                <strong>Error:</strong> Access denied. You don't have permission to view this
+                request.
+              </div>
+            `,
+            '',
+            c
+          )
+        )
+      }
     }
 
     // Map from storage format to API format
@@ -1224,7 +1255,7 @@ requestDetailsRoutes.get('/request/:id', async c => {
       </script>
     `
 
-    return c.html(layout('Request Details', content))
+    return c.html(layout('Request Details', content, '', c))
   } catch (error) {
     return c.html(
       layout(
@@ -1236,7 +1267,9 @@ requestDetailsRoutes.get('/request/:id', async c => {
           <div class="mb-6">
             <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
           </div>
-        `
+        `,
+        '',
+        c
       )
     )
   }
