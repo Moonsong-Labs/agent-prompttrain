@@ -1109,6 +1109,39 @@ export class StorageReader {
   }
 
   /**
+   * Check if user has access to a specific project
+   */
+  async checkUserProjectAccess(userEmail: string, projectId: string): Promise<boolean> {
+    try {
+      const query = `
+        SELECT 1
+        FROM projects p
+        LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($1)
+        WHERE p.project_id = $2
+          AND (p.is_private = false OR pm.user_email IS NOT NULL)
+        LIMIT 1
+      `
+
+      const result = await this.executeQuery<{ exists: number }>(
+        query,
+        [userEmail, projectId],
+        'checkUserProjectAccess'
+      )
+
+      return result.length > 0
+    } catch (error) {
+      logger.error('Failed to check user project access', {
+        metadata: {
+          userEmail,
+          projectId,
+          error: getErrorMessage(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  /**
    * Clear cache
    */
   clearCache(): void {

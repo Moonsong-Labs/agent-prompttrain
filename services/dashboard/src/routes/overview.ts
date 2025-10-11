@@ -16,6 +16,7 @@ export const overviewRoutes = new Hono<{
   Variables: {
     apiClient?: ProxyApiClient
     projectId?: string
+    auth?: { isAuthenticated: boolean; principal: string; method: string }
   }
 }>()
 
@@ -32,8 +33,9 @@ overviewRoutes.get('/', async c => {
   const currentPage = Math.max(1, page)
   const itemsPerPage = Math.min(Math.max(10, perPage), 100) // Between 10 and 100
 
-  // Get API client from context
+  // Get API client and auth context
   const apiClient = c.get('apiClient')
+  const auth = c.get('auth')
 
   if (!apiClient) {
     return c.html(
@@ -62,6 +64,7 @@ overviewRoutes.get('/', async c => {
         projectId,
         limit: itemsPerPage,
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
+        userEmail: auth?.principal, // Pass the authenticated user for privacy filtering
       }),
       pool ? listProjects(pool) : Promise.resolve([]),
     ])
@@ -215,7 +218,7 @@ overviewRoutes.get('/', async c => {
             : ''}'"
           style="margin-left: 0.5rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;"
         >
-          <option value="">All Project IDs</option>
+          <option value="">All Projects</option>
           ${raw(
             uniqueTrainIds
               .map(
@@ -500,7 +503,7 @@ overviewRoutes.get('/', async c => {
       </div>
     `
 
-    return c.html(layout('Dashboard', content))
+    return c.html(layout('Dashboard', content, '', c))
   } catch (error) {
     return c.html(
       layout(
@@ -509,7 +512,9 @@ overviewRoutes.get('/', async c => {
           <div class="error-banner">
             <strong>Error:</strong> ${getErrorMessage(error) || 'Failed to load conversations'}
           </div>
-        `
+        `,
+        '',
+        c
       )
     )
   }

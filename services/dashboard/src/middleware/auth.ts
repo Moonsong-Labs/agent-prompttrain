@@ -100,12 +100,17 @@ export const dashboardAuth: MiddlewareHandler<{ Variables: { auth: AuthContext }
   }
 
   // OAuth2-proxy mode: extract user email from forwarded headers
-  const forwardedIdentity = ssoHeaderNames
-    .map(headerName => c.req.header(headerName))
-    .find((value): value is string => Boolean(value))
+  const headerValues = ssoHeaderNames.map(headerName => ({
+    name: headerName,
+    value: c.req.header(headerName),
+  }))
+
+  const forwardedIdentity = headerValues.find((h): h is { name: string; value: string } =>
+    Boolean(h.value)
+  )
 
   if (forwardedIdentity) {
-    const normalizedIdentity = forwardedIdentity.trim()
+    const normalizedIdentity = forwardedIdentity.value.trim()
 
     // If allow list is configured, enforce it for email-style principals
     if (allowedDomains.length > 0 && normalizedIdentity.includes('@')) {

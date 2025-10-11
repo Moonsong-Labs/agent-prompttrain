@@ -208,9 +208,28 @@ export const layout = (
               <a href="/dashboard/prompts" class="text-sm text-blue-600">Prompts</a>
               <a href="/dashboard/credentials" class="text-sm text-blue-600">Credentials</a>
               <a href="/dashboard/projects" class="text-sm text-blue-600">Projects</a>
-              <span class="text-sm text-gray-600" id="current-project">All Project IDs</span>
-              ${auth.isAuthenticated && auth.principal
-                ? html`<span class="text-sm text-gray-600">${auth.principal}</span>`
+              ${auth.principal
+                ? html`<span
+                    class="text-sm text-gray-600"
+                    style="font-weight: 500; margin-left: 1rem; border-left: 1px solid #e5e7eb; padding-left: 1rem;"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      style="display: inline; vertical-align: -2px; margin-right: 4px;"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    ${auth.principal}
+                  </span>`
                 : ''}
               <a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>
               <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">

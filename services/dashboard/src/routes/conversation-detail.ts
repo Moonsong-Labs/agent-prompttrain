@@ -19,6 +19,10 @@ import type { ConversationRequest } from '../types/conversation.js'
 export const conversationDetailRoutes = new Hono<{
   Variables: {
     csrfToken?: string
+    auth?: {
+      principal: string
+      dashboardKey: string
+    }
   }
 }>()
 
@@ -32,6 +36,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
   const conversationId = c.req.param('id')
   const selectedBranch = c.req.query('branch')
   const view = c.req.query('view') || 'tree' // Default to tree view
+  const auth = c.get('auth')
 
   // Get storage service from container
   const { container } = await import('../container.js')
@@ -45,6 +50,21 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
       return c.html(html`
         <div class="error-banner"><strong>Error:</strong> Conversation not found</div>
       `)
+    }
+
+    // Check if user has access to this conversation's project
+    if (auth?.principal && conversation.requests.length > 0) {
+      const projectId = conversation.requests[0].projectId
+      const hasAccess = await storageService.checkUserProjectAccess(auth.principal, projectId)
+
+      if (!hasAccess) {
+        return c.html(html`
+          <div class="error-banner">
+            <strong>Error:</strong> Access denied. You don't have permission to view this
+            conversation.
+          </div>
+        `)
+      }
     }
 
     // Fetch sub-tasks for requests that have task invocations
@@ -1109,6 +1129,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
 conversationDetailRoutes.get('/conversation/:id/messages', async c => {
   const conversationId = c.req.param('id')
   const selectedBranch = c.req.query('branch')
+  const auth = c.get('auth')
 
   // Get storage service from container
   const { container } = await import('../container.js')
@@ -1119,6 +1140,18 @@ conversationDetailRoutes.get('/conversation/:id/messages', async c => {
 
     if (!conversation) {
       return c.html(html`<div class="error-banner">Conversation not found</div>`)
+    }
+
+    // Check if user has access to this conversation's project
+    if (auth?.principal && conversation.requests.length > 0) {
+      const projectId = conversation.requests[0].projectId
+      const hasAccess = await storageService.checkUserProjectAccess(auth.principal, projectId)
+
+      if (!hasAccess) {
+        return c.html(html`
+          <div class="error-banner"><strong>Error:</strong> Access denied.</div>
+        `)
+      }
     }
 
     let filteredRequests = conversation.requests

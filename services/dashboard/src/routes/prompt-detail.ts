@@ -285,7 +285,7 @@ promptDetailRoute.get('/:id', async c => {
       </style>
     `
 
-    return c.html(layout(`${prompt.name} - MCP Prompt`, content))
+    return c.html(layout(`${prompt.name} - MCP Prompt`, content, '', c))
   } catch (error) {
     console.error('Error loading prompt detail:', error)
     return c.html(
@@ -297,7 +297,9 @@ promptDetailRoute.get('/:id', async c => {
             <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
             <a href="/dashboard/prompts" class="btn btn-primary">Back to Prompts</a>
           </div>
-        `
+        `,
+        '',
+        c
       )
     )
   }
