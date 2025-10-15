@@ -188,6 +188,26 @@ export async function revokeTrainApiKey(
 }
 
 /**
+ * Update an API key name
+ */
+export async function updateTrainApiKeyName(
+  pool: Pool,
+  keyId: string,
+  name: string | null
+): Promise<boolean> {
+  const result = await pool.query(
+    `
+    UPDATE project_api_keys
+    SET name = $2
+    WHERE id = $1 AND revoked_at IS NULL
+    `,
+    [keyId, name]
+  )
+
+  return (result.rowCount ?? 0) > 0
+}
+
+/**
  * Delete an API key
  */
 export async function deleteTrainApiKey(pool: Pool, keyId: string): Promise<boolean> {
