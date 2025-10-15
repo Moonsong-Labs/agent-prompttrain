@@ -93,6 +93,7 @@
     "@playwright/test": "^1.54.2",
     "@types/glob": "^9.0.0",
     "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.7.2",
     "@types/pg": "^8.11.10",
     "bun-types": "latest",
     "concurrently": "^8.2.2",
