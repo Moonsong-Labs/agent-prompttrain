@@ -124,6 +124,10 @@ export interface CreateApiKeyRequest {
   created_by?: string
 }
 
+export interface UpdateApiKeyRequest {
+  name?: string | null
+}
+
 export interface GeneratedApiKey {
   id: string
   api_key: string // Full key, shown only once

@@ -93,6 +93,7 @@
     "@playwright/test": "^1.54.2",
     "@types/glob": "^9.0.0",
     "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.7.2",
     "@types/pg": "^8.11.10",
     "bun-types": "latest",
     "concurrently": "^8.2.2",
@@ -105,10 +106,12 @@
     "typescript-eslint": "^8.18.0"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.7",
     "@octokit/rest": "^22.0.0",
     "dotenv": "^16.4.7",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.8",
+    "hono": "^4.6.13",
     "js-yaml": "^4.1.0",
     "pg": "^8.16.3"
   }
