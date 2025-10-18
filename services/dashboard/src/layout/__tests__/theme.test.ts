@@ -40,7 +40,7 @@ describe('Theme Management', () => {
 
     // Mock global objects
     global.localStorage = localStorageMock
-    global.document = mockDocument
+    global.document = mockDocument as any
   })
 
   it('should default to light theme when no preference is stored', () => {
