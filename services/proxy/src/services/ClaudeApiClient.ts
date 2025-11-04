@@ -55,6 +55,22 @@ export class ClaudeApiClient {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.config.timeout)
 
+    // Log outbound request details (excluding body for privacy)
+    logger.info('Outbound request to Anthropic API', {
+      requestId: request.requestId,
+      metadata: {
+        url,
+        method: 'POST',
+        headers: {
+          ...headers,
+          // Mask sensitive token values but show structure
+          Authorization: headers.Authorization
+            ? `${headers.Authorization.split(' ')[0]} ${headers.Authorization.split(' ')[1]?.substring(0, 20)}...`
+            : undefined,
+        },
+      },
+    })
+
     try {
       const response = await fetch(url, {
         method: 'POST',
