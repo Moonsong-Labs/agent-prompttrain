@@ -10,15 +10,24 @@ import type {
 import { toSafeCredential } from './credential-queries-internal'
 
 /**
- * Create a new project with a randomly selected default account
+ * Create a new project
+ * - If default_account_id is explicitly provided, use it
+ * - If default_account_id is null, project will use user passthrough mode
+ * - If default_account_id is undefined, randomly select an account
  */
 export async function createProject(pool: Pool, request: CreateProjectRequest): Promise<Project> {
-  // Get a random credential to use as default
-  const credentialResult = await pool.query<{ id: string }>(
-    'SELECT id FROM anthropic_credentials ORDER BY RANDOM() LIMIT 1'
-  )
+  let defaultAccountId: string | null = null
 
-  const defaultAccountId = credentialResult.rows[0]?.id || null
+  if (request.default_account_id === undefined) {
+    // Undefined = auto-assign random account (backward compatibility)
+    const credentialResult = await pool.query<{ id: string }>(
+      'SELECT id FROM anthropic_credentials ORDER BY RANDOM() LIMIT 1'
+    )
+    defaultAccountId = credentialResult.rows[0]?.id || null
+  } else {
+    // Explicit value (including null) = use as-is
+    defaultAccountId = request.default_account_id
+  }
 
   const result = await pool.query<Project>(
     `
@@ -142,6 +151,10 @@ export async function updateProject(
   if (request.name !== undefined) {
     updates.push(`name = $${paramIndex++}`)
     values.push(request.name)
+  }
+  if (request.default_account_id !== undefined) {
+    updates.push(`default_account_id = $${paramIndex++}`)
+    values.push(request.default_account_id)
   }
   if (request.slack_enabled !== undefined) {
     updates.push(`slack_enabled = $${paramIndex++}`)

@@ -54,11 +54,34 @@ export class AuthenticationService {
     const credentials = await getProjectCredentials(this.pool, projectId)
 
     if (!credentials.length) {
-      throw new AuthenticationError('No default account configured for this project', {
-        requestId: context.requestId,
-        projectId,
-        hint: 'Set a default account for this project via the dashboard',
-      })
+      // Priority 3: User passthrough mode (when no default account configured)
+      if (context.apiKey?.startsWith('Bearer ')) {
+        logger.info('Using user passthrough authentication (no default account)', {
+          requestId: context.requestId,
+          projectId,
+        })
+
+        return {
+          type: 'oauth',
+          headers: {
+            Authorization: context.apiKey,
+            'anthropic-beta': OAUTH_BETA_HEADER,
+          },
+          key: context.apiKey.replace('Bearer ', ''),
+          betaHeader: OAUTH_BETA_HEADER,
+          accountId: 'user-passthrough',
+          accountName: 'User Account',
+        }
+      }
+
+      throw new AuthenticationError(
+        'No default account configured for this project and no user credentials provided',
+        {
+          requestId: context.requestId,
+          projectId,
+          hint: 'Either set a default account for this project via the dashboard, or provide your Anthropic credentials via Authorization header',
+        }
+      )
     }
 
     return this.buildAuthResult(credentials[0], context)

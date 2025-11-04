@@ -101,6 +101,7 @@ export interface UpdateCredentialTokensRequest {
 export interface CreateProjectRequest {
   project_id: string
   name: string
+  default_account_id?: string | null // null = user passthrough mode
   slack_enabled?: boolean
   slack_webhook_url?: string
   slack_channel?: string
@@ -111,6 +112,7 @@ export interface CreateProjectRequest {
 
 export interface UpdateProjectRequest {
   name?: string
+  default_account_id?: string | null // null = user passthrough mode
   slack_enabled?: boolean
   slack_webhook_url?: string
   slack_channel?: string

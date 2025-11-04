@@ -47,7 +47,12 @@ trainsUIRoutes.get('/', async c => {
   }
 
   try {
-    const projects = await listProjectsWithAccounts(pool)
+    const [projects, allAccounts] = await Promise.all([
+      listProjectsWithAccounts(pool),
+      pool.query<AnthropicCredentialSafe>(
+        'SELECT * FROM anthropic_credentials ORDER BY account_name ASC'
+      ),
+    ])
 
     // Fetch stats and ownership for each train
     const trainData = await Promise.all(
@@ -178,8 +183,13 @@ trainsUIRoutes.get('/', async c => {
                           </span>
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
-                          ${train.accounts.find(a => a.id === train.default_account_id)
-                            ?.account_name || 'None'}
+                          ${train.default_account_id === null
+                            ? html`<span
+                                style="display: inline-flex; align-items: center; gap: 0.25rem; background: #eff6ff; color: #1e40af; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem; font-weight: 600;"
+                                >👤 User Account</span
+                              >`
+                            : train.accounts.find(a => a.id === train.default_account_id)
+                                ?.account_name || 'None'}
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
                           ${train.firstOwner}
@@ -277,6 +287,31 @@ trainsUIRoutes.get('/', async c => {
                 placeholder="e.g., Marketing Team Production"
                 style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;"
               />
+            </div>
+
+            <div>
+              <label
+                for="default_account_id"
+                style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; color: #374151;"
+              >
+                Default Account
+              </label>
+              <select
+                id="default_account_id"
+                name="default_account_id"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem; background: white;"
+              >
+                <option value="__user__">👤 User Account (passthrough mode)</option>
+                ${allAccounts.rows.map(
+                  acc => html`
+                    <option value="${acc.id}">${acc.account_name} (${acc.account_id})</option>
+                  `
+                )}
+              </select>
+              <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #6b7280;">
+                User Account mode allows users to provide their own Anthropic credentials via
+                Authorization header
+              </p>
             </div>
 
             <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 0.25rem;">
@@ -512,20 +547,63 @@ trainsUIRoutes.get('/:projectId/view', async c => {
           </h3>
           <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
             All projects have access to all credentials. The default account is used for API calls.
+            Select "User Account" to allow users to provide their own credentials.
           </p>
 
-          ${!train.accounts || train.accounts.length === 0
-            ? html`
-                <div
-                  style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
-                >
-                  <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
-                    ⚠️ No credentials available.
-                  </p>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <!-- User Account Option -->
+            <div
+              style="background: ${train.default_account_id === null
+                ? '#eff6ff'
+                : '#f9fafb'}; border: 1px solid ${train.default_account_id === null
+                ? '#3b82f6'
+                : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
+            >
+              <div style="flex: 1;">
+                <div style="font-weight: 600; font-size: 0.875rem;">
+                  👤 User Account
+                  ${train.default_account_id === null
+                    ? html`<span
+                        style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
+                        >DEFAULT</span
+                      >`
+                    : ''}
                 </div>
-              `
-            : html`
-                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="font-size: 0.75rem; color: #6b7280;">
+                  Users provide their own Anthropic credentials via Authorization header
+                </div>
+              </div>
+              ${isOwner && train.default_account_id !== null
+                ? html`
+                    <form
+                      hx-post="/dashboard/projects/${train.id}/set-default-account"
+                      hx-swap="outerHTML"
+                      hx-target="closest div[style*='margin-bottom: 1.5rem']"
+                      style="margin: 0;"
+                    >
+                      <input type="hidden" name="credential_id" value="__user__" />
+                      <button
+                        type="submit"
+                        style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                      >
+                        Set as Default
+                      </button>
+                    </form>
+                  `
+                : ''}
+            </div>
+
+            ${!train.accounts || train.accounts.length === 0
+              ? html`
+                  <div
+                    style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
+                  >
+                    <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
+                      ⚠️ No organization credentials available.
+                    </p>
+                  </div>
+                `
+              : html`
                   ${train.accounts.map(
                     (cred: AnthropicCredentialSafe) => html`
                       <div
@@ -579,8 +657,8 @@ trainsUIRoutes.get('/:projectId/view', async c => {
                       </div>
                     `
                   )}
-                </div>
-              `}
+                `}
+          </div>
         </div>
 
         <!-- Members Section -->
@@ -1021,7 +1099,13 @@ trainsUIRoutes.post('/:projectId/set-default-account', async c => {
     const formData = await c.req.parseBody()
     const credentialId = formData.credential_id as string
 
-    await setProjectDefaultAccount(pool, projectId, credentialId)
+    // Handle user passthrough mode
+    if (credentialId === '__user__') {
+      // Use updateProject to set default_account_id to null
+      await updateProject(pool, projectId, { default_account_id: null })
+    } else {
+      await setProjectDefaultAccount(pool, projectId, credentialId)
+    }
 
     // Reload the credentials section
     return c.html(html`
@@ -1185,6 +1269,7 @@ trainsUIRoutes.post('/create', async c => {
     const projectId = formData.project_id as string
     const name = formData.name as string
     const isPrivate = formData.is_private === 'true'
+    const defaultAccountId = formData.default_account_id as string
 
     // Validate train ID format
     if (!/^[a-z0-9-]+$/.test(projectId)) {
@@ -1214,6 +1299,7 @@ trainsUIRoutes.post('/create', async c => {
         project_id: projectId,
         name: name,
         is_private: isPrivate,
+        default_account_id: defaultAccountId === '__user__' ? null : defaultAccountId,
       })
 
       // Add the creator as an owner
