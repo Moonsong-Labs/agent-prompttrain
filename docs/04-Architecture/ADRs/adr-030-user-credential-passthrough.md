@@ -46,9 +46,11 @@ The `MSL-Project-Id` header is now **mandatory** for all requests:
 
 The `AuthenticationService.authenticate()` method follows this priority order:
 
-1. **MSL-Account header** (explicit account override) → uses specified organization account
-2. **Project default account** → uses `default_account_id` from database
-3. **User passthrough mode** (NEW) → forwards user's `Authorization: Bearer <token>` header
+1. **Bearer token in Authorization header** (highest priority) → user passthrough mode
+2. **MSL-Account header** (explicit account override) → uses specified organization account
+3. **Project default account** → uses `default_account_id` from database
+
+**Rationale**: User-provided credentials always take precedence to ensure user choice is respected, even when MSL-Account header or default account are present. This allows users to use their own credentials regardless of project configuration.
 
 ### 4. Error Handling
 
@@ -103,6 +105,36 @@ When a project has no default account (`default_account_id = null`):
 - Dashboard uses `"__user__"` string value in forms
 - Converted to `null` before database insertion
 - Prevents dropdown from submitting empty string
+
+### 7. Header Passthrough
+
+In user passthrough mode, **all client headers are forwarded** to Anthropic API (except blacklisted infrastructure headers):
+
+**Headers Blacklisted (NOT forwarded):**
+
+- `host` - Proxy host (would be incorrect for Anthropic API)
+- `connection` - Proxy connection handling
+- `content-length` - Recalculated by fetch
+- `accept-encoding` - Handled by fetch
+- `authorization` - Filtered from client headers, provided by auth service to prevent duplicates
+- `x-forwarded-for`, `x-real-ip` - Proxy headers
+- `msl-project-id`, `msl-account` - Internal routing headers
+- `x-api-key` - Internal authentication
+- `baggage`, `sentry-trace`, `sec-fetch-mode` - Tracing/security headers
+
+**Headers Forwarded (examples):**
+
+- `anthropic-beta` - API beta feature flags (critical for compatibility)
+- `anthropic-version` - API version
+- `anthropic-dangerous-direct-browser-access` - Browser access flag
+- `user-agent` - Client identification
+- `x-stainless-*` - SDK telemetry headers
+- `x-app` - Application identification
+- All other client-provided headers
+
+**Rationale**: This ensures maximum compatibility with Anthropic API by preserving all client-specific headers (SDK versions, beta feature flags, etc.) while removing only infrastructure headers that would be incorrect or duplicate.
+
+**Logging**: Authorization headers are logged in plain text (not masked) to enable debugging of authentication issues. This is intentional for troubleshooting user passthrough mode.
 
 ## Consequences
 

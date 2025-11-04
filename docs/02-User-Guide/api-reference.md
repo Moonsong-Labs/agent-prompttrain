@@ -19,21 +19,41 @@ Include your client API key in the Authorization header:
 Authorization: Bearer cnp_live_YOUR_KEY
 ```
 
-### Train & Account Headers
+### Project & Account Headers
 
-Use the `MSL-Project-Id` header to associate requests with a project/train, and optionally
-`MSL-Account` to select a specific Anthropic account credential:
+The `MSL-Project-Id` header is **mandatory** for all requests to identify the project:
 
 ```bash
-MSL-Project-Id: project-alpha
-MSL-Account: acc_abc123xyz  # optional - account ID to override project default
+MSL-Project-Id: project-alpha  # REQUIRED
+MSL-Account: acc_abc123xyz     # optional - override account selection
 ```
 
-**Account Selection Priority:**
+**Authentication Priority:**
 
-1. If `MSL-Account` header is present, use the specified account ID
-2. Otherwise, use the project's configured default account
-3. If no default account is configured, return an error
+The proxy determines which Anthropic credentials to use in this order:
+
+1. **User Passthrough Mode** (highest priority): If `Authorization: Bearer <token>` header contains an Anthropic API token, forward it directly to Anthropic API
+2. **MSL-Account Header**: If present, use the specified organization account ID
+3. **Project Default Account**: Use the project's configured default account
+4. **Error**: If no credentials available, return error
+
+### User Passthrough Mode
+
+Projects can be configured to accept user-provided Anthropic credentials instead of using organization accounts:
+
+```bash
+MSL-Project-Id: my-project
+Authorization: Bearer sk-ant-api03-YOUR_ANTHROPIC_TOKEN
+```
+
+In this mode:
+
+- Your personal Anthropic API token is forwarded directly to Anthropic
+- Billing goes to your Anthropic account (not organization account)
+- Works regardless of project's default account configuration
+- All client headers are preserved for maximum API compatibility
+
+To obtain an Anthropic API token, visit: https://console.anthropic.com/settings/keys
 
 ## Endpoints
 
