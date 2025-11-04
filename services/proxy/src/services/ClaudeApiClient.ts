@@ -55,18 +55,37 @@ export class ClaudeApiClient {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.config.timeout)
 
+    // Helper function to mask token showing last 4 characters
+    const maskToken = (value: string | undefined): string | undefined => {
+      if (!value) {
+        return undefined
+      }
+      const parts = value.split(' ')
+      if (parts.length === 2 && parts[1]) {
+        const token = parts[1]
+        const last4 = token.slice(-4)
+        return `${parts[0]} ...${last4}`
+      }
+      return value
+    }
+
+    // Log incoming Authorization header (from user request)
+    logger.info('Request authentication details', {
+      requestId: request.requestId,
+      metadata: {
+        incomingAuthHeader: maskToken(request.apiKey),
+      },
+    })
+
     // Log outbound request details (excluding body for privacy)
     logger.info('Outbound request to Anthropic API', {
       requestId: request.requestId,
       metadata: {
         url,
         method: 'POST',
-        headers: {
+        outboundHeaders: {
           ...headers,
-          // Mask sensitive token values but show structure
-          Authorization: headers.Authorization
-            ? `${headers.Authorization.split(' ')[0]} ${headers.Authorization.split(' ')[1]?.substring(0, 20)}...`
-            : undefined,
+          Authorization: maskToken(headers.Authorization),
         },
       },
     })
