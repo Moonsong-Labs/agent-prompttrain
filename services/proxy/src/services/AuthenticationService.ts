@@ -23,7 +23,27 @@ export class AuthenticationService {
     const requestedAccount = context.account
     const projectId = context.projectId
 
-    // Priority 1: If specific account requested via MSL-Account header, use it
+    // Priority 1: If user provides Bearer token, use user passthrough mode
+    if (context.apiKey?.startsWith('Bearer ')) {
+      logger.info('Using user passthrough authentication', {
+        requestId: context.requestId,
+        projectId,
+      })
+
+      return {
+        type: 'oauth',
+        headers: {
+          Authorization: context.apiKey,
+          'anthropic-beta': OAUTH_BETA_HEADER,
+        },
+        key: context.apiKey.replace('Bearer ', ''),
+        betaHeader: OAUTH_BETA_HEADER,
+        accountId: 'user-passthrough',
+        accountName: 'User Account',
+      }
+    }
+
+    // Priority 2: If specific account requested via MSL-Account header, use it
     if (requestedAccount) {
       logger.info('Using account specified in MSL-Account header', {
         requestId: context.requestId,
@@ -48,26 +68,6 @@ export class AuthenticationService {
       }
 
       return this.buildAuthResult(allCredentials.rows[0], context)
-    }
-
-    // Priority 2: If user provides Bearer token, use user passthrough mode
-    if (context.apiKey?.startsWith('Bearer ')) {
-      logger.info('Using user passthrough authentication', {
-        requestId: context.requestId,
-        projectId,
-      })
-
-      return {
-        type: 'oauth',
-        headers: {
-          Authorization: context.apiKey,
-          'anthropic-beta': OAUTH_BETA_HEADER,
-        },
-        key: context.apiKey.replace('Bearer ', ''),
-        betaHeader: OAUTH_BETA_HEADER,
-        accountId: 'user-passthrough',
-        accountName: 'User Account',
-      }
     }
 
     // Priority 3: Use project's default account
