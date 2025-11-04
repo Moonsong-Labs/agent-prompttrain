@@ -26,8 +26,14 @@ Use the `MSL-Project-Id` header to associate requests with a project/train, and 
 
 ```bash
 MSL-Project-Id: project-alpha
-MSL-Account: account-primary  # optional
+MSL-Account: acc_abc123xyz  # optional - account ID to override project default
 ```
+
+**Account Selection Priority:**
+
+1. If `MSL-Account` header is present, use the specified account ID
+2. Otherwise, use the project's configured default account
+3. If no default account is configured, return an error
 
 ## Endpoints
 

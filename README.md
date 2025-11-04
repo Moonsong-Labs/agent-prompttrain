@@ -340,13 +340,13 @@ See the [Documentation](docs/README.md) for complete configuration options.
    ```bash
    curl -X POST http://localhost:3000/v1/messages \
      -H "MSL-Project-Id: project-alpha" \
-     -H "MSL-Account: account-primary" \
+     -H "MSL-Account: acc_abc123xyz" \
      -H "Authorization: Bearer cnp_live_team_alpha" \
      -H "Content-Type: application/json" \
      -d '{"model":"claude-3-opus-20240229","messages":[{"role":"user","content":"Hello"}]}'
    ```
 
-If `MSL-Account` is omitted, the proxy deterministically maps each project to an available account (hash-based), falling back to others only if the primary account is unavailable.
+If `MSL-Account` is omitted, the proxy uses the project's configured default account. Each project must have a default account set via the dashboard.
 
 ## Usage
 

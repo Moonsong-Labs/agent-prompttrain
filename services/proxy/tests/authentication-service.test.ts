@@ -2,7 +2,6 @@ import { beforeEach, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { AuthenticationService } from '../src/services/AuthenticationService'
 import { RequestContext } from '../src/domain/value-objects/RequestContext'
 import { AuthenticationError } from '@agent-prompttrain/shared'
-import { createHash } from 'crypto'
 import type { Pool } from 'pg'
 import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
@@ -48,33 +47,24 @@ describe('AuthenticationService', () => {
     mockGetApiKey.mockRestore()
   })
 
-  it('authenticates using the requested account header', async () => {
-    const credentials: AnthropicCredential[] = [
-      {
-        id: 'acc_primary',
-        account_id: 'acc_primary',
-        account_name: 'account-primary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-      {
-        id: 'acc_secondary',
-        account_id: 'acc_secondary',
-        account_name: 'account-secondary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-    ]
-
-    mockGetTrainCredentials.mockImplementation(() => credentials)
+  it('authenticates using the requested account header (MSL-Account)', async () => {
+    // Mock pool.query for direct credential lookup
+    mockPool.query = async () =>
+      ({
+        rows: [
+          {
+            id: 'acc_secondary',
+            account_id: 'acc_secondary',
+            account_name: 'account-secondary',
+            created_at: new Date(),
+            oauth_access_token: null,
+            oauth_refresh_token: null,
+            oauth_expires_at: null,
+            oauth_scopes: null,
+            oauth_is_max: null,
+          },
+        ],
+      }) as any
 
     const context = createRequestContext('project-alpha', 'acc_secondary')
     const auth = await service.authenticate(context)
@@ -112,27 +102,17 @@ describe('AuthenticationService', () => {
   })
 
   it('throws for invalid account identifier', async () => {
-    const credentials: AnthropicCredential[] = [
-      {
-        id: 'acc_primary',
-        account_id: 'acc_primary',
-        account_name: 'account-primary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-    ]
+    // Mock pool.query to return no credentials for invalid account
+    mockPool.query = async () =>
+      ({
+        rows: [],
+      }) as any
 
-    mockGetTrainCredentials.mockImplementation(() => credentials)
-
-    const context = createRequestContext('project-alpha', '../escape')
+    const context = createRequestContext('project-alpha', 'invalid-account')
     await expect(service.authenticate(context)).rejects.toBeInstanceOf(AuthenticationError)
   })
 
-  it('falls back to available account when none specified', async () => {
+  it('uses project default account when no MSL-Account header specified', async () => {
     const credentials: AnthropicCredential[] = [
       {
         id: 'acc_primary',
@@ -155,6 +135,15 @@ describe('AuthenticationService', () => {
     expect(auth.accountName).toBe('account-primary')
   })
 
+  it('throws error when project has no default account configured', async () => {
+    mockGetTrainCredentials.mockImplementation(() => [])
+
+    const context = createRequestContext('project-alpha')
+    await expect(service.authenticate(context)).rejects.toThrow(
+      'No default account configured for this project'
+    )
+  })
+
   it('reads client API keys from array file', async () => {
     // This test is no longer applicable - API keys are stored in database
     // Keeping the test but marking it as expected to pass with new architecture
@@ -174,7 +163,7 @@ describe('AuthenticationService', () => {
   })
 })
 
-describe('AuthenticationService deterministic account selection', () => {
+describe('AuthenticationService account selection priority', () => {
   let mockPool: Pool
   let mockGetTrainCredentials: any
   let mockGetApiKey: any
@@ -196,59 +185,77 @@ describe('AuthenticationService deterministic account selection', () => {
     mockGetApiKey.mockRestore()
   })
 
-  const computePreferredAccount = (projectId: string, accounts: string[]): string => {
-    const key = projectId.trim() || 'default'
-    const ordered = [...new Set(accounts)].sort()
+  it('prioritizes MSL-Account header over project default', async () => {
+    // Mock project default account
+    const defaultCredential: AnthropicCredential = {
+      id: 'default',
+      account_id: 'acc_default',
+      account_name: 'default-account',
+      created_at: new Date(),
+      oauth_access_token: null,
+      oauth_refresh_token: null,
+      oauth_expires_at: null,
+      oauth_scopes: null,
+      oauth_is_max: null,
+    }
 
-    const scored = ordered.map(accountName => {
-      const hashInput = `${key}::${accountName}`
-      const digest = createHash('sha256').update(hashInput).digest()
-      const score = digest.readBigUInt64BE(0)
-      return { accountName, score }
-    })
+    mockGetTrainCredentials.mockImplementation(() => [defaultCredential])
 
-    scored.sort((a, b) => {
-      if (a.score === b.score) {
-        return a.accountName.localeCompare(b.accountName)
-      }
-      return a.score > b.score ? -1 : 1
-    })
-
-    return scored[0].accountName
-  }
-
-  it('consistently maps the same train to the same account when header missing', async () => {
-    const credentials: AnthropicCredential[] = [
-      {
-        id: 'primary',
-        account_id: 'acc_primary',
-        account_name: 'primary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-      {
-        id: 'secondary',
-        account_id: 'acc_secondary',
-        account_name: 'secondary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-    ]
-
-    mockGetTrainCredentials.mockImplementation(() => credentials)
+    // Mock pool.query for MSL-Account header lookup
+    mockPool.query = async () =>
+      ({
+        rows: [
+          {
+            id: 'specific',
+            account_id: 'acc_specific',
+            account_name: 'specific-account',
+            created_at: new Date(),
+            oauth_access_token: null,
+            oauth_refresh_token: null,
+            oauth_expires_at: null,
+            oauth_scopes: null,
+            oauth_is_max: null,
+          },
+        ],
+      }) as any
 
     const service = new AuthenticationService(mockPool)
+    const context = new RequestContext(
+      'req-1',
+      'project-alpha',
+      'POST',
+      '/v1/messages',
+      Date.now(),
+      {},
+      undefined,
+      undefined,
+      'acc_specific'
+    )
 
+    const result = await service.authenticate(context)
+
+    // Should use the MSL-Account header, not the default
+    expect(result.accountName).toBe('specific-account')
+    expect(result.accountId).toBe('acc_specific')
+  })
+
+  it('consistently uses same default account for multiple requests', async () => {
+    const defaultCredential: AnthropicCredential = {
+      id: 'primary',
+      account_id: 'acc_primary',
+      account_name: 'primary',
+      created_at: new Date(),
+      oauth_access_token: null,
+      oauth_refresh_token: null,
+      oauth_expires_at: null,
+      oauth_scopes: null,
+      oauth_is_max: null,
+    }
+
+    mockGetTrainCredentials.mockImplementation(() => [defaultCredential])
+
+    const service = new AuthenticationService(mockPool)
     const projectId = 'project-alpha'
-    const expectedAccount = computePreferredAccount(projectId, ['primary', 'secondary'])
 
     const context1 = new RequestContext('req-1', projectId, 'POST', '/v1/messages', Date.now(), {})
     const context2 = new RequestContext('req-2', projectId, 'POST', '/v1/messages', Date.now(), {})
@@ -256,54 +263,8 @@ describe('AuthenticationService deterministic account selection', () => {
     const result1 = await service.authenticate(context1)
     const result2 = await service.authenticate(context2)
 
-    expect(result1.accountName).toBe(expectedAccount)
-    expect(result2.accountName).toBe(expectedAccount)
-  })
-
-  it('produces deterministic ordering across projects', async () => {
-    const credentials: AnthropicCredential[] = [
-      {
-        id: 'primary',
-        account_id: 'acc_primary',
-        account_name: 'primary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-      {
-        id: 'secondary',
-        account_id: 'acc_secondary',
-        account_name: 'secondary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-    ]
-
-    mockGetTrainCredentials.mockImplementation(() => credentials)
-
-    const service = new AuthenticationService(mockPool)
-
-    const projects = ['project-alpha', 'train-beta', 'train-gamma']
-    const accounts = ['primary', 'secondary']
-
-    const selections = await Promise.all(
-      projects.map(id =>
-        service.authenticate(
-          new RequestContext('req-' + id, id, 'POST', '/v1/messages', Date.now(), {})
-        )
-      )
-    )
-
-    selections.forEach((selection, index) => {
-      const expected = computePreferredAccount(projects[index], accounts)
-      expect(selection.accountName).toBe(expected)
-    })
+    // Both requests should use the same default account
+    expect(result1.accountName).toBe('primary')
+    expect(result2.accountName).toBe('primary')
   })
 })

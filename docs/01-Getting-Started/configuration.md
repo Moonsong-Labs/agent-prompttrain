@@ -76,7 +76,7 @@ Proxy access tokens live under `credentials/project-client-keys/<project-id>.cli
 ```
 
 - `MSL-Project-Id` header selects the project and unlocks analytics.
-- `MSL-Account` chooses the account credential file; when omitted, the proxy deterministically maps the project to an account using a stable hash.
+- `MSL-Account` chooses the account credential by account ID; when omitted, the proxy uses the project's configured default account.
 
 ## Database Configuration
 
