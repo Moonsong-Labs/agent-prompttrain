@@ -50,30 +50,30 @@ export class AuthenticationService {
       return this.buildAuthResult(allCredentials.rows[0], context)
     }
 
-    // Priority 2: Use project's default account
+    // Priority 2: If user provides Bearer token, use user passthrough mode
+    if (context.apiKey?.startsWith('Bearer ')) {
+      logger.info('Using user passthrough authentication', {
+        requestId: context.requestId,
+        projectId,
+      })
+
+      return {
+        type: 'oauth',
+        headers: {
+          Authorization: context.apiKey,
+          'anthropic-beta': OAUTH_BETA_HEADER,
+        },
+        key: context.apiKey.replace('Bearer ', ''),
+        betaHeader: OAUTH_BETA_HEADER,
+        accountId: 'user-passthrough',
+        accountName: 'User Account',
+      }
+    }
+
+    // Priority 3: Use project's default account
     const credentials = await getProjectCredentials(this.pool, projectId)
 
     if (!credentials.length) {
-      // Priority 3: User passthrough mode (when no default account configured)
-      if (context.apiKey?.startsWith('Bearer ')) {
-        logger.info('Using user passthrough authentication (no default account)', {
-          requestId: context.requestId,
-          projectId,
-        })
-
-        return {
-          type: 'oauth',
-          headers: {
-            Authorization: context.apiKey,
-            'anthropic-beta': OAUTH_BETA_HEADER,
-          },
-          key: context.apiKey.replace('Bearer ', ''),
-          betaHeader: OAUTH_BETA_HEADER,
-          accountId: 'user-passthrough',
-          accountName: 'User Account',
-        }
-      }
-
       throw new AuthenticationError(
         'No default account configured for this project and no user credentials provided',
         {
