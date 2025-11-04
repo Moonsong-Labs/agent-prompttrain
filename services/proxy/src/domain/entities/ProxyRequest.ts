@@ -167,9 +167,7 @@ export class ProxyRequest {
       'connection', // Proxy connection handling
       'content-length', // Will be recalculated by fetch
       'accept-encoding', // Let fetch handle encoding
-      'baggage', // Sentry/tracing header
-      'sentry-trace', // Sentry tracing
-      'sec-fetch-mode', // Browser security header
+      'authorization', // Will be provided by auth headers to avoid duplicates
       'x-forwarded-for', // Proxy header
       'x-real-ip', // Proxy header
       'msl-project-id', // Our internal header
