@@ -77,21 +77,24 @@ describe('AuthenticationService', () => {
   it('returns slack configuration when present on credentials', async () => {
     // Note: Slack configuration is no longer stored on credentials in the database-backed system
     // This test is kept for backwards compatibility but returns null as expected
-    const credentials: AnthropicCredential[] = [
-      {
-        id: 'acc_primary',
-        account_id: 'acc_primary',
-        account_name: 'account-primary',
-        created_at: new Date(),
-        oauth_access_token: null,
-        oauth_refresh_token: null,
-        oauth_expires_at: null,
-        oauth_scopes: null,
-        oauth_is_max: null,
-      },
-    ]
 
-    mockGetTrainCredentials.mockImplementation(() => credentials)
+    // Mock pool.query for MSL-Account header lookup
+    mockPool.query = async () =>
+      ({
+        rows: [
+          {
+            id: 'acc_primary',
+            account_id: 'acc_primary',
+            account_name: 'account-primary',
+            created_at: new Date(),
+            oauth_access_token: null,
+            oauth_refresh_token: null,
+            oauth_expires_at: null,
+            oauth_scopes: null,
+            oauth_is_max: null,
+          },
+        ],
+      }) as any
 
     const context = createRequestContext('project-alpha', 'acc_primary')
     const auth = await service.authenticate(context)
