@@ -23,9 +23,8 @@ credentials** are used to fulfil it (account).
 
 1. **Explicit Headers**
    - `MSL-Project-Id` remains mandatory for analytics but now defaults to `DEFAULT_PROJECT_ID` when absent.
-   - `MSL-Account` selects the Anthropic account credential file. When omitted the proxy chooses a
-     deterministic account based on the project identifier, falling back to other accounts only when the
-     preferred one fails to load.
+   - `MSL-Account` selects the Anthropic account credential by account ID. When omitted, the proxy uses the
+     project's configured default account. If no default account is configured, an error is returned.
    - Neither header is forwarded to Anthropic; only configured custom headers (e.g. via
      `ANTHROPIC_CUSTOM_HEADERS`) are propagated.
 
@@ -45,11 +44,11 @@ credentials** are used to fulfil it (account).
 ### Positive
 
 - Clear separation between projects (analytics) and accounts (credentials).
-- Simpler operational model: new projects require only a header; new accounts require only a credential
-  file.
+- Simpler operational model: new projects require only a header and default account configuration; new
+  accounts require only a credential entry in the database.
 - Eliminates wildcard precedence edge cases and large path traversal surface area.
-- Deterministic hashing provides consistent per-project account selection while still distributing load
-  across multiple keys.
+- Project default accounts provide consistent account selection per project while allowing override via
+  `MSL-Account` header.
 
 ### Negative
 

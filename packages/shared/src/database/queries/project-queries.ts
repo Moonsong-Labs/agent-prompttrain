@@ -225,15 +225,21 @@ export async function setProjectDefaultAccount(
 }
 
 /**
- * Get all credentials available to a project (all credentials)
+ * Get the default credential for a project
+ * Returns only the project's default_account_id credential
  */
 export async function getProjectCredentials(
   pool: Pool,
-  _projectId: string
+  projectId: string
 ): Promise<AnthropicCredential[]> {
-  // All projects have access to all credentials
   const result = await pool.query<AnthropicCredential>(
-    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
+    `
+    SELECT ac.*
+    FROM projects p
+    JOIN anthropic_credentials ac ON p.default_account_id = ac.id
+    WHERE p.project_id = $1
+    `,
+    [projectId]
   )
 
   return result.rows
