@@ -88,7 +88,6 @@ class Logger {
       'api_key',
       'apiKey',
       'x-api-key',
-      'authorization',
       'password',
       'secret',
       'refreshToken',
@@ -96,12 +95,9 @@ class Logger {
     ]
 
     if (typeof obj === 'string') {
-      // Mask API keys
+      // Mask API keys (but not Bearer tokens - those are logged for debugging)
       if (obj.startsWith('sk-ant-')) {
         return obj.substring(0, 10) + '****'
-      }
-      if (obj.startsWith('Bearer ')) {
-        return 'Bearer ****'
       }
       return obj
     }
