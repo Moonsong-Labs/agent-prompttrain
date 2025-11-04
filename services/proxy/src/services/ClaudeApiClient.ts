@@ -32,9 +32,13 @@ export class ClaudeApiClient {
   /**
    * Forward a request to Claude API
    */
-  async forward(request: ProxyRequest, auth: AuthResult): Promise<Response> {
+  async forward(
+    request: ProxyRequest,
+    auth: AuthResult,
+    clientHeaders: Record<string, string>
+  ): Promise<Response> {
     const url = `${this.config.baseUrl}/v1/messages`
-    const headers = request.createHeaders(auth.headers)
+    const headers = request.createHeaders(auth.headers, clientHeaders)
 
     // Use retry logic for transient failures
     return retryWithBackoff(

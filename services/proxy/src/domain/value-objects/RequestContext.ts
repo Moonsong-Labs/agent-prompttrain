@@ -43,16 +43,12 @@ export class RequestContext {
     // Only accept Bearer tokens from Authorization header (not x-api-key)
     const apiKey = c.req.header('authorization')
 
-    // Extract relevant headers
+    // Extract all headers for passthrough
     const headers: Record<string, string> = {}
-    const relevantHeaders = ['user-agent', 'x-forwarded-for', 'x-real-ip', 'content-type', 'accept']
-
-    for (const header of relevantHeaders) {
-      const value = c.req.header(header)
-      if (value) {
-        headers[header] = value
-      }
-    }
+    // Get all headers from the raw request
+    c.req.raw.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value
+    })
 
     return new RequestContext(
       requestId,
