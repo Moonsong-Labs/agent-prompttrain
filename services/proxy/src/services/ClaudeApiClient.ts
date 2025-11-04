@@ -59,25 +59,11 @@ export class ClaudeApiClient {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.config.timeout)
 
-    // Helper function to mask token showing last 4 characters
-    const maskToken = (value: string | undefined): string | undefined => {
-      if (!value) {
-        return undefined
-      }
-      const parts = value.split(' ')
-      if (parts.length === 2 && parts[1]) {
-        const token = parts[1]
-        const last4 = token.slice(-4)
-        return `${parts[0]} ...${last4}`
-      }
-      return value
-    }
-
     // Log incoming Authorization header (from user request)
     logger.info('Request authentication details', {
       requestId: request.requestId,
       metadata: {
-        incomingAuthHeader: maskToken(request.apiKey),
+        incomingAuthHeader: request.apiKey,
       },
     })
 
@@ -87,10 +73,7 @@ export class ClaudeApiClient {
       metadata: {
         url,
         method: 'POST',
-        outboundHeaders: {
-          ...headers,
-          Authorization: maskToken(headers.Authorization),
-        },
+        outboundHeaders: headers,
       },
     })
 
