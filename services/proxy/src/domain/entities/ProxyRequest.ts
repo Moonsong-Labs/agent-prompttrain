@@ -155,14 +155,42 @@ export class ProxyRequest {
 
   /**
    * Create request headers for Claude API
+   * Uses a blacklist to remove proxy-specific headers while preserving client headers
    */
-  createHeaders(authHeaders: Record<string, string>): Record<string, string> {
+  createHeaders(
+    authHeaders: Record<string, string>,
+    clientHeaders: Record<string, string>
+  ): Record<string, string> {
+    // Headers that should NOT be forwarded to Anthropic (added by proxies/infrastructure)
+    const headerBlacklist = new Set([
+      'host', // Proxy host
+      'connection', // Proxy connection handling
+      'content-length', // Will be recalculated by fetch
+      'accept-encoding', // Let fetch handle encoding
+      'authorization', // Will be provided by auth headers to avoid duplicates
+      'x-forwarded-for', // Proxy header
+      'x-real-ip', // Proxy header
+      'msl-project-id', // Our internal header
+      'msl-account', // Our internal header
+      'x-api-key', // Our internal auth
+    ])
+
+    // Start with client headers, filtering out blacklisted ones
+    const filteredClientHeaders: Record<string, string> = {}
+    for (const [key, value] of Object.entries(clientHeaders)) {
+      const lowerKey = key.toLowerCase()
+      if (!headerBlacklist.has(lowerKey)) {
+        filteredClientHeaders[lowerKey] = value
+      }
+    }
+
+    // Auth headers override client headers (e.g., for Authorization, anthropic-beta)
     // Filter out x-api-key to ensure it's never sent to Claude
     const { 'x-api-key': _, ...filteredAuthHeaders } = authHeaders
 
+    // Merge: client headers first, then auth headers (auth headers take precedence)
     return {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
+      ...filteredClientHeaders,
       ...filteredAuthHeaders,
     }
   }

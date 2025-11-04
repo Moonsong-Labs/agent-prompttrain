@@ -34,4 +34,4 @@ template: |
   * ...
   </examples>
 
-  Here is the file to work on: #$ARGUMENTS
+  The file to work on was provided in the previous <command-args> section.

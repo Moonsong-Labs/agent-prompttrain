@@ -32,9 +32,13 @@ export class ClaudeApiClient {
   /**
    * Forward a request to Claude API
    */
-  async forward(request: ProxyRequest, auth: AuthResult): Promise<Response> {
+  async forward(
+    request: ProxyRequest,
+    auth: AuthResult,
+    clientHeaders: Record<string, string>
+  ): Promise<Response> {
     const url = `${this.config.baseUrl}/v1/messages`
-    const headers = request.createHeaders(auth.headers)
+    const headers = request.createHeaders(auth.headers, clientHeaders)
 
     // Use retry logic for transient failures
     return retryWithBackoff(
@@ -54,6 +58,24 @@ export class ClaudeApiClient {
   ): Promise<Response> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), this.config.timeout)
+
+    // Log incoming Authorization header (from user request)
+    logger.info('Request authentication details', {
+      requestId: request.requestId,
+      metadata: {
+        incomingAuthHeader: request.apiKey,
+      },
+    })
+
+    // Log outbound request details (excluding body for privacy)
+    logger.info('Outbound request to Anthropic API', {
+      requestId: request.requestId,
+      metadata: {
+        url,
+        method: 'POST',
+        outboundHeaders: headers,
+      },
+    })
 
     try {
       const response = await fetch(url, {

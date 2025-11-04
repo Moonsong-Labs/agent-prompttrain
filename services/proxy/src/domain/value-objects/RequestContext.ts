@@ -1,5 +1,4 @@
 import { Context } from 'hono'
-import { config } from '@agent-prompttrain/shared/config'
 import { MSL_PROJECT_ID_HEADER_LOWER, MSL_ACCOUNT_HEADER_LOWER } from '@agent-prompttrain/shared'
 
 /**
@@ -29,25 +28,27 @@ export class RequestContext {
         'RequestContext: requestId not found in context. Ensure request-id middleware is applied.'
       )
     }
-    const fallbackTrainId = config.auth.defaultTrainId || 'default'
-    const projectId =
-      c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER) || fallbackTrainId
+
+    // MSL-Project-Id header is mandatory for proper project identification
+    const projectId = c.get('projectId') || c.req.header(MSL_PROJECT_ID_HEADER_LOWER)
+    if (!projectId) {
+      throw new Error(
+        'RequestContext: MSL-Project-Id header is required. Please provide the project identifier via the MSL-Project-Id header.'
+      )
+    }
+
     const rawTrainAccount = c.get('trainAccount') || c.req.header(MSL_ACCOUNT_HEADER_LOWER)
     const trainAccount =
       rawTrainAccount && rawTrainAccount.trim() ? rawTrainAccount.trim() : undefined
     // Only accept Bearer tokens from Authorization header (not x-api-key)
     const apiKey = c.req.header('authorization')
 
-    // Extract relevant headers
+    // Extract all headers for passthrough
     const headers: Record<string, string> = {}
-    const relevantHeaders = ['user-agent', 'x-forwarded-for', 'x-real-ip', 'content-type', 'accept']
-
-    for (const header of relevantHeaders) {
-      const value = c.req.header(header)
-      if (value) {
-        headers[header] = value
-      }
-    }
+    // Get all headers from the raw request
+    c.req.raw.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value
+    })
 
     return new RequestContext(
       requestId,

@@ -18,12 +18,12 @@ describe('projectIdExtractorMiddleware', () => {
     })
   })
 
-  it('falls back to default project when header missing', async () => {
+  it('leaves projectId undefined when header missing', async () => {
     const res = await app.request('/test')
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.projectId).toBe('default')
+    expect(body.projectId).toBeUndefined()
   })
 
   it('extracts projectId from MSL-Project-Id header', async () => {

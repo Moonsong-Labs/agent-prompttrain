@@ -270,4 +270,87 @@ describe('AuthenticationService account selection priority', () => {
     expect(result1.accountName).toBe('primary')
     expect(result2.accountName).toBe('primary')
   })
+
+  it('uses user passthrough mode when Bearer token provided (even with default account)', async () => {
+    // Mock project has a default account configured
+    const defaultCredential: AnthropicCredential = {
+      id: 'default',
+      account_id: 'acc_default',
+      account_name: 'default-account',
+      created_at: new Date(),
+      oauth_access_token: null,
+      oauth_refresh_token: null,
+      oauth_expires_at: null,
+      oauth_scopes: null,
+      oauth_is_max: null,
+    }
+    mockGetTrainCredentials.mockImplementation(() => [defaultCredential])
+
+    const service = new AuthenticationService(mockPool)
+    const context = new RequestContext(
+      'req-1',
+      'project-alpha',
+      'POST',
+      '/v1/messages',
+      Date.now(),
+      {},
+      'Bearer user-anthropic-token-xyz',
+      undefined,
+      undefined
+    )
+
+    const result = await service.authenticate(context)
+
+    // Should use user token, not default account
+    expect(result.accountName).toBe('User Account')
+    expect(result.accountId).toBe('user-passthrough')
+    expect(result.headers.Authorization).toBe('Bearer user-anthropic-token-xyz')
+    expect(result.type).toBe('oauth')
+  })
+
+  it('uses user passthrough mode when no default account and Bearer token provided', async () => {
+    mockGetTrainCredentials.mockImplementation(() => [])
+
+    const service = new AuthenticationService(mockPool)
+    const context = new RequestContext(
+      'req-1',
+      'project-alpha',
+      'POST',
+      '/v1/messages',
+      Date.now(),
+      {},
+      'Bearer user-anthropic-token-xyz',
+      undefined,
+      undefined
+    )
+
+    const result = await service.authenticate(context)
+
+    expect(result.accountName).toBe('User Account')
+    expect(result.accountId).toBe('user-passthrough')
+    expect(result.headers.Authorization).toBe('Bearer user-anthropic-token-xyz')
+    expect(result.type).toBe('oauth')
+  })
+
+  it('throws error when no default account and no Bearer token provided', async () => {
+    mockGetTrainCredentials.mockImplementation(() => [])
+
+    const service = new AuthenticationService(mockPool)
+    const context = new RequestContext(
+      'req-1',
+      'project-alpha',
+      'POST',
+      '/v1/messages',
+      Date.now(),
+      {},
+      undefined,
+      undefined,
+      undefined
+    )
+
+    await expect(service.authenticate(context)).rejects.toThrow(AuthenticationError)
+    await expect(service.authenticate(context)).rejects.toThrow(
+      'No default account configured for this project and no user credentials provided'
+    )
+  })
 })

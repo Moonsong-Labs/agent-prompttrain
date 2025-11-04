@@ -180,7 +180,7 @@ export class ProxyService {
             : `account:${auth.accountName}`,
       })
 
-      const claudeResponse = await this.apiClient.forward(request, auth)
+      const claudeResponse = await this.apiClient.forward(request, auth, context.headers)
 
       // Process response based on streaming mode
       let finalResponse: Response
