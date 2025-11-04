@@ -120,7 +120,6 @@ In user passthrough mode, **all client headers are forwarded** to Anthropic API 
 - `x-forwarded-for`, `x-real-ip` - Proxy headers
 - `msl-project-id`, `msl-account` - Internal routing headers
 - `x-api-key` - Internal authentication
-- `baggage`, `sentry-trace`, `sec-fetch-mode` - Tracing/security headers
 
 **Headers Forwarded (examples):**
 
@@ -130,6 +129,7 @@ In user passthrough mode, **all client headers are forwarded** to Anthropic API 
 - `user-agent` - Client identification
 - `x-stainless-*` - SDK telemetry headers
 - `x-app` - Application identification
+- `baggage`, `sentry-trace`, `sec-fetch-mode` - Tracing/security headers
 - All other client-provided headers
 
 **Rationale**: This ensures maximum compatibility with Anthropic API by preserving all client-specific headers (SDK versions, beta feature flags, etc.) while removing only infrastructure headers that would be incorrect or duplicate.
