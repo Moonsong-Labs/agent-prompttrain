@@ -33,7 +33,16 @@ We will implement **user credential passthrough mode** with the following design
 - When `default_account_id` is `null`, the project operates in user passthrough mode
 - Existing projects continue to work unchanged (backward compatible)
 
-### 2. Authentication Priority
+### 2. Mandatory Project Identification
+
+The `MSL-Project-Id` header is now **mandatory** for all requests:
+
+- Requests without this header are rejected with a clear error message
+- This ensures proper project identification for authentication lookup
+- Required to determine if project uses organization account or user passthrough mode
+- Removes fallback to default project ID for better security and explicit configuration
+
+### 3. Authentication Priority
 
 The `AuthenticationService.authenticate()` method follows this priority order:
 
@@ -41,7 +50,7 @@ The `AuthenticationService.authenticate()` method follows this priority order:
 2. **Project default account** → uses `default_account_id` from database
 3. **User passthrough mode** (NEW) → forwards user's `Authorization: Bearer <token>` header
 
-### 3. Error Handling
+### 4. Error Handling
 
 When a project has no default account (`default_account_id = null`):
 
@@ -52,7 +61,7 @@ When a project has no default account (`default_account_id = null`):
   Either set a default account via the dashboard, or provide your Anthropic credentials via Authorization header.
   ```
 
-### 4. Dashboard Integration
+### 5. Dashboard Integration
 
 **Project Creation:**
 
@@ -66,7 +75,7 @@ When a project has no default account (`default_account_id = null`):
 - Allow switching between User Account and organization accounts
 - Add explanatory text about passthrough mode
 
-### 5. Implementation Details
+### 6. Implementation Details
 
 **Migration:** `015-user-passthrough-support.ts`
 
@@ -83,6 +92,11 @@ When a project has no default account (`default_account_id = null`):
 
 - `createProject()`: Accepts explicit `null` for passthrough mode
 - `updateProject()`: Allows changing `default_account_id` to `null`
+
+**Request Context:**
+
+- `RequestContext.fromHono()`: Enforces mandatory `MSL-Project-Id` header
+- Throws clear error if header is missing
 
 **UI Sentinel Value:**
 
