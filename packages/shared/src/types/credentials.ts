@@ -2,32 +2,53 @@
  * Database models for credential and project management
  */
 
-export interface AnthropicCredential {
+export type ProviderType = 'anthropic' | 'bedrock'
+
+export interface BaseCredential {
   id: string
   account_id: string
   account_name: string
+  provider: ProviderType
+  created_at: Date
+  updated_at: Date
+}
+
+export interface AnthropicCredential extends BaseCredential {
+  provider: 'anthropic'
   oauth_access_token: string
   oauth_refresh_token: string
   oauth_expires_at: Date
   oauth_scopes: string[]
   oauth_is_max: boolean
-  created_at: Date
-  updated_at: Date
   last_refresh_at: Date | null
+  aws_api_key?: never
+  aws_region?: never
 }
 
-export interface AnthropicCredentialSafe {
-  id: string
-  account_id: string
-  account_name: string
-  oauth_expires_at: Date
-  oauth_scopes: string[]
-  oauth_is_max: boolean
-  created_at: Date
-  updated_at: Date
-  last_refresh_at: Date | null
+export interface BedrockCredential extends BaseCredential {
+  provider: 'bedrock'
+  aws_api_key: string
+  aws_region: string
+  oauth_access_token?: never
+  oauth_refresh_token?: never
+  oauth_expires_at?: never
+  oauth_scopes?: never
+  oauth_is_max?: never
+  last_refresh_at?: never
+}
+
+export type Credential = AnthropicCredential | BedrockCredential
+
+export interface AnthropicCredentialSafe
+  extends Omit<AnthropicCredential, 'oauth_access_token' | 'oauth_refresh_token'> {
   token_status: 'valid' | 'expiring_soon' | 'expired'
 }
+
+export interface BedrockCredentialSafe extends Omit<BedrockCredential, 'aws_api_key'> {
+  aws_api_key_preview: string // First 8 chars + ****
+}
+
+export type CredentialSafe = AnthropicCredentialSafe | BedrockCredentialSafe
 
 export interface Project {
   id: string
@@ -45,7 +66,7 @@ export interface Project {
 }
 
 export interface ProjectWithAccounts extends Project {
-  accounts: AnthropicCredentialSafe[]
+  accounts: CredentialSafe[]
 }
 
 export interface ProjectAccount {
@@ -82,7 +103,7 @@ export interface ProjectApiKeySafe {
   status: 'active' | 'revoked'
 }
 
-export interface CreateCredentialRequest {
+export interface CreateAnthropicCredentialRequest {
   account_id: string
   account_name: string
   oauth_access_token: string
@@ -91,6 +112,17 @@ export interface CreateCredentialRequest {
   oauth_scopes: string[]
   oauth_is_max?: boolean
 }
+
+export interface CreateBedrockCredentialRequest {
+  account_id: string
+  account_name: string
+  aws_api_key: string
+  aws_region?: string
+}
+
+export type CreateCredentialRequest =
+  | CreateAnthropicCredentialRequest
+  | CreateBedrockCredentialRequest
 
 export interface UpdateCredentialTokensRequest {
   oauth_access_token: string

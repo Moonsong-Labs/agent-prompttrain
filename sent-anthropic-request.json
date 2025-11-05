@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-06-20T11:53:06.818Z",
+  "method": "POST",
+  "path": "/v1/messages",
+  "headers": {
+    "accept": "application/json",
+    "accept-encoding": "gzip, deflate",
+    "accept-language": "*",
+    "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14",
+    "anthropic-dangerous-direct-browser-access": "true",
+    "anthropic-version": "2023-06-01",
+    "authorization": "Bearer cnp_live_U8WLVyIzR0EKTffkuoQRugnwIfhgHFpRFGr4MlvAhhc",
+    "connection": "keep-alive",
+    "content-length": "71045",
+    "content-type": "application/json",
+    "host": "localhost:3000",
+    "sec-fetch-mode": "cors",
+    "user-agent": "claude-cli/1.0.30 (external, cli)",
+    "x-app": "cli",
+    "x-stainless-arch": "x64",
+    "x-stainless-helper-method": "stream",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Linux",
+    "x-stainless-package-version": "0.51.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v22.11.0",
+    "x-stainless-timeout": "60"
+  },
+  "body": {
+    "model": "claude-opus-4-20250514",
+    "messages": [],
+    "temperature": 1,
+    "system": [],
+    "tools": []
+  }
+}

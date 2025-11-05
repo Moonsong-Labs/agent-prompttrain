@@ -18,7 +18,7 @@ import {
   updateProject,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
-import type { AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
+import type { CredentialSafe, AnthropicCredentialSafe } from '@agent-prompttrain/shared/types'
 import type { AuthContext } from '../middleware/auth.js'
 
 export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
@@ -527,7 +527,7 @@ trainsUIRoutes.get('/:projectId/view', async c => {
             : html`
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                   ${train.accounts.map(
-                    (cred: AnthropicCredentialSafe) => html`
+                    (cred: CredentialSafe) => html`
                       <div
                         style="background: ${train.default_account_id === cred.id
                           ? '#eff6ff'
@@ -550,12 +550,20 @@ trainsUIRoutes.get('/:projectId/view', async c => {
                               style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
                               >${cred.account_id}</code
                             >
-                            • Expires: ${new Date(cred.oauth_expires_at).toLocaleDateString()}
-                            ${new Date(cred.oauth_expires_at) < new Date()
-                              ? html`<span style="color: #dc2626; font-weight: 600;"
-                                  >⚠️ EXPIRED</span
-                                >`
-                              : ''}
+                            ${cred.provider === 'anthropic'
+                              ? html`
+                                  • Expires:
+                                  ${new Date(
+                                    (cred as AnthropicCredentialSafe).oauth_expires_at
+                                  ).toLocaleDateString()}
+                                  ${new Date((cred as AnthropicCredentialSafe).oauth_expires_at) <
+                                  new Date()
+                                    ? html`<span style="color: #dc2626; font-weight: 600;"
+                                        >⚠️ EXPIRED</span
+                                      >`
+                                    : ''}
+                                `
+                              : html`• Region: ${(cred as any).aws_region}`}
                           </div>
                         </div>
                         ${isOwner && train.default_account_id !== cred.id
