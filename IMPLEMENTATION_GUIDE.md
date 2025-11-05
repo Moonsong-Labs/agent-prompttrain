@@ -534,7 +534,7 @@ import { getTrainSlackConfig } from '@agent-prompttrain/shared/database/queries'
 
 1. Save credentials to database instead of filesystem
 2. Prompt for account_id and account_name
-3. Use `createCredential()` query
+3. Use `createAnthropicCredential()` query (multi-provider support)
 
 **Implementation:**
 
@@ -542,7 +542,7 @@ import { getTrainSlackConfig } from '@agent-prompttrain/shared/database/queries'
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { randomBytes, createHash } from 'crypto'
-import { createCredential } from '@agent-prompttrain/shared/database/queries'
+import { createAnthropicCredential } from '@agent-prompttrain/shared/database/queries'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
@@ -683,7 +683,7 @@ async function performOAuthLogin(): Promise<void> {
 
     // Save to database
     console.log('Saving credentials to database...')
-    const credential = await createCredential(pool, {
+    const credential = await createAnthropicCredential(pool, {
       account_id: accountId,
       account_name: accountName,
       oauth_access_token: tokens.accessToken,
@@ -716,8 +716,10 @@ performOAuthLogin()
 
 - Saves to database instead of filesystem
 - Prompts for account_id and account_name
-- Uses `createCredential()` query
+- Uses `createAnthropicCredential()` query (multi-provider support)
 - No API key generation (replaced by train API keys)
+
+**Note:** For AWS Bedrock credentials, use the separate `bedrock-login.ts` script which uses `createBedrockCredential()`. See [ADR-030: Multi-Provider Support](docs/04-Architecture/ADRs/adr-030-multi-provider-support.md).
 
 ---
 
