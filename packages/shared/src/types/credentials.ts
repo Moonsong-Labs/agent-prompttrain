@@ -120,10 +120,6 @@ export interface CreateBedrockCredentialRequest {
   aws_region?: string
 }
 
-export type CreateCredentialRequest =
-  | CreateAnthropicCredentialRequest
-  | CreateBedrockCredentialRequest
-
 export interface UpdateCredentialTokensRequest {
   oauth_access_token: string
   oauth_refresh_token: string

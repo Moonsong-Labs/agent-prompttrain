@@ -6,7 +6,6 @@ import type {
   CredentialSafe,
   CreateAnthropicCredentialRequest,
   CreateBedrockCredentialRequest,
-  CreateCredentialRequest,
   UpdateCredentialTokensRequest,
 } from '../../types/credentials'
 
@@ -72,21 +71,6 @@ export async function createBedrockCredential(
   )
 
   return result.rows[0]
-}
-
-/**
- * Create a new credential (legacy function for backward compatibility)
- * @deprecated Use createAnthropicCredential or createBedrockCredential instead
- */
-export async function createCredential(
-  pool: Pool,
-  request: CreateCredentialRequest
-): Promise<Credential> {
-  if ('oauth_access_token' in request) {
-    return createAnthropicCredential(pool, request)
-  } else {
-    return createBedrockCredential(pool, request)
-  }
 }
 
 /**
