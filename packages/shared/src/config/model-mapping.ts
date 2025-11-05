@@ -10,22 +10,34 @@ export interface BedrockModelConfig {
 
 /**
  * Map of Anthropic model names to Bedrock model IDs
- * Updated as of January 2025
+ * Updated as of November 2025
  */
 export const MODEL_MAPPING: Record<string, string> = {
+  // Claude 4.5 Haiku (Latest - October 2025)
+  'claude-haiku-4-5': 'us.anthropic.claude-haiku-4-5-20251015-v1:0',
+  'claude-haiku-4-5-20251015': 'us.anthropic.claude-haiku-4-5-20251015-v1:0',
+  'claude-haiku-4-5-20251001': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+
+  // Claude 4.5 Sonnet (Latest - September 2025)
+  'claude-sonnet-4-5': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+  'claude-sonnet-4-5-20250929': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+
+  // Claude 4.1 Opus (Latest - August 2025)
+  'claude-opus-4-1': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
+  'claude-opus-4-1-20250805': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
+
+  // Claude 4 Sonnet (May 2025)
+  'claude-sonnet-4-20250514': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
+
+  // Claude 4 Opus (May 2025)
+  'claude-opus-4-20250514': 'us.anthropic.claude-opus-4-20250514-v1:0',
+
   // Claude 3.5 Sonnet
   'claude-3-5-sonnet-20241022': 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
   'claude-3-5-sonnet-20240620': 'anthropic.claude-3-5-sonnet-20240620-v1:0',
 
   // Claude 3.5 Haiku
   'claude-3-5-haiku-20241022': 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
-
-  // Claude Sonnet 4
-  'claude-sonnet-4-20250514': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
-  'claude-sonnet-4-5-20250929': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
-
-  // Claude Opus 4
-  'claude-opus-4-20250514': 'us.anthropic.claude-opus-4-20250514-v1:0',
 
   // Claude 3 Opus
   'claude-3-opus-20240229': 'anthropic.claude-3-opus-20240229-v1:0',
