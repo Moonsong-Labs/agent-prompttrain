@@ -41,9 +41,21 @@ export class BedrockApiClient {
     const url = `https://bedrock-runtime.${this.config.region}.amazonaws.com/model/${bedrockModelId}/invoke${streamSuffix}`
 
     // Prepare Bedrock-specific headers
-    // Note: Bedrock uses x-api-key, not Authorization header
+    // Blacklist headers that should not be forwarded to Bedrock
+    const blacklistedHeaders = ['authorization', 'host', 'content-length']
+    const clientHeaders = request.createHeaders({})
+
+    // Filter out blacklisted headers
+    const filteredHeaders: Record<string, string> = {}
+    for (const [key, value] of Object.entries(clientHeaders)) {
+      if (!blacklistedHeaders.includes(key.toLowerCase())) {
+        filteredHeaders[key] = value
+      }
+    }
+
+    // Add Bedrock authentication
     const headers = {
-      'Content-Type': 'application/json',
+      ...filteredHeaders,
       ...authHeaders, // Contains x-api-key
     }
 
