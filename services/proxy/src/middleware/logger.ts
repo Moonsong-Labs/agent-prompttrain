@@ -96,12 +96,20 @@ class Logger {
     ]
 
     if (typeof obj === 'string') {
-      // Mask API keys
+      // Mask API keys - show first 10 and last 4 chars
       if (obj.startsWith('sk-ant-')) {
+        if (obj.length > 14) {
+          return obj.substring(0, 10) + '...' + obj.substring(obj.length - 4)
+        }
         return obj.substring(0, 10) + '****'
       }
+      // Mask Bearer tokens - show "Bearer " + first 3 chars + "..." + last 4 chars
       if (obj.startsWith('Bearer ')) {
-        return 'Bearer ****'
+        const token = obj.substring(7) // Remove "Bearer "
+        if (token.length > 7) {
+          return 'Bearer ' + token.substring(0, 3) + '...' + token.substring(token.length - 4)
+        }
+        return 'Bearer ' + token.substring(0, 3) + '...'
       }
       return obj
     }
@@ -124,7 +132,12 @@ class Logger {
         ) {
           masked[key] = value
         } else if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
-          masked[key] = '****'
+          // For sensitive keys, show partial value if it's a string
+          if (typeof value === 'string' && value.length > 7) {
+            masked[key] = value.substring(0, 3) + '...' + value.substring(value.length - 4)
+          } else {
+            masked[key] = '****'
+          }
         } else {
           masked[key] = this.maskSensitive(value)
         }
