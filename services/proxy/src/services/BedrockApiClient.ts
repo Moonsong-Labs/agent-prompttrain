@@ -32,7 +32,11 @@ export class BedrockApiClient {
   /**
    * Forward a request to Bedrock API
    */
-  async forward(request: ProxyRequest, authHeaders: BedrockAuthHeaders): Promise<Response> {
+  async forward(
+    request: ProxyRequest,
+    authHeaders: BedrockAuthHeaders,
+    clientHeaders?: Record<string, string>
+  ): Promise<Response> {
     // Map the model ID to Bedrock format
     const bedrockModelId = mapToBedrockModel(request.raw.model)
 
@@ -42,12 +46,14 @@ export class BedrockApiClient {
 
     // Prepare Bedrock-specific headers
     // Blacklist headers that should not be forwarded to Bedrock
-    const blacklistedHeaders = ['authorization', 'host', 'content-length']
-    const clientHeaders = request.createHeaders({})
+    const blacklistedHeaders = ['authorization', 'host', 'content-length', 'connection']
+
+    // Start with client headers if provided, otherwise use minimal set
+    const baseHeaders = clientHeaders || request.createHeaders({})
 
     // Filter out blacklisted headers
     const filteredHeaders: Record<string, string> = {}
-    for (const [key, value] of Object.entries(clientHeaders)) {
+    for (const [key, value] of Object.entries(baseHeaders)) {
       if (!blacklistedHeaders.includes(key.toLowerCase())) {
         filteredHeaders[key] = value
       }

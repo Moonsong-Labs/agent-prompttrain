@@ -190,7 +190,16 @@ export class ProxyService {
           region: auth.region || 'us-east-1',
           timeout: 600000,
         })
-        claudeResponse = await bedrockClient.forward(request, auth.headers as any)
+
+        // Extract raw headers from Hono context if available
+        const clientHeaders: Record<string, string> = {}
+        if (context.honoContext) {
+          context.honoContext.req.raw.headers.forEach((value, key) => {
+            clientHeaders[key] = value
+          })
+        }
+
+        claudeResponse = await bedrockClient.forward(request, auth.headers as any, clientHeaders)
       } else {
         claudeResponse = await this.apiClient.forward(request, auth)
       }
