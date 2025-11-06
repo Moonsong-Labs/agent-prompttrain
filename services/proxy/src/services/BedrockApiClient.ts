@@ -86,24 +86,14 @@ export class BedrockApiClient {
 
     try {
       // Add Bedrock-specific version to the request body
+      // Remove 'stream' and 'model' fields as they are not permitted in Bedrock API
+      // - 'model' is specified in the URL path
+      // - 'stream' is determined by the endpoint suffix (/invoke vs /invoke-with-response-stream)
+      const { stream: _stream, model: _model, ...bedrockRequestBody } = request.raw
       const bedrockBody = {
-        ...request.raw,
+        ...bedrockRequestBody,
         anthropic_version: 'bedrock-2023-05-31',
       }
-
-      // Log request details for debugging
-      logger.debug('Bedrock API request', {
-        requestId: request.requestId,
-        metadata: {
-          url,
-          method: 'POST',
-          hasAuthHeader: !!headers.Authorization,
-          authHeaderPreview: headers.Authorization
-            ? headers.Authorization.substring(0, 20) + '...'
-            : 'none',
-          headerKeys: Object.keys(headers),
-        },
-      })
 
       const response = await fetch(url, {
         method: 'POST',

@@ -189,6 +189,7 @@ if (auth.provider === 'bedrock') {
 - Projects continue to have a single default credential (no provider-based fail-over)
 - Model mapping uses `us.anthropic` prefix for US region Bedrock models
 - Bedrock requests require `anthropic_version: 'bedrock-2023-05-31'` in request body
+- Bedrock API does not accept `stream` or `model` fields in request body (model is in URL path, streaming mode is in endpoint suffix)
 - Dashboard UI uses emojis for quick visual provider identification
 - Future providers (e.g., Azure, GCP) can follow the same pattern
 

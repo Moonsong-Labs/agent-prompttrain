@@ -67,23 +67,11 @@ export function clientAuthMiddleware() {
       // Verify the API key and get the associated train ID
       const verification = await verifyApiKeyAndGetTrain(pool, token)
 
-      logger.debug('Client auth middleware: API key verification result', {
-        requestId,
-        projectId: verification?.projectId || 'none',
-        metadata: {
-          hasVerification: !!verification,
-          tokenPreview: token.substring(0, 13) + '...' + token.substring(token.length - 4),
-        },
-      })
-
       if (!verification) {
         logger.warn('Client auth middleware: Invalid API key', {
           requestId,
           path: c.req.path,
           ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
-          metadata: {
-            tokenPreview: token.substring(0, 13) + '...' + token.substring(token.length - 4),
-          },
         })
         return c.json(
           {
@@ -101,14 +89,6 @@ export function clientAuthMiddleware() {
 
       // Set the project ID in context based on the API key
       c.set('projectId', verification.projectId)
-
-      logger.debug('Client auth middleware: Authentication successful, projectId set', {
-        requestId,
-        projectId: verification.projectId,
-        metadata: {
-          contextProjectId: c.get('projectId'),
-        },
-      })
 
       // Authentication successful, proceed to next middleware
       await next()
