@@ -140,7 +140,7 @@ export class AuthenticationService {
       provider: 'bedrock',
       type: 'api_key',
       headers: {
-        'x-api-key': credential.aws_api_key,
+        Authorization: credential.aws_api_key,
       },
       key: credential.aws_api_key,
       accountId: credential.account_id,

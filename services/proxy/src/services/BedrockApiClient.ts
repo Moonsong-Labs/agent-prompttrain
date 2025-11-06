@@ -95,6 +95,17 @@ export class BedrockApiClient {
           parsedError = { error: { message: errorBody, type: 'api_error' } }
         }
 
+        // Log detailed error info for debugging
+        logger.error('Bedrock API error response', {
+          requestId: request.requestId,
+          metadata: {
+            status: response.status,
+            url: url,
+            errorBody: errorBody.substring(0, 500), // First 500 chars
+            headers: Object.fromEntries(response.headers.entries()),
+          },
+        })
+
         throw new UpstreamError(
           errorMessage,
           response.status,
