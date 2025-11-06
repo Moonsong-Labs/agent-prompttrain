@@ -106,6 +106,7 @@
     "typescript-eslint": "^8.18.0"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.925.0",
     "@hono/node-server": "^1.13.7",
     "@octokit/rest": "^22.0.0",
     "dotenv": "^16.4.7",
