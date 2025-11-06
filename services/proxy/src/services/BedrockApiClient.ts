@@ -40,8 +40,12 @@ export class BedrockApiClient {
     const streamSuffix = request.raw.stream ? '-with-response-stream' : ''
     const url = `https://bedrock-runtime.${this.config.region}.amazonaws.com/model/${bedrockModelId}/invoke${streamSuffix}`
 
-    // Prepare headers - pass through most client headers
-    const headers = request.createHeaders(authHeaders)
+    // Prepare Bedrock-specific headers
+    // Note: Bedrock uses x-api-key, not Authorization header
+    const headers = {
+      'Content-Type': 'application/json',
+      ...authHeaders, // Contains x-api-key
+    }
 
     // Use retry logic for transient failures
     return retryWithBackoff(
@@ -68,6 +72,20 @@ export class BedrockApiClient {
         ...request.raw,
         anthropic_version: 'bedrock-2023-05-31',
       }
+
+      // Log request details for debugging
+      logger.debug('Bedrock API request', {
+        requestId: request.requestId,
+        metadata: {
+          url,
+          method: 'POST',
+          hasAuthHeader: !!headers.Authorization,
+          authHeaderPreview: headers.Authorization
+            ? headers.Authorization.substring(0, 20) + '...'
+            : 'none',
+          headerKeys: Object.keys(headers),
+        },
+      })
 
       const response = await fetch(url, {
         method: 'POST',
