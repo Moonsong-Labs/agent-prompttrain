@@ -23,8 +23,8 @@ export const MODEL_MAPPING: Record<string, string> = {
   'claude-sonnet-4-5-20250929': 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
 
   // Claude 4.1 Opus (Latest - August 2025)
-  'claude-opus-4-1': 'global.anthropic.claude-opus-4-1-20250805-v1:0',
-  'claude-opus-4-1-20250805': 'global.anthropic.claude-opus-4-1-20250805-v1:0',
+  'claude-opus-4-1': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
+  'claude-opus-4-1-20250805': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
 
   // Claude 4 Sonnet (May 2025)
   'claude-sonnet-4-20250514': 'global.anthropic.claude-sonnet-4-20250514-v1:0',
