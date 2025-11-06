@@ -18,6 +18,17 @@ export function projectIdExtractorMiddleware() {
       const rawHeader = c.req.header(MSL_PROJECT_ID_HEADER_LOWER)
       const fallbackTrainId = config.auth.defaultTrainId || 'default'
 
+      logger.debug('Project ID extractor: checking for project ID', {
+        path: c.req.path,
+        method: c.req.method,
+        metadata: {
+          hasExistingTrainId: !!existingTrainId,
+          hasHeaderValue: !!rawHeader,
+          headerValue: rawHeader ? rawHeader.substring(0, 10) + '...' : 'none',
+          willUseFallback: !rawHeader || !rawHeader.trim(),
+        },
+      })
+
       if (!rawHeader || !rawHeader.trim()) {
         logger.debug('No train ID from auth or header; applying fallback', {
           path: c.req.path,
@@ -29,6 +40,11 @@ export function projectIdExtractorMiddleware() {
       } else {
         c.set('projectId', rawHeader.trim())
       }
+    } else {
+      logger.debug('Project ID extractor: projectId already set by auth', {
+        path: c.req.path,
+        projectId: existingTrainId,
+      })
     }
 
     const rawAccount = c.req.header(MSL_ACCOUNT_HEADER_LOWER)
