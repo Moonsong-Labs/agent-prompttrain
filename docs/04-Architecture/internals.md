@@ -59,15 +59,15 @@ The system classifies requests into four types:
 
 Detection logic in `ProxyRequest.determineRequestType()`:
 
-1. Check for internal operations (specific model + system prompt signature)
+1. Check for internal operations (system prompt signature)
 2. Check for quota queries
 3. Count system messages to distinguish inference vs query_evaluation
 
 Internal operations are detected by:
 
-- Model: `claude-haiku-4-5-20251001`
 - System prompt contains: "Extract any file paths that this command reads or modifies"
 - Empty or no tools array
+- Model-agnostic (works with any Claude model to future-proof against model changes)
 
 ## Core Components
 
