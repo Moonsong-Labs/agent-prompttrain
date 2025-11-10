@@ -51,7 +51,7 @@ export class TestSampleCollector {
   async collectSample(
     context: Context,
     validatedBody: ClaudeMessagesRequest,
-    requestType: 'query_evaluation' | 'inference' | 'quota'
+    requestType: 'query_evaluation' | 'inference' | 'quota' | 'internal_operation'
   ): Promise<string | undefined> {
     if (!this.enabled) {
       return undefined

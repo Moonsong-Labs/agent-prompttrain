@@ -293,7 +293,7 @@ interface RequestDetailsResponse {
   error_type?: string
   error_message?: string
   model?: string
-  request_type: 'inference' | 'query_evaluation' | 'quota'
+  request_type: 'inference' | 'query_evaluation' | 'quota' | 'internal_operation'
   input_tokens: number
   output_tokens: number
   total_tokens: number
@@ -460,7 +460,7 @@ type ModelId = string
 type AccountId = string
 
 // Request types
-type RequestType = 'inference' | 'query_evaluation' | 'quota'
+type RequestType = 'inference' | 'query_evaluation' | 'quota' | 'internal_operation'
 
 // HTTP methods
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'

@@ -29,7 +29,11 @@ export interface TelemetryData {
 }
 
 // Request types that should not be stored in the database
-const NON_STORABLE_REQUEST_TYPES = new Set<RequestType>(['query_evaluation', 'quota'])
+const NON_STORABLE_REQUEST_TYPES = new Set<RequestType>([
+  'query_evaluation',
+  'quota',
+  'internal_operation',
+])
 
 /**
  * Service responsible for metrics collection and tracking

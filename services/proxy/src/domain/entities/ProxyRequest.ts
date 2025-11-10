@@ -1,6 +1,6 @@
 import { ClaudeMessagesRequest, countSystemMessages } from '@agent-prompttrain/shared'
 
-export type RequestType = 'query_evaluation' | 'inference' | 'quota'
+export type RequestType = 'query_evaluation' | 'inference' | 'quota' | 'internal_operation'
 
 /**
  * Domain entity representing a proxy request
@@ -98,6 +98,11 @@ export class ProxyRequest {
   }
 
   private determineRequestType(): RequestType {
+    // Check if this is a Claude Code internal operation (file path extraction)
+    if (this.isInternalOperation()) {
+      return 'internal_operation'
+    }
+
     // Check if this is a quota query
     const userContent = this.getUserContent()
     if (userContent && userContent.trim().toLowerCase() === 'quota') {
@@ -151,6 +156,34 @@ export class ProxyRequest {
     // Add system messages from messages array
     count += this.raw.messages.filter(m => m.role === 'system').length
     return count
+  }
+
+  /**
+   * Check if this is a Claude Code internal operation request
+   * These requests are used by Claude Code CLI for internal operations like
+   * extracting file paths from command outputs
+   */
+  private isInternalOperation(): boolean {
+    // Check model - Claude Code internal requests use claude-haiku
+    if (this.raw.model !== 'claude-haiku-4-5-20251001') {
+      return false
+    }
+
+    // Check for empty or absent tools array
+    if (this.raw.tools && this.raw.tools.length > 0) {
+      return false
+    }
+
+    // Check system prompt for file path extraction signature
+    if (this.raw.system) {
+      const systemPromptText = Array.isArray(this.raw.system)
+        ? this.raw.system.map(block => (block.type === 'text' ? block.text : '')).join(' ')
+        : this.raw.system
+
+      return systemPromptText.includes('Extract any file paths that this command reads or modifies')
+    }
+
+    return false
   }
 
   /**
