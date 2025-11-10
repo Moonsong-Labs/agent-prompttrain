@@ -248,7 +248,7 @@ describe('ProxyRequest - Request Type Identification', () => {
       expect(request.requestType).toBe('internal_operation')
     })
 
-    it('should NOT identify internal operation if model is different', () => {
+    it('should identify internal operation regardless of model', () => {
       const request = new ProxyRequest(
         {
           model: 'claude-3-opus-20240229',
@@ -265,7 +265,7 @@ describe('ProxyRequest - Request Type Identification', () => {
         'test-123'
       )
 
-      expect(request.requestType).not.toBe('internal_operation')
+      expect(request.requestType).toBe('internal_operation')
     })
 
     it('should NOT identify internal operation if tools are present', () => {

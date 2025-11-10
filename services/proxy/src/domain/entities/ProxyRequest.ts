@@ -164,11 +164,6 @@ export class ProxyRequest {
    * extracting file paths from command outputs
    */
   private isInternalOperation(): boolean {
-    // Check model - Claude Code internal requests use claude-haiku
-    if (this.raw.model !== 'claude-haiku-4-5-20251001') {
-      return false
-    }
-
     // Check for empty or absent tools array
     if (this.raw.tools && this.raw.tools.length > 0) {
       return false
