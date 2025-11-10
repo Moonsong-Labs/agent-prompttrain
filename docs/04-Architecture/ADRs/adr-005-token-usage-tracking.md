@@ -75,8 +75,9 @@ We will implement **direct storage in the api_requests table** with account-leve
    ```
 
 3. **Request Type Handling**:
-   - Track ALL types: `inference`, `query_evaluation`, `quota`
-   - Non-storable types excluded from response storage but tracked for metrics
+   - Track ALL types: `inference`, `query_evaluation`, `quota`, `internal_operation`
+   - Non-storable types (`query_evaluation`, `quota`, `internal_operation`) excluded from response storage but tracked for metrics
+   - `internal_operation` represents Claude Code CLI internal requests (e.g., file path extraction)
 
 4. **5-Hour Window Queries**:
 

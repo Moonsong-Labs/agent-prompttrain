@@ -20,7 +20,7 @@ class TokenTracker {
     projectId: string,
     inputTokens: number = 0,
     outputTokens: number = 0,
-    requestType?: 'query_evaluation' | 'inference',
+    requestType?: 'query_evaluation' | 'inference' | 'internal_operation',
     toolCallCount: number = 0
   ) {
     const current = this.stats.get(projectId) || {

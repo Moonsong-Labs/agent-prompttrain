@@ -10,42 +10,42 @@ Agent Prompt Train uses PostgreSQL to store API request/response data, conversat
 
 The main table storing all API requests and responses.
 
-| Column                      | Type         | Description                                   |
-| --------------------------- | ------------ | --------------------------------------------- |
-| request_id                  | UUID         | Primary key, unique request identifier        |
-| project_id                  | VARCHAR(255) | Train identifier from `MSL-Project-Id` header |
-| account_id                  | VARCHAR(255) | Account identifier from credential file       |
-| timestamp                   | TIMESTAMPTZ  | Request timestamp                             |
-| method                      | VARCHAR(10)  | HTTP method (always POST for Claude)          |
-| path                        | VARCHAR(255) | API path (e.g., /v1/messages)                 |
-| headers                     | JSONB        | Request headers (sanitized)                   |
-| body                        | JSONB        | Request body                                  |
-| api_key_hash                | VARCHAR(50)  | Hashed API key for security                   |
-| model                       | VARCHAR(100) | Claude model name                             |
-| request_type                | VARCHAR(50)  | Type: inference, query_evaluation, or quota   |
-| response_status             | INTEGER      | HTTP response status code                     |
-| response_headers            | JSONB        | Response headers                              |
-| response_body               | JSONB        | Response body                                 |
-| response_streaming          | BOOLEAN      | Whether response was streamed                 |
-| input_tokens                | INTEGER      | Input token count                             |
-| output_tokens               | INTEGER      | Output token count                            |
-| total_tokens                | INTEGER      | Total tokens (input + output)                 |
-| cache_creation_input_tokens | INTEGER      | Cache creation tokens                         |
-| cache_read_input_tokens     | INTEGER      | Cache read tokens                             |
-| usage_data                  | JSONB        | Additional usage metadata                     |
-| first_token_ms              | INTEGER      | Time to first token (streaming)               |
-| duration_ms                 | INTEGER      | Total request duration                        |
-| error                       | TEXT         | Error message if request failed               |
-| tool_call_count             | INTEGER      | Number of tool calls in response              |
-| current_message_hash        | CHAR(64)     | SHA-256 hash of last message                  |
-| parent_message_hash         | CHAR(64)     | SHA-256 hash of previous message              |
-| conversation_id             | UUID         | Groups messages into conversations            |
-| branch_id                   | VARCHAR(255) | Branch within conversation (default: 'main')  |
-| message_count               | INTEGER      | Total messages in conversation                |
-| parent_task_request_id      | UUID         | Links sub-task requests to parent task        |
-| is_subtask                  | BOOLEAN      | Indicates if request is a sub-task            |
-| task_tool_invocation        | JSONB        | Task tool invocation details                  |
-| created_at                  | TIMESTAMPTZ  | Record creation timestamp                     |
+| Column                      | Type         | Description                                                     |
+| --------------------------- | ------------ | --------------------------------------------------------------- |
+| request_id                  | UUID         | Primary key, unique request identifier                          |
+| project_id                  | VARCHAR(255) | Train identifier from `MSL-Project-Id` header                   |
+| account_id                  | VARCHAR(255) | Account identifier from credential file                         |
+| timestamp                   | TIMESTAMPTZ  | Request timestamp                                               |
+| method                      | VARCHAR(10)  | HTTP method (always POST for Claude)                            |
+| path                        | VARCHAR(255) | API path (e.g., /v1/messages)                                   |
+| headers                     | JSONB        | Request headers (sanitized)                                     |
+| body                        | JSONB        | Request body                                                    |
+| api_key_hash                | VARCHAR(50)  | Hashed API key for security                                     |
+| model                       | VARCHAR(100) | Claude model name                                               |
+| request_type                | VARCHAR(50)  | Type: inference, query_evaluation, quota, or internal_operation |
+| response_status             | INTEGER      | HTTP response status code                                       |
+| response_headers            | JSONB        | Response headers                                                |
+| response_body               | JSONB        | Response body                                                   |
+| response_streaming          | BOOLEAN      | Whether response was streamed                                   |
+| input_tokens                | INTEGER      | Input token count                                               |
+| output_tokens               | INTEGER      | Output token count                                              |
+| total_tokens                | INTEGER      | Total tokens (input + output)                                   |
+| cache_creation_input_tokens | INTEGER      | Cache creation tokens                                           |
+| cache_read_input_tokens     | INTEGER      | Cache read tokens                                               |
+| usage_data                  | JSONB        | Additional usage metadata                                       |
+| first_token_ms              | INTEGER      | Time to first token (streaming)                                 |
+| duration_ms                 | INTEGER      | Total request duration                                          |
+| error                       | TEXT         | Error message if request failed                                 |
+| tool_call_count             | INTEGER      | Number of tool calls in response                                |
+| current_message_hash        | CHAR(64)     | SHA-256 hash of last message                                    |
+| parent_message_hash         | CHAR(64)     | SHA-256 hash of previous message                                |
+| conversation_id             | UUID         | Groups messages into conversations                              |
+| branch_id                   | VARCHAR(255) | Branch within conversation (default: 'main')                    |
+| message_count               | INTEGER      | Total messages in conversation                                  |
+| parent_task_request_id      | UUID         | Links sub-task requests to parent task                          |
+| is_subtask                  | BOOLEAN      | Indicates if request is a sub-task                              |
+| task_tool_invocation        | JSONB        | Task tool invocation details                                    |
+| created_at                  | TIMESTAMPTZ  | Record creation timestamp                                       |
 
 ### streaming_chunks
 
@@ -157,6 +157,7 @@ The `request_type` column categorizes requests:
 - `inference` - Normal Claude API calls (2+ system messages)
 - `query_evaluation` - Special evaluation requests (0-1 system messages)
 - `quota` - Quota check requests (user message = "quota")
+- `internal_operation` - Claude Code CLI internal requests (e.g., file path extraction) - **not stored in database**
 
 ### AI-Powered Conversation Analysis
 

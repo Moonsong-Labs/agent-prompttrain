@@ -196,6 +196,115 @@ describe('ProxyRequest - Request Type Identification', () => {
     })
   })
 
+  describe('internal_operation requests', () => {
+    it('should identify Claude Code internal file path extraction request', () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-haiku-4-5-20251001',
+          tools: [],
+          stream: true,
+          system: [
+            {
+              text: "You are Claude Code, Anthropic's official CLI for Claude.",
+              type: 'text',
+            },
+            {
+              text: 'Extract any file paths that this command reads or modifies. For commands like "git diff" and "cat", include the paths of files being shown.',
+              type: 'text',
+            },
+          ],
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  text: 'Command: ls apps/proxy/src/\nOutput: test\n\n',
+                  type: 'text',
+                },
+              ],
+            },
+          ],
+          max_tokens: 32000,
+        },
+        'project-alpha',
+        'test-123'
+      )
+
+      expect(request.requestType).toBe('internal_operation')
+    })
+
+    it('should identify internal operation with string system field', () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-haiku-4-5-20251001',
+          system: 'Extract any file paths that this command reads or modifies',
+          messages: [{ role: 'user', content: 'Command: ls' }],
+          max_tokens: 100,
+        },
+        'project-alpha',
+        'test-123'
+      )
+
+      expect(request.requestType).toBe('internal_operation')
+    })
+
+    it('should identify internal operation regardless of model', () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-3-opus-20240229',
+          system: [
+            {
+              text: 'Extract any file paths that this command reads or modifies',
+              type: 'text',
+            },
+          ],
+          messages: [{ role: 'user', content: 'Command: ls' }],
+          max_tokens: 100,
+        },
+        'project-alpha',
+        'test-123'
+      )
+
+      expect(request.requestType).toBe('internal_operation')
+    })
+
+    it('should NOT identify internal operation if tools are present', () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-haiku-4-5-20251001',
+          tools: [{ name: 'test_tool', description: 'test', input_schema: { type: 'object' } }],
+          system: [
+            {
+              text: 'Extract any file paths that this command reads or modifies',
+              type: 'text',
+            },
+          ],
+          messages: [{ role: 'user', content: 'Command: ls' }],
+          max_tokens: 100,
+        },
+        'project-alpha',
+        'test-123'
+      )
+
+      expect(request.requestType).not.toBe('internal_operation')
+    })
+
+    it('should NOT identify internal operation if system prompt is different', () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-haiku-4-5-20251001',
+          system: 'You are a helpful assistant',
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 100,
+        },
+        'project-alpha',
+        'test-123'
+      )
+
+      expect(request.requestType).not.toBe('internal_operation')
+    })
+  })
+
   describe('edge cases', () => {
     it('should handle empty messages array', () => {
       const request = new ProxyRequest(

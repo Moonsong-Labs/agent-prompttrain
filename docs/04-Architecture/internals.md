@@ -40,11 +40,34 @@ Deep dive into the Agent Prompt Train implementation details, architecture patte
 1. **Client Request** → Proxy Service
 2. **Authentication** → Validate client API key
 3. **Project Resolution** → Load credentials for project
-4. **Request Enhancement** → Add auth headers, tracking
-5. **Claude API Call** → Forward to Anthropic
-6. **Response Processing** → Stream or JSON response
-7. **Storage** → Async write to PostgreSQL
-8. **Response** → Return to client
+4. **Request Type Detection** → Determine request classification
+5. **Request Enhancement** → Add auth headers, tracking
+6. **Claude API Call** → Forward to Anthropic
+7. **Response Processing** → Stream or JSON response
+8. **Storage Filtering** → Check if request should be stored
+9. **Storage** → Async write to PostgreSQL (if applicable)
+10. **Response** → Return to client
+
+#### Request Type Detection
+
+The system classifies requests into four types:
+
+- **`inference`**: Normal Claude API calls with 2+ system messages - stored in database
+- **`query_evaluation`**: Evaluation requests with 0-1 system messages - not stored
+- **`quota`**: Quota check requests (user message = "quota") - not stored
+- **`internal_operation`**: Claude Code CLI internal operations (e.g., file path extraction) - not stored
+
+Detection logic in `ProxyRequest.determineRequestType()`:
+
+1. Check for internal operations (system prompt signature)
+2. Check for quota queries
+3. Count system messages to distinguish inference vs query_evaluation
+
+Internal operations are detected by:
+
+- System prompt contains: "Extract any file paths that this command reads or modifies"
+- Empty or no tools array
+- Model-agnostic (works with any Claude model to future-proof against model changes)
 
 ## Core Components
 
