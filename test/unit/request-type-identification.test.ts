@@ -205,7 +205,7 @@ describe('ProxyRequest - Request Type Identification', () => {
           stream: true,
           system: [
             {
-              text: 'You are Claude Code, Anthropic\'s official CLI for Claude.',
+              text: "You are Claude Code, Anthropic's official CLI for Claude.",
               type: 'text',
             },
             {
