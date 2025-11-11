@@ -96,11 +96,30 @@ bun run scripts/auth/generate-api-key.ts
 
 ### oauth-login.ts
 
-Initiates OAuth login flow for a train.
+Initiates OAuth login flow to add Anthropic credentials to the database. Interactive CLI that guides you through the OAuth process.
 
 ```bash
-bun run scripts/auth/oauth-login.ts example.com
+bun run scripts/auth/oauth-login.ts
 ```
+
+### bedrock-login.ts
+
+Adds AWS Bedrock credentials to the database. Interactive CLI that prompts for AWS API key, account details, and region.
+
+```bash
+bun run scripts/auth/bedrock-login.ts
+```
+
+**Prerequisites:**
+
+- Generate a long-term API key from AWS Bedrock Console: https://us-east-1.console.aws.amazon.com/bedrock/home?region=us-east-1#/api-keys/long-term/create
+
+**Prompts:**
+
+- Account ID (e.g., `acc_bedrock_prod`)
+- Account Name (e.g., `Bedrock Production`)
+- AWS Bedrock API Key
+- AWS Region (default: `us-east-1`)
 
 ### oauth-refresh.ts
 

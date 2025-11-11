@@ -4,7 +4,7 @@ import type {
   ProjectWithAccounts,
   CreateProjectRequest,
   UpdateProjectRequest,
-  AnthropicCredential,
+  Credential,
   SlackConfig,
 } from '../../types/credentials'
 import { toSafeCredential } from './credential-queries-internal'
@@ -15,7 +15,7 @@ import { toSafeCredential } from './credential-queries-internal'
 export async function createProject(pool: Pool, request: CreateProjectRequest): Promise<Project> {
   // Get a random credential to use as default
   const credentialResult = await pool.query<{ id: string }>(
-    'SELECT id FROM anthropic_credentials ORDER BY RANDOM() LIMIT 1'
+    'SELECT id FROM credentials ORDER BY RANDOM() LIMIT 1'
   )
 
   const defaultAccountId = credentialResult.rows[0]?.id || null
@@ -86,8 +86,8 @@ export async function getProjectWithAccounts(
   }
 
   // All projects have access to all credentials
-  const accountsResult = await pool.query<AnthropicCredential>(
-    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
+  const accountsResult = await pool.query<Credential>(
+    `SELECT * FROM credentials ORDER BY account_name ASC`
   )
 
   return {
@@ -112,8 +112,8 @@ export async function listProjectsWithAccounts(pool: Pool): Promise<ProjectWithA
   const projects = await listProjects(pool)
 
   // Get all credentials once (shared across all projects)
-  const accountsResult = await pool.query<AnthropicCredential>(
-    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
+  const accountsResult = await pool.query<Credential>(
+    `SELECT * FROM credentials ORDER BY account_name ASC`
   )
 
   const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
@@ -228,15 +228,12 @@ export async function setProjectDefaultAccount(
  * Get the default credential for a project
  * Returns only the project's default_account_id credential
  */
-export async function getProjectCredentials(
-  pool: Pool,
-  projectId: string
-): Promise<AnthropicCredential[]> {
-  const result = await pool.query<AnthropicCredential>(
+export async function getProjectCredentials(pool: Pool, projectId: string): Promise<Credential[]> {
+  const result = await pool.query<Credential>(
     `
-    SELECT ac.*
+    SELECT c.*
     FROM projects p
-    JOIN anthropic_credentials ac ON p.default_account_id = ac.id
+    JOIN credentials c ON p.default_account_id = c.id
     WHERE p.project_id = $1
     `,
     [projectId]

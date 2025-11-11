@@ -34,21 +34,28 @@ credentialsUIRoutes.get('/', async c => {
 
     const content = html`
       <div style="margin-bottom: 2rem;">
-        <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">
-          OAuth Credentials
-        </h2>
+        <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">API Credentials</h2>
 
         <div
           style="background-color: #eff6ff; border: 1px solid #3b82f6; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;"
         >
-          <p style="margin: 0; color: #1e40af;">
-            <strong>ℹ️ Note:</strong> OAuth credentials are managed via the command-line login
-            script. Use
-            <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
-              >bun run scripts/auth/oauth-login.ts</code
-            >
-            to add new credentials.
+          <p style="margin: 0; color: #1e40af; margin-bottom: 0.5rem;">
+            <strong>ℹ️ Note:</strong> Credentials are managed via command-line scripts:
           </p>
+          <ul style="margin: 0.5rem 0 0 1.5rem; color: #1e40af;">
+            <li>
+              Anthropic OAuth:
+              <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                >bun run scripts/auth/oauth-login.ts</code
+              >
+            </li>
+            <li>
+              AWS Bedrock:
+              <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                >bun run scripts/auth/bedrock-login.ts</code
+              >
+            </li>
+          </ul>
         </div>
 
         ${credentials.length === 0
@@ -72,6 +79,11 @@ credentialsUIRoutes.get('/', async c => {
                       <th
                         style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
                       >
+                        Provider
+                      </th>
+                      <th
+                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      >
                         Account ID
                       </th>
                       <th
@@ -82,22 +94,12 @@ credentialsUIRoutes.get('/', async c => {
                       <th
                         style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
                       >
-                        Expires At
+                        Details
                       </th>
                       <th
                         style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
                       >
-                        Scopes
-                      </th>
-                      <th
-                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                      >
-                        Is Max
-                      </th>
-                      <th
-                        style="padding: 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                      >
-                        Last Refreshed
+                        Status
                       </th>
                     </tr>
                   </thead>
@@ -105,6 +107,21 @@ credentialsUIRoutes.get('/', async c => {
                     ${credentials.map(
                       cred => html`
                         <tr style="border-bottom: 1px solid #e5e7eb;">
+                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
+                            ${cred.provider === 'anthropic'
+                              ? html`<span
+                                  style="display: inline-flex; align-items: center; background: #dbeafe; color: #1e40af; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 500;"
+                                  title="Anthropic Direct API"
+                                >
+                                  🔵 Anthropic
+                                </span>`
+                              : html`<span
+                                  style="display: inline-flex; align-items: center; background: #fed7aa; color: #9a3412; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 500;"
+                                  title="AWS Bedrock"
+                                >
+                                  🟠 Bedrock
+                                </span>`}
+                          </td>
                           <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
                             <code
                               style="background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
@@ -115,24 +132,40 @@ credentialsUIRoutes.get('/', async c => {
                             ${cred.account_name}
                           </td>
                           <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                            ${new Date(cred.oauth_expires_at).toLocaleString()}
-                            ${new Date(cred.oauth_expires_at) < new Date()
-                              ? html`<span
-                                  style="color: #dc2626; font-weight: 600; margin-left: 0.5rem;"
-                                  >⚠️ EXPIRED</span
-                                >`
-                              : ''}
+                            ${cred.provider === 'anthropic'
+                              ? html`
+                                  <div>
+                                    Expires:
+                                    ${new Date((cred as any).oauth_expires_at).toLocaleString()}
+                                  </div>
+                                  <div
+                                    style="margin-top: 0.25rem; font-size: 0.75rem; color: #6b7280;"
+                                  >
+                                    Scopes: ${(cred as any).oauth_scopes.join(', ')}
+                                  </div>
+                                `
+                              : html`
+                                  <div>Region: ${(cred as any).aws_region}</div>
+                                  <div
+                                    style="margin-top: 0.25rem; font-size: 0.75rem; color: #6b7280;"
+                                  >
+                                    Key: ${(cred as any).aws_api_key_preview}
+                                  </div>
+                                `}
                           </td>
                           <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                            ${cred.oauth_scopes.join(', ')}
-                          </td>
-                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
-                            ${cred.oauth_is_max ? '✅ Yes' : '❌ No'}
-                          </td>
-                          <td style="padding: 0.75rem; font-size: 0.875rem; color: #6b7280;">
-                            ${cred.last_refresh_at
-                              ? new Date(cred.last_refresh_at).toLocaleString()
-                              : 'Never'}
+                            ${cred.provider === 'anthropic'
+                              ? (cred as any).oauth_expires_at &&
+                                new Date((cred as any).oauth_expires_at) < new Date()
+                                ? html`<span style="color: #dc2626; font-weight: 600;"
+                                    >⚠️ EXPIRED</span
+                                  >`
+                                : html`<span style="color: #059669; font-weight: 600;"
+                                    >✅ Active</span
+                                  >`
+                              : html`<span style="color: #059669; font-weight: 600;"
+                                  >✅ Active</span
+                                >`}
                           </td>
                         </tr>
                       `
@@ -145,14 +178,29 @@ credentialsUIRoutes.get('/', async c => {
 
       <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;">
         <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 0.5rem;">
-          Add New Credential
+          Add New Credentials
         </h3>
         <p style="color: #6b7280; margin-bottom: 1rem;">
-          Run the OAuth login script to add a new credential:
+          Run the appropriate script to add credentials:
         </p>
-        <pre
-          style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto;"
-        ><code>bun run scripts/auth/oauth-login.ts</code></pre>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">
+              🔵 Anthropic OAuth
+            </h4>
+            <pre
+              style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.75rem;"
+            ><code>bun run scripts/auth/oauth-login.ts</code></pre>
+          </div>
+          <div>
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">
+              🟠 AWS Bedrock
+            </h4>
+            <pre
+              style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.75rem;"
+            ><code>bun run scripts/auth/bedrock-login.ts</code></pre>
+          </div>
+        </div>
       </div>
     `
 

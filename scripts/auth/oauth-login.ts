@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { randomBytes, createHash } from 'crypto'
-import { createCredential } from '../../packages/shared/src/database/queries/index.js'
+import { createAnthropicCredential } from '../../packages/shared/src/database/queries/index.js'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
@@ -142,7 +142,7 @@ async function performOAuthLogin(): Promise<void> {
 
     // Save to database
     console.log('Saving credentials to database...')
-    const credential = await createCredential(pool, {
+    const credential = await createAnthropicCredential(pool, {
       account_id: accountId,
       account_name: accountName,
       oauth_access_token: tokens.accessToken,

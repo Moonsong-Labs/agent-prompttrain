@@ -90,11 +90,6 @@ export function clientAuthMiddleware() {
       // Set the project ID in context based on the API key
       c.set('projectId', verification.projectId)
 
-      logger.debug('Client auth middleware: Authentication successful', {
-        requestId,
-        projectId: verification.projectId,
-      })
-
       // Authentication successful, proceed to next middleware
       await next()
     } catch (error) {

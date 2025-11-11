@@ -3,6 +3,7 @@ import { ProxyResponse } from '../domain/entities/ProxyResponse'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { AuthenticationService, AuthResult } from './AuthenticationService'
 import { ClaudeApiClient } from './ClaudeApiClient'
+import { BedrockApiClient } from './BedrockApiClient'
 import { NotificationService } from './NotificationService'
 import { MetricsService } from './MetricsService'
 import { ClaudeMessagesRequest, generateConversationId, config } from '@agent-prompttrain/shared'
@@ -155,6 +156,7 @@ export class ProxyService {
         })
 
         auth = {
+          provider: 'anthropic',
           type: 'oauth',
           headers: {
             Authorization: context.apiKey,
@@ -169,18 +171,38 @@ export class ProxyService {
         auth = await this.authService.authenticate(context)
       }
 
-      // Forward to Claude
-      log.info('Forwarding request to Claude', {
+      // Forward to appropriate provider
+      const providerName = auth.provider === 'bedrock' ? 'Bedrock' : 'Claude'
+      log.info(`Forwarding request to ${providerName}`, {
         model: request.model,
         streaming: request.isStreaming,
         requestType: request.requestType,
+        provider: auth.provider,
         authSource:
           context.apiKey && config.features.enableClientAuth === false
             ? 'passthrough from request'
             : `account:${auth.accountName}`,
       })
 
-      const claudeResponse = await this.apiClient.forward(request, auth)
+      let claudeResponse: Response
+      if (auth.provider === 'bedrock') {
+        const bedrockClient = new BedrockApiClient({
+          region: auth.region || 'us-east-1',
+          timeout: 600000,
+        })
+
+        // Extract raw headers from Hono context if available
+        const clientHeaders: Record<string, string> = {}
+        if (context.honoContext) {
+          context.honoContext.req.raw.headers.forEach((value, key) => {
+            clientHeaders[key] = value
+          })
+        }
+
+        claudeResponse = await bedrockClient.forward(request, auth.headers as any, clientHeaders)
+      } else {
+        claudeResponse = await this.apiClient.forward(request, auth)
+      }
 
       // Process response based on streaming mode
       let finalResponse: Response

@@ -65,10 +65,15 @@ export async function getApiKey(
     return null
   }
 
+  // Only OAuth credentials can be refreshed
+  if (credential.provider !== 'anthropic') {
+    return null
+  }
+
   const cacheKey = `credential:${credentialId}`
 
   // Check if token needs refresh (refresh 1 minute before expiry)
-  const expiresAt = new Date(credential.oauth_expires_at)
+  const expiresAt = new Date(credential.oauth_expires_at || 0)
   if (Date.now() >= expiresAt.getTime() - 60000) {
     // Check for recent failure (negative cache)
     const failureCheck = credentialManager.hasRecentFailure(cacheKey)
@@ -89,7 +94,7 @@ export async function getApiKey(
       credentialManager.updateMetrics('attempt')
 
       try {
-        const newTokens = await refreshToken(credential.oauth_refresh_token)
+        const newTokens = await refreshToken(credential.oauth_refresh_token || '')
 
         // Update database
         await updateCredentialTokens(pool, credentialId, {
@@ -118,7 +123,7 @@ export async function getApiKey(
     return refreshPromise
   }
 
-  return credential.oauth_access_token
+  return credential.oauth_access_token || null
 }
 
 /**

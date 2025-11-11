@@ -1,17 +1,25 @@
 import { Pool } from 'pg'
 import { getProjectCredentials } from '@agent-prompttrain/shared/database/queries'
-import { AuthenticationError, type AnthropicCredential } from '@agent-prompttrain/shared'
+import {
+  AuthenticationError,
+  type Credential,
+  type AnthropicCredential,
+  type BedrockCredential,
+  type ProviderType,
+} from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { getApiKey } from '../credentials'
 import { logger } from '../middleware/logger'
 
 export interface AuthResult {
-  type: 'oauth'
+  provider: ProviderType
+  type: 'oauth' | 'api_key'
   headers: Record<string, string>
   key: string
-  betaHeader: string
+  betaHeader?: string
   accountId: string
   accountName: string
+  region?: string
 }
 
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
@@ -34,8 +42,8 @@ export class AuthenticationService {
       })
 
       // Get all credentials to find the requested one
-      const allCredentials = await this.pool.query<AnthropicCredential>(
-        'SELECT * FROM anthropic_credentials WHERE account_id = $1',
+      const allCredentials = await this.pool.query<Credential>(
+        'SELECT * FROM credentials WHERE account_id = $1',
         [requestedAccount]
       )
 
@@ -65,6 +73,17 @@ export class AuthenticationService {
   }
 
   private async buildAuthResult(
+    credential: Credential,
+    context: RequestContext
+  ): Promise<AuthResult> {
+    if (credential.provider === 'anthropic') {
+      return this.buildAnthropicAuthResult(credential, context)
+    } else {
+      return this.buildBedrockAuthResult(credential, context)
+    }
+  }
+
+  private async buildAnthropicAuthResult(
     credential: AnthropicCredential,
     context: RequestContext
   ): Promise<AuthResult> {
@@ -78,16 +97,18 @@ export class AuthenticationService {
       })
     }
 
-    logger.info('Using OAuth credentials for account', {
+    logger.info('Using Anthropic OAuth credentials for account', {
       requestId: context.requestId,
       projectId: context.projectId,
       metadata: {
         accountName: credential.account_name,
         accountId: credential.account_id,
+        provider: 'anthropic',
       },
     })
 
     return {
+      provider: 'anthropic',
       type: 'oauth',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -100,9 +121,37 @@ export class AuthenticationService {
     }
   }
 
+  private buildBedrockAuthResult(
+    credential: BedrockCredential,
+    context: RequestContext
+  ): AuthResult {
+    logger.info('Using Bedrock API key credentials for account', {
+      requestId: context.requestId,
+      projectId: context.projectId,
+      metadata: {
+        accountName: credential.account_name,
+        accountId: credential.account_id,
+        provider: 'bedrock',
+        region: credential.aws_region,
+      },
+    })
+
+    return {
+      provider: 'bedrock',
+      type: 'api_key',
+      headers: {
+        authorization: `Bearer ${credential.aws_api_key}`,
+      },
+      key: credential.aws_api_key,
+      accountId: credential.account_id,
+      accountName: credential.account_name,
+      region: credential.aws_region,
+    }
+  }
+
   getMaskedCredentialInfo(auth: AuthResult): string {
     const maskedKey = auth.key.substring(0, 10) + '****'
-    return `oauth:${maskedKey}`
+    return `${auth.provider}:${auth.type}:${maskedKey}`
   }
 
   clearCaches(): void {
