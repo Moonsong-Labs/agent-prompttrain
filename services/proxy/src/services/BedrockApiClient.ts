@@ -9,7 +9,6 @@ import {
   getErrorMessage,
 } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger'
-import { retryWithBackoff, retryConfigs } from '../utils/retry'
 import { mapToBedrockModel } from '@agent-prompttrain/shared/config/model-mapping'
 
 export interface BedrockApiConfig {
@@ -31,6 +30,7 @@ export class BedrockApiClient {
 
   /**
    * Forward a request to Bedrock API
+   * Marks empty responses with a custom header (common Bedrock issue)
    */
   async forward(
     request: ProxyRequest,
@@ -65,12 +65,50 @@ export class BedrockApiClient {
       ...authHeaders, // Contains x-api-key
     }
 
-    // Use retry logic for transient failures
-    return retryWithBackoff(
-      async () => this.makeRequest(url, request, headers),
-      retryConfigs.standard,
-      { requestId: request.requestId, operation: 'bedrock_api_call' }
-    )
+    const response = await this.makeRequest(url, request, headers)
+
+    // Check for empty responses (common Bedrock issue) and mark them
+    if (!request.raw.stream && response.ok) {
+      const responseClone = response.clone()
+      try {
+        const json = (await responseClone.json()) as ClaudeMessagesResponse
+        const hasEmptyUsage =
+          !json.usage ||
+          Object.keys(json.usage).length === 0 ||
+          (json.usage.input_tokens === 0 && json.usage.output_tokens === 0)
+        const hasEmptyContent = !json.content || json.content.length === 0
+
+        if (hasEmptyUsage && hasEmptyContent) {
+          logger.warn('Bedrock returned empty response - passing through without storage', {
+            requestId: request.requestId,
+            metadata: {
+              usage: json.usage,
+              content: json.content,
+              id: json.id,
+              model: json.model,
+            },
+          })
+
+          // Create a new response with marker header to skip storage
+          const newHeaders = new Headers(response.headers)
+          newHeaders.set('x-bedrock-empty-response', 'true')
+
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders,
+          })
+        }
+      } catch (error) {
+        // JSON parse error or other issue, return original response
+        logger.debug('Failed to check for empty response', {
+          requestId: request.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    return response
   }
 
   /**
@@ -179,37 +217,6 @@ export class BedrockApiClient {
       },
     })
 
-    // Check for empty Bedrock responses (both usage and content are empty)
-    const hasEmptyUsage =
-      !json.usage ||
-      Object.keys(json.usage).length === 0 ||
-      (json.usage.input_tokens === 0 && json.usage.output_tokens === 0)
-    const hasEmptyContent = !json.content || json.content.length === 0
-
-    if (hasEmptyUsage && hasEmptyContent) {
-      logger.warn('Bedrock returned empty response - discarding', {
-        requestId: proxyResponse.requestId,
-        metadata: {
-          usage: json.usage,
-          content: json.content,
-          id: json.id,
-          model: json.model,
-          stop_reason: json.stop_reason,
-        },
-      })
-
-      throw new UpstreamError(
-        'Bedrock returned empty response with no usage or content',
-        response.status,
-        {
-          requestId: proxyResponse.requestId,
-          status: response.status,
-          body: JSON.stringify(json),
-        },
-        { error: { type: 'empty_response', message: 'Empty response from Bedrock API' } }
-      )
-    }
-
     proxyResponse.processResponse(json)
     return json
   }
@@ -228,8 +235,6 @@ export class BedrockApiClient {
 
     const decoder = new TextDecoder()
     let buffer = ''
-    let hasReceivedContent = false
-    let hasReceivedUsage = false
 
     try {
       while (true) {
@@ -257,23 +262,6 @@ export class BedrockApiClient {
 
             try {
               const event = JSON.parse(data) as ClaudeStreamEvent
-
-              // Track if we receive any content or usage
-              if (event.type === 'content_block_delta' || event.type === 'content_block_start') {
-                hasReceivedContent = true
-              }
-              if (event.type === 'message_start' && event.message?.usage) {
-                const usage = event.message.usage
-                if (usage.input_tokens > 0 || usage.output_tokens > 0) {
-                  hasReceivedUsage = true
-                }
-              }
-              if (event.type === 'message_delta' && event.usage) {
-                if (event.usage.output_tokens && event.usage.output_tokens > 0) {
-                  hasReceivedUsage = true
-                }
-              }
-
               proxyResponse.processStreamEvent(event)
               yield `data: ${data}\n\n`
             } catch (error) {
@@ -295,25 +283,6 @@ export class BedrockApiClient {
       // Process any remaining buffer
       if (buffer.trim()) {
         yield buffer + '\n'
-      }
-
-      // Check if we received an empty streaming response
-      if (!hasReceivedContent && !hasReceivedUsage) {
-        logger.warn('Bedrock returned empty streaming response - discarding', {
-          requestId: proxyResponse.requestId,
-        })
-
-        throw new UpstreamError(
-          'Bedrock returned empty streaming response with no usage or content',
-          response.status,
-          {
-            requestId: proxyResponse.requestId,
-            status: response.status,
-          },
-          {
-            error: { type: 'empty_response', message: 'Empty streaming response from Bedrock API' },
-          }
-        )
       }
     } finally {
       reader.releaseLock()

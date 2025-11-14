@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { BedrockApiClient } from '../BedrockApiClient'
 import { ProxyResponse } from '../../domain/entities/ProxyResponse'
-import { UpstreamError } from '@agent-prompttrain/shared'
 
 describe('BedrockApiClient', () => {
   let client: BedrockApiClient
@@ -14,35 +13,7 @@ describe('BedrockApiClient', () => {
   })
 
   describe('processResponse', () => {
-    it('should throw UpstreamError when response has empty usage and empty content', async () => {
-      const emptyResponse = {
-        id: '',
-        role: 'assistant' as const,
-        type: 'message' as const,
-        model: '',
-        usage: {},
-        content: [],
-        stop_reason: null,
-        stop_sequence: null,
-      }
-
-      const mockResponse = new Response(JSON.stringify(emptyResponse), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      const proxyResponse = new ProxyResponse('test-request-id', false)
-
-      try {
-        await client.processResponse(mockResponse, proxyResponse)
-        expect.unreachable('Should have thrown UpstreamError')
-      } catch (error) {
-        expect(error).toBeInstanceOf(UpstreamError)
-        expect((error as UpstreamError).message).toContain('empty response')
-      }
-    })
-
-    it('should throw UpstreamError when response has zero tokens and empty content', async () => {
+    it('should process empty response without throwing error', async () => {
       const emptyResponse = {
         id: '',
         role: 'assistant' as const,
@@ -64,9 +35,34 @@ describe('BedrockApiClient', () => {
 
       const proxyResponse = new ProxyResponse('test-request-id', false)
 
-      await expect(client.processResponse(mockResponse, proxyResponse)).rejects.toThrow(
-        UpstreamError
-      )
+      const result = await client.processResponse(mockResponse, proxyResponse)
+      expect(result).toEqual(emptyResponse)
+    })
+
+    it('should process response with zero tokens and empty content', async () => {
+      const emptyResponse = {
+        id: '',
+        role: 'assistant' as const,
+        type: 'message' as const,
+        model: '',
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+        },
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+      }
+
+      const mockResponse = new Response(JSON.stringify(emptyResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const proxyResponse = new ProxyResponse('test-request-id', false)
+
+      const result = await client.processResponse(mockResponse, proxyResponse)
+      expect(result).toEqual(emptyResponse)
     })
 
     it('should process valid response with content successfully', async () => {
