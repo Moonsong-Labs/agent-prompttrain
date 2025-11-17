@@ -69,9 +69,9 @@ export class BedrockApiClient {
 
     // Check for empty responses (common Bedrock issue) and mark them
     if (!request.raw.stream && response.ok) {
-      const responseClone = response.clone()
       try {
-        const json = (await responseClone.json()) as ClaudeMessagesResponse
+        // Read the response body once
+        const json = (await response.json()) as ClaudeMessagesResponse
         const hasEmptyUsage =
           !json.usage ||
           Object.keys(json.usage).length === 0 ||
@@ -93,18 +93,27 @@ export class BedrockApiClient {
           const newHeaders = new Headers(response.headers)
           newHeaders.set('x-bedrock-empty-response', 'true')
 
-          return new Response(response.body, {
+          // Reconstruct response with the JSON body
+          return new Response(JSON.stringify(json), {
             status: response.status,
             statusText: response.statusText,
             headers: newHeaders,
           })
         }
+
+        // Not empty - reconstruct response with original body
+        return new Response(JSON.stringify(json), {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        })
       } catch (error) {
         // JSON parse error or other issue, return original response
         logger.debug('Failed to check for empty response', {
           requestId: request.requestId,
           error: error instanceof Error ? error.message : String(error),
         })
+        return response
       }
     }
 
