@@ -103,8 +103,9 @@ export async function createProxyApp(): Promise<
       app.use('/v1/*', createTrainRateLimiter())
     }
 
-    // Validation for API routes
-    app.use('/v1/*', validationMiddleware())
+    // Validation middleware ONLY for /v1/messages
+    // Don't apply to generic proxy routes as they have different schemas
+    app.use('/v1/messages', validationMiddleware())
   }
 
   // ============================================
@@ -279,6 +280,14 @@ export async function createProxyApp(): Promise<
     const messageController = container.getMessageController()
     app.post('/v1/messages', c => messageController.handle(c))
     app.options('/v1/messages', c => messageController.handleOptions(c))
+
+    // Generic proxy for all other /v1/* endpoints
+    // IMPORTANT: This MUST be after specific routes like /v1/messages
+    // Handles arbitrary endpoints differently based on provider:
+    // - Claude accounts: proxies to Anthropic API
+    // - Bedrock accounts: emulates /v1/messages/count_tokens, returns 501 for others
+    const genericProxyController = container.getGenericProxyController()
+    app.all('/v1/*', c => genericProxyController.handle(c))
   }
 
   // Root endpoint

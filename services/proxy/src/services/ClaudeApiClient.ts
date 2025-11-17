@@ -11,6 +11,7 @@ import {
 } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger'
 import { retryWithBackoff, retryConfigs } from '../utils/retry'
+import { Context } from 'hono'
 
 export interface ClaudeApiConfig {
   baseUrl: string
@@ -198,6 +199,67 @@ export class ClaudeApiClient {
       }
     } finally {
       reader.releaseLock()
+    }
+  }
+
+  /**
+   * Forward an arbitrary request to Claude API (for generic proxy)
+   * This handles any /v1/* endpoint, not just /v1/messages
+   */
+  async genericForward(c: Context, auth: AuthResult): Promise<Response> {
+    const url = new URL(c.req.url)
+    const targetUrl = `${this.config.baseUrl}${url.pathname}${url.search}`
+
+    // Clone headers, removing host and adding auth headers
+    const headers = new Headers(c.req.raw.headers)
+    headers.delete('host')
+    headers.delete('msl-account')
+    headers.delete('msl-project-id')
+    headers.delete('x-api-key')
+
+    // Add authentication headers
+    for (const [key, value] of Object.entries(auth.headers)) {
+      headers.set(key, value)
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), this.config.timeout)
+
+    try {
+      const request = new Request(targetUrl, {
+        method: c.req.method,
+        headers: headers,
+        body: c.req.raw.body,
+        redirect: 'manual',
+        signal: controller.signal,
+      })
+
+      const response = await fetch(request)
+      clearTimeout(timeout)
+
+      // Filter out hop-by-hop headers
+      const responseHeaders = new Headers()
+      response.headers.forEach((value, key) => {
+        if (!['connection', 'keep-alive', 'transfer-encoding'].includes(key.toLowerCase())) {
+          responseHeaders.set(key, value)
+        }
+      })
+
+      return new Response(response.body, {
+        status: response.status,
+        headers: responseHeaders,
+      })
+    } catch (error) {
+      clearTimeout(timeout)
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new TimeoutError('Claude API request timeout', {
+          requestId: c.get('requestId'),
+          timeout: this.config.timeout,
+        })
+      }
+
+      throw error
     }
   }
 }
