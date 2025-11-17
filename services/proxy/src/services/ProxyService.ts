@@ -323,17 +323,27 @@ export class ProxyService {
       responseHeaders[key] = value
     })
 
-    // Track metrics with full response data
-    await this.metricsService.trackRequest(
-      request,
-      response,
-      context,
-      claudeResponse.status,
-      conversationData,
-      responseHeaders,
-      jsonResponse,
-      auth.accountId
-    )
+    // Check if this is an empty Bedrock response that should not be stored
+    const isEmptyBedrockResponse = claudeResponse.headers.get('x-bedrock-empty-response') === 'true'
+
+    if (isEmptyBedrockResponse) {
+      log.debug('Skipping storage for empty Bedrock response', {
+        usage: jsonResponse.usage,
+        content: jsonResponse.content,
+      })
+    } else {
+      // Track metrics with full response data
+      await this.metricsService.trackRequest(
+        request,
+        response,
+        context,
+        claudeResponse.status,
+        conversationData,
+        responseHeaders,
+        jsonResponse,
+        auth.accountId
+      )
+    }
 
     // Update test sample with response if enabled
     if (sampleId) {
@@ -344,11 +354,20 @@ export class ProxyService {
       })
     }
 
+    // Filter out internal headers before returning to client
+    const clientHeaders: Record<string, string> = {}
+    claudeResponse.headers.forEach((value, key) => {
+      if (!key.startsWith('x-bedrock-')) {
+        clientHeaders[key] = value
+      }
+    })
+
     // Return the response
     return new Response(JSON.stringify(jsonResponse), {
       status: claudeResponse.status,
       headers: {
         'Content-Type': 'application/json',
+        ...clientHeaders,
         ...this.getCorsHeaders(),
       },
     })

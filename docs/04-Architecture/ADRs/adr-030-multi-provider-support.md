@@ -192,6 +192,7 @@ if (auth.provider === 'bedrock') {
 - Bedrock API does not accept `stream` or `model` fields in request body (model is in URL path, streaming mode is in endpoint suffix)
 - Dashboard UI uses emojis for quick visual provider identification
 - Future providers (e.g., Azure, GCP) can follow the same pattern
+- **Empty Response Handling**: Bedrock API sometimes returns empty responses with no usage or content. The proxy automatically detects and discards these responses, throwing an `UpstreamError` which triggers the existing retry logic for transient failures
 
 ---
 

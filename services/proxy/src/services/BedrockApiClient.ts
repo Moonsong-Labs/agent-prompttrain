@@ -9,7 +9,6 @@ import {
   getErrorMessage,
 } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger'
-import { retryWithBackoff, retryConfigs } from '../utils/retry'
 import { mapToBedrockModel } from '@agent-prompttrain/shared/config/model-mapping'
 
 export interface BedrockApiConfig {
@@ -31,6 +30,7 @@ export class BedrockApiClient {
 
   /**
    * Forward a request to Bedrock API
+   * Marks empty responses with a custom header (common Bedrock issue)
    */
   async forward(
     request: ProxyRequest,
@@ -65,12 +65,59 @@ export class BedrockApiClient {
       ...authHeaders, // Contains x-api-key
     }
 
-    // Use retry logic for transient failures
-    return retryWithBackoff(
-      async () => this.makeRequest(url, request, headers),
-      retryConfigs.standard,
-      { requestId: request.requestId, operation: 'bedrock_api_call' }
-    )
+    const response = await this.makeRequest(url, request, headers)
+
+    // Check for empty responses (common Bedrock issue) and mark them
+    if (!request.raw.stream && response.ok) {
+      try {
+        // Read the response body once
+        const json = (await response.json()) as ClaudeMessagesResponse
+        const hasEmptyUsage =
+          !json.usage ||
+          Object.keys(json.usage).length === 0 ||
+          (json.usage.input_tokens === 0 && json.usage.output_tokens === 0)
+        const hasEmptyContent = !json.content || json.content.length === 0
+
+        if (hasEmptyUsage && hasEmptyContent) {
+          logger.warn('Bedrock returned empty response - passing through without storage', {
+            requestId: request.requestId,
+            metadata: {
+              usage: json.usage,
+              content: json.content,
+              id: json.id,
+              model: json.model,
+            },
+          })
+
+          // Create a new response with marker header to skip storage
+          const newHeaders = new Headers(response.headers)
+          newHeaders.set('x-bedrock-empty-response', 'true')
+
+          // Reconstruct response with the JSON body
+          return new Response(JSON.stringify(json), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders,
+          })
+        }
+
+        // Not empty - reconstruct response with original body
+        return new Response(JSON.stringify(json), {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        })
+      } catch (error) {
+        // JSON parse error or other issue, return original response
+        logger.debug('Failed to check for empty response', {
+          requestId: request.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return response
+      }
+    }
+
+    return response
   }
 
   /**
@@ -108,7 +155,7 @@ export class BedrockApiClient {
       if (!response.ok) {
         const errorBody = await response.text()
         let errorMessage = `Bedrock API error: ${response.status}`
-        let parsedError: any
+        let parsedError: unknown
 
         try {
           parsedError = JSON.parse(errorBody)
