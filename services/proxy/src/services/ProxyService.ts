@@ -718,4 +718,79 @@ export class ProxyService {
 
     return response
   }
+
+  /**
+   * Handle a token count request
+   * Forwards the request to Claude API's count_tokens endpoint
+   */
+  async handleTokenCountRequest(rawRequest: any, context: RequestContext): Promise<Response> {
+    const log = {
+      debug: (message: string, metadata?: Record<string, any>) => {
+        logger.debug(message, { requestId: context.requestId, domain: context.host, metadata })
+      },
+      info: (message: string, metadata?: Record<string, any>) => {
+        logger.info(message, { requestId: context.requestId, domain: context.host, metadata })
+      },
+      error: (message: string, error?: Error, metadata?: Record<string, any>) => {
+        logger.error(message, {
+          requestId: context.requestId,
+          domain: context.host,
+          error: error
+            ? {
+                message: error.message,
+                stack: error.stack,
+                code: (error as any).code,
+              }
+            : undefined,
+          metadata,
+        })
+      },
+    }
+
+    try {
+      // Authenticate
+      let auth: AuthResult
+
+      // Passthrough mode when client auth disabled and Bearer token present
+      if (config.features.enableClientAuth === false && context.apiKey?.startsWith('Bearer ')) {
+        log.debug('Using passthrough authentication for token count (client auth disabled)', {
+          domain: context.host,
+          hasToken: true,
+        })
+
+        auth = {
+          type: 'oauth',
+          headers: {
+            Authorization: context.apiKey,
+            'anthropic-beta': 'oauth-2025-04-20',
+          },
+          key: context.apiKey.replace('Bearer ', ''),
+          betaHeader: 'oauth-2025-04-20',
+        }
+      } else {
+        // Existing domain-based routing
+        auth = context.host.toLowerCase().includes('personal')
+          ? await this.authService.authenticatePersonalDomain(context)
+          : await this.authService.authenticateNonPersonalDomain(context)
+
+        log.debug('Authentication successful for token count', {
+          authType: auth.type,
+          betaHeader: auth.betaHeader,
+        })
+      }
+
+      // Forward the request directly to the count_tokens endpoint
+      const response = await this.apiClient.forwardTokenCount(rawRequest, auth, context.requestId)
+
+      log.info('Token count request completed', {
+        model: rawRequest.model,
+        messageCount: rawRequest.messages?.length || 0,
+      })
+
+      return response
+    } catch (error) {
+      log.error('Token count request failed', error as Error)
+      throw error
+    }
+  }
 }

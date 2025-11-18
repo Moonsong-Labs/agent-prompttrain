@@ -281,6 +281,11 @@ export async function createProxyApp(): Promise<
     app.options('/v1/messages', c => messageController.handleOptions(c))
   }
 
+  // Token counting endpoint
+  const tokenCountController = container.getTokenCountController()
+  app.post('/v1/messages/count_tokens', c => tokenCountController.handle(c))
+  app.options('/v1/messages/count_tokens', c => tokenCountController.handleOptions(c))
+
   // Root endpoint
   app.get('/', c => {
     const endpoints: Record<string, unknown> = {}
