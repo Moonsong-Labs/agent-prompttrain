@@ -22,13 +22,15 @@ try {
   console.log('📦 Bundling with optimizations...')
 
   // Build with Bun - production optimizations
+  // tiktoken is marked external because it requires WASM files at runtime
   await $`bun build ${join(srcDir, 'main.ts')} \
     --outdir ${distDir} \
     --target node \
     --minify \
     --sourcemap \
     --external pg \
-    --external @slack/webhook`
+    --external @slack/webhook \
+    --external tiktoken`
 
   // Create a minimal package.json for production
   const pkgJson = {
@@ -40,6 +42,8 @@ try {
       // Only include runtime dependencies that weren't bundled
       pg: '^8.13.1',
       '@slack/webhook': '^7.0.3',
+      // tiktoken is required at runtime for @anthropic-ai/tokenizer (WASM dependency)
+      tiktoken: '^1.0.21',
     },
   }
 
