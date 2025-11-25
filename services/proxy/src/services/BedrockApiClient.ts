@@ -17,7 +17,6 @@ export interface BedrockApiConfig {
 }
 
 export interface BedrockAuthHeaders {
-  'x-api-key': string
   [key: string]: string
 }
 
@@ -62,7 +61,7 @@ export class BedrockApiClient {
     // Add Bedrock authentication
     const headers = {
       ...filteredHeaders,
-      ...authHeaders, // Contains x-api-key
+      ...authHeaders, // Contains Authorization header
     }
 
     const response = await this.makeRequest(url, request, headers)
@@ -237,7 +236,7 @@ export class BedrockApiClient {
    *
    * @param modelId - The Bedrock model ID from the URL path
    * @param body - Raw request body (already in Bedrock format)
-   * @param authHeaders - Authentication headers containing x-api-key
+   * @param authHeaders - Authentication headers (Authorization: Bearer <api_key>)
    * @param isStream - Whether this is a streaming request
    * @param requestId - Request ID for logging
    * @param region - AWS region (optional, will use config region if not provided)

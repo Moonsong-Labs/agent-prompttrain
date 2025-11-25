@@ -135,11 +135,12 @@ export class BedrockNativeController {
         },
       })
 
-      // Forward to Bedrock
+      // Forward to Bedrock using auth headers from authentication service
+      // Bedrock API Gateway expects Authorization: Bearer <api_key>
       const response = await this.bedrockClient.forwardNative(
         decodedModelId,
         body,
-        { 'x-api-key': authResult.key },
+        authResult.headers,
         isStream,
         requestContext.requestId,
         region
