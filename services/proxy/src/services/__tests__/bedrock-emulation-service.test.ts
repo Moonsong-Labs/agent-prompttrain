@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach, mock } from 'bun:test'
 import { BedrockEmulationService } from '../BedrockEmulationService'
 import { Context } from 'hono'
 
+// Response types for type-safe assertions
+interface TokenCountResponse {
+  input_tokens: number
+}
+
+interface ErrorResponse {
+  error: {
+    type: string
+    message: string
+  }
+}
+
 /**
  * Creates a mock Hono Context with the specified request body.
  */
@@ -38,7 +50,7 @@ describe('BedrockEmulationService', () => {
       })
 
       const response = await service.handleCountTokens(ctx)
-      const data = await response.json()
+      const data = (await response.json()) as TokenCountResponse
 
       expect(response.status).toBe(200)
       expect(data.input_tokens).toBeGreaterThan(0)
@@ -48,7 +60,7 @@ describe('BedrockEmulationService', () => {
       const ctx = createMockContext({})
 
       const response = await service.handleCountTokens(ctx)
-      const data = await response.json()
+      const data = (await response.json()) as ErrorResponse
 
       expect(response.status).toBe(400)
       expect(data.error.type).toBe('invalid_request_error')
@@ -62,7 +74,7 @@ describe('BedrockEmulationService', () => {
       })
 
       const response = await service.handleCountTokens(ctx)
-      const data = await response.json()
+      const data = (await response.json()) as TokenCountResponse
 
       expect(response.status).toBe(200)
       expect(data.input_tokens).toBeGreaterThan(0)
@@ -74,7 +86,7 @@ describe('BedrockEmulationService', () => {
       })
 
       const response = await service.handleCountTokens(ctx)
-      const data = await response.json()
+      const data = (await response.json()) as TokenCountResponse
 
       expect(response.status).toBe(200)
       expect(data.input_tokens).toBeGreaterThan(0)
@@ -119,11 +131,11 @@ describe('BedrockEmulationService', () => {
         service.handleCountTokens(ctx3),
       ])
 
-      const [data1, data2, data3] = await Promise.all([
+      const [data1, data2, data3] = (await Promise.all([
         response1.json(),
         response2.json(),
         response3.json(),
-      ])
+      ])) as TokenCountResponse[]
 
       // All responses should have the same token count
       expect(data1.input_tokens).toBe(data2.input_tokens)
