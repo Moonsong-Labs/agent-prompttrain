@@ -1,8 +1,10 @@
 import { Pool } from 'pg'
 import { MessageController } from './controllers/MessageController.js'
+import { GenericProxyController } from './controllers/GenericProxyController.js'
 import { ProxyService } from './services/ProxyService.js'
 import { AuthenticationService } from './services/AuthenticationService.js'
 import { ClaudeApiClient } from './services/ClaudeApiClient.js'
+import { BedrockEmulationService } from './services/BedrockEmulationService.js'
 import { MetricsService } from './services/MetricsService.js'
 import { NotificationService } from './services/NotificationService.js'
 import { StorageAdapter } from './storage/StorageAdapter.js'
@@ -26,8 +28,10 @@ class Container {
   private notificationService?: NotificationService
   private authenticationService?: AuthenticationService
   private claudeApiClient?: ClaudeApiClient
+  private bedrockEmulationService?: BedrockEmulationService
   private proxyService?: ProxyService
   private messageController?: MessageController
+  private genericProxyController?: GenericProxyController
   private mcpServer?: McpServer
   private promptRegistry?: PromptRegistryService
   private githubSyncService?: GitHubSyncService
@@ -130,6 +134,7 @@ class Container {
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,
     })
+    this.bedrockEmulationService = new BedrockEmulationService()
 
     // Wire up dependencies
     this.proxyService = new ProxyService(
@@ -141,6 +146,11 @@ class Container {
     )
 
     this.messageController = new MessageController(this.proxyService)
+    this.genericProxyController = new GenericProxyController(
+      this.authenticationService,
+      this.claudeApiClient,
+      this.bedrockEmulationService
+    )
 
     // Initialize MCP services if enabled
     if (config.mcp.enabled) {
@@ -228,6 +238,13 @@ class Container {
     return this.messageController
   }
 
+  getGenericProxyController(): GenericProxyController {
+    if (!this.genericProxyController) {
+      throw new Error('GenericProxyController not initialized')
+    }
+    return this.genericProxyController
+  }
+
   getMcpHandler(): JsonRpcHandler | undefined {
     return this.jsonRpcHandler
   }
@@ -269,8 +286,10 @@ class Container {
     this.notificationService = undefined
     this.authenticationService = undefined
     this.claudeApiClient = undefined
+    this.bedrockEmulationService = undefined
     this.proxyService = undefined
     this.messageController = undefined
+    this.genericProxyController = undefined
     this.mcpServer = undefined
     this.githubSyncService = undefined
     this.jsonRpcHandler = undefined
@@ -327,6 +346,10 @@ class LazyContainer {
 
   getMessageController(): MessageController {
     return this.ensureInstance().getMessageController()
+  }
+
+  getGenericProxyController(): GenericProxyController {
+    return this.ensureInstance().getGenericProxyController()
   }
 
   getMcpHandler(): JsonRpcHandler | undefined {
