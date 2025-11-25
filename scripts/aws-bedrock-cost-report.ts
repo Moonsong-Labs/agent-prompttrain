@@ -324,6 +324,19 @@ const MODEL_PRICING: readonly ModelPricingEntry[] = [
     },
   },
   {
+    alias: 'claude-opus-4-5',
+    displayName: 'Claude Opus 4.5',
+    matchers: ['opus', '4-5'],
+    regions: {
+      global: {
+        // Pricing based on Opus 4.1 until official pricing is published
+        standard: { inputPerThousand: 0.015, outputPerThousand: 0.075 },
+        cacheReadPerThousand: 0.0015,
+        cacheWritePerThousand: 0.01875,
+      },
+    },
+  },
+  {
     alias: 'claude-opus-4-1',
     displayName: 'Claude Opus 4.1',
     matchers: ['opus', '4-1'],
