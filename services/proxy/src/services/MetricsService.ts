@@ -186,6 +186,121 @@ export class MetricsService {
   }
 
   /**
+   * Track metrics for a native Bedrock request (already in Bedrock format)
+   * This is a simplified tracking method for requests that bypass ProxyRequest/ProxyResponse
+   */
+  async trackNativeBedrockRequest(
+    context: RequestContext,
+    model: string,
+    requestBody: Record<string, unknown>,
+    responseBody: Record<string, unknown>,
+    status: number,
+    accountId: string,
+    responseHeaders?: Record<string, string>
+  ): Promise<void> {
+    // Extract usage from response
+    const usage = responseBody.usage as
+      | {
+          input_tokens?: number
+          output_tokens?: number
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+        }
+      | undefined
+
+    const inputTokens = usage?.input_tokens || 0
+    const outputTokens = usage?.output_tokens || 0
+    const cacheCreationInputTokens = usage?.cache_creation_input_tokens || 0
+    const cacheReadInputTokens = usage?.cache_read_input_tokens || 0
+    const totalTokens = inputTokens + outputTokens
+
+    // Count tool calls in response
+    const content = responseBody.content as Array<{ type: string }> | undefined
+    const toolCallCount = content?.filter(c => c.type === 'tool_use').length || 0
+
+    // Track tokens
+    if (this.config.enableTokenTracking) {
+      tokenTracker.track(context.projectId, inputTokens, outputTokens, 'inference', toolCallCount)
+
+      // Track in persistent storage
+      if (this.tokenUsageService && accountId) {
+        await this.tokenUsageService.recordUsage({
+          accountId,
+          projectId: context.projectId,
+          model,
+          requestType: 'inference',
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cacheCreationInputTokens,
+          cacheReadInputTokens,
+          requestCount: 1,
+        })
+      }
+    }
+
+    // Store in database
+    if (this.config.enableStorage && this.storageService) {
+      await this.storeNativeBedrockRequest(
+        context,
+        model,
+        requestBody,
+        responseBody,
+        status,
+        accountId,
+        {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cacheCreationInputTokens,
+          cacheReadInputTokens,
+          toolCallCount,
+        },
+        responseHeaders
+      )
+    }
+
+    // Log metrics
+    logger.info('Native Bedrock request processed', {
+      requestId: context.requestId,
+      projectId: context.projectId,
+      model,
+      metadata: {
+        inputTokens,
+        outputTokens,
+        duration: context.getElapsedTime(),
+        stored: this.config.enableStorage,
+      },
+    })
+
+    // Broadcast to dashboard
+    try {
+      broadcastConversation({
+        id: context.requestId,
+        projectId: context.projectId,
+        model,
+        tokens: totalTokens,
+        timestamp: new Date().toISOString(),
+      })
+
+      const stats = tokenTracker.getStats()
+      const trainStats = stats[context.projectId]
+      if (trainStats) {
+        broadcastMetrics({
+          projectId: context.projectId,
+          requests: trainStats.requestCount,
+          tokens: trainStats.inputTokens + trainStats.outputTokens,
+          activeUsers: Object.keys(stats).length,
+        })
+      }
+    } catch (e) {
+      logger.debug('Failed to broadcast metrics', {
+        metadata: { error: e instanceof Error ? e.message : String(e) },
+      })
+    }
+  }
+
+  /**
    * Track error metrics
    */
   async trackError(
@@ -344,6 +459,101 @@ export class MetricsService {
       }
     } catch (error) {
       logger.error('Failed to store request/response', {
+        requestId: context.requestId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
+
+  /**
+   * Store a native Bedrock request in database
+   * Simplified storage for requests that bypass ProxyRequest/ProxyResponse
+   */
+  private async storeNativeBedrockRequest(
+    context: RequestContext,
+    model: string,
+    requestBody: Record<string, unknown>,
+    responseBody: Record<string, unknown>,
+    status: number,
+    accountId: string,
+    metrics: {
+      inputTokens: number
+      outputTokens: number
+      totalTokens: number
+      cacheCreationInputTokens: number
+      cacheReadInputTokens: number
+      toolCallCount: number
+    },
+    responseHeaders?: Record<string, string>
+  ): Promise<void> {
+    if (!this.storageService) {
+      return
+    }
+
+    try {
+      // Calculate message count from request body
+      const messages = requestBody.messages as Array<unknown> | undefined
+      const messageCount = messages?.length || 0
+
+      await this.storageService.storeRequest({
+        id: context.requestId,
+        projectId: context.projectId,
+        accountId: accountId,
+        timestamp: new Date(context.startTime),
+        method: context.method,
+        path: context.path,
+        headers: context.headers,
+        body: requestBody,
+        request_type: 'inference',
+        model: model,
+        input_tokens: metrics.inputTokens,
+        output_tokens: metrics.outputTokens,
+        total_tokens: metrics.totalTokens,
+        cache_creation_input_tokens: metrics.cacheCreationInputTokens,
+        cache_read_input_tokens: metrics.cacheReadInputTokens,
+        usage_data: responseBody.usage as Record<string, unknown> | undefined,
+        tool_call_count: metrics.toolCallCount,
+        processing_time: context.getElapsedTime(),
+        status_code: status,
+        // Native Bedrock requests don't have conversation tracking
+        currentMessageHash: undefined,
+        parentMessageHash: undefined,
+        conversationId: undefined,
+        branchId: undefined,
+        systemHash: undefined,
+        messageCount: messageCount,
+        parentRequestId: undefined,
+        parentTaskRequestId: undefined,
+        isSubtask: undefined,
+      })
+
+      // Store response
+      await this.storageService.storeResponse({
+        request_id: context.requestId,
+        status_code: status,
+        headers: responseHeaders || {},
+        body: responseBody,
+        timestamp: new Date(),
+        input_tokens: metrics.inputTokens,
+        output_tokens: metrics.outputTokens,
+        total_tokens: metrics.totalTokens,
+        cache_creation_input_tokens: metrics.cacheCreationInputTokens,
+        cache_read_input_tokens: metrics.cacheReadInputTokens,
+        usage_data: responseBody.usage as Record<string, unknown> | undefined,
+        tool_call_count: metrics.toolCallCount,
+        processing_time: context.getElapsedTime(),
+      })
+
+      // Process Task tool invocations
+      await this.storageService.processTaskToolInvocations(
+        context.requestId,
+        responseBody,
+        context.projectId
+      )
+    } catch (error) {
+      logger.error('Failed to store native Bedrock request/response', {
         requestId: context.requestId,
         metadata: {
           error: error instanceof Error ? error.message : String(error),

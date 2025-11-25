@@ -161,7 +161,8 @@ class Container {
     )
     this.bedrockNativeController = new BedrockNativeController(
       this.authenticationService,
-      this.bedrockApiClient
+      this.bedrockApiClient,
+      this.metricsService
     )
 
     // Initialize MCP services if enabled

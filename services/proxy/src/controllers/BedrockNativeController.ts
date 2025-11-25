@@ -2,6 +2,7 @@ import { Context } from 'hono'
 import { RequestContext } from '../domain/value-objects/RequestContext.js'
 import { AuthenticationService } from '../services/AuthenticationService.js'
 import { BedrockApiClient } from '../services/BedrockApiClient.js'
+import { MetricsService } from '../services/MetricsService.js'
 import { extractBedrockRegion } from '@agent-prompttrain/shared/config/model-mapping'
 import { getRequestLogger } from '../middleware/logger.js'
 
@@ -18,7 +19,8 @@ import { getRequestLogger } from '../middleware/logger.js'
 export class BedrockNativeController {
   constructor(
     private authService: AuthenticationService,
-    private bedrockClient: BedrockApiClient
+    private bedrockClient: BedrockApiClient,
+    private metricsService: MetricsService
   ) {}
 
   /**
@@ -165,9 +167,39 @@ export class BedrockNativeController {
         })
       }
 
-      // For non-streaming or error responses, return as-is
-      const responseBody = await response.text()
-      return new Response(responseBody, {
+      // For non-streaming responses, parse and track metrics
+      const responseText = await response.text()
+
+      // Track metrics for successful non-streaming responses
+      if (response.ok) {
+        try {
+          const responseJson = JSON.parse(responseText) as Record<string, unknown>
+          const requestJson = JSON.parse(body) as Record<string, unknown>
+
+          // Extract response headers
+          const responseHeaders: Record<string, string> = {}
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value
+          })
+
+          await this.metricsService.trackNativeBedrockRequest(
+            requestContext,
+            decodedModelId,
+            requestJson,
+            responseJson,
+            response.status,
+            authResult.accountId,
+            responseHeaders
+          )
+        } catch (parseError) {
+          logger.warn('Failed to parse response for metrics tracking', {
+            requestId: requestContext.requestId,
+            error: parseError instanceof Error ? parseError.message : String(parseError),
+          })
+        }
+      }
+
+      return new Response(responseText, {
         status: response.status,
         headers: {
           'content-type': response.headers.get('content-type') || 'application/json',
