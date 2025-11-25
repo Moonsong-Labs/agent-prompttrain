@@ -295,6 +295,26 @@ export class MetricsService {
         return
       }
 
+      // Skip storing empty responses (zero tokens and empty content)
+      // This catches empty streaming responses that slip through other checks
+      const hasEmptyResponse =
+        metrics.inputTokens === 0 &&
+        metrics.outputTokens === 0 &&
+        (!fullResponseBody?.content || fullResponseBody.content.length === 0)
+
+      if (hasEmptyResponse) {
+        logger.debug('Skipping storage for empty response', {
+          requestId: context.requestId,
+          projectId: context.projectId,
+          metadata: {
+            inputTokens: metrics.inputTokens,
+            outputTokens: metrics.outputTokens,
+            hasContent: !!fullResponseBody?.content?.length,
+          },
+        })
+        return
+      }
+
       await this.storageService.storeRequest({
         id: context.requestId,
         projectId: context.projectId,
