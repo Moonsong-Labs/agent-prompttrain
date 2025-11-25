@@ -76,11 +76,12 @@ export class AuthenticationService {
     credential: Credential,
     context: RequestContext
   ): Promise<AuthResult> {
-    if (credential.provider === 'anthropic') {
-      return this.buildAnthropicAuthResult(credential, context)
-    } else {
+    if (credential.provider === 'bedrock') {
       return this.buildBedrockAuthResult(credential, context)
     }
+
+    // Default to Anthropic when provider is missing (backwards compatibility)
+    return this.buildAnthropicAuthResult(credential, context)
   }
 
   private async buildAnthropicAuthResult(

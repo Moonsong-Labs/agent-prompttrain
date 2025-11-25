@@ -4,14 +4,21 @@ import { AI_WORKER_CONFIG, GEMINI_CONFIG } from '@agent-prompttrain/shared/confi
 
 let workerInstance: AnalysisWorker | null = null
 
-export function startAnalysisWorker(): AnalysisWorker {
+export function startAnalysisWorker(): AnalysisWorker | null {
   if (workerInstance) {
     logger.warn('Analysis worker already started', { metadata: { worker: 'analysis-worker' } })
     return workerInstance
   }
 
+  if (!AI_WORKER_CONFIG.ENABLED) {
+    logger.info('AI Analysis Worker is disabled by configuration', {
+      metadata: { worker: 'analysis-worker' },
+    })
+    return null
+  }
+
   // Validate configuration before starting
-  if (AI_WORKER_CONFIG.ENABLED && !GEMINI_CONFIG.API_KEY) {
+  if (!GEMINI_CONFIG.API_KEY) {
     const error = new Error('GEMINI_API_KEY is not set in environment variables')
     logger.error(
       'FATAL: AI_WORKER_ENABLED is true, but GEMINI_API_KEY is not set. The AI Analysis Worker cannot start.',
