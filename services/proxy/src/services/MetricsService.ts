@@ -286,6 +286,15 @@ export class MetricsService {
         messageCount = request.raw.messages.length
       }
 
+      // Skip storing requests with no messages
+      if (messageCount === 0) {
+        logger.debug('Skipping storage for request with no messages', {
+          requestId: context.requestId,
+          projectId: context.projectId,
+        })
+        return
+      }
+
       await this.storageService.storeRequest({
         id: context.requestId,
         projectId: context.projectId,
