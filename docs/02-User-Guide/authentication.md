@@ -15,6 +15,12 @@ The proxy uses a two-layer authentication system:
 
 The proxy requires clients to authenticate using per-train Bearer tokens stored in the database. API keys are managed via the dashboard REST API.
 
+#### API Key Permissions
+
+- **Project owners** can create, view, update, and revoke all API keys for the project
+- **Project members** can create their own API keys and manage (view, update, revoke) keys they created
+- API keys are tracked by creator (`created_by` field) for audit purposes
+
 #### Generating an API Key
 
 **Via Dashboard API**:

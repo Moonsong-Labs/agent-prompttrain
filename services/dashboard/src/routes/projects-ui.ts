@@ -12,6 +12,7 @@ import {
   addProjectMember,
   deleteProject,
   isProjectOwner,
+  isProjectMember,
   getProjectStats,
   getProjectWithAccounts,
   getProjectById,
@@ -378,9 +379,12 @@ trainsUIRoutes.get('/:projectId/view', async c => {
       )
     }
 
-    const isOwner = auth.isAuthenticated
-      ? await isProjectOwner(pool, train.id, auth.principal)
-      : false
+    const [isOwner, isMember] = auth.isAuthenticated
+      ? await Promise.all([
+          isProjectOwner(pool, train.id, auth.principal),
+          isProjectMember(pool, train.id, auth.principal),
+        ])
+      : [false, false]
 
     const content = html`
       <div style="margin-bottom: 2rem;">
@@ -667,7 +671,7 @@ trainsUIRoutes.get('/:projectId/view', async c => {
         >
           <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">API Keys</h3>
 
-          ${isOwner
+          ${isMember
             ? html`
                 <form
                   hx-post="/dashboard/projects/${train.id}/generate-api-key"
@@ -914,14 +918,14 @@ trainsUIRoutes.post('/:projectId/generate-api-key', async c => {
     `)
   }
 
-  // Check ownership
-  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
-  if (!isOwner) {
+  // Check project membership (owners and members can create API keys)
+  const isMember = await isProjectMember(pool, projectId, auth.principal)
+  if (!isMember) {
     return c.html(html`
       <div
         style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
       >
-        <strong>Error:</strong> Only train owners can generate API keys
+        <strong>Error:</strong> Only project members can generate API keys
       </div>
     `)
   }
