@@ -148,15 +148,42 @@ export class BedrockNativeController {
         region
       )
 
-      // For streaming responses, we need to handle the response differently
+      // For streaming responses, intercept to track metrics
       if (isStream && response.ok && response.body) {
         logger.info('Streaming native Bedrock response', {
           requestId: requestContext.requestId,
           status: response.status,
         })
 
+        // Parse request body for metrics tracking
+        let requestJson: Record<string, unknown> = {}
+        try {
+          requestJson = JSON.parse(body) as Record<string, unknown>
+        } catch {
+          // Ignore parse errors for request body
+        }
+
+        // Extract response headers for tracking
+        const responseHeaders: Record<string, string> = {}
+        response.headers.forEach((value, key) => {
+          responseHeaders[key] = value
+        })
+
+        // Create stream tracker to intercept usage data
+        const streamTracker = this.createStreamTracker(
+          requestContext,
+          decodedModelId,
+          requestJson,
+          authResult.accountId,
+          responseHeaders,
+          logger
+        )
+
+        // Pipe response through tracker
+        const trackedStream = response.body.pipeThrough(streamTracker)
+
         // Return the streaming response with appropriate headers
-        return new Response(response.body, {
+        return new Response(trackedStream, {
           status: response.status,
           headers: {
             'content-type': response.headers.get('content-type') || 'application/json',
@@ -225,5 +252,136 @@ export class BedrockNativeController {
         statusCode as 500
       )
     }
+  }
+
+  /**
+   * Create a TransformStream that intercepts SSE events to extract usage data
+   * while passing through all data unchanged to the client
+   */
+  private createStreamTracker(
+    requestContext: RequestContext,
+    modelId: string,
+    requestBody: Record<string, unknown>,
+    accountId: string,
+    responseHeaders: Record<string, string>,
+    log: ReturnType<typeof getRequestLogger>
+  ): TransformStream<Uint8Array, Uint8Array> {
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    // Accumulated usage data from stream events
+    const usage = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    }
+    const responseContent: Array<{ type: string; text?: string }> = []
+    const metricsService = this.metricsService
+
+    return new TransformStream({
+      transform(chunk, controller) {
+        // Pass through chunk unchanged
+        controller.enqueue(chunk)
+
+        // Parse chunk to extract usage data
+        buffer += decoder.decode(chunk, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) {
+            continue
+          }
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') {
+            continue
+          }
+
+          try {
+            const event = JSON.parse(data) as {
+              type: string
+              message?: {
+                usage?: {
+                  input_tokens?: number
+                  output_tokens?: number
+                  cache_creation_input_tokens?: number
+                  cache_read_input_tokens?: number
+                }
+                content?: Array<{ type: string; text?: string }>
+              }
+              usage?: {
+                output_tokens?: number
+                cache_creation_input_tokens?: number
+                cache_read_input_tokens?: number
+              }
+              content_block?: { type: string }
+              delta?: { type: string; text?: string }
+            }
+
+            // Extract usage from message_start
+            if (event.type === 'message_start' && event.message?.usage) {
+              usage.input_tokens = event.message.usage.input_tokens || 0
+              if (event.message.usage.cache_creation_input_tokens) {
+                usage.cache_creation_input_tokens = event.message.usage.cache_creation_input_tokens
+              }
+              if (event.message.usage.cache_read_input_tokens) {
+                usage.cache_read_input_tokens = event.message.usage.cache_read_input_tokens
+              }
+            }
+
+            // Extract usage from message_delta
+            if (event.type === 'message_delta' && event.usage) {
+              usage.output_tokens = event.usage.output_tokens || usage.output_tokens
+              if (event.usage.cache_creation_input_tokens !== undefined) {
+                usage.cache_creation_input_tokens = event.usage.cache_creation_input_tokens
+              }
+              if (event.usage.cache_read_input_tokens !== undefined) {
+                usage.cache_read_input_tokens = event.usage.cache_read_input_tokens
+              }
+            }
+
+            // Accumulate text content
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              const lastContent = responseContent[responseContent.length - 1]
+              if (lastContent && lastContent.type === 'text') {
+                lastContent.text = (lastContent.text || '') + (event.delta.text || '')
+              }
+            }
+
+            if (event.type === 'content_block_start' && event.content_block) {
+              responseContent.push({ type: event.content_block.type })
+            }
+          } catch {
+            // Ignore parse errors for individual events
+          }
+        }
+      },
+
+      async flush() {
+        // Stream complete - track metrics
+        const responseBody: Record<string, unknown> = {
+          usage,
+          content: responseContent,
+        }
+
+        try {
+          await metricsService.trackNativeBedrockRequest(
+            requestContext,
+            modelId,
+            requestBody,
+            responseBody,
+            200,
+            accountId,
+            responseHeaders
+          )
+        } catch (error) {
+          log.warn('Failed to track streaming metrics', {
+            requestId: requestContext.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      },
+    })
   }
 }
