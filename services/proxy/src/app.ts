@@ -281,6 +281,26 @@ export async function createProxyApp(): Promise<
     app.post('/v1/messages', c => messageController.handle(c))
     app.options('/v1/messages', c => messageController.handleOptions(c))
 
+    // Native Bedrock Runtime API endpoints
+    // These support direct Bedrock-style requests without transformation
+    // Client authentication is applied for project ID tracking
+    if (config.features.enableClientAuth !== false) {
+      app.use('/model/*', clientAuthMiddleware())
+    }
+    app.use('/model/*', projectIdExtractorMiddleware())
+
+    // Rate limiting for native Bedrock endpoints
+    if (config.features.enableMetrics) {
+      app.use('/model/*', createRateLimiter())
+      app.use('/model/*', createTrainRateLimiter())
+    }
+
+    const bedrockNativeController = container.getBedrockNativeController()
+    app.post('/model/:modelId/invoke', c => bedrockNativeController.handleInvoke(c))
+    app.post('/model/:modelId/invoke-with-response-stream', c =>
+      bedrockNativeController.handleInvokeStream(c)
+    )
+
     // Generic proxy for all other /v1/* endpoints
     // IMPORTANT: This MUST be after specific routes like /v1/messages
     // Handles arbitrary endpoints differently based on provider:
@@ -298,6 +318,10 @@ export async function createProxyApp(): Promise<
     // Add mode-specific endpoints
     if (isProxyMode()) {
       endpoints.api = '/v1/messages'
+      endpoints['bedrock-native'] = {
+        invoke: '/model/{modelId}/invoke',
+        'invoke-stream': '/model/{modelId}/invoke-with-response-stream',
+      }
       endpoints.stats = '/token-stats'
       endpoints['oauth-metrics'] = '/oauth-metrics'
       endpoints['client-setup'] = '/client-setup/*'

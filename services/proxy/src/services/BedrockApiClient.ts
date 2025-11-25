@@ -231,6 +231,91 @@ export class BedrockApiClient {
   }
 
   /**
+   * Forward a native Bedrock request (request body already in Bedrock format)
+   * Used for /model/{modelId}/invoke and /model/{modelId}/invoke-with-response-stream endpoints
+   * No body transformation is performed - the request is forwarded as-is
+   *
+   * @param modelId - The Bedrock model ID from the URL path
+   * @param body - Raw request body (already in Bedrock format)
+   * @param authHeaders - Authentication headers containing x-api-key
+   * @param isStream - Whether this is a streaming request
+   * @param requestId - Request ID for logging
+   * @param region - AWS region (optional, will use config region if not provided)
+   */
+  async forwardNative(
+    modelId: string,
+    body: string,
+    authHeaders: BedrockAuthHeaders,
+    isStream: boolean,
+    requestId: string,
+    region?: string
+  ): Promise<Response> {
+    const targetRegion = region || this.config.region
+    const streamSuffix = isStream ? '-with-response-stream' : ''
+    const url = `https://bedrock-runtime.${targetRegion}.amazonaws.com/model/${encodeURIComponent(modelId)}/invoke${streamSuffix}`
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), this.config.timeout)
+
+    try {
+      logger.info('Forwarding native Bedrock request', {
+        requestId,
+        metadata: {
+          modelId,
+          region: targetRegion,
+          isStream,
+          url,
+        },
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...authHeaders,
+        },
+        body,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeout)
+
+      if (!response.ok) {
+        const errorBody = await response.text()
+        logger.error('Native Bedrock API error response', {
+          requestId,
+          metadata: {
+            status: response.status,
+            url,
+            errorBody: errorBody.substring(0, 500),
+            headers: Object.fromEntries(response.headers.entries()),
+          },
+        })
+
+        // Return the error response as-is for native endpoints
+        return new Response(errorBody, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        })
+      }
+
+      return response
+    } catch (error) {
+      clearTimeout(timeout)
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new TimeoutError('Native Bedrock API request timeout', {
+          requestId,
+          timeout: this.config.timeout,
+        })
+      }
+
+      throw error
+    }
+  }
+
+  /**
    * Process a streaming response
    */
   async *processStreamingResponse(

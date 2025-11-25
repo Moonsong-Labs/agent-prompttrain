@@ -67,3 +67,28 @@ export function mapToBedrockModel(anthropicModel: string): string {
 export function isBedrockModelId(modelId: string): boolean {
   return modelId.includes('anthropic.claude') || modelId.includes('global.anthropic.claude')
 }
+
+/**
+ * Regional prefix to AWS region mapping
+ * Used for extracting the appropriate AWS region from Bedrock model IDs
+ */
+const BEDROCK_REGION_MAPPING: Record<string, string> = {
+  us: 'us-east-1',
+  eu: 'eu-west-1',
+  ap: 'ap-northeast-1',
+  global: 'us-east-1', // Global models default to us-east-1
+}
+
+/**
+ * Extract AWS region from a Bedrock model ID
+ * Model IDs follow the pattern: {region_prefix}.anthropic.{model_name}
+ * e.g., "us.anthropic.claude-3-5-haiku-20241022-v1:0" -> "us-east-1"
+ *
+ * @param modelId - The Bedrock model ID
+ * @param fallbackRegion - Region to use if extraction fails (default: 'us-east-1')
+ * @returns The AWS region string
+ */
+export function extractBedrockRegion(modelId: string, fallbackRegion = 'us-east-1'): string {
+  const prefix = modelId.split('.')[0]?.toLowerCase()
+  return BEDROCK_REGION_MAPPING[prefix] || fallbackRegion
+}
