@@ -13,16 +13,20 @@ export interface BedrockModelConfig {
  * Updated as of November 2025
  */
 export const MODEL_MAPPING: Record<string, string> = {
-  // Claude 4.5 Haiku (Latest - October 2025)
+  // Claude 4.5 Opus (Latest - November 2025)
+  'claude-opus-4-5': 'global.anthropic.claude-opus-4-5-20251101-v1:0',
+  'claude-opus-4-5-20251101': 'global.anthropic.claude-opus-4-5-20251101-v1:0',
+
+  // Claude 4.5 Haiku (October 2025)
   'claude-haiku-4-5': 'global.anthropic.claude-haiku-4-5-20251015-v1:0',
   'claude-haiku-4-5-20251015': 'global.anthropic.claude-haiku-4-5-20251015-v1:0',
   'claude-haiku-4-5-20251001': 'global.anthropic.claude-haiku-4-5-20251001-v1:0',
 
-  // Claude 4.5 Sonnet (Latest - September 2025)
+  // Claude 4.5 Sonnet (September 2025)
   'claude-sonnet-4-5': 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
   'claude-sonnet-4-5-20250929': 'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
 
-  // Claude 4.1 Opus (Latest - August 2025)
+  // Claude 4.1 Opus (August 2025)
   'claude-opus-4-1': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
   'claude-opus-4-1-20250805': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
 

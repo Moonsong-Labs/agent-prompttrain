@@ -8,7 +8,7 @@ Complete reference for request and response schemas used in Agent Prompt Train.
 
 ```typescript
 interface MessagesRequest {
-  model: string // e.g., "claude-3-opus-20240229"
+  model: string // e.g., "claude-opus-4-5-20251101"
   messages: Message[] // Conversation history
   max_tokens: number // Maximum tokens to generate
   temperature?: number // 0.0 to 1.0 (default: 1.0)
@@ -486,15 +486,13 @@ function isValidProjectId(projectId: string): boolean {
 
 // Validate model
 function isValidModel(model: string): boolean {
-  const validModels = [
-    'claude-3-opus-20240229',
-    'claude-3-sonnet-20240229',
-    'claude-3-haiku-20240307',
-    'claude-2.1',
-    'claude-2.0',
-    'claude-instant-1.2',
+  // Models follow pattern: claude-{tier}-{version}-{date}
+  // Examples: claude-opus-4-5-20251101, claude-sonnet-4-5-20250929
+  const validModelPatterns = [
+    /^claude-(opus|sonnet|haiku)-\d+-\d+(-\d{8})?$/,
+    /^claude-3(-5)?-(opus|sonnet|haiku)-\d{8}$/,
   ]
-  return validModels.includes(model)
+  return validModelPatterns.some(pattern => pattern.test(model))
 }
 ```
 
