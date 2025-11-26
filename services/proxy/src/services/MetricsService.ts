@@ -6,6 +6,22 @@ import { StorageAdapter } from '../storage/StorageAdapter.js'
 import { TokenUsageService } from './TokenUsageService.js'
 import { logger } from '../middleware/logger'
 import { broadcastConversation, broadcastMetrics } from '../dashboard/sse.js'
+import { generateConversationId, ClaudeMessage } from '@agent-prompttrain/shared'
+
+/**
+ * System prompt prefixes that indicate internal Claude Code helper requests
+ * These requests should not be stored in the database as they're internal operations
+ */
+const INTERNAL_SYSTEM_PROMPT_PREFIXES = [
+  'Extract any file paths that this command reads or modifies',
+  'Summarize this coding conversation in under 50 characters',
+  'Please write a 5-10 word title for the following conversation',
+  'Your task is to process Bash commands that an AI coding agent wants to run',
+  'You are a file search specialist for Claude Code, Anthropic',
+  'Analyze if this message indicates a new conversation topic',
+  'You are an interactive CLI tool that helps users with software engineering tasks',
+  'You are a software architect and planning specialist for Claude Code',
+]
 
 export interface MetricsConfig {
   enableTokenTracking: boolean
@@ -392,6 +408,14 @@ export class MetricsService {
       return
     }
 
+    // Skip storing internal Claude Code helper requests
+    if (this.isInternalClaudeCodeRequest(request.raw)) {
+      logger.debug('Skipping storage for internal Claude Code request', {
+        requestId: context.requestId,
+      })
+      return
+    }
+
     try {
       const metrics = response.getMetrics()
 
@@ -492,10 +516,78 @@ export class MetricsService {
       return
     }
 
+    // Check if this is an internal Claude Code helper request that should not be stored
+    if (this.isInternalClaudeCodeRequest(requestBody)) {
+      logger.debug('Skipping storage for internal Claude Code request', {
+        requestId: context.requestId,
+      })
+      return
+    }
+
     try {
-      // Calculate message count from request body
-      const messages = requestBody.messages as Array<unknown> | undefined
+      // Extract messages and system from request body (Bedrock uses same message format as Anthropic)
+      const messages = requestBody.messages as ClaudeMessage[] | undefined
+      const systemPrompt = requestBody.system as
+        | string
+        | { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[]
+        | undefined
       const messageCount = messages?.length || 0
+
+      // Perform conversation linking if we have messages
+      let conversationData:
+        | {
+            currentMessageHash: string
+            parentMessageHash: string | null
+            conversationId: string
+            systemHash: string | null
+            branchId?: string
+            parentRequestId?: string
+            parentTaskRequestId?: string
+            isSubtask?: boolean
+          }
+        | undefined
+
+      if (messages && messages.length > 0) {
+        try {
+          const linkingResult = await this.storageService.linkConversation(
+            context.projectId,
+            messages,
+            systemPrompt,
+            context.requestId,
+            new Date(context.startTime)
+          )
+
+          // If no conversation ID was found, generate a new one
+          const conversationId = linkingResult.conversationId || generateConversationId()
+
+          conversationData = {
+            currentMessageHash: linkingResult.currentMessageHash,
+            parentMessageHash: linkingResult.parentMessageHash,
+            conversationId,
+            systemHash: linkingResult.systemHash,
+            branchId: linkingResult.branchId,
+            parentRequestId: linkingResult.parentRequestId || undefined,
+            parentTaskRequestId: linkingResult.parentTaskRequestId || undefined,
+            isSubtask: linkingResult.isSubtask || undefined,
+          }
+
+          logger.debug('Native Bedrock conversation linking', {
+            requestId: context.requestId,
+            metadata: {
+              conversationId,
+              branchId: linkingResult.branchId,
+              isNewConversation: !linkingResult.conversationId,
+            },
+          })
+        } catch (error) {
+          logger.warn('Failed to link conversation for native Bedrock request', {
+            requestId: context.requestId,
+            metadata: {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          })
+        }
+      }
 
       await this.storageService.storeRequest({
         id: context.requestId,
@@ -517,16 +609,15 @@ export class MetricsService {
         tool_call_count: metrics.toolCallCount,
         processing_time: context.getElapsedTime(),
         status_code: status,
-        // Native Bedrock requests don't have conversation tracking
-        currentMessageHash: undefined,
-        parentMessageHash: undefined,
-        conversationId: undefined,
-        branchId: undefined,
-        systemHash: undefined,
+        currentMessageHash: conversationData?.currentMessageHash,
+        parentMessageHash: conversationData?.parentMessageHash,
+        conversationId: conversationData?.conversationId,
+        branchId: conversationData?.branchId,
+        systemHash: conversationData?.systemHash,
         messageCount: messageCount,
-        parentRequestId: undefined,
-        parentTaskRequestId: undefined,
-        isSubtask: undefined,
+        parentRequestId: conversationData?.parentRequestId,
+        parentTaskRequestId: conversationData?.parentTaskRequestId,
+        isSubtask: conversationData?.isSubtask,
       })
 
       // Store response
@@ -560,6 +651,37 @@ export class MetricsService {
         },
       })
     }
+  }
+
+  /**
+   * Check if the request is an internal Claude Code helper request
+   * These are utility requests for file path extraction, conversation summarization, etc.
+   */
+  private isInternalClaudeCodeRequest(requestBody: Record<string, unknown>): boolean {
+    const system = requestBody.system
+
+    // Handle string system prompt
+    if (typeof system === 'string') {
+      return INTERNAL_SYSTEM_PROMPT_PREFIXES.some(prefix => system.startsWith(prefix))
+    }
+
+    // Handle array of system prompt blocks
+    if (Array.isArray(system)) {
+      for (const block of system) {
+        if (
+          typeof block === 'object' &&
+          block !== null &&
+          'text' in block &&
+          typeof block.text === 'string'
+        ) {
+          if (INTERNAL_SYSTEM_PROMPT_PREFIXES.some(prefix => block.text.startsWith(prefix))) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
   }
 
   /**
