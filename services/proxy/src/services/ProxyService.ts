@@ -184,6 +184,14 @@ export class ProxyService {
             : `account:${auth.accountName}`,
       })
 
+      // Extract raw headers from Hono context if available (needed for both providers)
+      const clientHeaders: Record<string, string> = {}
+      if (context.honoContext) {
+        context.honoContext.req.raw.headers.forEach((value, key) => {
+          clientHeaders[key] = value
+        })
+      }
+
       let claudeResponse: Response
       if (auth.provider === 'bedrock') {
         const bedrockClient = new BedrockApiClient({
@@ -191,17 +199,9 @@ export class ProxyService {
           timeout: 600000,
         })
 
-        // Extract raw headers from Hono context if available
-        const clientHeaders: Record<string, string> = {}
-        if (context.honoContext) {
-          context.honoContext.req.raw.headers.forEach((value, key) => {
-            clientHeaders[key] = value
-          })
-        }
-
         claudeResponse = await bedrockClient.forward(request, auth.headers as any, clientHeaders)
       } else {
-        claudeResponse = await this.apiClient.forward(request, auth)
+        claudeResponse = await this.apiClient.forward(request, auth, clientHeaders)
       }
 
       // Process response based on streaming mode

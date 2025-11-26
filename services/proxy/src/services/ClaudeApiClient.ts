@@ -32,10 +32,17 @@ export class ClaudeApiClient {
 
   /**
    * Forward a request to Claude API
+   * @param request - The proxy request
+   * @param auth - Authentication result with headers
+   * @param clientHeaders - Optional client headers to merge (for beta header combination)
    */
-  async forward(request: ProxyRequest, auth: AuthResult): Promise<Response> {
+  async forward(
+    request: ProxyRequest,
+    auth: AuthResult,
+    clientHeaders?: Record<string, string>
+  ): Promise<Response> {
     const url = `${this.config.baseUrl}/v1/messages`
-    const headers = request.createHeaders(auth.headers)
+    const headers = request.createHeaders(auth.headers, clientHeaders)
 
     // Use retry logic for transient failures
     return retryWithBackoff(
