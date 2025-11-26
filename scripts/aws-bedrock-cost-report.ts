@@ -329,10 +329,9 @@ const MODEL_PRICING: readonly ModelPricingEntry[] = [
     matchers: ['opus', '4-5'],
     regions: {
       global: {
-        // Pricing based on Opus 4.1 until official pricing is published
-        standard: { inputPerThousand: 0.015, outputPerThousand: 0.075 },
-        cacheReadPerThousand: 0.0015,
-        cacheWritePerThousand: 0.01875,
+        standard: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.0005,
+        cacheWritePerThousand: 0.00625,
       },
     },
   },
