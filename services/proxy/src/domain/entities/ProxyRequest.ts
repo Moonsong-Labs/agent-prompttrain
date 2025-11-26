@@ -183,15 +183,42 @@ export class ProxyRequest {
 
   /**
    * Create request headers for Claude API
+   * Merges auth headers with client headers, combining anthropic-beta values
    */
-  createHeaders(authHeaders: Record<string, string>): Record<string, string> {
+  createHeaders(
+    authHeaders: Record<string, string>,
+    clientHeaders?: Record<string, string>
+  ): Record<string, string> {
     // Filter out x-api-key to ensure it's never sent to Claude
     const { 'x-api-key': _, ...filteredAuthHeaders } = authHeaders
 
-    return {
+    // Extract beta headers from both sources
+    const authBeta = filteredAuthHeaders['anthropic-beta']
+    const clientBeta = clientHeaders?.['anthropic-beta']
+
+    // Combine beta headers (unique values only, comma-separated)
+    let combinedBeta = authBeta
+    if (clientBeta) {
+      const allBetas = new Set<string>()
+      if (authBeta) {
+        authBeta.split(',').forEach(b => allBetas.add(b.trim()))
+      }
+      clientBeta.split(',').forEach(b => allBetas.add(b.trim()))
+      combinedBeta = Array.from(allBetas).join(',')
+    }
+
+    // Build final headers
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
       ...filteredAuthHeaders,
     }
+
+    // Override with combined beta header if we have one
+    if (combinedBeta) {
+      headers['anthropic-beta'] = combinedBeta
+    }
+
+    return headers
   }
 }

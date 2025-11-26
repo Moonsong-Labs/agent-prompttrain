@@ -3,10 +3,14 @@ import { ProxyResponse } from '../domain/entities/ProxyResponse'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { AuthenticationService, AuthResult } from './AuthenticationService'
 import { ClaudeApiClient } from './ClaudeApiClient'
-import { BedrockApiClient } from './BedrockApiClient'
 import { NotificationService } from './NotificationService'
 import { MetricsService } from './MetricsService'
-import { ClaudeMessagesRequest, generateConversationId, config } from '@agent-prompttrain/shared'
+import {
+  ClaudeMessagesRequest,
+  generateConversationId,
+  config,
+  ValidationError,
+} from '@agent-prompttrain/shared'
 import { getProjectSlackConfig } from '@agent-prompttrain/shared/database/queries'
 import { logger } from '../middleware/logger'
 import { testSampleCollector } from './TestSampleCollector'
@@ -171,9 +175,22 @@ export class ProxyService {
         auth = await this.authService.authenticate(context)
       }
 
-      // Forward to appropriate provider
-      const providerName = auth.provider === 'bedrock' ? 'Bedrock' : 'Claude'
-      log.info(`Forwarding request to ${providerName}`, {
+      // Bedrock accounts are not supported on /v1/messages endpoint
+      // They must use the native Bedrock endpoints: /model/{modelId}/invoke
+      if (auth.provider === 'bedrock') {
+        throw new ValidationError(
+          'Bedrock accounts are not supported on /v1/messages. Use native Bedrock endpoints: /model/{modelId}/invoke or /model/{modelId}/invoke-with-response-stream',
+          {
+            requestId: context.requestId,
+            accountId: auth.accountId,
+            accountName: auth.accountName,
+            hint: 'Configure an Anthropic OAuth account for /v1/messages or use native Bedrock endpoints',
+          }
+        )
+      }
+
+      // Forward to Claude API
+      log.info('Forwarding request to Claude', {
         model: request.model,
         streaming: request.isStreaming,
         requestType: request.requestType,
@@ -184,25 +201,15 @@ export class ProxyService {
             : `account:${auth.accountName}`,
       })
 
-      let claudeResponse: Response
-      if (auth.provider === 'bedrock') {
-        const bedrockClient = new BedrockApiClient({
-          region: auth.region || 'us-east-1',
-          timeout: 600000,
+      // Extract raw headers from Hono context if available (for beta header merging)
+      const clientHeaders: Record<string, string> = {}
+      if (context.honoContext) {
+        context.honoContext.req.raw.headers.forEach((value, key) => {
+          clientHeaders[key] = value
         })
-
-        // Extract raw headers from Hono context if available
-        const clientHeaders: Record<string, string> = {}
-        if (context.honoContext) {
-          context.honoContext.req.raw.headers.forEach((value, key) => {
-            clientHeaders[key] = value
-          })
-        }
-
-        claudeResponse = await bedrockClient.forward(request, auth.headers as any, clientHeaders)
-      } else {
-        claudeResponse = await this.apiClient.forward(request, auth)
       }
+
+      const claudeResponse = await this.apiClient.forward(request, auth, clientHeaders)
 
       // Process response based on streaming mode
       let finalResponse: Response
