@@ -6,6 +6,22 @@ import { StorageAdapter } from '../storage/StorageAdapter.js'
 import { TokenUsageService } from './TokenUsageService.js'
 import { logger } from '../middleware/logger'
 import { broadcastConversation, broadcastMetrics } from '../dashboard/sse.js'
+import { generateConversationId, ClaudeMessage } from '@agent-prompttrain/shared'
+
+/**
+ * System prompt prefixes that indicate internal Claude Code helper requests
+ * These requests should not be stored in the database as they're internal operations
+ */
+const INTERNAL_SYSTEM_PROMPT_PREFIXES = [
+  'Extract any file paths that this command reads or modifies',
+  'Summarize this coding conversation in under 50 characters',
+  'Please write a 5-10 word title for the following conversation',
+  'Your task is to process Bash commands that an AI coding agent wants to run',
+  'You are a file search specialist for Claude Code, Anthropic',
+  'Analyze if this message indicates a new conversation topic',
+  'You are an interactive CLI tool that helps users with software engineering tasks',
+  'You are a software architect and planning specialist for Claude Code',
+]
 
 export interface MetricsConfig {
   enableTokenTracking: boolean
@@ -186,6 +202,121 @@ export class MetricsService {
   }
 
   /**
+   * Track metrics for a native Bedrock request (already in Bedrock format)
+   * This is a simplified tracking method for requests that bypass ProxyRequest/ProxyResponse
+   */
+  async trackNativeBedrockRequest(
+    context: RequestContext,
+    model: string,
+    requestBody: Record<string, unknown>,
+    responseBody: Record<string, unknown>,
+    status: number,
+    accountId: string,
+    responseHeaders?: Record<string, string>
+  ): Promise<void> {
+    // Extract usage from response
+    const usage = responseBody.usage as
+      | {
+          input_tokens?: number
+          output_tokens?: number
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+        }
+      | undefined
+
+    const inputTokens = usage?.input_tokens || 0
+    const outputTokens = usage?.output_tokens || 0
+    const cacheCreationInputTokens = usage?.cache_creation_input_tokens || 0
+    const cacheReadInputTokens = usage?.cache_read_input_tokens || 0
+    const totalTokens = inputTokens + outputTokens
+
+    // Count tool calls in response
+    const content = responseBody.content as Array<{ type: string }> | undefined
+    const toolCallCount = content?.filter(c => c.type === 'tool_use').length || 0
+
+    // Track tokens
+    if (this.config.enableTokenTracking) {
+      tokenTracker.track(context.projectId, inputTokens, outputTokens, 'inference', toolCallCount)
+
+      // Track in persistent storage
+      if (this.tokenUsageService && accountId) {
+        await this.tokenUsageService.recordUsage({
+          accountId,
+          projectId: context.projectId,
+          model,
+          requestType: 'inference',
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cacheCreationInputTokens,
+          cacheReadInputTokens,
+          requestCount: 1,
+        })
+      }
+    }
+
+    // Store in database
+    if (this.config.enableStorage && this.storageService) {
+      await this.storeNativeBedrockRequest(
+        context,
+        model,
+        requestBody,
+        responseBody,
+        status,
+        accountId,
+        {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cacheCreationInputTokens,
+          cacheReadInputTokens,
+          toolCallCount,
+        },
+        responseHeaders
+      )
+    }
+
+    // Log metrics
+    logger.info('Native Bedrock request processed', {
+      requestId: context.requestId,
+      projectId: context.projectId,
+      model,
+      metadata: {
+        inputTokens,
+        outputTokens,
+        duration: context.getElapsedTime(),
+        stored: this.config.enableStorage,
+      },
+    })
+
+    // Broadcast to dashboard
+    try {
+      broadcastConversation({
+        id: context.requestId,
+        projectId: context.projectId,
+        model,
+        tokens: totalTokens,
+        timestamp: new Date().toISOString(),
+      })
+
+      const stats = tokenTracker.getStats()
+      const trainStats = stats[context.projectId]
+      if (trainStats) {
+        broadcastMetrics({
+          projectId: context.projectId,
+          requests: trainStats.requestCount,
+          tokens: trainStats.inputTokens + trainStats.outputTokens,
+          activeUsers: Object.keys(stats).length,
+        })
+      }
+    } catch (e) {
+      logger.debug('Failed to broadcast metrics', {
+        metadata: { error: e instanceof Error ? e.message : String(e) },
+      })
+    }
+  }
+
+  /**
    * Track error metrics
    */
   async trackError(
@@ -277,6 +408,14 @@ export class MetricsService {
       return
     }
 
+    // Skip storing internal Claude Code helper requests
+    if (this.isInternalClaudeCodeRequest(request.raw)) {
+      logger.debug('Skipping storage for internal Claude Code request', {
+        requestId: context.requestId,
+      })
+      return
+    }
+
     try {
       const metrics = response.getMetrics()
 
@@ -350,6 +489,199 @@ export class MetricsService {
         },
       })
     }
+  }
+
+  /**
+   * Store a native Bedrock request in database
+   * Simplified storage for requests that bypass ProxyRequest/ProxyResponse
+   */
+  private async storeNativeBedrockRequest(
+    context: RequestContext,
+    model: string,
+    requestBody: Record<string, unknown>,
+    responseBody: Record<string, unknown>,
+    status: number,
+    accountId: string,
+    metrics: {
+      inputTokens: number
+      outputTokens: number
+      totalTokens: number
+      cacheCreationInputTokens: number
+      cacheReadInputTokens: number
+      toolCallCount: number
+    },
+    responseHeaders?: Record<string, string>
+  ): Promise<void> {
+    if (!this.storageService) {
+      return
+    }
+
+    // Check if this is an internal Claude Code helper request that should not be stored
+    if (this.isInternalClaudeCodeRequest(requestBody)) {
+      logger.debug('Skipping storage for internal Claude Code request', {
+        requestId: context.requestId,
+      })
+      return
+    }
+
+    try {
+      // Extract messages and system from request body (Bedrock uses same message format as Anthropic)
+      const messages = requestBody.messages as ClaudeMessage[] | undefined
+      const systemPrompt = requestBody.system as
+        | string
+        | { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[]
+        | undefined
+      const messageCount = messages?.length || 0
+
+      // Perform conversation linking if we have messages
+      let conversationData:
+        | {
+            currentMessageHash: string
+            parentMessageHash: string | null
+            conversationId: string
+            systemHash: string | null
+            branchId?: string
+            parentRequestId?: string
+            parentTaskRequestId?: string
+            isSubtask?: boolean
+          }
+        | undefined
+
+      if (messages && messages.length > 0) {
+        try {
+          const linkingResult = await this.storageService.linkConversation(
+            context.projectId,
+            messages,
+            systemPrompt,
+            context.requestId,
+            new Date(context.startTime)
+          )
+
+          // If no conversation ID was found, generate a new one
+          const conversationId = linkingResult.conversationId || generateConversationId()
+
+          conversationData = {
+            currentMessageHash: linkingResult.currentMessageHash,
+            parentMessageHash: linkingResult.parentMessageHash,
+            conversationId,
+            systemHash: linkingResult.systemHash,
+            branchId: linkingResult.branchId,
+            parentRequestId: linkingResult.parentRequestId || undefined,
+            parentTaskRequestId: linkingResult.parentTaskRequestId || undefined,
+            isSubtask: linkingResult.isSubtask || undefined,
+          }
+
+          logger.debug('Native Bedrock conversation linking', {
+            requestId: context.requestId,
+            metadata: {
+              conversationId,
+              branchId: linkingResult.branchId,
+              isNewConversation: !linkingResult.conversationId,
+            },
+          })
+        } catch (error) {
+          logger.warn('Failed to link conversation for native Bedrock request', {
+            requestId: context.requestId,
+            metadata: {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          })
+        }
+      }
+
+      await this.storageService.storeRequest({
+        id: context.requestId,
+        projectId: context.projectId,
+        accountId: accountId,
+        timestamp: new Date(context.startTime),
+        method: context.method,
+        path: context.path,
+        headers: context.headers,
+        body: requestBody,
+        request_type: 'inference',
+        model: model,
+        input_tokens: metrics.inputTokens,
+        output_tokens: metrics.outputTokens,
+        total_tokens: metrics.totalTokens,
+        cache_creation_input_tokens: metrics.cacheCreationInputTokens,
+        cache_read_input_tokens: metrics.cacheReadInputTokens,
+        usage_data: responseBody.usage as Record<string, unknown> | undefined,
+        tool_call_count: metrics.toolCallCount,
+        processing_time: context.getElapsedTime(),
+        status_code: status,
+        currentMessageHash: conversationData?.currentMessageHash,
+        parentMessageHash: conversationData?.parentMessageHash,
+        conversationId: conversationData?.conversationId,
+        branchId: conversationData?.branchId,
+        systemHash: conversationData?.systemHash,
+        messageCount: messageCount,
+        parentRequestId: conversationData?.parentRequestId,
+        parentTaskRequestId: conversationData?.parentTaskRequestId,
+        isSubtask: conversationData?.isSubtask,
+      })
+
+      // Store response
+      await this.storageService.storeResponse({
+        request_id: context.requestId,
+        status_code: status,
+        headers: responseHeaders || {},
+        body: responseBody,
+        timestamp: new Date(),
+        input_tokens: metrics.inputTokens,
+        output_tokens: metrics.outputTokens,
+        total_tokens: metrics.totalTokens,
+        cache_creation_input_tokens: metrics.cacheCreationInputTokens,
+        cache_read_input_tokens: metrics.cacheReadInputTokens,
+        usage_data: responseBody.usage as Record<string, unknown> | undefined,
+        tool_call_count: metrics.toolCallCount,
+        processing_time: context.getElapsedTime(),
+      })
+
+      // Process Task tool invocations
+      await this.storageService.processTaskToolInvocations(
+        context.requestId,
+        responseBody,
+        context.projectId
+      )
+    } catch (error) {
+      logger.error('Failed to store native Bedrock request/response', {
+        requestId: context.requestId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
+
+  /**
+   * Check if the request is an internal Claude Code helper request
+   * These are utility requests for file path extraction, conversation summarization, etc.
+   */
+  private isInternalClaudeCodeRequest(requestBody: Record<string, unknown>): boolean {
+    const system = requestBody.system
+
+    // Handle string system prompt
+    if (typeof system === 'string') {
+      return INTERNAL_SYSTEM_PROMPT_PREFIXES.some(prefix => system.startsWith(prefix))
+    }
+
+    // Handle array of system prompt blocks
+    if (Array.isArray(system)) {
+      for (const block of system) {
+        if (
+          typeof block === 'object' &&
+          block !== null &&
+          'text' in block &&
+          typeof block.text === 'string'
+        ) {
+          if (INTERNAL_SYSTEM_PROMPT_PREFIXES.some(prefix => block.text.startsWith(prefix))) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
   }
 
   /**

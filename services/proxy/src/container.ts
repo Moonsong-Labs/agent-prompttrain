@@ -1,9 +1,11 @@
 import { Pool } from 'pg'
 import { MessageController } from './controllers/MessageController.js'
 import { GenericProxyController } from './controllers/GenericProxyController.js'
+import { BedrockNativeController } from './controllers/BedrockNativeController.js'
 import { ProxyService } from './services/ProxyService.js'
 import { AuthenticationService } from './services/AuthenticationService.js'
 import { ClaudeApiClient } from './services/ClaudeApiClient.js'
+import { BedrockApiClient } from './services/BedrockApiClient.js'
 import { BedrockEmulationService } from './services/BedrockEmulationService.js'
 import { MetricsService } from './services/MetricsService.js'
 import { NotificationService } from './services/NotificationService.js'
@@ -28,10 +30,12 @@ class Container {
   private notificationService?: NotificationService
   private authenticationService?: AuthenticationService
   private claudeApiClient?: ClaudeApiClient
+  private bedrockApiClient?: BedrockApiClient
   private bedrockEmulationService?: BedrockEmulationService
   private proxyService?: ProxyService
   private messageController?: MessageController
   private genericProxyController?: GenericProxyController
+  private bedrockNativeController?: BedrockNativeController
   private mcpServer?: McpServer
   private promptRegistry?: PromptRegistryService
   private githubSyncService?: GitHubSyncService
@@ -134,6 +138,10 @@ class Container {
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,
     })
+    this.bedrockApiClient = new BedrockApiClient({
+      region: 'us-east-1', // Default region, will be overridden per-request
+      timeout: config.api.claudeTimeout,
+    })
     this.bedrockEmulationService = new BedrockEmulationService()
 
     // Wire up dependencies
@@ -150,6 +158,11 @@ class Container {
       this.authenticationService,
       this.claudeApiClient,
       this.bedrockEmulationService
+    )
+    this.bedrockNativeController = new BedrockNativeController(
+      this.authenticationService,
+      this.bedrockApiClient,
+      this.metricsService
     )
 
     // Initialize MCP services if enabled
@@ -245,6 +258,13 @@ class Container {
     return this.genericProxyController
   }
 
+  getBedrockNativeController(): BedrockNativeController {
+    if (!this.bedrockNativeController) {
+      throw new Error('BedrockNativeController not initialized')
+    }
+    return this.bedrockNativeController
+  }
+
   getMcpHandler(): JsonRpcHandler | undefined {
     return this.jsonRpcHandler
   }
@@ -286,10 +306,12 @@ class Container {
     this.notificationService = undefined
     this.authenticationService = undefined
     this.claudeApiClient = undefined
+    this.bedrockApiClient = undefined
     this.bedrockEmulationService = undefined
     this.proxyService = undefined
     this.messageController = undefined
     this.genericProxyController = undefined
+    this.bedrockNativeController = undefined
     this.mcpServer = undefined
     this.githubSyncService = undefined
     this.jsonRpcHandler = undefined
@@ -350,6 +372,10 @@ class LazyContainer {
 
   getGenericProxyController(): GenericProxyController {
     return this.ensureInstance().getGenericProxyController()
+  }
+
+  getBedrockNativeController(): BedrockNativeController {
+    return this.ensureInstance().getBedrockNativeController()
   }
 
   getMcpHandler(): JsonRpcHandler | undefined {

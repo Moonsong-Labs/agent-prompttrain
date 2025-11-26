@@ -100,6 +100,78 @@ event: message_stop
 data: {"type":"message_stop"}
 ```
 
+### Native Bedrock Runtime API
+
+For Bedrock accounts, the proxy supports native Bedrock Runtime API endpoints. These endpoints forward requests directly to AWS Bedrock without transformation, using the Bedrock API Key for authentication.
+
+#### Invoke Model
+
+```http
+POST /model/{modelId}/invoke
+```
+
+Invokes a Bedrock model with a non-streaming response.
+
+**Path Parameters:**
+
+- `modelId` - The Bedrock model ID (e.g., `us.anthropic.claude-3-5-haiku-20241022-v1:0`)
+
+**Request:**
+
+The request body should be in Bedrock format (must include `anthropic_version`):
+
+```json
+{
+  "anthropic_version": "bedrock-2023-05-31",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, Claude!"
+    }
+  ],
+  "max_tokens": 1000
+}
+```
+
+**Response:**
+
+Standard Bedrock/Claude response format.
+
+**Notes:**
+
+- Requires a Bedrock account (not an Anthropic API account)
+- Region is extracted from the model ID prefix (e.g., `us.` -> `us-east-1`)
+- The `x-api-key` header is used for Bedrock authentication (populated from account credentials)
+
+#### Invoke Model with Streaming
+
+```http
+POST /model/{modelId}/invoke-with-response-stream
+```
+
+Invokes a Bedrock model with a streaming response.
+
+**Path Parameters:**
+
+- `modelId` - The Bedrock model ID (e.g., `us.anthropic.claude-3-5-haiku-20241022-v1:0`)
+
+**Request:**
+
+Same as non-streaming invoke (Bedrock format).
+
+**Response:**
+
+Server-sent events stream with Bedrock event format.
+
+**Regional Model ID Prefixes:**
+
+| Prefix    | AWS Region       |
+| --------- | ---------------- |
+| `us.`     | `us-east-1`      |
+| `eu.`     | `eu-west-1`      |
+| `ap.`     | `ap-northeast-1` |
+| `global.` | `us-east-1`      |
+
 ### Token Statistics
 
 #### Get Token Usage
