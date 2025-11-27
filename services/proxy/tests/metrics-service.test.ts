@@ -185,5 +185,112 @@ describe('MetricsService', () => {
       expect(mockStoreRequest).not.toHaveBeenCalled()
       expect(mockStoreResponse).not.toHaveBeenCalled()
     })
+
+    it('should NOT store requests with empty messages array', async () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-3-opus-20240229',
+          messages: [],
+          system: [
+            { type: 'text', text: 'System prompt 1' },
+            { type: 'text', text: 'System prompt 2' },
+          ],
+        },
+        'example.com',
+        'test-request-id',
+        'test-api-key'
+      )
+
+      const response = new ProxyResponse('test-request-id', false)
+      response.processResponse({
+        id: 'test-id',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Response' }],
+        model: 'claude-3-opus-20240229',
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+        usage: {
+          input_tokens: 10,
+          output_tokens: 20,
+        },
+      })
+
+      const context = new RequestContext(
+        'test-request-id',
+        'example.com',
+        'POST',
+        '/v1/messages',
+        Date.now(),
+        {},
+        undefined,
+        undefined,
+        undefined
+      )
+
+      await metricsService.trackRequest(request, response, context)
+
+      // Verify storage was NOT called for request with empty messages
+      expect(mockStoreRequest).not.toHaveBeenCalled()
+      expect(mockStoreResponse).not.toHaveBeenCalled()
+    })
+
+    it('should NOT store requests with empty response (zero tokens and no content)', async () => {
+      const request = new ProxyRequest(
+        {
+          model: 'claude-3-opus-20240229',
+          messages: [
+            { role: 'system', content: 'System prompt 1' },
+            { role: 'system', content: 'System prompt 2' },
+            { role: 'user', content: 'Hello' },
+          ],
+        },
+        'example.com',
+        'test-request-id',
+        'test-api-key'
+      )
+
+      // Create response with zero tokens (simulates empty streaming response)
+      const response = new ProxyResponse('test-request-id', true)
+      // Don't call processResponse - leaves tokens at 0
+
+      const context = new RequestContext(
+        'test-request-id',
+        'example.com',
+        'POST',
+        '/v1/messages',
+        Date.now(),
+        {},
+        undefined,
+        undefined,
+        undefined
+      )
+
+      // Pass empty response body (simulates reconstructed empty streaming response)
+      const emptyResponseBody = {
+        id: '',
+        type: 'message',
+        role: 'assistant',
+        content: [],
+        model: '',
+        stop_reason: null,
+        stop_sequence: null,
+        usage: {},
+      }
+
+      await metricsService.trackRequest(
+        request,
+        response,
+        context,
+        200,
+        undefined,
+        {},
+        emptyResponseBody
+      )
+
+      // Verify storage was NOT called for empty response
+      expect(mockStoreRequest).not.toHaveBeenCalled()
+      expect(mockStoreResponse).not.toHaveBeenCalled()
+    })
   })
 })
