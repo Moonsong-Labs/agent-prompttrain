@@ -21,6 +21,7 @@ const INTERNAL_SYSTEM_PROMPT_PREFIXES = [
   'Analyze if this message indicates a new conversation topic',
   'You are an interactive CLI tool that helps users with software engineering tasks',
   'You are a software architect and planning specialist for Claude Code',
+  'You are an expert at analyzing git history',
 ]
 
 export interface MetricsConfig {
