@@ -226,11 +226,31 @@ export class BedrockNativeController {
         }
       }
 
+      // Build response headers
+      const clientResponseHeaders: Record<string, string> = {
+        'content-type': response.headers.get('content-type') || 'application/json',
+      }
+
+      // For error responses (4xx/5xx), forward important Bedrock headers to the client
+      // These headers are essential for clients to understand and handle errors properly
+      if (!response.ok) {
+        const bedrockErrorHeaders = [
+          'x-amzn-errortype', // Error type (e.g., ServiceUnavailableException)
+          'x-amzn-requestid', // AWS request ID for debugging
+          'retry-after', // Retry guidance for rate limits and service unavailable
+          'date', // Date from Bedrock
+        ]
+        for (const header of bedrockErrorHeaders) {
+          const value = response.headers.get(header)
+          if (value) {
+            clientResponseHeaders[header] = value
+          }
+        }
+      }
+
       return new Response(responseText, {
         status: response.status,
-        headers: {
-          'content-type': response.headers.get('content-type') || 'application/json',
-        },
+        headers: clientResponseHeaders,
       })
     } catch (error) {
       logger.error('Native Bedrock request failed', error instanceof Error ? error : undefined, {

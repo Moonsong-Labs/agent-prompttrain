@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Native Bedrock API error responses now forward `x-amzn-errortype`, `x-amzn-requestid`, and `retry-after` headers to clients for improved error handling and debugging
 - Display of XML tags in dashboard conversation view (e.g., `<system-reminder>`, `<command>`) instead of filtering them
 - Conversation branching visualization in dashboard
 - Message count tracking at database level for performance

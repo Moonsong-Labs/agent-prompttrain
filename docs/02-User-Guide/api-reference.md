@@ -172,6 +172,18 @@ Server-sent events stream with Bedrock event format.
 | `ap.`     | `ap-northeast-1` |
 | `global.` | `us-east-1`      |
 
+**Error Response Headers:**
+
+For 4xx/5xx error responses from Bedrock, the proxy forwards important AWS error headers to clients:
+
+| Header             | Description                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `x-amzn-errortype` | The specific AWS error type (e.g., `ServiceUnavailableException`, `ThrottlingException`) |
+| `x-amzn-requestid` | AWS request ID for debugging and support tickets                                         |
+| `retry-after`      | Suggested wait time (seconds) before retrying, typically present on 429/503 responses    |
+
+These headers help clients implement proper error handling and retry logic for Bedrock-specific errors.
+
 ### Token Statistics
 
 #### Get Token Usage
