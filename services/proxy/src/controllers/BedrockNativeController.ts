@@ -238,6 +238,7 @@ export class BedrockNativeController {
           'x-amzn-errortype', // Error type (e.g., ServiceUnavailableException)
           'x-amzn-requestid', // AWS request ID for debugging
           'retry-after', // Retry guidance for rate limits and service unavailable
+          'date', // Date from Bedrock
         ]
         for (const header of bedrockErrorHeaders) {
           const value = response.headers.get(header)
