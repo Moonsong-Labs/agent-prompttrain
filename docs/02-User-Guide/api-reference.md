@@ -184,6 +184,37 @@ For 4xx/5xx error responses from Bedrock, the proxy forwards important AWS error
 
 These headers help clients implement proper error handling and retry logic for Bedrock-specific errors.
 
+### Event Logging API (Claude Code CLI)
+
+The proxy supports forwarding event logging requests used by the Claude Code CLI for telemetry and analytics.
+
+#### Batch Event Logging
+
+```http
+POST /api/event_logging/batch
+```
+
+Forwards batch event logging requests to Claude's API. This endpoint is used by the Claude Code CLI for sending telemetry data.
+
+**Authentication:**
+
+Same as `/v1/*` endpoints - requires a valid API key in the Authorization header:
+
+```bash
+Authorization: Bearer cnp_live_YOUR_KEY
+```
+
+**Rate Limiting:**
+
+Subject to the same rate limits as other proxy endpoints.
+
+**Notes:**
+
+- This endpoint is a transparent proxy to Claude's internal event logging API
+- Only available in `proxy` and `full` service modes
+- Requests are forwarded to `api.anthropic.com/api/event_logging/batch`
+- The endpoint is not supported for Bedrock accounts (returns 501)
+
 ### Token Statistics
 
 #### Get Token Usage

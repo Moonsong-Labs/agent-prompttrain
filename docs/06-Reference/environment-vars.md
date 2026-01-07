@@ -74,13 +74,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 **SERVICE_MODE Details:**
 
 - **`full`** (default): All endpoints available
-  - Claude Code endpoints: `/v1/messages`, `/mcp`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
-  - Dashboard API endpoints: `/api/*`
+  - Claude Code endpoints: `/v1/messages`, `/model/*`, `/api/event_logging/*`, `/mcp`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
+  - Dashboard API endpoints: `/api/*` (except `/api/event_logging/*` which is for Claude Code)
   - Health endpoint: `/health`
   - **Requirements**: `DATABASE_URL`, `INTERNAL_API_KEY`
 
 - **`proxy`**: Only Claude Code endpoints
-  - Available: `/v1/messages`, `/mcp`, `/health`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
+  - Available: `/v1/messages`, `/model/*`, `/api/event_logging/*`, `/mcp`, `/health`, `/token-stats`, `/oauth-metrics`, `/client-setup/*`
   - **Requirements**: None (database optional for tracking)
 
 - **`api`**: Only Dashboard API endpoints
