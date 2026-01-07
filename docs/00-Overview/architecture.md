@@ -37,6 +37,9 @@ agent-prompttrain/
 **Endpoints:**
 
 - `POST /v1/messages` - Main proxy endpoint
+- `POST /model/{modelId}/invoke` - Native Bedrock invoke endpoint
+- `POST /model/{modelId}/invoke-with-response-stream` - Native Bedrock streaming endpoint
+- `POST /api/event_logging/*` - Claude Code CLI event logging
 - `GET /token-stats` - Token usage statistics
 - `GET /health` - Health check
 - `GET /client-setup/*` - Client configuration files
