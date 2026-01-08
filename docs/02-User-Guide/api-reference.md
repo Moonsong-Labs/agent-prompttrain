@@ -186,15 +186,24 @@ These headers help clients implement proper error handling and retry logic for B
 
 ### Event Logging API (Claude Code CLI)
 
-The proxy supports forwarding event logging requests used by the Claude Code CLI for telemetry and analytics.
+The proxy accepts event logging requests used by the Claude Code CLI for telemetry.
 
 #### Batch Event Logging
 
 ```http
 POST /api/event_logging/batch
+POST /api/event_logging/*
 ```
 
-Forwards batch event logging requests to Claude's API. This endpoint is used by the Claude Code CLI for sending telemetry data.
+Accepts event logging requests from the Claude Code CLI. These endpoints silently return a 200 OK response without forwarding to Claude's API, avoiding unnecessary external telemetry calls.
+
+**Response:**
+
+```json
+{
+  "status": "ok"
+}
+```
 
 **Authentication:**
 
@@ -210,10 +219,9 @@ Subject to the same rate limits as other proxy endpoints.
 
 **Notes:**
 
-- This endpoint is a transparent proxy to Claude's internal event logging API
+- Requests are accepted silently and not forwarded to Claude's API
 - Only available in `proxy` and `full` service modes
-- Requests are forwarded to `api.anthropic.com/api/event_logging/batch`
-- The endpoint is not supported for Bedrock accounts (returns 501)
+- Returns 200 OK with `{"status": "ok"}` for all valid requests
 
 ### Token Statistics
 
