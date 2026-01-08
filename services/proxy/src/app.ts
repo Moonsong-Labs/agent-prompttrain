@@ -91,22 +91,21 @@ export async function createProxyApp(): Promise<
     // This sets projectId from API key authentication
     if (config.features.enableClientAuth !== false) {
       app.use('/v1/*', clientAuthMiddleware())
-      // Also protect Claude-specific /api/* routes used by claude-code CLI
-      app.use('/api/event_logging/*', clientAuthMiddleware())
     }
 
     // Project ID extraction fallback for proxy endpoints only
     // Only sets projectId if not already set by client auth
     app.use('/v1/*', projectIdExtractorMiddleware())
-    app.use('/api/event_logging/*', projectIdExtractorMiddleware())
 
     // Rate limiting
     if (config.features.enableMetrics) {
       app.use('/v1/*', createRateLimiter())
       app.use('/v1/*', createTrainRateLimiter())
-      app.use('/api/event_logging/*', createRateLimiter())
-      app.use('/api/event_logging/*', createTrainRateLimiter())
     }
+
+    // Silent OK handler for event_logging endpoints (no auth, no rate limiting)
+    // These endpoints accept Claude Code CLI telemetry without processing
+    app.all('/api/event_logging/*', c => c.json({ status: 'ok' }, 200))
 
     // Validation middleware ONLY for /v1/messages
     // Don't apply to generic proxy routes as they have different schemas
@@ -313,11 +312,6 @@ export async function createProxyApp(): Promise<
     // - Bedrock accounts: emulates /v1/messages/count_tokens, returns 501 for others
     const genericProxyController = container.getGenericProxyController()
     app.all('/v1/*', c => genericProxyController.handle(c))
-
-    // Claude-specific /api/* routes (used by claude-code CLI for telemetry)
-    // These endpoints silently accept requests without forwarding to Claude API
-    // This avoids unnecessary external calls for telemetry that is not needed
-    app.all('/api/event_logging/*', c => c.json({ status: 'ok' }, 200))
   }
 
   // Root endpoint
