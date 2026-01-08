@@ -315,9 +315,9 @@ export async function createProxyApp(): Promise<
     app.all('/v1/*', c => genericProxyController.handle(c))
 
     // Claude-specific /api/* routes (used by claude-code CLI for telemetry)
-    // These are forwarded to Claude API, not handled by the dashboard API
-    // Must be registered BEFORE API mode routes to take precedence
-    app.all('/api/event_logging/*', c => genericProxyController.handle(c))
+    // These endpoints silently accept requests without forwarding to Claude API
+    // This avoids unnecessary external calls for telemetry that is not needed
+    app.all('/api/event_logging/*', c => c.json({ status: 'ok' }, 200))
   }
 
   // Root endpoint
