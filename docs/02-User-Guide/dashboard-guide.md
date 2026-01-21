@@ -59,9 +59,35 @@ Live updates via Server-Sent Events (SSE) show:
 
 ### Token Usage Analytics
 
+#### Claude Account Rate Limits
+
+For Anthropic OAuth accounts, the Token Usage page displays real-time rate limit utilization from the Anthropic API:
+
+**Overview Page:**
+
+- Compact usage indicators under each account name
+- Shows utilization percentages for active windows (5h, 7d, 7d Sonnet)
+- Color-coded: Green (<50%), Orange (50-80%), Red (>80%)
+
+**Detail Page (per account):**
+
+- "Claude Account Rate Limits" section at the top
+- Progress bars showing utilization percentage
+- Reset times for each rate limit window
+- Data refreshed from Anthropic OAuth API
+
+**Available Rate Limit Windows:**
+
+- **5-Hour Window**: Rolling 5-hour token limit
+- **7-Day Window**: Rolling 7-day overall limit
+- **7-Day Sonnet**: Model-specific limit for Sonnet
+- **7-Day Opus**: Model-specific limit for Opus (when applicable)
+
+> Note: This feature requires Anthropic OAuth credentials. Bedrock accounts will show "N/A".
+
 #### Current Window (5-hour)
 
-Monitor Claude API rate limits:
+Monitor internal proxy rate limits:
 
 - Token consumption by account
 - Usage percentage of 5-hour limit

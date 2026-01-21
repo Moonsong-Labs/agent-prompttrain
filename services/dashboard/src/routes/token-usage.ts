@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import { getErrorMessage, OAuthUsageDisplay } from '@agent-prompttrain/shared'
 import { layout } from '../layout/index.js'
 
 export const tokenUsageRoutes = new Hono<{
@@ -22,6 +22,45 @@ function escapeHtml(unsafe: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
+}
+
+function formatTimeLeft(isoTimestamp: string): string {
+  const resetDate = new Date(isoTimestamp)
+  const now = new Date()
+  const diffMs = resetDate.getTime() - now.getTime()
+
+  if (diffMs <= 0) {
+    return '<span style="font-family: monospace;">now</span>'
+  }
+
+  const totalMins = Math.floor(diffMs / (1000 * 60))
+  const days = Math.floor(totalMins / (60 * 24))
+  const hours = Math.floor((totalMins % (60 * 24)) / 60)
+  const mins = totalMins % 60
+
+  // Build HTML with fixed-width spans for alignment
+  // Each unit gets a fixed width span: days=2ch, hours=3ch, mins=3ch
+  const parts: string[] = []
+
+  if (days > 0) {
+    parts.push(
+      `<span style="display: inline-block; width: 2ch; text-align: right;">${days}</span>d`
+    )
+  } else {
+    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
+  }
+
+  if (days > 0 || hours > 0) {
+    parts.push(
+      `<span style="display: inline-block; width: 2ch; text-align: right;">${hours}</span>h`
+    )
+  } else {
+    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
+  }
+
+  parts.push(`<span style="display: inline-block; width: 2ch; text-align: right;">${mins}</span>m`)
+
+  return `<span style="font-family: monospace; white-space: pre;">${parts.join(' ')}</span>`
 }
 
 /**
@@ -50,7 +89,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
     try {
       const accountsData = await apiClient.getAccountsTokenUsage()
 
-      // Fetch sliding window data for all accounts in parallel
+      // Fetch sliding window data and OAuth usage for all accounts in parallel
       const slidingWindowPromises = accountsData.accounts.map(
         account =>
           apiClient
@@ -63,13 +102,28 @@ tokenUsageRoutes.get('/token-usage', async c => {
             .catch(() => null) // Handle errors gracefully
       )
 
-      const slidingWindowResults = await Promise.all(slidingWindowPromises)
+      const oauthUsagePromises = accountsData.accounts.map(
+        account => apiClient.getOAuthUsage(account.accountId).catch(() => null) // Handle errors gracefully
+      )
+
+      const [slidingWindowResults, oauthUsageResults] = await Promise.all([
+        Promise.all(slidingWindowPromises),
+        Promise.all(oauthUsagePromises),
+      ])
 
       // Create a map of accountId to sliding window data
       const slidingWindowMap = new Map()
       slidingWindowResults.forEach((result, index) => {
         if (result) {
           slidingWindowMap.set(accountsData.accounts[index].accountId, result)
+        }
+      })
+
+      // Create a map of accountId to OAuth usage data
+      const oauthUsageMap = new Map<string, OAuthUsageDisplay>()
+      oauthUsageResults.forEach((result, index) => {
+        if (result) {
+          oauthUsageMap.set(accountsData.accounts[index].accountId, result)
         }
       })
 
@@ -276,8 +330,10 @@ tokenUsageRoutes.get('/token-usage', async c => {
                     })();
                   `
 
+                          const oauthUsage = oauthUsageMap.get(account.accountId)
+
                           return `
-                    <div style="height: 120px; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 15px; background: white;">
+                    <div style="min-height: 120px; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 15px; background: white;">
                       <a href="/dashboard/token-usage?accountId=${encodeURIComponent(account.accountId)}" style="text-decoration: none; color: inherit; display: block;">
                         <div style="display: flex; align-items: flex-start; gap: 20px; height: 100%;">
                           <div style="flex: 1; min-width: 0;">
@@ -303,6 +359,42 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 }
                               </span>
                             </div>
+                            ${
+                              oauthUsage && oauthUsage.available && oauthUsage.windows.length > 0
+                                ? `
+                            <div style="display: grid; gap: 8px; margin-bottom: 8px;">
+                              ${oauthUsage.windows
+                                .map(w => {
+                                  const color =
+                                    w.utilization > 80
+                                      ? '#ef4444'
+                                      : w.utilization > 50
+                                        ? '#fb923c'
+                                        : '#10b981'
+                                  const timeLeft = formatTimeLeft(w.resets_at_iso)
+                                  return `
+                                  <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="min-width: 100px; font-size: 13px; font-weight: 500; color: #374151;">
+                                      ${escapeHtml(w.name)}
+                                    </div>
+                                    <div style="flex: 1; max-width: 200px;">
+                                      <div style="position: relative; background: #f3f4f6; height: 20px; border-radius: 4px; overflow: hidden;">
+                                        <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, w.utilization)}%;"></div>
+                                        <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #1f2937;">
+                                          ${w.utilization.toFixed(1)}%
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div style="min-width: 90px; font-size: 12px; color: #6b7280;">
+                                      <strong style="color: #374151;">${timeLeft}</strong> left
+                                    </div>
+                                  </div>`
+                                })
+                                .join('')}
+                            </div>
+                            `
+                                : ''
+                            }
                             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
                               ${account.trainIds
                                 .map(
@@ -364,12 +456,14 @@ tokenUsageRoutes.get('/token-usage', async c => {
       rateLimitsResult,
       slidingWindow24hResult,
       slidingWindow7dResult,
+      oauthUsageResult,
     ] = await Promise.allSettled([
       apiClient.getTokenUsageWindow({ accountId, window: 300 }), // 5 hour window
       apiClient.getDailyTokenUsage({ accountId, days: 30, aggregate: true }), // Daily usage
       apiClient.getRateLimitConfigs({ accountId }), // Rate limit configs
       apiClient.getSlidingWindowUsage({ accountId, days: 1, bucketMinutes: 5, windowHours: 5 }), // 24-hour sliding window with 5-minute buckets
       apiClient.getSlidingWindowUsage({ accountId, days: 7, bucketMinutes: 60, windowHours: 5 }), // 7-day sliding window with 60-minute buckets
+      apiClient.getOAuthUsage(accountId), // OAuth usage from Anthropic API
     ])
 
     // Handle results
@@ -380,6 +474,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
       slidingWindow24hResult.status === 'fulfilled' ? slidingWindow24hResult.value : null
     const slidingWindow7d =
       slidingWindow7dResult.status === 'fulfilled' ? slidingWindow7dResult.value : null
+    const oauthUsage = oauthUsageResult.status === 'fulfilled' ? oauthUsageResult.value : null
 
     // Find the primary rate limit for this account
     const primaryLimit =
@@ -392,6 +487,65 @@ tokenUsageRoutes.get('/token-usage', async c => {
       </div>
 
       <h2 style="margin: 0 0 1.5rem 0;">Token Usage for Account: ${escapeHtml(accountId)}</h2>
+
+      <!-- Claude Account Rate Limits (OAuth Usage) -->
+      ${oauthUsage && oauthUsage.available && oauthUsage.windows.length > 0
+        ? html`
+            <div class="section">
+              <div class="section-header">Claude Account Rate Limits</div>
+              <div class="section-content">
+                <div style="display: grid; gap: 12px;">
+                  ${raw(
+                    oauthUsage.windows
+                      .map(window => {
+                        const utilization = window.utilization
+                        const color =
+                          utilization > 80 ? '#ef4444' : utilization > 50 ? '#fb923c' : '#10b981'
+                        const timeLeft = formatTimeLeft(window.resets_at_iso)
+
+                        return `
+                          <div style="display: flex; align-items: center; gap: 16px;">
+                            <div style="min-width: 140px; font-weight: 500; color: #374151;">
+                              ${escapeHtml(window.name)}
+                            </div>
+                            <div style="flex: 1; max-width: 300px;">
+                              <div style="position: relative; background: #f3f4f6; height: 24px; border-radius: 4px; overflow: hidden;">
+                                <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, utilization)}%; transition: width 0.3s ease;"></div>
+                                <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; color: #1f2937;">
+                                  ${utilization.toFixed(1)}%
+                                </div>
+                              </div>
+                            </div>
+                            <div style="min-width: 110px; font-size: 13px; color: #6b7280;">
+                              <strong style="color: #374151;">${timeLeft}</strong> left
+                            </div>
+                          </div>
+                        `
+                      })
+                      .join('')
+                  )}
+                </div>
+                <div
+                  style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;"
+                >
+                  Data from Anthropic OAuth API • Updated:
+                  ${new Date(oauthUsage.fetched_at).toLocaleTimeString()}
+                </div>
+              </div>
+            </div>
+          `
+        : oauthUsage && !oauthUsage.available
+          ? html`
+              <div class="section">
+                <div class="section-header">Claude Account Rate Limits</div>
+                <div class="section-content">
+                  <p class="text-gray-500">
+                    ${oauthUsage.error || 'OAuth usage data not available for this account.'}
+                  </p>
+                </div>
+              </div>
+            `
+          : ''}
 
       <!-- Current 5-Hour Window Usage -->
       <div class="section">

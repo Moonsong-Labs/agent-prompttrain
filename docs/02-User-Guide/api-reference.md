@@ -699,6 +699,78 @@ Get rate limit configurations.
 }
 ```
 
+#### OAuth Usage (Claude Account Rate Limits)
+
+```http
+GET /api/oauth-usage/:accountId
+```
+
+Get Claude account rate limits directly from Anthropic's OAuth API. This endpoint fetches real-time utilization data for the specified account's rate limit windows.
+
+**Path Parameters:**
+
+- `accountId` - The account ID to fetch OAuth usage for
+
+**Response (Anthropic Account):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "acc_123",
+    "provider": "anthropic",
+    "available": true,
+    "windows": [
+      {
+        "name": "5-Hour Window",
+        "short_name": "5h",
+        "utilization": 34.0,
+        "resets_at": "12:59 PM EST",
+        "resets_at_iso": "2026-01-21T12:59:59.893091+00:00"
+      },
+      {
+        "name": "7-Day Window",
+        "short_name": "7d",
+        "utilization": 28.0,
+        "resets_at": "Jan 26, 07:59 PM",
+        "resets_at_iso": "2026-01-26T19:59:59.893113+00:00"
+      },
+      {
+        "name": "7-Day Sonnet",
+        "short_name": "7d Sonnet",
+        "utilization": 0.0,
+        "resets_at": "Jan 27, 08:59 AM",
+        "resets_at_iso": "2026-01-27T08:59:59.893127+00:00"
+      }
+    ],
+    "fetched_at": "2026-01-21T10:30:00.000Z"
+  }
+}
+```
+
+**Response (Non-Anthropic Account):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "account_id": "bedrock_acc",
+    "provider": "bedrock",
+    "available": false,
+    "error": "OAuth usage is only available for Anthropic accounts",
+    "windows": [],
+    "fetched_at": "2026-01-21T10:30:00.000Z"
+  }
+}
+```
+
+**Notes:**
+
+- Only available for Anthropic OAuth credentials
+- Returns `available: false` for Bedrock accounts
+- Requires valid OAuth access token in the credential
+- Uses `anthropic-beta: oauth-2025-04-20` header
+
 #### Update Rate Limit
 
 ```http
