@@ -24,6 +24,30 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;')
 }
 
+function formatTimeLeft(isoTimestamp: string): string {
+  const resetDate = new Date(isoTimestamp)
+  const now = new Date()
+  const diffMs = resetDate.getTime() - now.getTime()
+
+  if (diffMs <= 0) {
+    return 'now'
+  }
+
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffDays > 0) {
+    const remainingHours = diffHours % 24
+    return remainingHours > 0 ? `${diffDays}d ${remainingHours}h` : `${diffDays}d`
+  } else if (diffHours > 0) {
+    const remainingMins = diffMins % 60
+    return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`
+  } else {
+    return `${diffMins}m`
+  }
+}
+
 /**
  * Token usage dashboard
  */
@@ -323,7 +347,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             ${
                               oauthUsage && oauthUsage.available && oauthUsage.windows.length > 0
                                 ? `
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                            <div style="display: grid; gap: 8px; margin-bottom: 8px;">
                               ${oauthUsage.windows
                                 .map(w => {
                                   const color =
@@ -332,10 +356,24 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                       : w.utilization > 50
                                         ? '#fb923c'
                                         : '#10b981'
-                                  return `<span style="font-size: 12px; color: ${color}; background: ${color}15; padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-                                  <span style="width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
-                                  ${escapeHtml(w.short_name)}: ${w.utilization.toFixed(0)}%
-                                </span>`
+                                  const timeLeft = formatTimeLeft(w.resets_at_iso)
+                                  return `
+                                  <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="min-width: 100px; font-size: 13px; font-weight: 500; color: #374151;">
+                                      ${escapeHtml(w.name)}
+                                    </div>
+                                    <div style="flex: 1; max-width: 200px;">
+                                      <div style="position: relative; background: #f3f4f6; height: 20px; border-radius: 4px; overflow: hidden;">
+                                        <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, w.utilization)}%;"></div>
+                                        <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #1f2937;">
+                                          ${w.utilization.toFixed(1)}%
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div style="min-width: 70px; font-size: 12px; color: #6b7280;">
+                                      <strong style="color: #374151;">${timeLeft}</strong> left
+                                    </div>
+                                  </div>`
                                 })
                                 .join('')}
                             </div>
@@ -448,6 +486,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                         const utilization = window.utilization
                         const color =
                           utilization > 80 ? '#ef4444' : utilization > 50 ? '#fb923c' : '#10b981'
+                        const timeLeft = formatTimeLeft(window.resets_at_iso)
 
                         return `
                           <div style="display: flex; align-items: center; gap: 16px;">
@@ -462,8 +501,8 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 </div>
                               </div>
                             </div>
-                            <div style="min-width: 160px; font-size: 13px; color: #6b7280;">
-                              Resets: ${escapeHtml(window.resets_at)}
+                            <div style="min-width: 100px; font-size: 13px; color: #6b7280;">
+                              <strong style="color: #374151;">${timeLeft}</strong> left
                             </div>
                           </div>
                         `
