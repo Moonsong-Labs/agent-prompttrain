@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Claude OAuth usage display in Token Usage page showing real-time account rate limits from Anthropic API
+  - Overview page: Compact usage indicators (5h, 7d, Sonnet) under each account name
+  - Detail page: Full "Claude Account Rate Limits" section with progress bars and reset times
+  - New API endpoint `GET /api/oauth-usage/:accountId` to fetch usage from Anthropic OAuth API
 - Silent OK handler for `/api/event_logging/*` endpoint used by Claude Code CLI (returns 200 without forwarding)
 - Native Bedrock API error responses now forward `x-amzn-errortype`, `x-amzn-requestid`, and `retry-after` headers to clients for improved error handling and debugging
 - Display of XML tags in dashboard conversation view (e.g., `<system-reminder>`, `<command>`) instead of filtering them

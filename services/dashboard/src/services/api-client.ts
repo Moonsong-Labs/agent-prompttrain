@@ -1,5 +1,5 @@
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import { getErrorMessage, OAuthUsageDisplay } from '@agent-prompttrain/shared'
 import { HttpError } from '../errors/HttpError.js'
 
 interface StatsResponse {
@@ -783,6 +783,44 @@ export class ProxyApiClient {
         params,
       })
       throw error
+    }
+  }
+
+  /**
+   * Get OAuth usage from Anthropic API for an account
+   */
+  async getOAuthUsage(accountId: string): Promise<OAuthUsageDisplay | null> {
+    try {
+      const url = new URL(`/api/oauth-usage/${encodeURIComponent(accountId)}`, this.baseUrl)
+
+      const response = await fetch(url.toString(), {
+        headers: this.getHeaders(),
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null
+        }
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const json = (await response.json()) as {
+        success: boolean
+        data?: OAuthUsageDisplay
+        error?: string
+      }
+
+      if (!json.success || !json.data) {
+        return null
+      }
+
+      return json.data
+    } catch (error) {
+      logger.error('Failed to fetch OAuth usage from proxy API', {
+        error: getErrorMessage(error),
+        metadata: { accountId },
+      })
+      return null
     }
   }
 

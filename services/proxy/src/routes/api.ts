@@ -1416,3 +1416,192 @@ apiRoutes.get('/analytics/token-usage/sliding-window', async c => {
     return c.json({ error: 'Failed to retrieve sliding window usage data' }, 500)
   }
 })
+
+/**
+ * GET /api/oauth-usage/:accountId - Get OAuth usage from Anthropic API for an account
+ * Requires the account to have Anthropic OAuth credentials
+ */
+apiRoutes.get('/oauth-usage/:accountId', async c => {
+  const { getCredentialByAccountId } = await import(
+    '@agent-prompttrain/shared/database/queries/credential-queries'
+  )
+
+  let pool = c.get('pool')
+
+  if (!pool) {
+    pool = container.getDbPool()
+    if (!pool) {
+      return c.json({ error: 'Database not configured' }, 503)
+    }
+  }
+
+  const accountId = c.req.param('accountId')
+
+  try {
+    // Get the credential for this account
+    const credential = await getCredentialByAccountId(pool, accountId)
+
+    if (!credential) {
+      return c.json(
+        {
+          success: false,
+          error: `Account ${accountId} not found`,
+        },
+        404
+      )
+    }
+
+    // Check if it's an Anthropic credential
+    if (credential.provider !== 'anthropic') {
+      return c.json({
+        success: true,
+        data: {
+          account_id: accountId,
+          provider: credential.provider,
+          available: false,
+          error: 'OAuth usage is only available for Anthropic accounts',
+          windows: [],
+          fetched_at: new Date().toISOString(),
+        },
+      })
+    }
+
+    // Call Anthropic OAuth usage API
+    const oauthToken = credential.oauth_access_token
+    const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${oauthToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'anthropic-beta': 'oauth-2025-04-20',
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      logger.error('Failed to fetch OAuth usage from Anthropic', {
+        metadata: {
+          accountId,
+          status: response.status,
+          error: errorText,
+        },
+      })
+
+      return c.json({
+        success: true,
+        data: {
+          account_id: accountId,
+          provider: 'anthropic',
+          available: false,
+          error: `Anthropic API error: ${response.status}`,
+          windows: [],
+          fetched_at: new Date().toISOString(),
+        },
+      })
+    }
+
+    const usageData = (await response.json()) as {
+      five_hour?: { utilization: number; resets_at: string } | null
+      seven_day?: { utilization: number; resets_at: string } | null
+      seven_day_oauth_apps?: { utilization: number; resets_at: string } | null
+      seven_day_opus?: { utilization: number; resets_at: string } | null
+      seven_day_sonnet?: { utilization: number; resets_at: string } | null
+      iguana_necktie?: { utilization: number; resets_at: string } | null
+      extra_usage?: {
+        is_enabled: boolean
+        monthly_limit: number | null
+        used_credits: number | null
+        utilization: number | null
+      }
+    }
+
+    // Process the usage data into display format
+    const windows: Array<{
+      name: string
+      short_name: string
+      utilization: number
+      resets_at: string
+      resets_at_iso: string
+    }> = []
+
+    // Window mappings for display names
+    const windowMappings: Array<{
+      key: keyof typeof usageData
+      name: string
+      shortName: string
+    }> = [
+      { key: 'five_hour', name: '5-Hour Window', shortName: '5h' },
+      { key: 'seven_day', name: '7-Day Window', shortName: '7d' },
+      { key: 'seven_day_oauth_apps', name: '7-Day OAuth Apps', shortName: '7d OAuth' },
+      { key: 'seven_day_opus', name: '7-Day Opus', shortName: '7d Opus' },
+      { key: 'seven_day_sonnet', name: '7-Day Sonnet', shortName: '7d Sonnet' },
+    ]
+
+    for (const mapping of windowMappings) {
+      const windowData = usageData[mapping.key] as
+        | { utilization: number; resets_at: string }
+        | null
+        | undefined
+      if (windowData && typeof windowData === 'object' && 'utilization' in windowData) {
+        const resetDate = new Date(windowData.resets_at)
+        windows.push({
+          name: mapping.name,
+          short_name: mapping.shortName,
+          utilization: windowData.utilization,
+          resets_at: formatResetTime(resetDate),
+          resets_at_iso: windowData.resets_at,
+        })
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        account_id: accountId,
+        provider: 'anthropic',
+        available: true,
+        windows,
+        fetched_at: new Date().toISOString(),
+      },
+    })
+  } catch (error) {
+    logger.error('Failed to get OAuth usage', {
+      error: getErrorMessage(error),
+      metadata: { accountId },
+    })
+    return c.json(
+      {
+        success: false,
+        error: 'Failed to retrieve OAuth usage data',
+      },
+      500
+    )
+  }
+})
+
+/**
+ * Helper function to format reset time for display
+ */
+function formatResetTime(date: Date): string {
+  const now = new Date()
+  const diffMs = date.getTime() - now.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+
+  if (diffHours < 24) {
+    // Show time only for same day
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    })
+  } else {
+    // Show date for future days
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+}
