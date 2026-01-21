@@ -30,22 +30,37 @@ function formatTimeLeft(isoTimestamp: string): string {
   const diffMs = resetDate.getTime() - now.getTime()
 
   if (diffMs <= 0) {
-    return 'now'
+    return '<span style="font-family: monospace;">now</span>'
   }
 
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+  const totalMins = Math.floor(diffMs / (1000 * 60))
+  const days = Math.floor(totalMins / (60 * 24))
+  const hours = Math.floor((totalMins % (60 * 24)) / 60)
+  const mins = totalMins % 60
 
-  if (diffDays > 0) {
-    const remainingHours = diffHours % 24
-    return remainingHours > 0 ? `${diffDays}d ${remainingHours}h` : `${diffDays}d`
-  } else if (diffHours > 0) {
-    const remainingMins = diffMins % 60
-    return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`
+  // Build HTML with fixed-width spans for alignment
+  // Each unit gets a fixed width span: days=2ch, hours=3ch, mins=3ch
+  const parts: string[] = []
+
+  if (days > 0) {
+    parts.push(
+      `<span style="display: inline-block; width: 2ch; text-align: right;">${days}</span>d`
+    )
   } else {
-    return `${diffMins}m`
+    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
   }
+
+  if (days > 0 || hours > 0) {
+    parts.push(
+      `<span style="display: inline-block; width: 2ch; text-align: right;">${hours}</span>h`
+    )
+  } else {
+    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
+  }
+
+  parts.push(`<span style="display: inline-block; width: 2ch; text-align: right;">${mins}</span>m`)
+
+  return `<span style="font-family: monospace; white-space: pre;">${parts.join(' ')}</span>`
 }
 
 /**
@@ -370,7 +385,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                         </div>
                                       </div>
                                     </div>
-                                    <div style="min-width: 70px; font-size: 12px; color: #6b7280;">
+                                    <div style="min-width: 90px; font-size: 12px; color: #6b7280;">
                                       <strong style="color: #374151;">${timeLeft}</strong> left
                                     </div>
                                   </div>`
@@ -501,7 +516,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 </div>
                               </div>
                             </div>
-                            <div style="min-width: 100px; font-size: 13px; color: #6b7280;">
+                            <div style="min-width: 110px; font-size: 13px; color: #6b7280;">
                               <strong style="color: #374151;">${timeLeft}</strong> left
                             </div>
                           </div>
