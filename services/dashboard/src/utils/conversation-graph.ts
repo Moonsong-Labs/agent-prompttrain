@@ -16,6 +16,7 @@ function escapeHtml(str: string): string {
 export interface ConversationNode {
   id: string
   label: string
+  displayName?: string // Sub-agent name or other display override
   timestamp: Date
   branchId: string
   parentId?: string
@@ -51,6 +52,7 @@ export interface LayoutNode {
   branchId: string
   timestamp: Date
   label: string
+  displayName?: string // Sub-agent name or other display override
   tokens: number
   model: string
   hasError: boolean
@@ -272,6 +274,7 @@ function calculateReversedLayout(
         branchId: node.branchId,
         timestamp: node.timestamp,
         label: node.label,
+        displayName: node.displayName,
         tokens: node.tokens,
         model: node.model,
         hasError: node.hasError,
@@ -318,6 +321,7 @@ function calculateReversedLayout(
         branchId: node.branchId,
         timestamp: node.timestamp,
         label: node.label,
+        displayName: node.displayName,
         tokens: node.tokens,
         model: node.model,
         hasError: node.hasError,
@@ -763,9 +767,16 @@ export function renderGraphSVG(layout: GraphLayout, interactive: boolean = true)
         svg += `    <text x="${x + 32}" y="${y + node.height / 2 + 3}" text-anchor="middle" class="graph-node-label" style="font-size: 12px;" title="${title}">${icon}</text>\n`
       }
 
-      // Add request ID (first 8 chars) shifted more to the left
-      const requestIdShort = node.id.substring(0, 8)
-      svg += `    <text x="${x + 42}" y="${y + node.height / 2 + 3}" text-anchor="start" class="graph-node-label" style="font-weight: 500; font-size: 11px;">${requestIdShort}</text>\n`
+      // Add display name (subagent type) or request ID (first 8 chars) shifted more to the left
+      const rawDisplayText = node.displayName || node.id.substring(0, 8)
+      // Truncate if too long and escape HTML for security
+      const displayText =
+        rawDisplayText.length > 20
+          ? escapeHtml(rawDisplayText.substring(0, 17) + '...')
+          : escapeHtml(rawDisplayText)
+      const fullText = escapeHtml(rawDisplayText) // Full text for tooltip
+
+      svg += `    <text x="${x + 42}" y="${y + node.height / 2 + 3}" text-anchor="start" class="graph-node-label" style="font-weight: 500; font-size: 11px;" title="${fullText}">${displayText}</text>\n`
 
       // Add timestamp aligned more to the right
       const time = node.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
