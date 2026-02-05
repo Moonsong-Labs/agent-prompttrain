@@ -100,6 +100,28 @@ app.use(async (c, next) => {
 })
 ```
 
+#### Compression/Decompression Issues
+
+If clients report `ZlibError` or decompression errors:
+
+1. **Root cause**: The proxy automatically decompresses upstream responses via the Fetch API but was inadvertently passing through the original `Content-Encoding` header. This caused clients to attempt double-decompression.
+
+2. **Solution**: The proxy now filters out `Content-Encoding` headers since the response body is already decompressed when forwarded to clients.
+
+3. **Verification**: Check that responses don't include `Content-Encoding: gzip` when the body is plaintext:
+
+```bash
+# Test response headers
+curl -v -X POST http://localhost:3000/v1/messages \
+  -H "Host: example.com" \
+  -H "Authorization: Bearer your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "test"}], "model": "claude-3-haiku-20240307", "max_tokens": 10}' \
+  2>&1 | grep -i "content-encoding"
+
+# Should return empty (no Content-Encoding header in response)
+```
+
 #### Debug Streaming Responses
 
 ```bash
