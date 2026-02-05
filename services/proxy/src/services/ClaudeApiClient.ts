@@ -244,10 +244,18 @@ export class ClaudeApiClient {
       const response = await fetch(request)
       clearTimeout(timeout)
 
-      // Filter out hop-by-hop headers
+      // Filter out hop-by-hop headers and content-encoding
+      // Content-Encoding must be removed because the Fetch API automatically decompresses
+      // the response body, so we're forwarding uncompressed data. Passing through the
+      // original Content-Encoding header would cause clients to try decompressing
+      // already-decompressed data, resulting in ZlibError.
       const responseHeaders = new Headers()
       response.headers.forEach((value, key) => {
-        if (!['connection', 'keep-alive', 'transfer-encoding'].includes(key.toLowerCase())) {
+        if (
+          !['connection', 'keep-alive', 'transfer-encoding', 'content-encoding'].includes(
+            key.toLowerCase()
+          )
+        ) {
           responseHeaders.set(key, value)
         }
       })

@@ -361,10 +361,15 @@ export class ProxyService {
       })
     }
 
-    // Filter out internal headers before returning to client
+    // Filter out internal headers and content-encoding before returning to client
+    // Content-Encoding must be removed because the Fetch API automatically decompresses
+    // the response body when we call response.json(), so we're forwarding uncompressed data.
+    // Passing through the original Content-Encoding header would cause clients to try
+    // decompressing already-decompressed data, resulting in ZlibError.
     const clientHeaders: Record<string, string> = {}
     claudeResponse.headers.forEach((value, key) => {
-      if (!key.startsWith('x-bedrock-')) {
+      const lowerKey = key.toLowerCase()
+      if (!key.startsWith('x-bedrock-') && lowerKey !== 'content-encoding') {
         clientHeaders[key] = value
       }
     })

@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Content-Encoding header now properly filtered from proxy responses to prevent client ZlibError decompression failures (Fetch API auto-decompresses upstream responses)
 - Branch parent resolution for conversations with hash collisions
 - Conversation tree pointing to incorrect parent requests
 - Message count display showing 0 for existing conversations
