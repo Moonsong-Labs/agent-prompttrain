@@ -184,6 +184,17 @@ Adds train ownership and membership management:
 - Supports OAuth email-based user identification
 - Enables team collaboration with proper authorization
 
+### 018-account-pool-threshold.ts
+
+Adds per-account token limit threshold for automatic account pool switching:
+
+- `token_limit_threshold` DECIMAL(3,2) DEFAULT 0.80
+- CHECK constraint: `token_limit_threshold > 0 AND token_limit_threshold <= 1`
+
+When a project has 2+ linked accounts, the proxy automatically switches
+to a less-loaded account when either the 5-hour or 7-day utilization
+(from Anthropic OAuth API) exceeds this threshold.
+
 ## Future Migrations
 
 When adding new migrations:

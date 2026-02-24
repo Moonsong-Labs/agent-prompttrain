@@ -354,6 +354,64 @@ curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
 
 The proxy will use credentials in the order they were linked. If the first credential fails, it automatically tries the second.
 
+## Account Pool Auto-Switching
+
+When a project has **2 or more linked accounts**, the proxy automatically enables account pool mode. This distributes load across accounts to prevent rate limit blocking.
+
+### How It Works
+
+1. **Sticky routing**: The proxy sticks to the current account for a project until its utilization exceeds the configured threshold
+2. **Usage monitoring**: The proxy checks both the 5-hour and 7-day utilization windows via the Anthropic OAuth usage API (cached for 60 seconds)
+3. **Automatic switching**: When the current account exceeds its threshold in either window, the proxy switches to the least-loaded available account
+4. **Exhaustion handling**: If all accounts exceed their thresholds, the proxy returns HTTP 429 with an estimated reset time
+
+### Per-Account Threshold
+
+Each account has a `token_limit_threshold` (default: 80%) that controls when switching occurs. The threshold is stored in the `credentials` table and can be configured per account.
+
+When either the 5-hour or 7-day utilization exceeds this threshold, the account is considered over-limit and the pool selects an alternative.
+
+### Pool Activation
+
+- **0-1 linked accounts**: Default account behavior (no pooling)
+- **2+ linked accounts**: Automatic pool mode with sticky least-loaded selection
+- **Bedrock accounts**: Excluded from pool selection (Anthropic OAuth usage API only)
+
+### Exhaustion Response
+
+When all accounts in a pool exceed their thresholds:
+
+```json
+HTTP 429
+{
+  "type": "error",
+  "error": {
+    "type": "rate_limit_error",
+    "message": "All 3 accounts in pool for project \"marketing-prod\" have exceeded their utilization threshold"
+  }
+}
+```
+
+### Setting Up Account Pooling
+
+Link 2+ accounts to a project to enable automatic pooling:
+
+```bash
+# Link first account
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "credential-1-uuid"}'
+
+# Link second account (enables pooling)
+curl -X POST http://localhost:3001/api/projects/marketing-prod/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Dashboard-Key: your-dashboard-key" \
+  -d '{"credential_id": "credential-2-uuid"}'
+```
+
+No additional configuration is needed — pooling activates automatically when 2+ accounts are linked.
+
 ## Security Best Practices
 
 ### Database Security
