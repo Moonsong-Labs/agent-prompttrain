@@ -35,6 +35,7 @@ function toSafeAnthropicCredential(credential: AnthropicCredential): AnthropicCr
     oauth_is_max: credential.oauth_is_max,
     created_at: credential.created_at,
     updated_at: credential.updated_at,
+    token_limit_threshold: credential.token_limit_threshold,
     last_refresh_at: credential.last_refresh_at,
     token_status: tokenStatus,
   }
@@ -53,6 +54,7 @@ function toSafeBedrockCredential(credential: BedrockCredential): BedrockCredenti
     aws_api_key_preview: credential.aws_api_key.substring(0, 8) + '****',
     created_at: credential.created_at,
     updated_at: credential.updated_at,
+    token_limit_threshold: credential.token_limit_threshold,
   }
 }
 
