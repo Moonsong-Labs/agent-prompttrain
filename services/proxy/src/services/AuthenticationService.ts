@@ -1,5 +1,4 @@
 import { Pool } from 'pg'
-import { getProjectCredentials } from '@agent-prompttrain/shared/database/queries'
 import {
   AuthenticationError,
   type Credential,
@@ -10,6 +9,7 @@ import {
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { getApiKey } from '../credentials'
 import { logger } from '../middleware/logger'
+import { AccountPoolService, AccountPoolExhaustedError } from './account-pool-service'
 
 export interface AuthResult {
   provider: ProviderType
@@ -25,7 +25,11 @@ export interface AuthResult {
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
 
 export class AuthenticationService {
-  constructor(private readonly pool: Pool) {}
+  private readonly accountPoolService: AccountPoolService
+
+  constructor(private readonly pool: Pool) {
+    this.accountPoolService = new AccountPoolService(this.pool)
+  }
 
   async authenticate(context: RequestContext): Promise<AuthResult> {
     const requestedAccount = context.account
@@ -58,18 +62,32 @@ export class AuthenticationService {
       return this.buildAuthResult(allCredentials.rows[0], context)
     }
 
-    // Priority 2: Use project's default account
-    const credentials = await getProjectCredentials(this.pool, projectId)
+    // Priority 2: Account pool or default account
+    try {
+      const selection = await this.accountPoolService.selectAccount(projectId)
 
-    if (!credentials.length) {
+      if (selection.fromPool) {
+        logger.info('Account selected from pool', {
+          requestId: context.requestId,
+          projectId,
+          metadata: {
+            accountId: selection.credential.account_id,
+            maxUtilization: Math.round(selection.maxUtilization * 100),
+          },
+        })
+      }
+
+      return this.buildAuthResult(selection.credential, context)
+    } catch (error) {
+      if (error instanceof AccountPoolExhaustedError) {
+        throw error
+      }
       throw new AuthenticationError('No default account configured for this project', {
         requestId: context.requestId,
         projectId,
         hint: 'Set a default account for this project via the dashboard',
       })
     }
-
-    return this.buildAuthResult(credentials[0], context)
   }
 
   private async buildAuthResult(
