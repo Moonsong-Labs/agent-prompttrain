@@ -24,6 +24,7 @@ describe('AuthenticationService', () => {
   let service: AuthenticationService
   let mockPool: Pool
   let mockGetTrainCredentials: any
+  let mockGetLinkedCredentials: any
   let mockGetApiKey: any
 
   beforeEach(async () => {
@@ -31,6 +32,11 @@ describe('AuthenticationService', () => {
 
     // Mock getProjectCredentials
     mockGetTrainCredentials = spyOn(queries, 'getProjectCredentials').mockImplementation(
+      () => [] as any
+    )
+
+    // Mock getProjectLinkedCredentials (used by AccountPoolService)
+    mockGetLinkedCredentials = spyOn(queries, 'getProjectLinkedCredentials').mockImplementation(
       () => [] as any
     )
 
@@ -44,6 +50,7 @@ describe('AuthenticationService', () => {
 
   afterEach(() => {
     mockGetTrainCredentials.mockRestore()
+    mockGetLinkedCredentials.mockRestore()
     mockGetApiKey.mockRestore()
   })
 
@@ -172,12 +179,18 @@ describe('AuthenticationService', () => {
 describe('AuthenticationService account selection priority', () => {
   let mockPool: Pool
   let mockGetTrainCredentials: any
+  let mockGetLinkedCredentials: any
   let mockGetApiKey: any
 
   beforeEach(async () => {
     mockPool = {} as Pool
 
     mockGetTrainCredentials = spyOn(queries, 'getProjectCredentials').mockImplementation(
+      () => [] as any
+    )
+
+    // Mock getProjectLinkedCredentials (used by AccountPoolService)
+    mockGetLinkedCredentials = spyOn(queries, 'getProjectLinkedCredentials').mockImplementation(
       () => [] as any
     )
 
@@ -188,6 +201,7 @@ describe('AuthenticationService account selection priority', () => {
 
   afterEach(() => {
     mockGetTrainCredentials.mockRestore()
+    mockGetLinkedCredentials.mockRestore()
     mockGetApiKey.mockRestore()
   })
 
