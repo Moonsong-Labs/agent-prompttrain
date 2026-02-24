@@ -3,6 +3,7 @@ import { ProxyService } from '../services/ProxyService'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { validateClaudeRequest, ValidationError, serializeError } from '@agent-prompttrain/shared'
 import { getRequestLogger } from '../middleware/logger'
+import { AccountPoolExhaustedError } from '../services/account-pool-service'
 
 /**
  * Controller for handling /v1/messages endpoint
@@ -50,6 +51,20 @@ export class MessageController {
         model: c.get('validatedBody')?.model,
         streaming: c.get('validatedBody')?.stream,
       })
+
+      // Handle account pool exhaustion with Claude API error format
+      if (error instanceof AccountPoolExhaustedError) {
+        return c.json(
+          {
+            type: 'error',
+            error: {
+              type: 'rate_limit_error',
+              message: error.message,
+            },
+          },
+          429
+        )
+      }
 
       // Serialize error for response
       const errorObj = error instanceof Error ? error : new Error(String(error))
