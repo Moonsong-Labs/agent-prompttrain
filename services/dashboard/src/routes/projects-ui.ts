@@ -7,6 +7,8 @@ import {
   listTrainApiKeys,
   createProject,
   createTrainApiKey,
+  revokeTrainApiKey,
+  getTrainApiKeySafe,
   setProjectDefaultAccount,
   getProjectMembers,
   addProjectMember,
@@ -753,6 +755,7 @@ trainsUIRoutes.get('/:projectId/view', async c => {
 trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
   const projectId = c.req.param('projectId')
   const pool = container.getPool()
+  const auth = c.get('auth')
 
   if (!pool) {
     return c.html(html`
@@ -764,6 +767,10 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
 
   try {
     const apiKeys = await listTrainApiKeys(pool, projectId)
+
+    // Determine if user is project owner (can revoke any key)
+    const userIsOwner =
+      auth.isAuthenticated && (await isProjectOwner(pool, projectId, auth.principal))
 
     if (apiKeys.length === 0) {
       return c.html(html`
@@ -780,6 +787,7 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
         ${apiKeys.map(
           key => html`
             <div
+              data-testid="api-key-item"
               style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem;"
             >
               <div
@@ -796,15 +804,214 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
                     >
                   </div>
                 </div>
-                ${key.revoked_at
-                  ? html`<span
-                      style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
-                      >REVOKED</span
-                    >`
-                  : html`<span
-                      style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
-                      >ACTIVE</span
-                    >`}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  ${key.revoked_at
+                    ? html`<span
+                        style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                        >REVOKED</span
+                      >`
+                    : html`<span
+                          style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >ACTIVE</span
+                        >
+                        ${auth.isAuthenticated &&
+                        !key.revoked_at &&
+                        (userIsOwner || key.created_by === auth.principal)
+                          ? html`
+                              <form
+                                data-testid="revoke-api-key-form"
+                                hx-delete="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
+                                hx-confirm="Are you sure you want to revoke this API key? This action cannot be undone."
+                                hx-target="#api-keys-${projectId}"
+                                hx-swap="innerHTML"
+                                style="margin: 0;"
+                              >
+                                <button
+                                  type="submit"
+                                  data-testid="revoke-api-key-button"
+                                  style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Revoke
+                                </button>
+                              </form>
+                            `
+                          : ''}`}
+                </div>
+              </div>
+              <div style="font-size: 0.75rem; color: #6b7280;">
+                Owner: ${key.created_by || 'Unknown'} • Created:
+                ${new Date(key.created_at).toLocaleString()}
+                ${key.last_used_at
+                  ? html`• Last used: ${new Date(key.last_used_at).toLocaleString()}`
+                  : html`• Never used`}
+              </div>
+            </div>
+          `
+        )}
+      </div>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Revoke an API key (HTMX form submission - owner or key creator only)
+ * Returns the refreshed api-keys-list HTML after revoking
+ */
+trainsUIRoutes.delete('/:projectId/revoke-api-key/:keyId', async c => {
+  const projectId = c.req.param('projectId')
+  const keyId = c.req.param('keyId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check project membership
+  const isMember = await isProjectMember(pool, projectId, auth.principal)
+  if (!isMember) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> You are not a member of this project
+      </div>
+    `)
+  }
+
+  // Get the API key to check ownership
+  const apiKey = await getTrainApiKeySafe(pool, keyId)
+  if (!apiKey) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> API key not found or already revoked
+      </div>
+    `)
+  }
+
+  // Check if key belongs to this project
+  if (apiKey.project_id !== projectId) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> API key does not belong to this project
+      </div>
+    `)
+  }
+
+  // Check if user is project owner OR key creator
+  const userIsOwner = await isProjectOwner(pool, projectId, auth.principal)
+  const isKeyCreator = apiKey.created_by === auth.principal
+
+  if (!userIsOwner && !isKeyCreator) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only project owners or key creators can revoke API keys
+      </div>
+    `)
+  }
+
+  try {
+    const success = await revokeTrainApiKey(pool, keyId, auth.principal)
+
+    if (!success) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> API key not found or already revoked
+        </div>
+      `)
+    }
+
+    // Return refreshed api-keys-list by redirecting HTMX to reload
+    c.header('HX-Trigger', 'api-key-revoked')
+    // Re-fetch and return the updated list
+    const apiKeys = await listTrainApiKeys(pool, projectId)
+
+    if (apiKeys.length === 0) {
+      return c.html(html`
+        <div
+          style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem; color: #6b7280; text-align: center;"
+        >
+          No API keys generated yet
+        </div>
+      `)
+    }
+
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 0.5rem 0.75rem; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.875rem;"
+      >
+        API key revoked successfully
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        ${apiKeys.map(
+          key => html`
+            <div
+              data-testid="api-key-item"
+              style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem;"
+            >
+              <div
+                style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.25rem;"
+              >
+                <div>
+                  <div style="font-weight: 600; font-size: 0.875rem;">
+                    ${key.name || 'Unnamed API Key'}
+                  </div>
+                  <div style="font-size: 0.75rem; color: #6b7280;">
+                    <code
+                      style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                      >${key.key_preview}...</code
+                    >
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  ${key.revoked_at
+                    ? html`<span
+                        style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                        >REVOKED</span
+                      >`
+                    : html`<span
+                          style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >ACTIVE</span
+                        >
+                        ${auth.isAuthenticated &&
+                        !key.revoked_at &&
+                        (userIsOwner || key.created_by === auth.principal)
+                          ? html`
+                              <form
+                                data-testid="revoke-api-key-form"
+                                hx-delete="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
+                                hx-confirm="Are you sure you want to revoke this API key? This action cannot be undone."
+                                hx-target="#api-keys-${projectId}"
+                                hx-swap="innerHTML"
+                                style="margin: 0;"
+                              >
+                                <button
+                                  type="submit"
+                                  data-testid="revoke-api-key-button"
+                                  style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Revoke
+                                </button>
+                              </form>
+                            `
+                          : ''}`}
+                </div>
               </div>
               <div style="font-size: 0.75rem; color: #6b7280;">
                 Owner: ${key.created_by || 'Unknown'} • Created:
