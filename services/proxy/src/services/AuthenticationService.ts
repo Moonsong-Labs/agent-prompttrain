@@ -74,11 +74,16 @@ export class AuthenticationService {
       if (error instanceof AccountPoolExhaustedError) {
         throw error
       }
-      throw new AuthenticationError('No default account configured for this project', {
-        requestId: context.requestId,
-        projectId,
-        hint: 'Set a default account for this project via the dashboard',
-      })
+      // Only translate "no credential" errors to AuthenticationError;
+      // rethrow operational failures (DB errors, etc.) as-is
+      if (error instanceof Error && error.message.includes('No default credential')) {
+        throw new AuthenticationError('No default account configured for this project', {
+          requestId: context.requestId,
+          projectId,
+          hint: 'Set a default account for this project via the dashboard',
+        })
+      }
+      throw error
     }
 
     if (selection.fromPool) {

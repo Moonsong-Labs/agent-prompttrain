@@ -237,7 +237,7 @@ export class AccountPoolService {
       ].filter((t): t is string => t !== null && t !== undefined)
 
       for (const resetTime of resetTimes) {
-        if (!earliest || resetTime < earliest) {
+        if (!earliest || new Date(resetTime).getTime() < new Date(earliest).getTime()) {
           earliest = resetTime
         }
       }
