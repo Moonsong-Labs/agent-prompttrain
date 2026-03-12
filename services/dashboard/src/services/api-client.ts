@@ -17,6 +17,7 @@ interface StatsResponse {
 interface RequestSummary {
   requestId: string
   projectId: string
+  accountId: string | null
   model: string
   timestamp: string
   inputTokens: number
@@ -218,6 +219,7 @@ export class ProxyApiClient {
         requests: (json.requests || []).map((req: any) => ({
           requestId: req.requestId,
           projectId: req.projectId,
+          accountId: req.accountId ?? null,
           model: req.model,
           timestamp: req.timestamp,
           inputTokens: req.inputTokens,
@@ -263,6 +265,7 @@ export class ProxyApiClient {
       const details: RequestDetails = {
         requestId: json.requestId,
         projectId: json.projectId,
+        accountId: json.accountId ?? null,
         model: json.model,
         timestamp: json.timestamp,
         inputTokens: json.inputTokens,

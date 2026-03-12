@@ -4,6 +4,7 @@ import { Pool } from 'pg'
 import { logger } from '../middleware/logger.js'
 import { getErrorMessage, getErrorStack, type AnthropicCredential } from '@agent-prompttrain/shared'
 import { container } from '../container.js'
+import { apiResponseCache } from '../services/response-cache.js'
 
 // Query parameter schemas
 const statsQuerySchema = z.object({
@@ -44,6 +45,7 @@ interface StatsResponse {
 interface RequestSummary {
   requestId: string
   projectId: string
+  accountId: string | null
   model: string
   timestamp: string
   inputTokens: number
@@ -209,10 +211,15 @@ apiRoutes.get('/dashboard/stats', async c => {
     const query = c.req.query()
     const projectId = query.projectId
     const accountId = query.accountId
+    const statsDays = Math.min(Math.max(parseInt(query.statsDays || '30') || 30, 1), 365)
 
     const conditions: string[] = []
     const values: any[] = []
     let paramCount = 0
+
+    // Add time bound to prevent full table scan on conversation_stats
+    conditions.push(`timestamp >= NOW() - ($${++paramCount} * INTERVAL '1 day')`)
+    values.push(statsDays)
 
     if (projectId) {
       conditions.push(`project_id = $${++paramCount}`)
@@ -224,12 +231,19 @@ apiRoutes.get('/dashboard/stats', async c => {
       values.push(accountId)
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    const whereClause = `WHERE ${conditions.join(' AND ')}`
+
+    // Check cache (30s TTL - stats don't need to be real-time)
+    const cacheKey = `dashboard-stats:${statsDays}:${projectId || ''}:${accountId || ''}`
+    const cached = apiResponseCache.get<object>(cacheKey)
+    if (cached) {
+      return c.json(cached)
+    }
 
     // Single optimized query to get all dashboard statistics
     const statsQuery = `
       WITH conversation_stats AS (
-        SELECT 
+        SELECT
           COUNT(DISTINCT conversation_id) as total_conversations,
           COUNT(DISTINCT account_id) as active_users,
           COUNT(*) as total_requests,
@@ -241,26 +255,26 @@ apiRoutes.get('/dashboard/stats', async c => {
           ARRAY_AGG(DISTINCT model) FILTER (WHERE model IS NOT NULL) as models_used
         FROM api_requests
         ${whereClause}
-        ${whereClause ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
+        AND conversation_id IS NOT NULL
       ),
       recent_activity AS (
-        SELECT 
+        SELECT
           COUNT(*) as requests_last_24h,
           COUNT(DISTINCT conversation_id) as conversations_last_24h,
           COUNT(DISTINCT account_id) as active_users_last_24h
         FROM api_requests
         ${whereClause}
-        ${whereClause ? 'AND' : 'WHERE'} timestamp > NOW() - INTERVAL '24 hours'
+        AND timestamp > NOW() - INTERVAL '24 hours'
         AND conversation_id IS NOT NULL
       ),
       hourly_activity AS (
-        SELECT 
+        SELECT
           date_trunc('hour', timestamp) as hour,
           COUNT(*) as request_count,
           SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as token_count
         FROM api_requests
         ${whereClause}
-        ${whereClause ? 'AND' : 'WHERE'} timestamp > NOW() - INTERVAL '24 hours'
+        AND timestamp > NOW() - INTERVAL '24 hours'
         AND conversation_id IS NOT NULL
         GROUP BY date_trunc('hour', timestamp)
         ORDER BY hour DESC
@@ -313,7 +327,7 @@ apiRoutes.get('/dashboard/stats', async c => {
       hourly_activity: [],
     }
 
-    return c.json({
+    const responseData = {
       totalConversations: parseInt(stats.total_conversations),
       activeUsers: parseInt(stats.active_users),
       totalRequests: parseInt(stats.total_requests),
@@ -329,7 +343,10 @@ apiRoutes.get('/dashboard/stats', async c => {
         activeUsers: parseInt(stats.active_users_last_24h),
       },
       hourlyActivity: stats.hourly_activity || [],
-    })
+    }
+
+    apiResponseCache.set(cacheKey, responseData, 30)
+    return c.json(responseData)
   } catch (error) {
     logger.error('Failed to get dashboard stats', { error: getErrorMessage(error) })
     return c.json({ error: 'Failed to retrieve dashboard statistics' }, 500)
@@ -372,9 +389,10 @@ apiRoutes.get('/requests', async c => {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
     const requestsQuery = `
-      SELECT 
+      SELECT
         request_id,
         project_id,
+        account_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -396,6 +414,7 @@ apiRoutes.get('/requests', async c => {
     const requests: RequestSummary[] = result.rows.map(row => ({
       requestId: row.request_id,
       projectId: row.project_id,
+      accountId: row.account_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -484,6 +503,7 @@ apiRoutes.get('/requests/:id', async c => {
     const details: RequestDetails = {
       requestId: row.request_id,
       projectId: row.project_id,
+      accountId: row.account_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -634,6 +654,14 @@ apiRoutes.get('/conversations', async c => {
     // Optimized query using "limit first, aggregate second" approach
     let conversationsQuery: string
 
+    // For early pages without date filters, add a time bound to avoid full table scan
+    // (600K+ rows → ~5K rows). Falls back to full scan for deep pagination or date-filtered queries.
+    const needsRows = params.offset + params.limit
+    const useTimeBound = !userEmail && !params.dateFrom && !params.dateTo && needsRows <= 200
+    const timeBoundClause = useTimeBound
+      ? `${whereClauseNoPrefix ? 'AND' : 'WHERE'} timestamp >= NOW() - INTERVAL '7 days'`
+      : ''
+
     if (userEmail) {
       // With privacy filtering
       conversationsQuery = `
@@ -724,6 +752,7 @@ apiRoutes.get('/conversations', async c => {
         FROM api_requests
         ${whereClauseNoPrefix}
         ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
+        ${timeBoundClause}
         GROUP BY conversation_id
         ORDER BY last_message_time DESC
         LIMIT $${++paramCount}
@@ -811,6 +840,7 @@ apiRoutes.get('/conversations', async c => {
       FROM api_requests
       ${whereClauseNoPrefix}
       ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
+      ${timeBoundClause}
     `
 
     // Execute both queries in parallel
@@ -1127,32 +1157,44 @@ apiRoutes.get('/token-usage/accounts', async c => {
     // Fetch time series data for all accounts in a single query
     const accountIds = accounts.map(acc => acc.accountId)
 
+    // Optimized: pre-filter api_requests to the 10h window (5h lookback from earliest bucket),
+    // then aggregate per account+bucket. This avoids the full table scan caused by CROSS JOIN.
     const timeSeriesQuery = `
       WITH time_buckets AS (
-        SELECT 
+        SELECT
           generate_series(
             NOW() - INTERVAL '5 hours',
             NOW(),
             INTERVAL '15 minutes'
           ) AS bucket_time
       ),
+      accounts AS (
+        SELECT unnest($1::text[]) AS account_id
+      ),
+      -- Pre-filter requests to just the relevant 10h window (5h of buckets + 5h lookback)
+      filtered_requests AS (
+        SELECT account_id, output_tokens, timestamp
+        FROM api_requests
+        WHERE account_id = ANY($1::text[])
+          AND timestamp >= NOW() - INTERVAL '10 hours'
+      ),
       account_cumulative AS (
-        SELECT 
-          au.account_id,
+        SELECT
+          a.account_id,
           tb.bucket_time,
           COALESCE(
-            SUM(ar.output_tokens) FILTER (
-              WHERE ar.timestamp > tb.bucket_time - INTERVAL '5 hours' 
-              AND ar.timestamp <= tb.bucket_time
+            SUM(fr.output_tokens) FILTER (
+              WHERE fr.timestamp > tb.bucket_time - INTERVAL '5 hours'
+              AND fr.timestamp <= tb.bucket_time
             ),
             0
           ) AS cumulative_output_tokens
-        FROM (SELECT unnest($1::text[]) AS account_id) au
+        FROM accounts a
         CROSS JOIN time_buckets tb
-        LEFT JOIN api_requests ar ON ar.account_id = au.account_id
-        GROUP BY au.account_id, tb.bucket_time
+        LEFT JOIN filtered_requests fr ON fr.account_id = a.account_id
+        GROUP BY a.account_id, tb.bucket_time
       )
-      SELECT 
+      SELECT
         account_id,
         bucket_time,
         cumulative_output_tokens
@@ -1403,11 +1445,10 @@ apiRoutes.get('/analytics/token-usage/sliding-window', async c => {
       return c.json({ error: 'windowHours must be a valid number between 1 and 24' }, 400)
     }
 
-    const result = await tokenUsageService.getSlidingWindowUsage(
-      accountId,
-      days,
-      bucketMinutes,
-      windowHours
+    // Cache sliding window results (60s TTL - most expensive query at 5-12s per call)
+    const cacheKey = `sliding-window:${accountId}:${days}:${bucketMinutes}:${windowHours}`
+    const result = await apiResponseCache.getOrCompute(cacheKey, 60, () =>
+      tokenUsageService.getSlidingWindowUsage(accountId, days, bucketMinutes, windowHours)
     )
 
     return c.json(result)
@@ -1422,6 +1463,15 @@ apiRoutes.get('/analytics/token-usage/sliding-window', async c => {
  * Requires the account to have Anthropic OAuth credentials
  */
 apiRoutes.get('/oauth-usage/:accountId', async c => {
+  const accountId = c.req.param('accountId')
+
+  // Cache OAuth usage for 120s - external API call that doesn't change frequently
+  const oauthCacheKey = `oauth-usage:${accountId}`
+  const cachedOAuth = apiResponseCache.get<object>(oauthCacheKey)
+  if (cachedOAuth) {
+    return c.json(cachedOAuth)
+  }
+
   const { getCredentialByAccountId } = await import(
     '@agent-prompttrain/shared/database/queries/credential-queries'
   )
@@ -1434,8 +1484,6 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       return c.json({ error: 'Database not configured' }, 503)
     }
   }
-
-  const accountId = c.req.param('accountId')
 
   try {
     // Get the credential for this account
@@ -1479,7 +1527,7 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       : await usageCacheService.getUsage(credential as AnthropicCredential)
 
     if (!entry || !entry.usage) {
-      return c.json({
+      const errorResponse = {
         success: true,
         data: {
           account_id: accountId,
@@ -1490,7 +1538,11 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
           fetched_at: new Date().toISOString(),
           is_estimated: false,
         },
-      })
+      }
+
+      // Cache error responses with shorter TTL to back off from Anthropic rate limits
+      apiResponseCache.set(oauthCacheKey, errorResponse, 60)
+      return c.json(errorResponse)
     }
 
     // Transform raw usage to display format
@@ -1530,7 +1582,7 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       }
     }
 
-    return c.json({
+    const oauthResponse = {
       success: true,
       data: {
         account_id: accountId,
@@ -1541,7 +1593,10 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
         is_estimated: entry.isEstimated,
         extra_usage: entry.usage.extra_usage ?? undefined,
       },
-    })
+    }
+
+    apiResponseCache.set(oauthCacheKey, oauthResponse, 120)
+    return c.json(oauthResponse)
   } catch (error) {
     logger.error('Failed to get OAuth usage', {
       error: getErrorMessage(error),
