@@ -372,9 +372,10 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
   try {
     const query = c.req.query()
     const weeks = Math.min(Math.max(parseInt(query.weeks || '12') || 12, 1), 52)
+    const days = query.days ? Math.min(Math.max(parseInt(query.days) || 0, 0), 365) : 0
     const projectId = query.projectId
 
-    const cacheKey = `weekly-conversations:${weeks}:${projectId || ''}`
+    const cacheKey = `weekly-conversations:${weeks}:${days}:${projectId || ''}`
     const cached = apiResponseCache.get<object>(cacheKey)
     if (cached) {
       return c.json(cached)
@@ -393,6 +394,16 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
     // across all time), then only include those created within the window.
     // Using HAVING instead of WHERE ensures we get the real start date,
     // not a false start from the first activity within the window.
+    // Supports either 'days' (exact day count) or 'weeks' (week count) lookback.
+    const timeFilter =
+      days > 0
+        ? `HAVING MIN(timestamp) >= NOW() - ($1 * INTERVAL '1 day')`
+        : `HAVING MIN(timestamp) >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')`
+    const timeValue = days > 0 ? days : weeks
+
+    // Override first param with the right time value
+    values[0] = timeValue
+
     const result = await pool.query(
       `
       WITH conversation_starts AS (
@@ -403,7 +414,7 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
         WHERE conversation_id IS NOT NULL
           ${projectFilter}
         GROUP BY conversation_id
-        HAVING MIN(timestamp) >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')
+        ${timeFilter}
       )
       SELECT
         date_trunc('week', started_at)::date as week_start,

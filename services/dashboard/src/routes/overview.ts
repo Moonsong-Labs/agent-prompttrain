@@ -66,7 +66,7 @@ overviewRoutes.get('/', async c => {
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
         userEmail: auth?.principal, // Pass the authenticated user for privacy filtering
       }),
-      apiClient.getWeeklyConversations({ weeks: 12, projectId }),
+      apiClient.getWeeklyConversations({ days: 30, projectId }),
       pool ? listProjects(pool) : Promise.resolve([]),
     ])
 
