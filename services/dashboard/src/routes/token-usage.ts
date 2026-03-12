@@ -412,7 +412,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 })
                                 .join('')}
                             </div>
-                            ${oauthUsage.is_estimated ? `<div style="font-size: 11px; color: #92400e; margin-top: 4px;">&#9888; Estimated (API rate limited) &bull; Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}</div>` : ''}
+                            <div style="font-size: 11px; color: ${oauthUsage.is_estimated ? '#92400e' : '#9ca3af'}; margin-top: 4px;">${oauthUsage.is_estimated ? '&#9888; Estimated (API rate limited) &bull; ' : ''}Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}</div>
                             `
                                 : ''
                             }
