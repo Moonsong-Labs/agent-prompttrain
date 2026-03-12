@@ -28,9 +28,11 @@ const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
 export class AuthenticationService {
   private readonly accountPoolService: AccountPoolService
 
-  constructor(private readonly pool: Pool) {
-    const usageCacheService = new UsageCacheService(this.pool)
-    this.accountPoolService = new AccountPoolService(this.pool, usageCacheService)
+  constructor(
+    private readonly pool: Pool,
+    private readonly usageCacheService: UsageCacheService
+  ) {
+    this.accountPoolService = new AccountPoolService(this.pool, this.usageCacheService)
   }
 
   async authenticate(context: RequestContext): Promise<AuthResult> {

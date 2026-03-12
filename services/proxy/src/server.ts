@@ -9,6 +9,7 @@ import { config, createLogger } from '@agent-prompttrain/shared'
 import { createProxyApp } from './app.js'
 import { ProxyService } from './services/ProxyService.js'
 import { AuthenticationService } from './services/AuthenticationService.js'
+import { UsageCacheService } from './services/usage-cache-service.js'
 import { ClaudeApiClient } from './services/ClaudeApiClient.js'
 import { MetricsService } from './services/MetricsService.js'
 import { NotificationService } from './services/NotificationService.js'
@@ -50,7 +51,8 @@ async function startServer() {
   }
 
   // 2. Create services with their dependencies
-  const authService = new AuthenticationService(dbPool)
+  const usageCacheService = new UsageCacheService(dbPool)
+  const authService = new AuthenticationService(dbPool, usageCacheService)
 
   const apiClient = new ClaudeApiClient({
     baseUrl: config.api.claudeBaseUrl,
