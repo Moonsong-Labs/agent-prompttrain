@@ -65,6 +65,7 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
 - **Conversation visualization** with branch support
 - **SSE (Server-Sent Events)** for live updates
 - **Account-based analytics**
+- **Weekly conversation trend chart** for service usage tracking
 
 ### 🔔 Notifications & Alerts
 

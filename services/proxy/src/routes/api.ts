@@ -354,6 +354,78 @@ apiRoutes.get('/dashboard/stats', async c => {
 })
 
 /**
+ * GET /api/analytics/conversations/weekly - Get conversation counts grouped by week
+ * Returns the number of new conversations started per ISO week
+ */
+apiRoutes.get('/analytics/conversations/weekly', async c => {
+  let pool = c.get('pool')
+
+  if (!pool) {
+    const { container } = await import('../container.js')
+    pool = container.getDbPool()
+
+    if (!pool) {
+      return c.json({ error: 'Database not configured' }, 503)
+    }
+  }
+
+  try {
+    const query = c.req.query()
+    const weeks = Math.min(Math.max(parseInt(query.weeks || '12') || 12, 1), 52)
+    const projectId = query.projectId
+
+    const cacheKey = `weekly-conversations:${weeks}:${projectId || ''}`
+    const cached = apiResponseCache.get<object>(cacheKey)
+    if (cached) {
+      return c.json(cached)
+    }
+
+    const conditions: string[] = [
+      `timestamp >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')`,
+    ]
+    const values: any[] = [weeks]
+    let paramCount = 1
+
+    if (projectId) {
+      conditions.push(`project_id = $${++paramCount}`)
+      values.push(projectId)
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')} AND conversation_id IS NOT NULL`
+
+    const result = await pool.query(
+      `
+      SELECT
+        date_trunc('week', MIN(timestamp))::date as week_start,
+        COUNT(DISTINCT conversation_id) as conversation_count
+      FROM api_requests
+      ${whereClause}
+      GROUP BY date_trunc('week', timestamp)
+      ORDER BY week_start ASC
+      `,
+      values
+    )
+
+    const responseData = {
+      weeks: result.rows.map(row => ({
+        weekStart: row.week_start,
+        conversationCount: parseInt(row.conversation_count),
+      })),
+      query: {
+        weeks,
+        projectId: projectId || null,
+      },
+    }
+
+    apiResponseCache.set(cacheKey, responseData, 60)
+    return c.json(responseData)
+  } catch (error) {
+    logger.error('Failed to get weekly conversations', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to retrieve weekly conversation data' }, 500)
+  }
+})
+
+/**
  * GET /api/requests - Get recent requests
  */
 apiRoutes.get('/requests', async c => {

@@ -451,6 +451,42 @@ Optimized endpoint for dashboard overview page that returns aggregated statistic
 }
 ```
 
+#### Get Weekly Conversation Counts
+
+Returns conversation counts grouped by ISO week for usage trend analysis.
+
+```http
+GET /api/analytics/conversations/weekly?weeks=12&projectId=my-project
+```
+
+**Query Parameters:**
+
+| Parameter   | Type   | Default | Description                         |
+| ----------- | ------ | ------- | ----------------------------------- |
+| `weeks`     | number | 12      | Number of weeks to look back (1-52) |
+| `projectId` | string | —       | Filter by project ID                |
+
+**Response:**
+
+```json
+{
+  "weeks": [
+    {
+      "weekStart": "2024-01-08",
+      "conversationCount": 42
+    },
+    {
+      "weekStart": "2024-01-15",
+      "conversationCount": 56
+    }
+  ],
+  "query": {
+    "weeks": 12,
+    "projectId": null
+  }
+}
+```
+
 #### Get Conversation Details
 
 ```http
