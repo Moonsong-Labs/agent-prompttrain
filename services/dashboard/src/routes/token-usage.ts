@@ -63,6 +63,26 @@ function formatTimeLeft(isoTimestamp: string): string {
   return `<span style="font-family: monospace; white-space: pre;">${parts.join(' ')}</span>`
 }
 
+function formatRelativeTime(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+
+  if (diffMs < 60_000) {
+    return 'just now'
+  }
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 60) {
+    return `${mins} minute${mins === 1 ? '' : 's'} ago`
+  }
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+  const days = Math.floor(hours / 24)
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
 /**
  * Token usage dashboard
  */
@@ -392,6 +412,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 })
                                 .join('')}
                             </div>
+                            ${oauthUsage.is_estimated ? `<div style="font-size: 11px; color: #92400e; margin-top: 4px;">&#9888; Estimated (API rate limited) &bull; Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}</div>` : ''}
                             `
                                 : ''
                             }
@@ -463,7 +484,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
       apiClient.getRateLimitConfigs({ accountId }), // Rate limit configs
       apiClient.getSlidingWindowUsage({ accountId, days: 1, bucketMinutes: 5, windowHours: 5 }), // 24-hour sliding window with 5-minute buckets
       apiClient.getSlidingWindowUsage({ accountId, days: 7, bucketMinutes: 60, windowHours: 5 }), // 7-day sliding window with 60-minute buckets
-      apiClient.getOAuthUsage(accountId), // OAuth usage from Anthropic API
+      apiClient.getOAuthUsage(accountId, c.req.query('force') === 'true'), // OAuth usage from Anthropic API
     ])
 
     // Handle results
@@ -528,8 +549,18 @@ tokenUsageRoutes.get('/token-usage', async c => {
                 <div
                   style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;"
                 >
-                  Data from Anthropic OAuth API • Updated:
-                  ${new Date(oauthUsage.fetched_at).toLocaleTimeString()}
+                  Data from Anthropic OAuth
+                  API${oauthUsage.is_estimated
+                    ? ' <span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-weight: 600;">estimated</span>'
+                    : ''}
+                  • Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}
+                  <a
+                    href="/dashboard/token-usage?accountId=${encodeURIComponent(
+                      accountId!
+                    )}&force=true"
+                    style="margin-left: 8px; color: #3b82f6; text-decoration: underline; font-size: 12px;"
+                    >&#8635; Refresh</a
+                  >
                 </div>
               </div>
             </div>
