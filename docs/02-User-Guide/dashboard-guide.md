@@ -47,6 +47,7 @@ The main dashboard displays:
 - **Total Sub-tasks**: Count of Task tool invocations
 - **Success Rate**: Percentage of successful requests
 - **Average Latency**: Mean response time
+- **Conversations Per Week**: Bar chart showing the number of new conversations started each week over the last 12 weeks, useful for tracking service adoption and usage trends
 
 ### Real-time Metrics
 

@@ -57,8 +57,8 @@ overviewRoutes.get('/', async c => {
     // Get database pool for fetching project privacy info
     const pool = container.getPool()
 
-    // Fetch dashboard stats, conversations, and projects in parallel
-    const [statsResult, conversationsResult, projects] = await Promise.all([
+    // Fetch dashboard stats, conversations, weekly trend, and projects in parallel
+    const [statsResult, conversationsResult, weeklyResult, projects] = await Promise.all([
       apiClient.getDashboardStats({ projectId }),
       apiClient.getConversations({
         projectId,
@@ -66,6 +66,7 @@ overviewRoutes.get('/', async c => {
         offset: searchQuery ? 0 : offset, // For search, get all and filter client-side for now
         userEmail: auth?.principal, // Pass the authenticated user for privacy filtering
       }),
+      apiClient.getWeeklyConversations({ days: 30, projectId }),
       pool ? listProjects(pool) : Promise.resolve([]),
     ])
 
@@ -253,6 +254,128 @@ overviewRoutes.get('/', async c => {
           <div class="stat-meta">Combined usage</div>
         </div>
       </div>
+
+      <!-- Weekly Conversations Chart -->
+      ${weeklyResult.weeks.length > 0
+        ? html`
+            <div class="section" style="margin-bottom: 1.5rem;">
+              <div class="section-header">Conversations Per Week</div>
+              <div class="section-content">
+                <canvas
+                  id="weekly-conversations-chart"
+                  width="800"
+                  height="250"
+                  style="width: 100%; height: 250px;"
+                  data-testid="weekly-conversations-chart"
+                ></canvas>
+                <script>
+                  ;(function () {
+                    const canvas = document.getElementById('weekly-conversations-chart')
+                    if (!canvas) return
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) return
+
+                    const dpr = window.devicePixelRatio || 1
+                    const rect = canvas.getBoundingClientRect()
+                    canvas.width = rect.width * dpr
+                    canvas.height = rect.height * dpr
+                    ctx.scale(dpr, dpr)
+
+                    const width = rect.width
+                    const height = rect.height
+
+                    const data = ${raw(
+                      JSON.stringify(
+                        weeklyResult.weeks.map(w => ({
+                          label: w.weekStart,
+                          value: w.conversationCount,
+                        }))
+                      )
+                    )}
+
+                    if (data.length === 0) return
+
+                    const padding = { top: 20, right: 20, bottom: 50, left: 50 }
+                    const chartWidth = width - padding.left - padding.right
+                    const chartHeight = height - padding.top - padding.bottom
+
+                    const maxValue = Math.max(...data.map(d => d.value), 1)
+                    const barWidth = Math.max((chartWidth / data.length) * 0.7, 4)
+                    const barGap = chartWidth / data.length - barWidth
+
+                    // Detect dark mode
+                    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+                    const textColor = isDark ? '#9ca3af' : '#6b7280'
+                    const gridColor = isDark ? '#374151' : '#e5e7eb'
+                    const barColor = isDark ? '#60a5fa' : '#3b82f6'
+                    const barHoverColor = isDark ? '#93c5fd' : '#2563eb'
+
+                    // Draw grid lines
+                    ctx.strokeStyle = gridColor
+                    ctx.lineWidth = 0.5
+                    const gridLines = 5
+                    for (let i = 0; i <= gridLines; i++) {
+                      const y = padding.top + (chartHeight / gridLines) * i
+                      ctx.beginPath()
+                      ctx.moveTo(padding.left, y)
+                      ctx.lineTo(width - padding.right, y)
+                      ctx.stroke()
+
+                      // Y-axis labels
+                      const val = Math.round(maxValue - (maxValue / gridLines) * i)
+                      ctx.fillStyle = textColor
+                      ctx.font = '11px system-ui, sans-serif'
+                      ctx.textAlign = 'right'
+                      ctx.fillText(val.toString(), padding.left - 8, y + 4)
+                    }
+
+                    // Draw bars
+                    data.forEach((d, i) => {
+                      const x = padding.left + i * (barWidth + barGap) + barGap / 2
+                      const barHeight = (d.value / maxValue) * chartHeight
+                      const y = padding.top + chartHeight - barHeight
+
+                      // Bar fill
+                      ctx.fillStyle = barColor
+                      ctx.beginPath()
+                      const radius = Math.min(3, barWidth / 4)
+                      ctx.moveTo(x + radius, y)
+                      ctx.lineTo(x + barWidth - radius, y)
+                      ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius)
+                      ctx.lineTo(x + barWidth, y + barHeight)
+                      ctx.lineTo(x, y + barHeight)
+                      ctx.lineTo(x, y + radius)
+                      ctx.quadraticCurveTo(x, y, x + radius, y)
+                      ctx.fill()
+
+                      // Value label on top of bar
+                      if (d.value > 0) {
+                        ctx.fillStyle = textColor
+                        ctx.font = '10px system-ui, sans-serif'
+                        ctx.textAlign = 'center'
+                        ctx.fillText(d.value.toString(), x + barWidth / 2, y - 5)
+                      }
+
+                      // X-axis label (week start date)
+                      ctx.fillStyle = textColor
+                      ctx.font = '10px system-ui, sans-serif'
+                      ctx.textAlign = 'center'
+                      ctx.save()
+                      ctx.translate(x + barWidth / 2, padding.top + chartHeight + 14)
+                      ctx.rotate(-Math.PI / 6)
+                      const dateLabel = new Date(d.label).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                      ctx.fillText(dateLabel, 0, 0)
+                      ctx.restore()
+                    })
+                  })()
+                </script>
+              </div>
+            </div>
+          `
+        : ''}
 
       <!-- Conversations Table -->
       <div class="section">

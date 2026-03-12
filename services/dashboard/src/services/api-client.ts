@@ -790,6 +790,61 @@ export class ProxyApiClient {
   }
 
   /**
+   * Get weekly conversation counts for usage trend analysis
+   */
+  async getWeeklyConversations(params?: {
+    weeks?: number
+    days?: number
+    projectId?: string
+  }): Promise<{
+    weeks: Array<{
+      weekStart: string
+      conversationCount: number
+    }>
+    query: {
+      weeks: number
+      projectId: string | null
+    }
+  }> {
+    try {
+      const url = new URL('/api/analytics/conversations/weekly', this.baseUrl)
+      if (params?.weeks) {
+        url.searchParams.set('weeks', params.weeks.toString())
+      }
+      if (params?.days) {
+        url.searchParams.set('days', params.days.toString())
+      }
+      if (params?.projectId) {
+        url.searchParams.set('projectId', params.projectId)
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: this.getHeaders(),
+      })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      return (await response.json()) as {
+        weeks: Array<{
+          weekStart: string
+          conversationCount: number
+        }>
+        query: {
+          weeks: number
+          projectId: string | null
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to fetch weekly conversations from proxy API', {
+        error: getErrorMessage(error),
+        params,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Get OAuth usage from Anthropic API for an account
    */
   async getOAuthUsage(accountId: string, force = false): Promise<OAuthUsageDisplay | null> {

@@ -354,6 +354,101 @@ apiRoutes.get('/dashboard/stats', async c => {
 })
 
 /**
+ * GET /api/analytics/conversations/weekly - Get conversation counts grouped by week
+ * Returns the number of new conversations started per ISO week
+ */
+apiRoutes.get('/analytics/conversations/weekly', async c => {
+  let pool = c.get('pool')
+
+  if (!pool) {
+    const { container } = await import('../container.js')
+    pool = container.getDbPool()
+
+    if (!pool) {
+      return c.json({ error: 'Database not configured' }, 503)
+    }
+  }
+
+  try {
+    const query = c.req.query()
+    const weeks = Math.min(Math.max(parseInt(query.weeks || '12') || 12, 1), 52)
+    const days = query.days ? Math.min(Math.max(parseInt(query.days) || 0, 0), 365) : 0
+    const projectId = query.projectId
+
+    const cacheKey = `weekly-conversations:${weeks}:${days}:${projectId || ''}`
+    const cached = apiResponseCache.get<object>(cacheKey)
+    if (cached) {
+      return c.json(cached)
+    }
+
+    const values: any[] = [weeks]
+    let paramCount = 1
+
+    // Optional project filter applied inside the subquery
+    const projectFilter = projectId ? `AND project_id = $${++paramCount}` : ''
+    if (projectId) {
+      values.push(projectId)
+    }
+
+    // Count conversations by the week they were truly CREATED (first message
+    // across all time), then only include those created within the window.
+    // Using HAVING instead of WHERE ensures we get the real start date,
+    // not a false start from the first activity within the window.
+    // Supports either 'days' (exact day count) or 'weeks' (week count) lookback.
+    const timeFilter =
+      days > 0
+        ? `HAVING MIN(timestamp) >= NOW() - ($1 * INTERVAL '1 day')`
+        : `HAVING MIN(timestamp) >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')`
+    const timeValue = days > 0 ? days : weeks
+
+    // Override first param with the right time value
+    values[0] = timeValue
+
+    const result = await pool.query(
+      `
+      WITH conversation_starts AS (
+        SELECT
+          conversation_id,
+          MIN(timestamp) as started_at
+        FROM api_requests
+        WHERE conversation_id IS NOT NULL
+          ${projectFilter}
+        GROUP BY conversation_id
+        ${timeFilter}
+      )
+      SELECT
+        date_trunc('week', started_at)::date as week_start,
+        COUNT(*) as conversation_count
+      FROM conversation_starts
+      GROUP BY date_trunc('week', started_at)
+      ORDER BY week_start ASC
+      `,
+      values
+    )
+
+    const responseData = {
+      weeks: result.rows.map(row => ({
+        weekStart:
+          row.week_start instanceof Date
+            ? row.week_start.toISOString().split('T')[0]
+            : String(row.week_start).split('T')[0],
+        conversationCount: parseInt(row.conversation_count),
+      })),
+      query: {
+        weeks,
+        projectId: projectId || null,
+      },
+    }
+
+    apiResponseCache.set(cacheKey, responseData, 60)
+    return c.json(responseData)
+  } catch (error) {
+    logger.error('Failed to get weekly conversations', { error: getErrorMessage(error) })
+    return c.json({ error: 'Failed to retrieve weekly conversation data' }, 500)
+  }
+})
+
+/**
  * GET /api/requests - Get recent requests
  */
 apiRoutes.get('/requests', async c => {
