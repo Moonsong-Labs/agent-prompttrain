@@ -389,8 +389,10 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
       values.push(projectId)
     }
 
-    // Count conversations by the week they were STARTED (first message),
-    // not by when they had any activity
+    // Count conversations by the week they were truly CREATED (first message
+    // across all time), then only include those created within the window.
+    // Using HAVING instead of WHERE ensures we get the real start date,
+    // not a false start from the first activity within the window.
     const result = await pool.query(
       `
       WITH conversation_starts AS (
@@ -399,9 +401,9 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
           MIN(timestamp) as started_at
         FROM api_requests
         WHERE conversation_id IS NOT NULL
-          AND timestamp >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')
           ${projectFilter}
         GROUP BY conversation_id
+        HAVING MIN(timestamp) >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')
       )
       SELECT
         date_trunc('week', started_at)::date as week_start,
