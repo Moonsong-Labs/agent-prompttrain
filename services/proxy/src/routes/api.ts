@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { Pool } from 'pg'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage, getErrorStack } from '@agent-prompttrain/shared'
+import { getErrorMessage, getErrorStack, type AnthropicCredential } from '@agent-prompttrain/shared'
 import { container } from '../container.js'
 import { apiResponseCache } from '../services/response-cache.js'
 
@@ -1496,41 +1496,33 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
           error: 'OAuth usage is only available for Anthropic accounts',
           windows: [],
           fetched_at: new Date().toISOString(),
+          is_estimated: false,
         },
       })
     }
 
-    // Call Anthropic OAuth usage API
-    const oauthToken = credential.oauth_access_token
-    const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${oauthToken}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'anthropic-beta': 'oauth-2025-04-20',
-      },
-    })
+    // Get the usage cache service from container
+    const usageCacheService = container.getUsageCacheService()
+    if (!usageCacheService) {
+      return c.json({ success: false, error: 'Usage cache service not available' }, 503)
+    }
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('Failed to fetch OAuth usage from Anthropic', {
-        metadata: {
-          accountId,
-          status: response.status,
-          error: errorText,
-        },
-      })
+    const forceRefresh = c.req.query('force') === 'true'
+    const entry = forceRefresh
+      ? await usageCacheService.forceRefresh(credential as AnthropicCredential)
+      : await usageCacheService.getUsage(credential as AnthropicCredential)
 
+    if (!entry || !entry.usage) {
       const errorResponse = {
         success: true,
         data: {
           account_id: accountId,
           provider: 'anthropic',
           available: false,
-          error: `Anthropic API error: ${response.status}`,
+          error: 'Failed to fetch usage data',
           windows: [],
           fetched_at: new Date().toISOString(),
+          is_estimated: false,
         },
       }
 
@@ -1539,33 +1531,15 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       return c.json(errorResponse)
     }
 
-    const usageData = (await response.json()) as {
-      five_hour?: { utilization: number; resets_at: string } | null
-      seven_day?: { utilization: number; resets_at: string } | null
-      seven_day_oauth_apps?: { utilization: number; resets_at: string } | null
-      seven_day_opus?: { utilization: number; resets_at: string } | null
-      seven_day_sonnet?: { utilization: number; resets_at: string } | null
-      iguana_necktie?: { utilization: number; resets_at: string } | null
-      extra_usage?: {
-        is_enabled: boolean
-        monthly_limit: number | null
-        used_credits: number | null
-        utilization: number | null
-      }
-    }
-
-    // Process the usage data into display format
-    const windows: Array<{
-      name: string
-      short_name: string
-      utilization: number
-      resets_at: string
-      resets_at_iso: string
-    }> = []
-
-    // Window mappings for display names
+    // Transform raw usage to display format
+    type WindowKey =
+      | 'five_hour'
+      | 'seven_day'
+      | 'seven_day_oauth_apps'
+      | 'seven_day_opus'
+      | 'seven_day_sonnet'
     const windowMappings: Array<{
-      key: keyof typeof usageData
+      key: WindowKey
       name: string
       shortName: string
     }> = [
@@ -1576,8 +1550,9 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       { key: 'seven_day_sonnet', name: '7-Day Sonnet', shortName: '7d Sonnet' },
     ]
 
+    const windows = []
     for (const mapping of windowMappings) {
-      const windowData = usageData[mapping.key] as
+      const windowData = entry.usage[mapping.key] as
         | { utilization: number; resets_at: string }
         | null
         | undefined
@@ -1600,7 +1575,9 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
         provider: 'anthropic',
         available: true,
         windows,
-        fetched_at: new Date().toISOString(),
+        fetched_at: new Date(entry.fetchedAt).toISOString(),
+        is_estimated: entry.isEstimated,
+        extra_usage: entry.usage.extra_usage ?? undefined,
       },
     }
 

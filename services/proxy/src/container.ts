@@ -18,6 +18,7 @@ import { PromptRegistryService } from './mcp/PromptRegistryService.js'
 import { GitHubSyncService } from './mcp/GitHubSyncService.js'
 import { SyncScheduler } from './mcp/SyncScheduler.js'
 import { JsonRpcHandler } from './mcp/JsonRpcHandler.js'
+import { UsageCacheService } from './services/usage-cache-service.js'
 
 /**
  * Dependency injection container for the proxy service
@@ -41,6 +42,7 @@ class Container {
   private githubSyncService?: GitHubSyncService
   private syncScheduler?: SyncScheduler
   private jsonRpcHandler?: JsonRpcHandler
+  private usageCacheService?: UsageCacheService
   private initialized = false
   private initializationPromise?: Promise<void>
 
@@ -133,7 +135,8 @@ class Container {
     if (!this.pool) {
       throw new Error('Database pool is required for AuthenticationService')
     }
-    this.authenticationService = new AuthenticationService(this.pool)
+    this.usageCacheService = new UsageCacheService(this.pool)
+    this.authenticationService = new AuthenticationService(this.pool, this.usageCacheService)
     this.claudeApiClient = new ClaudeApiClient({
       baseUrl: config.api.claudeBaseUrl,
       timeout: config.api.claudeTimeout,
@@ -281,6 +284,10 @@ class Container {
     return this.syncScheduler
   }
 
+  getUsageCacheService(): UsageCacheService | undefined {
+    return this.usageCacheService
+  }
+
   async cleanup(): Promise<void> {
     this.initialized = false
 
@@ -315,6 +322,7 @@ class Container {
     this.mcpServer = undefined
     this.githubSyncService = undefined
     this.jsonRpcHandler = undefined
+    this.usageCacheService = undefined
   }
 }
 
@@ -392,6 +400,10 @@ class LazyContainer {
 
   getSyncScheduler(): SyncScheduler | undefined {
     return this.ensureInstance().getSyncScheduler()
+  }
+
+  getUsageCacheService(): UsageCacheService | undefined {
+    return this.ensureInstance().getUsageCacheService()
   }
 
   async cleanup(): Promise<void> {
