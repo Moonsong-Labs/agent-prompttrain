@@ -408,7 +408,10 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
 
     const responseData = {
       weeks: result.rows.map(row => ({
-        weekStart: row.week_start,
+        weekStart:
+          row.week_start instanceof Date
+            ? row.week_start.toISOString().split('T')[0]
+            : String(row.week_start).split('T')[0],
         conversationCount: parseInt(row.conversation_count),
       })),
       query: {

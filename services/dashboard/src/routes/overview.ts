@@ -363,13 +363,10 @@ overviewRoutes.get('/', async c => {
                       ctx.save()
                       ctx.translate(x + barWidth / 2, padding.top + chartHeight + 14)
                       ctx.rotate(-Math.PI / 6)
-                      const dateLabel = new Date(d.label + 'T00:00:00').toLocaleDateString(
-                        'en-US',
-                        {
-                          month: 'short',
-                          day: 'numeric',
-                        }
-                      )
+                      const dateLabel = new Date(d.label).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })
                       ctx.fillText(dateLabel, 0, 0)
                       ctx.restore()
                     })
