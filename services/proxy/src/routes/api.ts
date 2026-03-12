@@ -45,6 +45,7 @@ interface StatsResponse {
 interface RequestSummary {
   requestId: string
   projectId: string
+  accountId: string | null
   model: string
   timestamp: string
   inputTokens: number
@@ -388,9 +389,10 @@ apiRoutes.get('/requests', async c => {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
     const requestsQuery = `
-      SELECT 
+      SELECT
         request_id,
         project_id,
+        account_id,
         model,
         timestamp,
         COALESCE(input_tokens, 0) as input_tokens,
@@ -412,6 +414,7 @@ apiRoutes.get('/requests', async c => {
     const requests: RequestSummary[] = result.rows.map(row => ({
       requestId: row.request_id,
       projectId: row.project_id,
+      accountId: row.account_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,
@@ -500,6 +503,7 @@ apiRoutes.get('/requests/:id', async c => {
     const details: RequestDetails = {
       requestId: row.request_id,
       projectId: row.project_id,
+      accountId: row.account_id,
       model: row.model,
       timestamp: row.timestamp,
       inputTokens: row.input_tokens,

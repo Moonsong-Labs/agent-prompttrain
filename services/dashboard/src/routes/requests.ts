@@ -153,6 +153,7 @@ requestsRoutes.get('/requests', async c => {
                   <tr>
                     <th>Time</th>
                     <th>Project ID</th>
+                    <th>Account</th>
                     <th>Model</th>
                     <th>Tokens</th>
                     <th>Status</th>
@@ -167,6 +168,7 @@ requestsRoutes.get('/requests', async c => {
                 <tr>
                   <td class="text-sm">${formatRelativeTime(req.timestamp)}</td>
                   <td class="text-sm">${escapeHtml(req.projectId || 'unknown')}</td>
+                  <td class="text-sm">${escapeHtml(req.accountId || 'N/A')}</td>
                   <td class="text-sm">${req.model || 'N/A'}</td>
                   <td class="text-sm">${formatNumber(req.totalTokens || 0)}</td>
                   <td class="text-sm">${req.responseStatus || 'N/A'}</td>
