@@ -1,10 +1,14 @@
 import { Pool } from 'pg'
-import type { Credential, AnthropicCredential, OAuthUsageData } from '@agent-prompttrain/shared'
+import type {
+  Credential,
+  AnthropicCredential,
+  AnthropicOAuthUsageResponse,
+} from '@agent-prompttrain/shared'
 import {
   getProjectLinkedCredentials,
   getProjectCredentials,
 } from '@agent-prompttrain/shared/database/queries'
-import { getApiKey } from '../credentials'
+import { UsageCacheService, type CachedUsageEntry } from './usage-cache-service'
 import { logger } from '../middleware/logger'
 
 /**
@@ -27,18 +31,11 @@ export class AccountPoolExhaustedError extends Error {
 export interface AccountSelection {
   /** The selected credential to use for the request */
   credential: Credential
-  /** Highest utilization across 5h and 7d windows (0-100) */
+  /** Highest utilization across 5h and 7d windows (0-1, normalized) */
   maxUtilization: number
   /** True if selected from a multi-account pool, false if using default account */
   fromPool: boolean
 }
-
-interface UsageCacheEntry {
-  usage: OAuthUsageData
-  fetchedAt: number
-}
-
-const USAGE_CACHE_TTL_MS = 60_000
 
 /**
  * AccountPoolService selects the best account for a project based on real-time
@@ -53,10 +50,10 @@ export class AccountPoolService {
   /** Sticky mapping: projectId -> credentialId */
   private stickyMap: Map<string, string> = new Map()
 
-  /** Usage cache: credentialId -> { usage, fetchedAt } */
-  private usageCache: Map<string, UsageCacheEntry> = new Map()
-
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly usageCacheService: UsageCacheService
+  ) {}
 
   /**
    * Select the best account for a project.
@@ -71,24 +68,21 @@ export class AccountPoolService {
    * 4. Throws AccountPoolExhaustedError if no accounts are available
    */
   async selectAccount(projectId: string): Promise<AccountSelection> {
-    const linkedCredentials = await getProjectLinkedCredentials(this.pool, projectId)
-
-    // If fewer than 2 linked accounts, use default account (non-pool mode)
-    if (linkedCredentials.length < 2) {
-      return this.selectDefaultAccount(projectId)
+    // Try pool mode: check if project has 2+ linked accounts
+    let linkedCredentials: Credential[] = []
+    try {
+      linkedCredentials = await getProjectLinkedCredentials(this.pool, projectId)
+    } catch {
+      // project_accounts table may not exist yet — fall back to default account
     }
 
-    // Pool mode: filter to Anthropic accounts for usage checks
+    // Filter to Anthropic accounts (only these support usage checks for pool mode)
     const anthropicCredentials = linkedCredentials.filter(
       (c): c is AnthropicCredential => c.provider === 'anthropic'
     )
 
-    // If all linked accounts are Bedrock (no Anthropic accounts for usage checks),
-    // fall back to default account
-    if (anthropicCredentials.length === 0) {
-      logger.info('All linked accounts are Bedrock, falling back to default account', {
-        metadata: { projectId, linkedCount: linkedCredentials.length },
-      })
+    // Pool mode requires 2+ Anthropic accounts; otherwise use default account
+    if (anthropicCredentials.length < 2) {
       return this.selectDefaultAccount(projectId)
     }
 
@@ -97,8 +91,8 @@ export class AccountPoolService {
     if (stickyCredentialId) {
       const stickyCredential = anthropicCredentials.find(c => c.id === stickyCredentialId)
       if (stickyCredential) {
-        const usage = await this.fetchUsage(stickyCredential)
-        const maxUtilization = this.computeMaxUtilization(usage)
+        const cachedEntry = await this.usageCacheService.getUsage(stickyCredential)
+        const maxUtilization = this.computeMaxUtilization(cachedEntry?.usage ?? null)
 
         if (maxUtilization < stickyCredential.token_limit_threshold) {
           logger.debug('Reusing sticky account (under threshold)', {
@@ -128,13 +122,12 @@ export class AccountPoolService {
     }
 
     // Fetch usage for all Anthropic accounts in parallel
-    const usageResults = await Promise.all(
-      anthropicCredentials.map(async credential => {
-        const usage = await this.fetchUsage(credential)
-        const maxUtilization = this.computeMaxUtilization(usage)
-        return { credential, maxUtilization }
-      })
-    )
+    const usageMap = await this.usageCacheService.getUsageMultiple(anthropicCredentials)
+    const usageResults = anthropicCredentials.map(credential => {
+      const entry = usageMap.get(credential.id)
+      const maxUtilization = this.computeMaxUtilization(entry?.usage ?? null)
+      return { credential, maxUtilization }
+    })
 
     // Filter to accounts under their respective thresholds
     const available = usageResults.filter(
@@ -143,7 +136,7 @@ export class AccountPoolService {
 
     if (available.length === 0) {
       // Find the earliest reset time across all accounts for the error
-      const estimatedReset = this.findEarliestReset(anthropicCredentials)
+      const estimatedReset = this.findEarliestReset(anthropicCredentials, usageMap)
 
       logger.warn('All accounts in pool exhausted', {
         metadata: {
@@ -209,26 +202,32 @@ export class AccountPoolService {
 
   /**
    * Compute the maximum utilization across 5-hour and 7-day windows.
-   * Returns 100 (treat as over threshold) if usage data is null (conservative).
+   * Returns 1 (treat as over threshold) if usage data is null (conservative).
    */
-  private computeMaxUtilization(usage: OAuthUsageData | null): number {
+  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null): number {
     if (!usage) {
-      return 100
+      return 1
     }
 
-    return Math.max(usage.five_hour?.utilization ?? 0, usage.seven_day?.utilization ?? 0)
+    // API returns utilization as 0-100, normalize to 0-1 to match token_limit_threshold
+    const fiveHour = (usage.five_hour?.utilization ?? 0) / 100
+    const sevenDay = (usage.seven_day?.utilization ?? 0) / 100
+    return Math.max(fiveHour, sevenDay)
   }
 
   /**
    * Find the earliest reset time from cached usage data for the given credentials.
    * Returns null if no reset times are available.
    */
-  private findEarliestReset(credentials: AnthropicCredential[]): string | null {
+  private findEarliestReset(
+    credentials: AnthropicCredential[],
+    usageMap: Map<string, CachedUsageEntry>
+  ): string | null {
     let earliest: string | null = null
 
     for (const credential of credentials) {
-      const cached = this.usageCache.get(credential.id)
-      if (!cached) {
+      const cached = usageMap.get(credential.id)
+      if (!cached?.usage) {
         continue
       }
 
@@ -248,99 +247,9 @@ export class AccountPoolService {
   }
 
   /**
-   * Fetch OAuth usage data for an Anthropic credential.
-   * Results are cached with a 60-second TTL per account.
-   *
-   * On error, logs a warning and returns null (conservative approach:
-   * the caller treats null as over-threshold).
-   */
-  private async fetchUsage(credential: AnthropicCredential): Promise<OAuthUsageData | null> {
-    // Check cache
-    const cached = this.usageCache.get(credential.id)
-    if (cached && Date.now() - cached.fetchedAt < USAGE_CACHE_TTL_MS) {
-      return cached.usage
-    }
-
-    try {
-      // Get a fresh OAuth token (handles refresh automatically)
-      const token = await getApiKey(credential.id, this.pool)
-      if (!token) {
-        logger.warn('Failed to get OAuth token for usage fetch', {
-          metadata: {
-            accountId: credential.account_id,
-            credentialId: credential.id,
-          },
-        })
-        return null
-      }
-
-      const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'anthropic-beta': 'oauth-2025-04-20',
-        },
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        logger.warn('Failed to fetch OAuth usage from Anthropic', {
-          metadata: {
-            accountId: credential.account_id,
-            credentialId: credential.id,
-            status: response.status,
-            error: errorText,
-          },
-        })
-        return null
-      }
-
-      const rawData = (await response.json()) as {
-        five_hour?: { utilization: number; resets_at: string } | null
-        seven_day?: { utilization: number; resets_at: string } | null
-        seven_day_opus?: { utilization: number; resets_at: string } | null
-        seven_day_sonnet?: { utilization: number; resets_at: string } | null
-      }
-
-      const usage: OAuthUsageData = {
-        five_hour: rawData.five_hour ?? null,
-        seven_day: rawData.seven_day ?? null,
-        seven_day_opus: rawData.seven_day_opus ?? null,
-        seven_day_sonnet: rawData.seven_day_sonnet ?? null,
-      }
-
-      // Update cache
-      this.usageCache.set(credential.id, {
-        usage,
-        fetchedAt: Date.now(),
-      })
-
-      return usage
-    } catch (error) {
-      logger.warn('Error fetching OAuth usage', {
-        metadata: {
-          accountId: credential.account_id,
-          credentialId: credential.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-      return null
-    }
-  }
-
-  /**
    * Clear sticky routing state. Useful for testing.
    */
   clearStickyState(): void {
     this.stickyMap.clear()
-  }
-
-  /**
-   * Clear the usage cache. Useful for testing.
-   */
-  clearUsageCache(): void {
-    this.usageCache.clear()
   }
 }

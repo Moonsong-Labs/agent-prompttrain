@@ -1,5 +1,10 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test'
-import type { AnthropicCredential, BedrockCredential, Credential } from '@agent-prompttrain/shared'
+import type {
+  AnthropicCredential,
+  AnthropicOAuthUsageResponse,
+  BedrockCredential,
+  Credential,
+} from '@agent-prompttrain/shared'
 
 // ── Mock functions ──────────────────────────────────────────────────────────
 
@@ -38,6 +43,7 @@ mock.module('../../middleware/logger', () => ({
 // ── Import service under test (after mocks) ─────────────────────────────────
 
 import { AccountPoolService, AccountPoolExhaustedError } from '../account-pool-service'
+import { UsageCacheService } from '../usage-cache-service'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -77,12 +83,20 @@ function makeBedrockCredential(overrides: Partial<BedrockCredential> = {}): Bedr
   }
 }
 
-function makeUsageResponse(fiveHour = 0.5, sevenDay = 0.3) {
+function makeUsageResponse(fiveHour = 50, sevenDay = 30): AnthropicOAuthUsageResponse {
   return {
     five_hour: { utilization: fiveHour, resets_at: '2026-02-24T12:00:00Z' },
     seven_day: { utilization: sevenDay, resets_at: '2026-02-28T00:00:00Z' },
+    seven_day_oauth_apps: null,
     seven_day_opus: null,
     seven_day_sonnet: null,
+    iguana_necktie: null,
+    extra_usage: {
+      is_enabled: false,
+      monthly_limit: null,
+      used_credits: null,
+      utilization: null,
+    },
   }
 }
 
@@ -106,10 +120,12 @@ function mockFetchFailure() {
 
 describe('AccountPoolService', () => {
   let service: AccountPoolService
+  let usageCacheService: UsageCacheService
   const fakePool = null as any
 
   beforeEach(() => {
-    service = new AccountPoolService(fakePool)
+    usageCacheService = new UsageCacheService(fakePool)
+    service = new AccountPoolService(fakePool, usageCacheService)
     mockGetProjectLinkedCredentials.mockReset()
     mockGetProjectCredentials.mockReset()
     mockGetApiKey.mockReset()
@@ -164,8 +180,8 @@ describe('AccountPoolService', () => {
 
       // cred-1 has lower utilization, so it should be selected first
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       const first = await service.selectAccount('project-1')
@@ -197,17 +213,17 @@ describe('AccountPoolService', () => {
 
       // First call: cred-1 has lower usage, gets selected & becomes sticky
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
       const first = await service.selectAccount('project-1')
       expect(first.credential.id).toBe('cred-1')
 
       // Now cred-1 five_hour spikes above threshold, cred-2 is still under
-      service.clearUsageCache()
+      usageCacheService.clearCache()
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.85, 0.2), // 5h over 0.80 threshold
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(85, 20), // 5h over 0.80 threshold
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       const second = await service.selectAccount('project-1')
@@ -234,17 +250,17 @@ describe('AccountPoolService', () => {
 
       // First call: cred-1 is lower
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
       const first = await service.selectAccount('project-1')
       expect(first.credential.id).toBe('cred-1')
 
       // Now cred-1 seven_day goes over threshold, but five_hour stays low
-      service.clearUsageCache()
+      usageCacheService.clearCache()
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.85), // 7d over 0.80 threshold
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 85), // 7d over 0.80 threshold
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       const second = await service.selectAccount('project-1')
@@ -270,8 +286,8 @@ describe('AccountPoolService', () => {
 
       // Both accounts over threshold
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.9, 0.85),
-        'cred-2': makeUsageResponse(0.95, 0.88),
+        'cred-1': makeUsageResponse(90, 85),
+        'cred-2': makeUsageResponse(95, 88),
       })
 
       try {
@@ -292,14 +308,14 @@ describe('AccountPoolService', () => {
   // ── Scenario 6: Cache expiry ─────────────────────────────────────────────
 
   describe('usage cache expiry', () => {
-    test('re-fetches from API after clearUsageCache()', async () => {
+    test('re-fetches from API after clearCache()', async () => {
       const cred1 = makeAnthropicCredential({ id: 'cred-1' })
       const cred2 = makeAnthropicCredential({ id: 'cred-2' })
       mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
 
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       await service.selectAccount('project-1')
@@ -315,7 +331,7 @@ describe('AccountPoolService', () => {
       expect(fetchCallCountAfterCachedCall).toBe(fetchCallCount)
 
       // Clear cache and call again - should trigger new fetches
-      service.clearUsageCache()
+      usageCacheService.clearCache()
       await service.selectAccount('project-1')
       const fetchCallCountAfterCacheClear = (globalThis.fetch as any).mock.calls.length
       // After cache clear, sticky check re-fetches (1 call), and since it's under threshold, returns
@@ -346,7 +362,7 @@ describe('AccountPoolService', () => {
         await service.selectAccount('project-1')
         expect(true).toBe(false)
       } catch (error) {
-        // null usage -> maxUtilization = 100 -> all over threshold -> exhausted
+        // null usage -> maxUtilization = 1 -> all over threshold -> exhausted
         expect(error).toBeInstanceOf(AccountPoolExhaustedError)
       }
     })
@@ -376,19 +392,42 @@ describe('AccountPoolService', () => {
 
   describe('Bedrock accounts skipped', () => {
     test('only Anthropic accounts participate in pool', async () => {
-      const anthropicCred = makeAnthropicCredential({ id: 'cred-anth', account_id: 'acct-anth' })
+      const anthropicCred1 = makeAnthropicCredential({
+        id: 'cred-anth-1',
+        account_id: 'acct-anth-1',
+      })
+      const anthropicCred2 = makeAnthropicCredential({
+        id: 'cred-anth-2',
+        account_id: 'acct-anth-2',
+      })
       const bedrockCred = makeBedrockCredential({ id: 'cred-bedrock', account_id: 'acct-bedrock' })
       mockGetProjectLinkedCredentials.mockImplementation(() =>
-        Promise.resolve([anthropicCred, bedrockCred])
+        Promise.resolve([anthropicCred1, anthropicCred2, bedrockCred])
       )
 
       mockFetchWithUsage({
-        'cred-anth': makeUsageResponse(0.3, 0.2),
+        'cred-anth-1': makeUsageResponse(30, 20),
+        'cred-anth-2': makeUsageResponse(50, 40),
       })
 
       const result = await service.selectAccount('project-1')
-      expect(result.credential.id).toBe('cred-anth')
+      // Should pick least-utilized Anthropic account, ignoring Bedrock
+      expect(result.credential.id).toBe('cred-anth-1')
       expect(result.fromPool).toBe(true)
+    })
+
+    test('falls back to default when only 1 Anthropic + 1 Bedrock linked', async () => {
+      const anthropicCred = makeAnthropicCredential({ id: 'cred-anth', account_id: 'acct-anth' })
+      const bedrockCred = makeBedrockCredential({ id: 'cred-bedrock', account_id: 'acct-bedrock' })
+      const defaultCred = makeAnthropicCredential({ id: 'default-cred' })
+      mockGetProjectLinkedCredentials.mockImplementation(() =>
+        Promise.resolve([anthropicCred, bedrockCred])
+      )
+      mockGetProjectCredentials.mockImplementation(() => Promise.resolve([defaultCred]))
+
+      const result = await service.selectAccount('project-1')
+      expect(result.fromPool).toBe(false)
+      expect(result.credential.id).toBe('default-cred')
     })
 
     test('falls back to default account when all linked accounts are Bedrock', async () => {
@@ -407,9 +446,9 @@ describe('AccountPoolService', () => {
     })
   })
 
-  // ── Scenario 9: clearStickyState() / clearUsageCache() ──────────────────
+  // ── Scenario 9: clearStickyState() ────────────────────────────────────────
 
-  describe('clearStickyState() / clearUsageCache()', () => {
+  describe('clearStickyState()', () => {
     test('clearStickyState() resets sticky mapping', async () => {
       const cred1 = makeAnthropicCredential({ id: 'cred-1', account_id: 'acct-1' })
       const cred2 = makeAnthropicCredential({ id: 'cred-2', account_id: 'acct-2' })
@@ -417,8 +456,8 @@ describe('AccountPoolService', () => {
 
       // cred-1 gets selected (lower utilization)
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       const first = await service.selectAccount('project-1')
@@ -426,24 +465,24 @@ describe('AccountPoolService', () => {
 
       // Clear sticky and cache, now cred-2 is lower
       service.clearStickyState()
-      service.clearUsageCache()
+      usageCacheService.clearCache()
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.7, 0.6),
-        'cred-2': makeUsageResponse(0.2, 0.1),
+        'cred-1': makeUsageResponse(70, 60),
+        'cred-2': makeUsageResponse(20, 10),
       })
 
       const second = await service.selectAccount('project-1')
       expect(second.credential.id).toBe('cred-2')
     })
 
-    test('clearUsageCache() forces fresh API calls', async () => {
+    test('clearCache() forces fresh API calls', async () => {
       const cred1 = makeAnthropicCredential({ id: 'cred-1' })
       const cred2 = makeAnthropicCredential({ id: 'cred-2' })
       mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
 
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(0.3, 0.2),
-        'cred-2': makeUsageResponse(0.5, 0.4),
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
       })
 
       await service.selectAccount('project-1')
@@ -452,7 +491,7 @@ describe('AccountPoolService', () => {
       const callsAfterFirst = (globalThis.fetch as any).mock.calls.length
 
       // Clear cache
-      service.clearUsageCache()
+      usageCacheService.clearCache()
 
       // Now the next call must re-fetch
       await service.selectAccount('project-1')

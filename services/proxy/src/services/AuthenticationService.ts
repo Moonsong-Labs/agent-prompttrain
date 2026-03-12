@@ -10,6 +10,7 @@ import { RequestContext } from '../domain/value-objects/RequestContext'
 import { getApiKey } from '../credentials'
 import { logger } from '../middleware/logger'
 import { AccountPoolService, AccountPoolExhaustedError } from './account-pool-service'
+import { UsageCacheService } from './usage-cache-service'
 
 export interface AuthResult {
   provider: ProviderType
@@ -28,7 +29,8 @@ export class AuthenticationService {
   private readonly accountPoolService: AccountPoolService
 
   constructor(private readonly pool: Pool) {
-    this.accountPoolService = new AccountPoolService(this.pool)
+    const usageCacheService = new UsageCacheService(this.pool)
+    this.accountPoolService = new AccountPoolService(this.pool, usageCacheService)
   }
 
   async authenticate(context: RequestContext): Promise<AuthResult> {
@@ -63,21 +65,9 @@ export class AuthenticationService {
     }
 
     // Priority 2: Account pool or default account
+    let selection
     try {
-      const selection = await this.accountPoolService.selectAccount(projectId)
-
-      if (selection.fromPool) {
-        logger.info('Account selected from pool', {
-          requestId: context.requestId,
-          projectId,
-          metadata: {
-            accountId: selection.credential.account_id,
-            maxUtilization: Math.round(selection.maxUtilization * 100),
-          },
-        })
-      }
-
-      return this.buildAuthResult(selection.credential, context)
+      selection = await this.accountPoolService.selectAccount(projectId)
     } catch (error) {
       if (error instanceof AccountPoolExhaustedError) {
         throw error
@@ -88,6 +78,19 @@ export class AuthenticationService {
         hint: 'Set a default account for this project via the dashboard',
       })
     }
+
+    if (selection.fromPool) {
+      logger.info('Account selected from pool', {
+        requestId: context.requestId,
+        projectId,
+        metadata: {
+          accountId: selection.credential.account_id,
+          maxUtilization: Math.round(selection.maxUtilization * 100),
+        },
+      })
+    }
+
+    return this.buildAuthResult(selection.credential, context)
   }
 
   private async buildAuthResult(
