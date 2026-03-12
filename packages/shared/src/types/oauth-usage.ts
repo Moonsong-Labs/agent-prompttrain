@@ -58,6 +58,8 @@ export interface OAuthUsageDisplay {
   windows: OAuthUsageWindowDisplay[]
   /** Fetched timestamp */
   fetched_at: string
+  /** Whether this data is extrapolated due to API rate limiting */
+  is_estimated?: boolean
 }
 
 /**

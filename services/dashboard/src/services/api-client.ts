@@ -789,9 +789,12 @@ export class ProxyApiClient {
   /**
    * Get OAuth usage from Anthropic API for an account
    */
-  async getOAuthUsage(accountId: string): Promise<OAuthUsageDisplay | null> {
+  async getOAuthUsage(accountId: string, force = false): Promise<OAuthUsageDisplay | null> {
     try {
       const url = new URL(`/api/oauth-usage/${encodeURIComponent(accountId)}`, this.baseUrl)
+      if (force) {
+        url.searchParams.set('force', 'true')
+      }
 
       const response = await fetch(url.toString(), {
         headers: this.getHeaders(),

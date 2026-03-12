@@ -291,3 +291,26 @@ export async function getProjectStats(
     requestCount24h: 0, // TODO: Implement request tracking
   }
 }
+
+/**
+ * Get all credentials linked to a project via project_accounts junction table.
+ * Used by AccountPoolService to determine pool eligibility (2+ accounts)
+ * and to get the pool of available accounts.
+ */
+export async function getProjectLinkedCredentials(
+  pool: Pool,
+  projectId: string
+): Promise<Credential[]> {
+  const result = await pool.query<Credential>(
+    `
+    SELECT c.*
+    FROM project_accounts pa
+    JOIN credentials c ON pa.credential_id = c.id
+    JOIN projects p ON pa.project_id = p.id
+    WHERE p.project_id = $1
+    ORDER BY pa.created_at ASC
+    `,
+    [projectId]
+  )
+  return result.rows
+}

@@ -1,3 +1,5 @@
+import type { OAuthUsageWindow } from './oauth-usage.js'
+
 /**
  * Database models for credential and project management
  */
@@ -11,6 +13,7 @@ export interface BaseCredential {
   provider: ProviderType
   created_at: Date
   updated_at: Date
+  token_limit_threshold: number
 }
 
 export interface AnthropicCredential extends BaseCredential {
@@ -171,4 +174,11 @@ export interface SlackConfig {
   channel?: string
   username?: string
   icon_emoji?: string
+}
+
+export interface OAuthUsageData {
+  five_hour: OAuthUsageWindow | null
+  seven_day: OAuthUsageWindow | null
+  seven_day_opus: OAuthUsageWindow | null
+  seven_day_sonnet: OAuthUsageWindow | null
 }
