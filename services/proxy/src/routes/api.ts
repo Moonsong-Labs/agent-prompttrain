@@ -380,27 +380,34 @@ apiRoutes.get('/analytics/conversations/weekly', async c => {
       return c.json(cached)
     }
 
-    const conditions: string[] = [
-      `timestamp >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')`,
-    ]
     const values: any[] = [weeks]
     let paramCount = 1
 
+    // Optional project filter applied inside the subquery
+    const projectFilter = projectId ? `AND project_id = $${++paramCount}` : ''
     if (projectId) {
-      conditions.push(`project_id = $${++paramCount}`)
       values.push(projectId)
     }
 
-    const whereClause = `WHERE ${conditions.join(' AND ')} AND conversation_id IS NOT NULL`
-
+    // Count conversations by the week they were STARTED (first message),
+    // not by when they had any activity
     const result = await pool.query(
       `
+      WITH conversation_starts AS (
+        SELECT
+          conversation_id,
+          MIN(timestamp) as started_at
+        FROM api_requests
+        WHERE conversation_id IS NOT NULL
+          AND timestamp >= date_trunc('week', NOW()) - ($1 * INTERVAL '1 week')
+          ${projectFilter}
+        GROUP BY conversation_id
+      )
       SELECT
-        date_trunc('week', MIN(timestamp))::date as week_start,
-        COUNT(DISTINCT conversation_id) as conversation_count
-      FROM api_requests
-      ${whereClause}
-      GROUP BY date_trunc('week', timestamp)
+        date_trunc('week', started_at)::date as week_start,
+        COUNT(*) as conversation_count
+      FROM conversation_starts
+      GROUP BY date_trunc('week', started_at)
       ORDER BY week_start ASC
       `,
       values
