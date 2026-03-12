@@ -650,6 +650,14 @@ apiRoutes.get('/conversations', async c => {
     // Optimized query using "limit first, aggregate second" approach
     let conversationsQuery: string
 
+    // For early pages without date filters, add a time bound to avoid full table scan
+    // (600K+ rows → ~5K rows). Falls back to full scan for deep pagination or date-filtered queries.
+    const needsRows = params.offset + params.limit
+    const useTimeBound = !userEmail && !params.dateFrom && !params.dateTo && needsRows <= 200
+    const timeBoundClause = useTimeBound
+      ? `${whereClauseNoPrefix ? 'AND' : 'WHERE'} timestamp >= NOW() - INTERVAL '7 days'`
+      : ''
+
     if (userEmail) {
       // With privacy filtering
       conversationsQuery = `
@@ -740,6 +748,7 @@ apiRoutes.get('/conversations', async c => {
         FROM api_requests
         ${whereClauseNoPrefix}
         ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
+        ${timeBoundClause}
         GROUP BY conversation_id
         ORDER BY last_message_time DESC
         LIMIT $${++paramCount}
@@ -827,6 +836,7 @@ apiRoutes.get('/conversations', async c => {
       FROM api_requests
       ${whereClauseNoPrefix}
       ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
+      ${timeBoundClause}
     `
 
     // Execute both queries in parallel
