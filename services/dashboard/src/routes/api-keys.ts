@@ -145,9 +145,9 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'Un-revoking API keys is not supported' }, 400)
     }
 
-    // Reject combined revoke + name update
+    // Don't allow combining revoke with name update
     if (body.revoked === true && body.name !== undefined) {
-      return c.json({ error: 'Cannot update name and revoke in the same request' }, 400)
+      return c.json({ error: 'Cannot combine revoke with name update' }, 400)
     }
 
     // Handle revoke if requested
