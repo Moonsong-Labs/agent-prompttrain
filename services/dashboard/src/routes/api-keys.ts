@@ -140,7 +140,7 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
 
     const body = await c.req.json<UpdateApiKeyRequest>()
 
-    // When revoking, it must be the only field in the request
+    // Handle revoke if requested
     if ('revoked' in body) {
       if (body.revoked !== true) {
         return c.json({ error: 'Un-revoking API keys is not supported' }, 400)
@@ -150,10 +150,7 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
       if (otherKeys.length > 0) {
         return c.json({ error: 'Revoke must be the only field in the request' }, 400)
       }
-    }
 
-    // Handle revoke if requested
-    if (body.revoked === true) {
       if (apiKey.revoked_at) {
         return c.json({ error: 'API key is already revoked' }, 400)
       }
