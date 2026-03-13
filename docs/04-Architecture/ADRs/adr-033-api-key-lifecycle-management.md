@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -13,8 +13,8 @@ Additionally, the current REST API uses `DELETE` for revoking, which is semantic
 ## Decision Drivers
 
 - **RESTful semantics**: HTTP verbs should match their intended purpose
-- **Data hygiene**: Owners should be able to permanently remove revoked keys
-- **Security**: Only project owners should be able to hard-delete keys
+- **Data hygiene**: Owners and key creators should be able to permanently remove revoked keys
+- **Security**: Only project owners or key creators should be able to hard-delete keys
 - **Safety**: Only already-revoked keys can be deleted to prevent accidental data loss
 
 ## Considered Options
@@ -45,12 +45,12 @@ Additionally, the current REST API uses `DELETE` for revoking, which is semantic
 
 - Hard-deletes the key row from the database
 - Precondition: key must already be revoked (returns 400 otherwise)
-- Auth: project owner only
+- Auth: project owner or key creator
 
 ### HTMX UI Changes
 
 - Revoke button sends PATCH with `{ revoked: true }` instead of DELETE
-- New "Delete" button appears on revoked keys, visible only to project owner
+- New "Delete" button appears on revoked keys, visible to project owner or key creator
 - Confirmation dialog before hard-delete
 
 ### Type Changes
@@ -69,13 +69,12 @@ Additionally, the current REST API uses `DELETE` for revoking, which is semantic
 ### Positive
 
 - REST API semantics are correct (PATCH for state change, DELETE for removal)
-- Owners can clean up revoked keys they no longer need
+- Owners and key creators can clean up revoked keys they no longer need
 - Safety guard: only revoked keys can be deleted
 
 ### Negative
 
 - Breaking change to the DELETE endpoint behavior for API consumers
-- Slightly more complex authorization model (owner-only for delete vs owner-or-creator for revoke)
 
 ### Risks and Mitigations
 
