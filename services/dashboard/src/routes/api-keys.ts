@@ -225,10 +225,15 @@ apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'API key does not belong to this project' }, 403)
     }
 
-    // Only project owners can hard-delete
+    // Check if user is project owner OR key creator
     const isOwner = await isProjectOwner(pool, train.id, auth.principal)
-    if (!isOwner) {
-      return c.json({ error: 'Access denied: Only project owners can delete API keys' }, 403)
+    const isKeyCreator = apiKey.created_by === auth.principal
+
+    if (!isOwner && !isKeyCreator) {
+      return c.json(
+        { error: 'Access denied: Only project owners or key creators can delete API keys' },
+        403
+      )
     }
 
     // Key must be revoked before it can be deleted

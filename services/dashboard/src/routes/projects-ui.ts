@@ -805,7 +805,7 @@ function renderApiKeysList(
                         style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
                         >REVOKED</span
                       >
-                      ${userIsOwner
+                      ${userIsOwner || (auth.isAuthenticated && key.created_by === auth.principal)
                         ? html`
                             <form
                               data-testid="delete-api-key-form"
@@ -1051,16 +1051,6 @@ trainsUIRoutes.delete('/:projectId/delete-api-key/:keyId', async c => {
     `)
   }
 
-  // Only project owners can delete
-  const userIsOwner = await isProjectOwner(pool, projectId, auth.principal)
-  if (!userIsOwner) {
-    return c.html(html`
-      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-        <strong>Error:</strong> Only project owners can delete API keys
-      </div>
-    `)
-  }
-
   // Get the API key
   const apiKey = await getTrainApiKeySafe(pool, keyId)
   if (!apiKey) {
@@ -1076,6 +1066,18 @@ trainsUIRoutes.delete('/:projectId/delete-api-key/:keyId', async c => {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
         <strong>Error:</strong> API key does not belong to this project
+      </div>
+    `)
+  }
+
+  // Check if user is project owner OR key creator
+  const userIsOwner = await isProjectOwner(pool, projectId, auth.principal)
+  const isKeyCreator = apiKey.created_by === auth.principal
+
+  if (!userIsOwner && !isKeyCreator) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only project owners or key creators can delete API keys
       </div>
     `)
   }
