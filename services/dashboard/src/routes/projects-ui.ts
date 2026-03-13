@@ -755,9 +755,6 @@ trainsUIRoutes.get('/:projectId/view', async c => {
 })
 
 /**
- * HTMX endpoint to load API keys for a specific train
- */
-/**
  * Renders the API keys list HTML fragment.
  * Used by the api-keys-list GET endpoint and the revoke/delete PATCH/DELETE endpoints.
  */
@@ -885,6 +882,9 @@ function renderApiKeysList(
   `
 }
 
+/**
+ * HTMX endpoint to load API keys for a specific train
+ */
 trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
   const projectId = c.req.param('projectId')
   const pool = container.getPool()
