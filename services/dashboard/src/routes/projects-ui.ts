@@ -8,6 +8,7 @@ import {
   createProject,
   createTrainApiKey,
   revokeTrainApiKey,
+  deleteTrainApiKey,
   getTrainApiKeySafe,
   setProjectDefaultAccount,
   getProjectMembers,
@@ -807,9 +808,29 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                   ${key.revoked_at
                     ? html`<span
-                        style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
-                        >REVOKED</span
-                      >`
+                          style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >REVOKED</span
+                        >
+                        ${userIsOwner
+                          ? html`
+                              <form
+                                data-testid="delete-api-key-form"
+                                hx-delete="/dashboard/projects/${projectId}/delete-api-key/${key.id}"
+                                hx-confirm="Are you sure you want to permanently delete this API key? This action cannot be undone."
+                                hx-target="#api-keys-${projectId}"
+                                hx-swap="innerHTML"
+                                style="margin: 0;"
+                              >
+                                <button
+                                  type="submit"
+                                  data-testid="delete-api-key-button"
+                                  style="background: #6b7280; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Delete
+                                </button>
+                              </form>
+                            `
+                          : ''}`
                     : html`<span
                           style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
                           >ACTIVE</span
@@ -820,7 +841,7 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
                           ? html`
                               <form
                                 data-testid="revoke-api-key-form"
-                                hx-delete="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
+                                hx-patch="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
                                 hx-confirm="Are you sure you want to revoke this API key? This action cannot be undone."
                                 hx-target="#api-keys-${projectId}"
                                 hx-swap="innerHTML"
@@ -863,7 +884,7 @@ trainsUIRoutes.get('/:projectId/api-keys-list', async c => {
  * Revoke an API key (HTMX form submission - owner or key creator only)
  * Returns the refreshed api-keys-list HTML after revoking
  */
-trainsUIRoutes.delete('/:projectId/revoke-api-key/:keyId', async c => {
+trainsUIRoutes.patch('/:projectId/revoke-api-key/:keyId', async c => {
   const projectId = c.req.param('projectId')
   const keyId = c.req.param('keyId')
   const pool = container.getPool()
@@ -982,9 +1003,29 @@ trainsUIRoutes.delete('/:projectId/revoke-api-key/:keyId', async c => {
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                   ${key.revoked_at
                     ? html`<span
-                        style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
-                        >REVOKED</span
-                      >`
+                          style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >REVOKED</span
+                        >
+                        ${userIsOwner
+                          ? html`
+                              <form
+                                data-testid="delete-api-key-form"
+                                hx-delete="/dashboard/projects/${projectId}/delete-api-key/${key.id}"
+                                hx-confirm="Are you sure you want to permanently delete this API key? This action cannot be undone."
+                                hx-target="#api-keys-${projectId}"
+                                hx-swap="innerHTML"
+                                style="margin: 0;"
+                              >
+                                <button
+                                  type="submit"
+                                  data-testid="delete-api-key-button"
+                                  style="background: #6b7280; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Delete
+                                </button>
+                              </form>
+                            `
+                          : ''}`
                     : html`<span
                           style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
                           >ACTIVE</span
@@ -995,7 +1036,210 @@ trainsUIRoutes.delete('/:projectId/revoke-api-key/:keyId', async c => {
                           ? html`
                               <form
                                 data-testid="revoke-api-key-form"
-                                hx-delete="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
+                                hx-patch="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
+                                hx-confirm="Are you sure you want to revoke this API key? This action cannot be undone."
+                                hx-target="#api-keys-${projectId}"
+                                hx-swap="innerHTML"
+                                style="margin: 0;"
+                              >
+                                <button
+                                  type="submit"
+                                  data-testid="revoke-api-key-button"
+                                  style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                >
+                                  Revoke
+                                </button>
+                              </form>
+                            `
+                          : ''}`}
+                </div>
+              </div>
+              <div style="font-size: 0.75rem; color: #6b7280;">
+                Owner: ${key.created_by || 'Unknown'} • Created:
+                ${new Date(key.created_at).toLocaleString()}
+                ${key.last_used_at
+                  ? html`• Last used: ${new Date(key.last_used_at).toLocaleString()}`
+                  : html`• Never used`}
+              </div>
+            </div>
+          `
+        )}
+      </div>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Delete a revoked API key permanently (HTMX form submission - owner only)
+ * Returns the refreshed api-keys-list HTML after deletion
+ */
+trainsUIRoutes.delete('/:projectId/delete-api-key/:keyId', async c => {
+  const projectId = c.req.param('projectId')
+  const keyId = c.req.param('keyId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  // Check project membership
+  const isMember = await isProjectMember(pool, projectId, auth.principal)
+  if (!isMember) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> You are not a member of this project
+      </div>
+    `)
+  }
+
+  // Only project owners can delete
+  const userIsOwner = await isProjectOwner(pool, projectId, auth.principal)
+  if (!userIsOwner) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only project owners can delete API keys
+      </div>
+    `)
+  }
+
+  // Get the API key
+  const apiKey = await getTrainApiKeySafe(pool, keyId)
+  if (!apiKey) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> API key not found
+      </div>
+    `)
+  }
+
+  // Check if key belongs to this project
+  if (apiKey.project_id !== projectId) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> API key does not belong to this project
+      </div>
+    `)
+  }
+
+  // Key must be revoked before deletion
+  if (!apiKey.revoked_at) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> API key must be revoked before it can be deleted
+      </div>
+    `)
+  }
+
+  try {
+    const success = await deleteTrainApiKey(pool, keyId)
+
+    if (!success) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Failed to delete API key
+        </div>
+      `)
+    }
+
+    c.header('HX-Trigger', 'api-key-deleted')
+    const apiKeys = await listTrainApiKeys(pool, projectId)
+
+    if (apiKeys.length === 0) {
+      return c.html(html`
+        <div
+          style="background: #d1fae5; color: #065f46; padding: 0.5rem 0.75rem; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.875rem;"
+        >
+          API key deleted successfully
+        </div>
+        <div
+          style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem; color: #6b7280; text-align: center;"
+        >
+          No API keys generated yet
+        </div>
+      `)
+    }
+
+    // Re-render key list with success message
+    // userIsOwner is always true since we checked above
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 0.5rem 0.75rem; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.875rem;"
+      >
+        API key deleted successfully
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        ${apiKeys.map(
+          key => html`
+            <div
+              data-testid="api-key-item"
+              style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; border-radius: 0.25rem;"
+            >
+              <div
+                style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.25rem;"
+              >
+                <div>
+                  <div style="font-weight: 600; font-size: 0.875rem;">
+                    ${key.name || 'Unnamed API Key'}
+                  </div>
+                  <div style="font-size: 0.75rem; color: #6b7280;">
+                    <code
+                      style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                      >${key.key_preview}...</code
+                    >
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  ${key.revoked_at
+                    ? html`<span
+                          style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >REVOKED</span
+                        >
+                        <form
+                          data-testid="delete-api-key-form"
+                          hx-delete="/dashboard/projects/${projectId}/delete-api-key/${key.id}"
+                          hx-confirm="Are you sure you want to permanently delete this API key? This action cannot be undone."
+                          hx-target="#api-keys-${projectId}"
+                          hx-swap="innerHTML"
+                          style="margin: 0;"
+                        >
+                          <button
+                            type="submit"
+                            data-testid="delete-api-key-button"
+                            style="background: #6b7280; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                          >
+                            Delete
+                          </button>
+                        </form>`
+                    : html`<span
+                          style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                          >ACTIVE</span
+                        >
+                        ${auth.isAuthenticated &&
+                        !key.revoked_at &&
+                        (userIsOwner || key.created_by === auth.principal)
+                          ? html`
+                              <form
+                                data-testid="revoke-api-key-form"
+                                hx-patch="/dashboard/projects/${projectId}/revoke-api-key/${key.id}"
                                 hx-confirm="Are you sure you want to revoke this API key? This action cannot be undone."
                                 hx-target="#api-keys-${projectId}"
                                 hx-swap="innerHTML"
