@@ -140,14 +140,16 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
 
     const body = await c.req.json<UpdateApiKeyRequest>()
 
-    // Reject un-revoking API keys
-    if (body.revoked === false) {
-      return c.json({ error: 'Un-revoking API keys is not supported' }, 400)
-    }
+    // When revoking, it must be the only field in the request
+    if ('revoked' in body) {
+      if (body.revoked !== true) {
+        return c.json({ error: 'Un-revoking API keys is not supported' }, 400)
+      }
 
-    // Don't allow combining revoke with name update
-    if (body.revoked === true && body.name !== undefined) {
-      return c.json({ error: 'Cannot combine revoke with name update' }, 400)
+      const otherKeys = Object.keys(body).filter(k => k !== 'revoked')
+      if (otherKeys.length > 0) {
+        return c.json({ error: 'Revoke must be the only field in the request' }, 400)
+      }
     }
 
     // Handle revoke if requested
