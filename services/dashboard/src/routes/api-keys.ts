@@ -9,6 +9,7 @@ import {
   getTrainApiKeySafe,
   isProjectOwner,
   isProjectMember,
+  deleteTrainApiKey,
 } from '@agent-prompttrain/shared/database/queries'
 import type { CreateApiKeyRequest, UpdateApiKeyRequest } from '@agent-prompttrain/shared'
 import type { AuthContext } from '../middleware/auth.js'
@@ -139,6 +140,21 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
 
     const body = await c.req.json<UpdateApiKeyRequest>()
 
+    // Handle revoke if requested
+    if (body.revoked === true) {
+      if (apiKey.revoked_at) {
+        return c.json({ error: 'API key is already revoked' }, 400)
+      }
+
+      const success = await revokeTrainApiKey(pool, keyId, auth.principal)
+      if (!success) {
+        return c.json({ error: 'Failed to revoke API key' }, 500)
+      }
+
+      const updatedKey = await getTrainApiKeySafe(pool, keyId)
+      return c.json({ api_key: updatedKey })
+    }
+
     // Validate name if provided
     if (body.name !== undefined && body.name !== null && typeof body.name === 'string') {
       if (body.name.trim().length === 0) {
@@ -165,7 +181,7 @@ apiKeys.patch('/:projectId/api-keys/:keyId', async c => {
   }
 })
 
-// DELETE /api/projects/:projectId/api-keys/:keyId - Revoke API key (owner or key creator only)
+// DELETE /api/projects/:projectId/api-keys/:keyId - Hard-delete a revoked API key (owner only)
 apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
   try {
     const pool = container.getPool()
@@ -189,10 +205,10 @@ apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'Access denied: You are not a member of this project' }, 403)
     }
 
-    // Get the API key to check ownership
+    // Get the API key
     const apiKey = await getTrainApiKeySafe(pool, keyId)
     if (!apiKey) {
-      return c.json({ error: 'API key not found or already revoked' }, 404)
+      return c.json({ error: 'API key not found' }, 404)
     }
 
     // Check if key belongs to this project
@@ -200,27 +216,27 @@ apiKeys.delete('/:projectId/api-keys/:keyId', async c => {
       return c.json({ error: 'API key does not belong to this project' }, 403)
     }
 
-    // Check if user is project owner OR key creator
+    // Only project owners can hard-delete
     const isOwner = await isProjectOwner(pool, train.id, auth.principal)
-    const isKeyCreator = apiKey.created_by === auth.principal
-
-    if (!isOwner && !isKeyCreator) {
-      return c.json(
-        { error: 'Access denied: Only project owners or key creators can revoke API keys' },
-        403
-      )
+    if (!isOwner) {
+      return c.json({ error: 'Access denied: Only project owners can delete API keys' }, 403)
     }
 
-    const success = await revokeTrainApiKey(pool, keyId, auth.principal)
+    // Key must be revoked before it can be deleted
+    if (!apiKey.revoked_at) {
+      return c.json({ error: 'API key must be revoked before it can be deleted' }, 400)
+    }
+
+    const success = await deleteTrainApiKey(pool, keyId)
 
     if (!success) {
-      return c.json({ error: 'API key not found or already revoked' }, 404)
+      return c.json({ error: 'Failed to delete API key' }, 500)
     }
 
     return c.json({ success: true })
   } catch (error) {
-    console.error('Failed to revoke API key:', error)
-    return c.json({ error: 'Failed to revoke API key' }, 500)
+    console.error('Failed to delete API key:', error)
+    return c.json({ error: 'Failed to delete API key' }, 500)
   }
 })
 

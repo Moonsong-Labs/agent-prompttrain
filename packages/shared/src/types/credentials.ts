@@ -157,6 +157,7 @@ export interface CreateApiKeyRequest {
 
 export interface UpdateApiKeyRequest {
   name?: string | null
+  revoked?: boolean
 }
 
 export interface GeneratedApiKey {
