@@ -1,4 +1,5 @@
 import type { OAuthUsageWindow } from './oauth-usage.js'
+import type { SystemContentBlock } from './claude.js'
 
 /**
  * Database models for credential and project management
@@ -64,6 +65,8 @@ export interface Project {
   slack_username: string | null
   slack_icon_emoji: string | null
   is_private: boolean
+  system_prompt_enabled: boolean
+  system_prompt: SystemContentBlock[] | null
   created_at: Date
   updated_at: Date
 }
@@ -148,6 +151,8 @@ export interface UpdateProjectRequest {
   slack_username?: string
   slack_icon_emoji?: string
   is_private?: boolean
+  system_prompt_enabled?: boolean
+  system_prompt?: SystemContentBlock[] | null
 }
 
 export interface CreateApiKeyRequest {

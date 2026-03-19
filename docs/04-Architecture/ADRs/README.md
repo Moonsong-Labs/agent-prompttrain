@@ -61,6 +61,13 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-025](./adr-025-dashboard-sso-proxy.md)               | Dashboard SSO via OAuth2 Proxy         | Accepted   | —          |
 | [ADR-026](./adr-026-database-credential-storage.md)       | Database-Based Credential Storage      | Accepted   | —          |
 | [ADR-027](./adr-027-mandatory-user-authentication.md)     | Mandatory User Authentication          | Accepted   | 2025-08-19 |
+| [ADR-028](./adr-028-proxy-service-operational-modes.md)   | Proxy Service Operational Modes        | Accepted   | —          |
+| [ADR-029](./adr-029-project-privacy-model.md)             | Project Privacy Model                  | Accepted   | —          |
+| [ADR-030](./adr-030-multi-provider-support.md)            | Multi-Provider Support                 | Accepted   | —          |
+| [ADR-031](./adr-031-account-pool-auto-switching.md)       | Account Pool Auto-Switching            | Accepted   | —          |
+| [ADR-032](./adr-032-centralized-usage-cache.md)           | Centralized Usage Cache                | Accepted   | —          |
+| [ADR-033](./adr-033-api-key-lifecycle-management.md)      | API Key Lifecycle Management           | Accepted   | —          |
+| [ADR-034](./adr-034-project-system-prompt-override.md)    | Project System Prompt Override         | Accepted   | 2026-03-19 |
 
 ## Creating a New ADR
 

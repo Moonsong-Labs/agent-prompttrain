@@ -18,6 +18,7 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
 - **Streaming support** for real-time responses
 - **Request/response transformation** capabilities
 - **Configurable timeouts** (default 10 minutes for long-running requests)
+- **Project system prompt override**: per-project system prompts injected transparently into all Claude API requests, with enable/disable toggle and `cache_control` support
 
 ### 🔐 Authentication & Security
 

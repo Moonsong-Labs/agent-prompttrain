@@ -13,6 +13,7 @@ import {
 } from '@agent-prompttrain/shared'
 import { getProjectSlackConfig } from '@agent-prompttrain/shared/database/queries'
 import { logger } from '../middleware/logger'
+import { applySystemPromptOverride } from './system-prompt-override'
 import { testSampleCollector } from './TestSampleCollector'
 import { StorageAdapter } from '../storage/StorageAdapter.js'
 
@@ -146,6 +147,12 @@ export class ProxyService {
       } catch (error) {
         log.warn('Failed to extract conversation data', error as Error)
       }
+    }
+
+    // Apply project system prompt override (after conversation tracking, before forwarding)
+    if (this.storageAdapter) {
+      const pool = this.storageAdapter.getPool()
+      await applySystemPromptOverride(rawRequest, context.projectId, pool)
     }
 
     try {

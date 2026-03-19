@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Project system prompt override: projects can now define a system prompt that the proxy injects into all incoming Claude API requests
+  - New `PUT /api/projects/:id/system-prompt` endpoint (requires project membership)
+  - Enable/disable toggle and JSON editor in the dashboard project settings page
+  - System prompt stored as a JSONB array of `SystemContentBlock` objects with optional `cache_control`
+  - DB migration 020 adds `system_prompt_enabled` (boolean, default false) and `system_prompt` (JSONB) columns to the `projects` table
 - Weekly conversations trend chart on dashboard overview page showing service usage over the last 12 weeks
   - New API endpoint `GET /api/analytics/conversations/weekly` with configurable week count and project filter
 - Claude OAuth usage display in Token Usage page showing real-time account rate limits from Anthropic API

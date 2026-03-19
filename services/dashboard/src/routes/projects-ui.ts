@@ -514,6 +514,91 @@ trainsUIRoutes.get('/:projectId/view', async c => {
             `
           : ''}
 
+        <!-- System Prompt Section (Members Only) -->
+        ${isMember
+          ? html`
+              <div
+                style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
+                id="system-prompt-settings"
+              >
+                <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 0.5rem;">
+                  System Prompt Override
+                </h3>
+                <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 1rem;">
+                  When enabled, replaces the system prompt in all Claude API requests routed through
+                  this project. The original system prompt from the request is discarded.
+                </p>
+
+                <div
+                  style="background: #f3f4f6; padding: 1rem; border-radius: 0.25rem; margin-bottom: 0.75rem;"
+                >
+                  <form
+                    hx-post="/dashboard/projects/${train.id}/toggle-system-prompt"
+                    hx-swap="outerHTML"
+                    hx-target="#system-prompt-settings"
+                    style="display: flex; align-items: center; justify-content: space-between;"
+                  >
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">
+                        Status: ${train.system_prompt_enabled ? '✅ Enabled' : '⏸️ Disabled'}
+                      </div>
+                      <div style="font-size: 0.75rem; color: #6b7280;">
+                        ${train.system_prompt_enabled
+                          ? 'System prompt override is active for all requests.'
+                          : 'Requests pass through with their original system prompt.'}
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      style="background: ${train.system_prompt_enabled
+                        ? '#f59e0b'
+                        : '#10b981'}; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                    >
+                      ${train.system_prompt_enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  </form>
+                </div>
+
+                <div>
+                  <label
+                    style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem;"
+                  >
+                    System Prompt (JSON array of content blocks):
+                    ${train.system_prompt &&
+                    Array.isArray(train.system_prompt) &&
+                    train.system_prompt.length > 0
+                      ? html`<span style="color: #6b7280; font-weight: 400;"
+                          >${train.system_prompt.length} block(s) configured</span
+                        >`
+                      : html`<span style="color: #9ca3af; font-weight: 400;">not configured</span>`}
+                  </label>
+                  <form
+                    hx-put="/dashboard/projects/${train.id}/system-prompt"
+                    hx-swap="outerHTML"
+                    hx-target="#system-prompt-settings"
+                  >
+                    <textarea
+                      name="system_prompt"
+                      rows="10"
+                      style="width: 100%; font-family: monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem; resize: vertical; box-sizing: border-box;"
+                      placeholder='[{"type": "text", "text": "Your system prompt here"}]'
+                    >
+${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</textarea
+                    >
+                    <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                      <button
+                        type="submit"
+                        style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                      >
+                        Save System Prompt
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            `
+          : ''}
+
         <!-- Default Account Section -->
         <div
           style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
@@ -1675,6 +1760,142 @@ trainsUIRoutes.post('/:projectId/toggle-privacy', async c => {
         </div>
       </div>
     `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Toggle system prompt enabled/disabled
+ */
+trainsUIRoutes.post('/:projectId/toggle-system-prompt', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  try {
+    const isMember = await isProjectMember(pool, projectId, auth.principal)
+    if (!isMember) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only project members can change system prompt settings
+        </div>
+      `)
+    }
+
+    const project = await getProjectById(pool, projectId)
+    if (!project) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Project not found
+        </div>
+      `)
+    }
+
+    const newEnabled = !project.system_prompt_enabled
+    await updateProject(pool, projectId, { system_prompt_enabled: newEnabled })
+
+    // Redirect to reload the page with updated data
+    const updatedProject = await getProjectById(pool, projectId)
+    return c.redirect(`/dashboard/projects/${updatedProject!.project_id}/view`)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Save system prompt content
+ */
+trainsUIRoutes.put('/:projectId/system-prompt', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  try {
+    const isMember = await isProjectMember(pool, projectId, auth.principal)
+    if (!isMember) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only project members can update the system prompt
+        </div>
+      `)
+    }
+
+    const formData = await c.req.parseBody()
+    const rawJson = formData['system_prompt'] as string
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let systemPrompt: any[] | null = null
+    if (rawJson && rawJson.trim()) {
+      try {
+        systemPrompt = JSON.parse(rawJson)
+      } catch {
+        return c.html(html`
+          <div
+            style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;"
+          >
+            <strong>Error:</strong> Invalid JSON. Please ensure the system prompt is valid JSON.
+          </div>
+        `)
+      }
+    }
+
+    // Validate using shared validation
+    const { validateSystemPrompt } = await import('@agent-prompttrain/shared')
+    const validation = validateSystemPrompt(systemPrompt)
+    if (!validation.valid) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> ${validation.error}
+        </div>
+      `)
+    }
+
+    await updateProject(pool, projectId, { system_prompt: systemPrompt })
+
+    // Redirect to reload the page with updated data
+    const project = await getProjectById(pool, projectId)
+    return c.redirect(`/dashboard/projects/${project!.project_id}/view`)
   } catch (error) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
