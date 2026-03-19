@@ -147,6 +147,34 @@ Filter by:
 - Request type
 - Status (success/error)
 
+### Project Settings
+
+Each project has a settings page accessible from the project detail view. Settings include:
+
+- **General**: project name, privacy mode, and Slack webhook URL (owner only)
+- **System Prompt**: configure a system prompt that the proxy injects into every Claude API request for this project
+
+#### System Prompt Override
+
+The System Prompt section lets project members define a prompt that replaces the `system` field in all incoming requests:
+
+- **Enable/disable toggle**: turn the override on or off without losing the saved prompt
+- **JSON editor**: enter the system prompt as a JSON array of content blocks, for example:
+
+  ```json
+  [
+    {
+      "type": "text",
+      "text": "You are a helpful assistant specialized in marketing.",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ]
+  ```
+
+- Changes are saved via `PUT /api/projects/:id/system-prompt` and take effect immediately for new requests.
+
+When the override is enabled, the original `system` value sent by clients is silently replaced. When disabled, the client's `system` field is forwarded unchanged.
+
 ### Account Management
 
 View per-account statistics:

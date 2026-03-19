@@ -838,6 +838,82 @@ Update a rate limit configuration.
 }
 ```
 
+#### Update Project System Prompt
+
+```http
+PUT /api/projects/:id/system-prompt
+```
+
+Updates the system prompt configuration for a project. Requires project membership (any member, not just owner).
+
+**Path Parameters:**
+
+- `id` - Project UUID
+
+**Request:**
+
+```json
+{
+  "system_prompt_enabled": true,
+  "system_prompt": [
+    {
+      "type": "text",
+      "text": "You are a helpful assistant specialized in marketing.",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ]
+}
+```
+
+**Request Body Fields:**
+
+| Field                   | Type                                        | Description                                                                 |
+| ----------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| `system_prompt_enabled` | `boolean` (optional)                        | Enable or disable system prompt override. Defaults to `false`.              |
+| `system_prompt`         | `SystemContentBlock[]` or `null` (optional) | Array of content blocks to use as the system prompt, or `null` to clear it. |
+
+**`SystemContentBlock` Schema:**
+
+```typescript
+interface SystemContentBlock {
+  type: 'text'
+  text: string
+  cache_control?: { type: 'ephemeral' }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "project": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "project_id": "marketing-prod",
+    "system_prompt_enabled": true,
+    "system_prompt": [
+      {
+        "type": "text",
+        "text": "You are a helpful assistant specialized in marketing.",
+        "cache_control": { "type": "ephemeral" }
+      }
+    ]
+  }
+}
+```
+
+**Behavior:**
+
+- When `system_prompt_enabled` is `true` and a `system_prompt` is configured, the proxy replaces the `system` field of all incoming Claude API requests for that project with the stored system prompt.
+- When `system_prompt_enabled` is `false`, the original `system` field from client requests is passed through unchanged.
+- Sending `"system_prompt": null` clears the stored prompt without affecting `system_prompt_enabled`.
+
+**Notes:**
+
+- Requires project membership (not restricted to project owner)
+- Fields are optional — omitting a field leaves its current value unchanged
+- The stored prompt must be a valid JSON array of `SystemContentBlock` objects
+
 #### Server-Sent Events
 
 ```http
