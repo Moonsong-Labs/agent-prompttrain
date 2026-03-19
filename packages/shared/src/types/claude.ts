@@ -35,18 +35,18 @@ export interface ClaudeTool {
   [key: string]: any // Allow any additional fields at tool level
 }
 
+export interface SystemContentBlock {
+  type: 'text'
+  text: string
+  cache_control?: {
+    type: 'ephemeral'
+  }
+}
+
 export interface ClaudeMessagesRequest {
   model: string
   messages: ClaudeMessage[]
-  system?:
-    | string
-    | Array<{
-        type: 'text'
-        text: string
-        cache_control?: {
-          type: 'ephemeral'
-        }
-      }>
+  system?: string | SystemContentBlock[]
   max_tokens: number
   metadata?: {
     user_id?: string
