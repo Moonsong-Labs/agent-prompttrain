@@ -81,6 +81,7 @@ CREATE INDEX idx_projects_private ON projects(is_private) WHERE is_private = tru
 
 - Privacy is binary (public/private) with no intermediate visibility levels
 - All project members have equal access (no role-based viewing)
+- Project members (not just owners) can edit certain project settings such as the system prompt override (see [ADR-034](./adr-034-project-system-prompt-override.md))
 
 ## Future Considerations
 
