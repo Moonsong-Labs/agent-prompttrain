@@ -9,7 +9,11 @@ import {
   getUserProjectsWithAccounts,
   deleteProject,
 } from '@agent-prompttrain/shared/database/queries'
-import type { CreateProjectRequest, UpdateProjectRequest } from '@agent-prompttrain/shared'
+import {
+  validateSystemPrompt,
+  type CreateProjectRequest,
+  type UpdateProjectRequest,
+} from '@agent-prompttrain/shared'
 import type { AuthContext } from '../middleware/auth.js'
 import { requireProjectOwner, requireProjectMembership } from '../middleware/project-ownership.js'
 
@@ -118,6 +122,41 @@ projects.put('/:id/default-account', requireProjectOwner, async c => {
   } catch (error) {
     console.error('Failed to set default account:', error)
     return c.json({ error: 'Failed to set default account' }, 500)
+  }
+})
+
+// PUT /api/projects/:id/system-prompt - Update system prompt (member only)
+projects.put('/:id/system-prompt', requireProjectMembership, async c => {
+  try {
+    const pool = container.getPool()
+    const id = c.req.param('id')
+    const body = await c.req.json<{
+      system_prompt_enabled?: boolean
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      system_prompt?: any[] | null
+    }>()
+
+    // Validate system prompt if provided
+    if (body.system_prompt !== undefined) {
+      const validation = validateSystemPrompt(body.system_prompt)
+      if (!validation.valid) {
+        return c.json({ error: `Invalid system prompt: ${validation.error}` }, 400)
+      }
+    }
+
+    const train = await updateProject(pool, id, {
+      system_prompt_enabled: body.system_prompt_enabled,
+      system_prompt: body.system_prompt,
+    })
+
+    return c.json({ train })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error('Failed to update system prompt:', error)
+    if (error.message.includes('not found')) {
+      return c.json({ error: 'Project not found' }, 404)
+    }
+    return c.json({ error: 'Failed to update system prompt' }, 500)
   }
 })
 
