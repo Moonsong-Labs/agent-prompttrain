@@ -59,6 +59,7 @@ export interface Project {
   project_id: string
   name: string
   default_account_id: string | null
+  disabled: boolean
   slack_enabled: boolean
   slack_webhook_url: string | null
   slack_channel: string | null

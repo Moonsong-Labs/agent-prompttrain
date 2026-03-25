@@ -179,11 +179,17 @@ trainsUIRoutes.get('/', async c => {
                             : ''}
                         </td>
                         <td style="padding: 0.75rem 1rem; text-align: center;">
-                          <span
-                            style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
-                          >
-                            ACTIVE
-                          </span>
+                          ${train.disabled
+                            ? html`<span
+                                style="background: #ef4444; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                              >
+                                DISABLED
+                              </span>`
+                            : html`<span
+                                style="background: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;"
+                              >
+                                ACTIVE
+                              </span>`}
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
                           ${train.accounts.find(a => a.id === train.default_account_id)

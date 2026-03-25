@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Project disable/enable feature: administrators can disable abandoned projects to prevent members from using them
+  - CLI script `scripts/disable-project.ts` to disable, re-enable, or list disabled projects
+  - DB migration 021 adds `disabled` column to the `projects` table
+  - Disabled projects reject all API key authentication while preserving historical data
+  - Dashboard shows DISABLED badge for disabled projects
 - Project system prompt override: projects can now define a system prompt that the proxy injects into all incoming Claude API requests
   - New `PUT /api/projects/:id/system-prompt` endpoint (requires project membership)
   - Enable/disable toggle and JSON editor in the dashboard project settings page
