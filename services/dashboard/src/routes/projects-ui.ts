@@ -20,6 +20,8 @@ import {
   getProjectWithAccounts,
   getProjectById,
   updateProject,
+  addProjectAccount,
+  removeProjectAccount,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 import type {
@@ -605,15 +607,14 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
             `
           : ''}
 
-        <!-- Default Account Section -->
+        <!-- Accounts Section -->
         <div
           style="background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;"
         >
-          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 1rem;">
-            Default Account
-          </h3>
+          <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 0.25rem;">Accounts</h3>
           <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
-            All projects have access to all credentials. The default account is used for API calls.
+            Link 2+ Anthropic accounts to enable automatic load balancing. The default account is
+            used as fallback.
           </p>
 
           ${!train.accounts || train.accounts.length === 0
@@ -622,28 +623,40 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                   style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.25rem;"
                 >
                   <p style="margin: 0; color: #92400e; font-size: 0.875rem;">
-                    ⚠️ No credentials available.
+                    No credentials available.
                   </p>
                 </div>
               `
             : html`
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                  ${train.accounts.map(
-                    (cred: CredentialSafe) => html`
+                  ${train.accounts.map((cred: CredentialSafe) => {
+                    const isDefault = train.default_account_id === cred.id
+                    const isLinked = train.linked_account_ids.includes(cred.id)
+                    return html`
                       <div
-                        style="background: ${train.default_account_id === cred.id
+                        style="background: ${isDefault
                           ? '#eff6ff'
-                          : '#f9fafb'}; border: 1px solid ${train.default_account_id === cred.id
+                          : isLinked
+                            ? '#f0fdf4'
+                            : '#f9fafb'}; border: 1px solid ${isDefault
                           ? '#3b82f6'
-                          : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
+                          : isLinked
+                            ? '#22c55e'
+                            : '#e5e7eb'}; padding: 0.75rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center;"
                       >
                         <div style="flex: 1;">
                           <div style="font-weight: 600; font-size: 0.875rem;">
                             ${cred.account_name}
-                            ${train.default_account_id === cred.id
+                            ${isDefault
                               ? html`<span
                                   style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
                                   >DEFAULT</span
+                                >`
+                              : ''}
+                            ${isLinked
+                              ? html`<span
+                                  style="background: #22c55e; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
+                                  >LINKED</span
                                 >`
                               : ''}
                           </div>
@@ -661,34 +674,72 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                                   ${new Date((cred as AnthropicCredentialSafe).oauth_expires_at) <
                                   new Date()
                                     ? html`<span style="color: #dc2626; font-weight: 600;"
-                                        >⚠️ EXPIRED</span
+                                        >EXPIRED</span
                                       >`
                                     : ''}
                                 `
                               : html`• Region: ${(cred as any).aws_region}`}
                           </div>
                         </div>
-                        ${isOwner && train.default_account_id !== cred.id
-                          ? html`
-                              <form
-                                hx-post="/dashboard/projects/${train.id}/set-default-account"
-                                hx-swap="outerHTML"
-                                hx-target="closest div[style*='margin-bottom: 1.5rem']"
-                                style="margin: 0;"
-                              >
-                                <input type="hidden" name="credential_id" value="${cred.id}" />
-                                <button
-                                  type="submit"
-                                  style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                        <div style="display: flex; gap: 0.375rem; align-items: center;">
+                          ${isOwner && !isDefault
+                            ? html`
+                                <form
+                                  hx-post="/dashboard/projects/${train.id}/set-default-account"
+                                  hx-swap="outerHTML"
+                                  hx-target="closest div[style*='margin-bottom: 1.5rem']"
+                                  style="margin: 0;"
                                 >
-                                  Set as Default
-                                </button>
-                              </form>
-                            `
-                          : ''}
+                                  <input type="hidden" name="credential_id" value="${cred.id}" />
+                                  <button
+                                    type="submit"
+                                    style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                  >
+                                    Set Default
+                                  </button>
+                                </form>
+                              `
+                            : ''}
+                          ${isOwner && !isLinked
+                            ? html`
+                                <form
+                                  hx-post="/dashboard/projects/${train.id}/link-account"
+                                  hx-swap="outerHTML"
+                                  hx-target="closest div[style*='margin-bottom: 1.5rem']"
+                                  style="margin: 0;"
+                                >
+                                  <input type="hidden" name="credential_id" value="${cred.id}" />
+                                  <button
+                                    type="submit"
+                                    style="background: #22c55e; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                  >
+                                    Link
+                                  </button>
+                                </form>
+                              `
+                            : ''}
+                          ${isOwner && isLinked && !isDefault
+                            ? html`
+                                <form
+                                  hx-delete="/dashboard/projects/${train.id}/unlink-account/${cred.id}"
+                                  hx-confirm="Remove this account from the pool?"
+                                  hx-swap="outerHTML"
+                                  hx-target="closest div[style*='margin-bottom: 1.5rem']"
+                                  style="margin: 0;"
+                                >
+                                  <button
+                                    type="submit"
+                                    style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                  >
+                                    Unlink
+                                  </button>
+                                </form>
+                              `
+                            : ''}
+                        </div>
                       </div>
                     `
-                  )}
+                  })}
                 </div>
               `}
         </div>
@@ -1429,6 +1480,130 @@ trainsUIRoutes.post('/:projectId/set-default-account', async c => {
         style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
       >
         <strong>✅ Success!</strong> Default account updated.
+      </div>
+      <script>
+        setTimeout(() => location.reload(), 1500)
+      </script>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Link an account to a project's pool (HTMX form submission - owner only)
+ */
+trainsUIRoutes.post('/:projectId/link-account', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only project owners can manage the account pool
+      </div>
+    `)
+  }
+
+  try {
+    const formData = await c.req.parseBody()
+    const credentialId = formData.credential_id as string
+
+    await addProjectAccount(pool, projectId, credentialId)
+
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Account linked to pool.</strong>
+      </div>
+      <script>
+        setTimeout(() => location.reload(), 1500)
+      </script>
+    `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Unlink an account from a project's pool (HTMX form submission - owner only)
+ */
+trainsUIRoutes.delete('/:projectId/unlink-account/:credentialId', async c => {
+  const projectId = c.req.param('projectId')
+  const credentialId = c.req.param('credentialId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  const isOwner = await isProjectOwner(pool, projectId, auth.principal)
+  if (!isOwner) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Only project owners can manage the account pool
+      </div>
+    `)
+  }
+
+  try {
+    // Prevent unlinking the default account
+    const project = await getProjectById(pool, projectId)
+    if (project?.default_account_id === credentialId) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Cannot unlink the default account. Change the default first.
+        </div>
+      `)
+    }
+
+    await removeProjectAccount(pool, projectId, credentialId)
+
+    return c.html(html`
+      <div
+        style="background: #d1fae5; color: #065f46; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1rem;"
+      >
+        <strong>Account removed from pool.</strong>
       </div>
       <script>
         setTimeout(() => location.reload(), 1500)
