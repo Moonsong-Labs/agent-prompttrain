@@ -8,6 +8,22 @@ import {
 
 describe('Model Context Limits', () => {
   describe('getModelContextLimit', () => {
+    // Test 1M context models (models with [1m] suffix)
+    it('should return 1M for Claude Opus 4.6 with 1M context', () => {
+      const result = getModelContextLimit('claude-opus-4-6[1m]')
+      expect(result).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Sonnet 4.6 with 1M context', () => {
+      const result = getModelContextLimit('claude-sonnet-4-6[1m]')
+      expect(result).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 200k for Claude Opus 4.6 without 1M suffix', () => {
+      const result = getModelContextLimit('claude-opus-4-6')
+      expect(result).toEqual({ limit: 200000, isEstimate: false })
+    })
+
     // Test exact model matches
     it('should return 200k for Claude 3.5 Sonnet', () => {
       const result = getModelContextLimit('claude-3-5-sonnet-20241022')

@@ -16,9 +16,26 @@ export interface ModelContextRule {
 /**
  * Model context window rules
  * Order matters - more specific patterns should come before general ones
+ *
+ * Models with "[1m]" suffix (e.g., "claude-opus-4-6[1m]") use 1M context windows.
+ * This rule must come first to take priority over standard model matches.
  */
 export const MODEL_CONTEXT_RULES: ModelContextRule[] = [
-  // Claude 4 (future-proofed with .*)
+  // 1M context models (suffix "[1m]" in model name)
+  // Source: Anthropic Claude Code with extended context (1M tokens)
+  {
+    pattern: /\[1m\]/i,
+    limit: 1000000,
+    source: 'https://docs.anthropic.com/en/docs/about-claude/models',
+  },
+
+  // Claude 4.5/4.6+ (new naming: claude-{family}-{version})
+  // Source: Anthropic API docs (200k standard for Claude 4.x)
+  { pattern: /claude-opus-4/i, limit: 200000 },
+  { pattern: /claude-sonnet-4/i, limit: 200000 },
+  { pattern: /claude-haiku-4/i, limit: 200000 },
+
+  // Claude 4 (legacy naming: claude-4-{family})
   // Source: Anthropic API docs (200k standard for Claude 4)
   { pattern: /claude-4.*opus/i, limit: 200000 },
   { pattern: /claude-4.*sonnet/i, limit: 200000 },
