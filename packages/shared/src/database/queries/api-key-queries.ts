@@ -69,9 +69,11 @@ export async function verifyApiKeyAndGetTrain(
   pool: Pool,
   apiKey: string
 ): Promise<{ trainApiKey: ProjectApiKey; projectId: string } | null> {
-  const result = await pool.query<ProjectApiKey & { project_id: string }>(
+  const result = await pool.query<
+    ProjectApiKey & { project_id: string; project_disabled: boolean }
+  >(
     `
-    SELECT tak.*, t.project_id
+    SELECT tak.*, t.project_id, t.disabled as project_disabled
     FROM project_api_keys tak
     INNER JOIN projects t ON t.id = tak.project_id
     WHERE tak.api_key = $1
@@ -81,6 +83,11 @@ export async function verifyApiKeyAndGetTrain(
   )
 
   if (result.rows.length === 0) {
+    return null
+  }
+
+  // Reject authentication for disabled projects
+  if (result.rows[0].project_disabled) {
     return null
   }
 
@@ -104,9 +111,9 @@ export async function verifyTrainApiKey(
   projectId: string,
   apiKey: string
 ): Promise<ProjectApiKey | null> {
-  const result = await pool.query<ProjectApiKey>(
+  const result = await pool.query<ProjectApiKey & { project_disabled: boolean }>(
     `
-    SELECT tak.*
+    SELECT tak.*, t.disabled as project_disabled
     FROM project_api_keys tak
     INNER JOIN projects t ON t.id = tak.project_id
     WHERE t.project_id = $1
@@ -117,6 +124,11 @@ export async function verifyTrainApiKey(
   )
 
   if (result.rows.length === 0) {
+    return null
+  }
+
+  // Reject authentication for disabled projects
+  if (result.rows[0].project_disabled) {
     return null
   }
 

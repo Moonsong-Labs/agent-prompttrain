@@ -84,6 +84,25 @@ bun run scripts/db/backup-database.ts --file
 bun run scripts/db/backup-database.ts --file=backup.sql
 ```
 
+## Project Management Scripts
+
+### disable-project.ts
+
+Disables or enables a project to control access without deletion. When a project is disabled, all API key authentication is rejected, preventing members from making API requests. Existing conversations and data remain visible in the dashboard.
+
+```bash
+# Disable a project
+bun run scripts/disable-project.ts <project_id>
+
+# Re-enable a project
+bun run scripts/disable-project.ts <project_id> --enable
+
+# List all disabled projects
+bun run scripts/disable-project.ts --list-disabled
+```
+
+Requires `DATABASE_URL` environment variable.
+
 ## Authentication Scripts (`auth/`)
 
 ### generate-api-key.ts
