@@ -16,9 +16,34 @@ export interface ModelContextRule {
 /**
  * Model context window rules
  * Order matters - more specific patterns should come before general ones
+ *
+ * Claude Opus 4.6 and Sonnet 4.6 support 1M context windows (GA March 2026).
+ * Models with "[1m]" suffix in their display name also indicate 1M context.
+ * Earlier Claude 4.x models use 200k context windows.
+ *
+ * @see https://claude.com/blog/1m-context-ga
  */
 export const MODEL_CONTEXT_RULES: ModelContextRule[] = [
-  // Claude 4 (future-proofed with .*)
+  // 1M context models: explicit "[1m]" suffix in model/display name
+  // Source: Claude Code display format for 1M context models
+  {
+    pattern: /\[1m\]/i,
+    limit: 1000000,
+    source: 'https://claude.com/blog/1m-context-ga',
+  },
+
+  // Claude 4.6 (Opus & Sonnet) - 1M context window (GA March 2026)
+  // Source: https://claude.com/blog/1m-context-ga
+  { pattern: /claude-opus-4-6/i, limit: 1000000 },
+  { pattern: /claude-sonnet-4-6/i, limit: 1000000 },
+
+  // Claude 4.5 and earlier 4.x (new naming: claude-{family}-{version}) - 200k context
+  // Source: Anthropic API docs
+  { pattern: /claude-opus-4/i, limit: 200000 },
+  { pattern: /claude-sonnet-4/i, limit: 200000 },
+  { pattern: /claude-haiku-4/i, limit: 200000 },
+
+  // Claude 4 (legacy naming: claude-4-{family})
   // Source: Anthropic API docs (200k standard for Claude 4)
   { pattern: /claude-4.*opus/i, limit: 200000 },
   { pattern: /claude-4.*sonnet/i, limit: 200000 },

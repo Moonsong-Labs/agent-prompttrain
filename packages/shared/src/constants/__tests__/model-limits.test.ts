@@ -8,6 +8,38 @@ import {
 
 describe('Model Context Limits', () => {
   describe('getModelContextLimit', () => {
+    // Test 1M context models - Claude 4.6 (Opus & Sonnet)
+    it('should return 1M for Claude Opus 4.6', () => {
+      const result = getModelContextLimit('claude-opus-4-6')
+      expect(result).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Sonnet 4.6', () => {
+      const result = getModelContextLimit('claude-sonnet-4-6')
+      expect(result).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Opus 4.6 with [1m] display suffix', () => {
+      const result = getModelContextLimit('claude-opus-4-6[1m]')
+      expect(result).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    // Test 200k for earlier Claude 4.x models
+    it('should return 200k for Claude Opus 4.5', () => {
+      const result = getModelContextLimit('claude-opus-4-5-20251101')
+      expect(result).toEqual({ limit: 200000, isEstimate: false })
+    })
+
+    it('should return 200k for Claude Opus 4.1', () => {
+      const result = getModelContextLimit('claude-opus-4-1-20250805')
+      expect(result).toEqual({ limit: 200000, isEstimate: false })
+    })
+
+    it('should return 200k for Claude Haiku 4.5', () => {
+      const result = getModelContextLimit('claude-haiku-4-5-20251001')
+      expect(result).toEqual({ limit: 200000, isEstimate: false })
+    })
+
     // Test exact model matches
     it('should return 200k for Claude 3.5 Sonnet', () => {
       const result = getModelContextLimit('claude-3-5-sonnet-20241022')
@@ -41,7 +73,7 @@ describe('Model Context Limits', () => {
       expect(result).toEqual({ limit: 200000, isEstimate: false })
     })
 
-    it('should match future-dated Claude 4 Sonnet model', () => {
+    it('should match future-dated Claude 4 Sonnet model (legacy naming)', () => {
       const result = getModelContextLimit('claude-4-sonnet-20250515')
       expect(result).toEqual({ limit: 200000, isEstimate: false })
     })
