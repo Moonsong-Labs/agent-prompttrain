@@ -74,6 +74,7 @@ export interface Project {
 
 export interface ProjectWithAccounts extends Project {
   accounts: CredentialSafe[]
+  linked_account_ids: string[]
 }
 
 export interface ProjectAccount {

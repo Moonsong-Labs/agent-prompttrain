@@ -86,14 +86,20 @@ export async function getProjectWithAccounts(
     return null
   }
 
-  // All projects have access to all credentials
-  const accountsResult = await pool.query<Credential>(
-    `SELECT * FROM credentials ORDER BY account_name ASC`
-  )
+  // Fetch credentials and linked account IDs concurrently
+  const [accountsResult, linkedResult] = await Promise.all([
+    pool.query<Credential>(`SELECT * FROM credentials ORDER BY account_name ASC`),
+    pool.query<{ credential_id: string }>(
+      `SELECT credential_id FROM project_accounts WHERE project_id = $1`,
+      [train.id]
+    ),
+  ])
+  const linkedAccountIds = linkedResult.rows.map(r => r.credential_id)
 
   return {
     ...train,
     accounts: accountsResult.rows.map(cred => toSafeCredential(cred)),
+    linked_account_ids: linkedAccountIds,
   }
 }
 
@@ -116,16 +122,31 @@ export async function listProjectsWithAccounts(pool: Pool): Promise<ProjectWithA
   const accountsResult = await pool.query<Credential>(
     `SELECT * FROM credentials ORDER BY account_name ASC`
   )
-
   const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
 
-  // All projects have access to all credentials
-  const trainsWithAccounts = projects.map(train => ({
+  // Get project-account links scoped to active projects
+  const projectIds = projects.map(p => p.id)
+  const linksResult =
+    projectIds.length > 0
+      ? await pool.query<{ project_id: string; credential_id: string }>(
+          `SELECT project_id, credential_id FROM project_accounts WHERE project_id = ANY($1)`,
+          [projectIds]
+        )
+      : { rows: [] as { project_id: string; credential_id: string }[] }
+
+  // Group linked IDs by project
+  const linksByProject = new Map<string, string[]>()
+  for (const link of linksResult.rows) {
+    const existing = linksByProject.get(link.project_id) ?? []
+    existing.push(link.credential_id)
+    linksByProject.set(link.project_id, existing)
+  }
+
+  return projects.map(train => ({
     ...train,
     accounts: allAccounts,
+    linked_account_ids: linksByProject.get(train.id) ?? [],
   }))
-
-  return trainsWithAccounts
 }
 
 /**
@@ -345,4 +366,40 @@ export async function getProjectLinkedCredentials(
     [projectId]
   )
   return result.rows
+}
+
+/**
+ * Link a credential to a project's account pool.
+ * Idempotent — returns true if inserted, false if already linked.
+ */
+export async function addProjectAccount(
+  pool: Pool,
+  projectUuid: string,
+  credentialId: string
+): Promise<boolean> {
+  const result = await pool.query(
+    `
+    INSERT INTO project_accounts (project_id, credential_id)
+    VALUES ($1, $2)
+    ON CONFLICT (project_id, credential_id) DO NOTHING
+    `,
+    [projectUuid, credentialId]
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+/**
+ * Unlink a credential from a project's account pool.
+ * Returns true if removed, false if wasn't linked.
+ */
+export async function removeProjectAccount(
+  pool: Pool,
+  projectUuid: string,
+  credentialId: string
+): Promise<boolean> {
+  const result = await pool.query(
+    `DELETE FROM project_accounts WHERE project_id = $1 AND credential_id = $2`,
+    [projectUuid, credentialId]
+  )
+  return (result.rowCount ?? 0) > 0
 }

@@ -4,7 +4,7 @@ import type {
   ProjectMemberRole,
   Project,
   ProjectWithAccounts,
-  AnthropicCredential,
+  Credential,
 } from '../../types/index.js'
 import { toSafeCredential } from './credential-queries.js'
 
@@ -145,17 +145,33 @@ export async function getUserProjectsWithAccounts(
   const projects = await getUserProjects(pool, userEmail)
 
   // All projects have access to all credentials
-  const accountsResult = await pool.query<AnthropicCredential>(
-    `SELECT * FROM anthropic_credentials ORDER BY account_name ASC`
+  const accountsResult = await pool.query<Credential>(
+    `SELECT * FROM credentials ORDER BY account_name ASC`
   )
   const allAccounts = accountsResult.rows.map(cred => toSafeCredential(cred))
 
-  const projectsWithAccounts = projects.map(project => ({
+  // Get all project-account links for these projects in one query
+  const projectIds = projects.map(p => p.id)
+  const linksResult =
+    projectIds.length > 0
+      ? await pool.query<{ project_id: string; credential_id: string }>(
+          `SELECT project_id, credential_id FROM project_accounts WHERE project_id = ANY($1)`,
+          [projectIds]
+        )
+      : { rows: [] }
+
+  const linksByProject = new Map<string, string[]>()
+  for (const link of linksResult.rows) {
+    const existing = linksByProject.get(link.project_id) ?? []
+    existing.push(link.credential_id)
+    linksByProject.set(link.project_id, existing)
+  }
+
+  return projects.map(project => ({
     ...project,
     accounts: allAccounts,
+    linked_account_ids: linksByProject.get(project.id) ?? [],
   }))
-
-  return projectsWithAccounts
 }
 
 /**
