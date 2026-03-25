@@ -8,6 +8,9 @@ import {
   addProjectMember,
   getUserProjectsWithAccounts,
   deleteProject,
+  addProjectAccount,
+  removeProjectAccount,
+  getProjectById,
 } from '@agent-prompttrain/shared/database/queries'
 import {
   validateSystemPrompt,
@@ -176,6 +179,53 @@ projects.delete('/:id', requireProjectOwner, async c => {
   } catch (error) {
     console.error('Failed to delete train:', error)
     return c.json({ error: 'Failed to delete train' }, 500)
+  }
+})
+
+// POST /api/projects/:id/accounts - Link account to project pool (owner only)
+projects.post('/:id/accounts', requireProjectOwner, async c => {
+  try {
+    const pool = container.getPool()
+    const projectId = c.req.param('id')
+    const { credential_id } = await c.req.json<{ credential_id: string }>()
+
+    if (!credential_id) {
+      return c.json({ error: 'credential_id is required' }, 400)
+    }
+
+    const added = await addProjectAccount(pool, projectId, credential_id)
+    return c.json({ linked: added }, added ? 201 : 200)
+  } catch (error: any) {
+    console.error('Failed to link account:', error)
+    if (error.code === '23503') {
+      return c.json({ error: 'Invalid credential ID' }, 400)
+    }
+    return c.json({ error: 'Failed to link account' }, 500)
+  }
+})
+
+// DELETE /api/projects/:id/accounts/:credentialId - Unlink account from project pool (owner only)
+projects.delete('/:id/accounts/:credentialId', requireProjectOwner, async c => {
+  try {
+    const pool = container.getPool()
+    const projectId = c.req.param('id')
+    const credentialId = c.req.param('credentialId')
+
+    // Prevent unlinking the default account
+    const project = await getProjectById(pool, projectId)
+    if (project?.default_account_id === credentialId) {
+      return c.json({ error: 'Cannot unlink the default account. Change the default first.' }, 400)
+    }
+
+    const removed = await removeProjectAccount(pool, projectId, credentialId)
+    if (!removed) {
+      return c.json({ error: 'Account was not linked to this project' }, 404)
+    }
+
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Failed to unlink account:', error)
+    return c.json({ error: 'Failed to unlink account' }, 500)
   }
 })
 
