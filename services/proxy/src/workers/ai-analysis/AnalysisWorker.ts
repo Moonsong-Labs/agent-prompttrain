@@ -1,4 +1,4 @@
-import { GeminiService } from './GeminiService.js'
+import { AnthropicAnalysisService } from './AnthropicAnalysisService.js'
 import {
   claimJob,
   completeJob,
@@ -12,7 +12,7 @@ import { AI_WORKER_CONFIG, getErrorMessage, getErrorStack } from '@agent-promptt
 import { logger } from '../../middleware/logger.js'
 
 export class AnalysisWorker {
-  private geminiService: GeminiService
+  private analysisService: AnthropicAnalysisService
   private pollInterval: number
   private maxConcurrentJobs: number
   private jobTimeoutMinutes: number
@@ -21,7 +21,7 @@ export class AnalysisWorker {
   private activeJobs: Array<Promise<void>> = []
 
   constructor() {
-    this.geminiService = new GeminiService()
+    this.analysisService = new AnthropicAnalysisService()
 
     this.pollInterval = AI_WORKER_CONFIG.POLL_INTERVAL_MS
     this.maxConcurrentJobs = AI_WORKER_CONFIG.MAX_CONCURRENT_JOBS
@@ -189,7 +189,7 @@ export class AnalysisWorker {
       }
 
       const analysis = await this.withExponentialBackoff(
-        () => this.geminiService.analyzeConversation(messages, job.custom_prompt),
+        () => this.analysisService.analyzeConversation(messages, job.custom_prompt),
         job.retry_count
       )
 
@@ -200,7 +200,7 @@ export class AnalysisWorker {
         analysis.content,
         analysis.data,
         analysis.rawResponse,
-        this.geminiService['modelName'] || 'gemini-2.0-flash-exp',
+        this.analysisService.getModelName(),
         analysis.promptTokens,
         analysis.completionTokens,
         processingDuration

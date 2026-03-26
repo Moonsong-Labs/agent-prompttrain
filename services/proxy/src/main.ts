@@ -224,15 +224,16 @@ async function main() {
     // Show AI Analysis configuration
     console.log('\nAI Analysis:')
     if (process.env.AI_WORKER_ENABLED === 'true') {
-      if (process.env.GEMINI_API_KEY) {
+      if (process.env.AI_ANALYSIS_PROJECT_ID) {
         console.log('  - Enabled: Yes')
         console.log(
-          `  - Model: ${process.env.GEMINI_MODEL_NAME || 'gemini-2.0-flash-exp (default)'}`
+          `  - Model: ${process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-6 (default)'}`
         )
-        console.log('  - API Key: Configured')
+        console.log(`  - Project: ${process.env.AI_ANALYSIS_PROJECT_ID}`)
+        console.log(`  - Routing: Via local proxy`)
       } else {
         console.log('  - Enabled: No')
-        console.log('  - Reason: GEMINI_API_KEY not set')
+        console.log('  - Reason: AI_ANALYSIS_PROJECT_ID not set')
       }
     } else {
       console.log('  - Enabled: No')
@@ -265,7 +266,7 @@ async function main() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.log('✗ AI Analysis Worker not started:', message)
-      console.log('  GEMINI_CONFIG.API_KEY:', process.env.GEMINI_API_KEY ? 'SET' : 'NOT SET')
+      console.log('  AI_ANALYSIS_PROJECT_ID:', process.env.AI_ANALYSIS_PROJECT_ID || 'NOT SET')
       // Non-fatal - continue without analysis worker
     }
 
