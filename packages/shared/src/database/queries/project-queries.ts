@@ -303,7 +303,7 @@ export async function getProjectSlackConfig(
 export async function getProjectStats(
   pool: Pool,
   projectId: string
-): Promise<{ lastUsedAt: Date | null; requestCount24h: number }> {
+): Promise<{ lastUsedAt: Date | null }> {
   const result = await pool.query<{ last_used_at: Date | null }>(
     `
     SELECT
@@ -318,7 +318,6 @@ export async function getProjectStats(
 
   return {
     lastUsedAt: result.rows[0]?.last_used_at || null,
-    requestCount24h: 0, // TODO: Implement request tracking
   }
 }
 

@@ -80,6 +80,13 @@ trainsUIRoutes.get('/', async c => {
       })
     )
 
+    // Default sort: last used descending (most recently used first)
+    trainData.sort((a, b) => {
+      const aTime = a.stats.lastUsedAt ? new Date(a.stats.lastUsedAt).getTime() : 0
+      const bTime = b.stats.lastUsedAt ? new Date(b.stats.lastUsedAt).getTime() : 0
+      return bTime - aTime
+    })
+
     const content = html`
       <div style="margin-bottom: 2rem;">
         <div
@@ -111,19 +118,25 @@ trainsUIRoutes.get('/', async c => {
                 <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                   <tr>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="project-id"
+                      onclick="sortTable(this, 0, 'string')"
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Project ID
+                      Project ID <span class="sort-arrow">⇅</span>
                     </th>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="name"
+                      onclick="sortTable(this, 1, 'string')"
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Name
+                      Name <span class="sort-arrow">⇅</span>
                     </th>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="status"
+                      onclick="sortTable(this, 2, 'string')"
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Status
+                      Status <span class="sort-arrow">⇅</span>
                     </th>
                     <th
                       style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
@@ -131,24 +144,25 @@ trainsUIRoutes.get('/', async c => {
                       Default Account
                     </th>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="owner"
+                      onclick="sortTable(this, 4, 'string')"
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Owner
+                      Owner <span class="sort-arrow">⇅</span>
                     </th>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="members"
+                      onclick="sortTable(this, 5, 'number')"
+                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Members
+                      Members <span class="sort-arrow">⇅</span>
                     </th>
                     <th
-                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
+                      data-sort="last-used"
+                      onclick="sortTable(this, 6, 'date')"
+                      style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151; cursor: pointer; user-select: none;"
                     >
-                      Last Used
-                    </th>
-                    <th
-                      style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
-                    >
-                      24h Requests
+                      Last Used <span class="sort-arrow">⇅</span>
                     </th>
                     <th
                       style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600; color: #374151;"
@@ -203,13 +217,15 @@ trainsUIRoutes.get('/', async c => {
                         <td style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem;">
                           ${train.membersCount}
                         </td>
-                        <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
+                        <td
+                          style="padding: 0.75rem 1rem; font-size: 0.875rem;"
+                          data-sort-value="${train.stats.lastUsedAt
+                            ? new Date(train.stats.lastUsedAt).getTime()
+                            : '0'}"
+                        >
                           ${train.stats.lastUsedAt
                             ? new Date(train.stats.lastUsedAt).toLocaleString()
                             : 'Never'}
-                        </td>
-                        <td style="padding: 0.75rem 1rem; text-align: center; font-size: 0.875rem;">
-                          ${train.stats.requestCount24h}
                         </td>
                         <td style="padding: 0.75rem 1rem; text-align: center;">
                           ${train.isOwner
@@ -337,9 +353,64 @@ trainsUIRoutes.get('/', async c => {
       layout(
         'Projects',
         content,
-        raw(`<script>
+        raw(`<style>
+          th[data-sort] { white-space: nowrap; }
+          th[data-sort]:hover { background: #e5e7eb; }
+          .sort-arrow { font-size: 0.7rem; opacity: 0.3; vertical-align: middle; }
+          th[data-sort].asc .sort-arrow { opacity: 1; }
+          th[data-sort].desc .sort-arrow { opacity: 1; }
+        </style>
+        <script>
           document.body.addEventListener('htmx:responseError', function(evt) {
             evt.target.innerHTML = '<div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">Operation failed</div>';
+          });
+
+          function sortTable(header, colIndex, type) {
+            var table = header.closest('table');
+            var tbody = table.querySelector('tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            var headers = table.querySelectorAll('th[data-sort]');
+            var isAsc = header.classList.contains('asc');
+            var dir = isAsc ? 'desc' : 'asc';
+
+            headers.forEach(function(h) {
+              h.classList.remove('asc', 'desc');
+              h.querySelector('.sort-arrow').textContent = '⇅';
+            });
+            header.classList.add(dir);
+            header.querySelector('.sort-arrow').textContent = dir === 'asc' ? '↑' : '↓';
+
+            rows.sort(function(a, b) {
+              var cellA = a.children[colIndex];
+              var cellB = b.children[colIndex];
+              var valA, valB;
+
+              if (type === 'date') {
+                valA = parseFloat(cellA.getAttribute('data-sort-value') || '0');
+                valB = parseFloat(cellB.getAttribute('data-sort-value') || '0');
+              } else if (type === 'number') {
+                valA = parseFloat(cellA.textContent.trim()) || 0;
+                valB = parseFloat(cellB.textContent.trim()) || 0;
+              } else {
+                valA = cellA.textContent.trim().toLowerCase();
+                valB = cellB.textContent.trim().toLowerCase();
+              }
+
+              if (valA < valB) return dir === 'asc' ? -1 : 1;
+              if (valA > valB) return dir === 'asc' ? 1 : -1;
+              return 0;
+            });
+
+            rows.forEach(function(row) { tbody.appendChild(row); });
+          }
+
+          // Mark initial sort state (Last Used descending)
+          document.addEventListener('DOMContentLoaded', function() {
+            var lastUsedHeader = document.querySelector('th[data-sort="last-used"]');
+            if (lastUsedHeader) {
+              lastUsedHeader.classList.add('desc');
+              lastUsedHeader.querySelector('.sort-arrow').textContent = '↓';
+            }
           });
         </script>`),
         c
