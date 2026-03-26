@@ -183,6 +183,14 @@ export function validateAnalysisOutput(output: string): ValidationResult {
   }
 }
 
+/**
+ * Redacts PII from analysis output text before storage.
+ * Used instead of rejecting outputs that contain PII patterns.
+ */
+export function redactOutputPII(output: string): string {
+  return piiRedactor.redact(output)
+}
+
 export function enhancePromptForRetry(originalPrompt: string): string {
   return (
     originalPrompt +

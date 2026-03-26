@@ -9,7 +9,11 @@ import {
   config,
 } from '@agent-prompttrain/shared/config'
 import { logger } from '../../middleware/logger.js'
-import { sanitizeForLLM, validateAnalysisOutput } from '../../middleware/sanitization.js'
+import {
+  sanitizeForLLM,
+  validateAnalysisOutput,
+  redactOutputPII,
+} from '../../middleware/sanitization.js'
 import { getErrorMessage } from '@agent-prompttrain/shared'
 
 /** Response shape from Claude Messages API (proxied through our proxy) */
@@ -109,12 +113,20 @@ export class AnthropicAnalysisService {
           throw new Error('No response content from Claude API')
         }
 
-        // Validate the output
-        const validation = validateAnalysisOutput(analysisText)
+        // Redact any PII from the output before validation/storage
+        const redactedText = redactOutputPII(analysisText)
+        if (redactedText !== analysisText) {
+          logger.info('PII redacted from analysis output before storage', {
+            metadata: { worker: 'analysis-worker', attempt: attempt + 1 },
+          })
+        }
+
+        // Validate the output structure
+        const validation = validateAnalysisOutput(redactedText)
 
         if (validation.isValid) {
           try {
-            const parsedAnalysis = parseAnalysisResponse(analysisText)
+            const parsedAnalysis = parseAnalysisResponse(redactedText)
             const markdownContent = this.formatAnalysisAsMarkdown(parsedAnalysis)
 
             logger.info(`Analysis completed in ${Date.now() - startTime}ms`, {
@@ -145,28 +157,13 @@ export class AnthropicAnalysisService {
             })
 
             return {
-              content: analysisText,
+              content: redactedText,
               data: null,
               rawResponse: response,
               promptTokens: response.usage.input_tokens,
               completionTokens: response.usage.output_tokens,
             }
           }
-        }
-
-        // Handle validation failures
-        if (
-          validation.issues.some(
-            issue => issue.includes('PII') || issue.includes('sensitive information')
-          )
-        ) {
-          logger.error('Analysis contains sensitive information', {
-            metadata: {
-              worker: 'analysis-worker',
-              validationIssues: validation.issues,
-            },
-          })
-          throw new Error('Analysis contains sensitive information and cannot be stored')
         }
 
         // For structural issues, retry with enhanced prompt
