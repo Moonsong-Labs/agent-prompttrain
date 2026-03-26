@@ -277,16 +277,13 @@ export const config = {
   },
 
   // AI Analysis configuration
+  // Requests are routed through the local proxy using a dedicated project
   aiAnalysis: {
-    // Gemini API configuration
-    get geminiApiKey() {
-      return env.string('GEMINI_API_KEY', '')
+    get modelName() {
+      return env.string('ANTHROPIC_ANALYSIS_MODEL', 'claude-opus-4-6')
     },
-    get geminiApiUrl() {
-      return env.string('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models')
-    },
-    get geminiModelName() {
-      return env.string('GEMINI_MODEL_NAME', 'gemini-2.0-flash-exp')
+    get projectId() {
+      return env.string('AI_ANALYSIS_PROJECT_ID', '')
     },
 
     // Security configurations
@@ -416,6 +413,7 @@ export type Config = typeof config
 // Export AI analysis configuration
 export {
   ANALYSIS_PROMPT_CONFIG,
+  ANTHROPIC_ANALYSIS_CONFIG,
   GEMINI_CONFIG,
   AI_WORKER_CONFIG,
   AI_ANALYSIS_CONFIG,

@@ -15,13 +15,13 @@ function parseEnvJson<T>(envVar: string | undefined, defaultValue: T): T {
 }
 
 export const ANALYSIS_PROMPT_CONFIG = {
-  // Using Gemini 1.5 Pro's 1M context window, leaving room for response.
+  // Using Claude's 200k context window, leaving room for response.
   // We can tune this based on observed output token sizes.
-  MAX_CONTEXT_TOKENS: Number(process.env.AI_MAX_CONTEXT_TOKENS) || 1000000,
+  MAX_CONTEXT_TOKENS: Number(process.env.AI_MAX_CONTEXT_TOKENS) || 200000,
   // Apply safety margin to avoid potential tokenizer discrepancies
   MAX_PROMPT_TOKENS:
     Number(process.env.AI_MAX_PROMPT_TOKENS) ||
-    Math.floor((Number(process.env.AI_MAX_PROMPT_TOKENS_BASE) || 900000) * TOKENIZER_SAFETY_MARGIN), // ~855k with 5% margin
+    Math.floor((Number(process.env.AI_MAX_PROMPT_TOKENS_BASE) || 180000) * TOKENIZER_SAFETY_MARGIN), // ~171k with 5% margin
   TRUNCATION_STRATEGY: parseEnvJson(process.env.AI_TRUNCATION_STRATEGY, {
     HEAD_MESSAGES: Number(process.env.AI_HEAD_MESSAGES) || 5,
     TAIL_MESSAGES: Number(process.env.AI_TAIL_MESSAGES) || 20,
@@ -35,19 +35,19 @@ export const ANALYSIS_PROMPT_CONFIG = {
   TOKENIZER_SAFETY_MARGIN,
 }
 
-// Gemini API Configuration
-// Use getters to read environment variables lazily after dotenv has loaded
-export const GEMINI_CONFIG = {
-  get API_URL() {
-    return process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models'
-  },
-  get API_KEY() {
-    return process.env.GEMINI_API_KEY || ''
-  },
+// AI Analysis Model Configuration
+// Requests are routed through the local proxy using a dedicated project
+export const ANTHROPIC_ANALYSIS_CONFIG = {
   get MODEL_NAME() {
-    return process.env.GEMINI_MODEL_NAME || 'gemini-2.5-pro'
+    return process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-6'
+  },
+  get PROJECT_ID() {
+    return process.env.AI_ANALYSIS_PROJECT_ID || ''
   },
 }
+
+/** @deprecated Use ANTHROPIC_ANALYSIS_CONFIG instead */
+export const GEMINI_CONFIG = ANTHROPIC_ANALYSIS_CONFIG
 
 // AI Analysis Worker Configuration
 // Use getters to read environment variables lazily after dotenv has loaded
@@ -70,8 +70,16 @@ export const AI_WORKER_CONFIG = {
   get MAX_RETRIES() {
     return Number(process.env.AI_ANALYSIS_MAX_RETRIES) || 3
   },
+  get ANTHROPIC_REQUEST_TIMEOUT_MS() {
+    return (
+      Number(process.env.AI_ANALYSIS_REQUEST_TIMEOUT_MS) ||
+      Number(process.env.AI_ANALYSIS_GEMINI_REQUEST_TIMEOUT_MS) ||
+      60000
+    )
+  },
+  /** @deprecated Use ANTHROPIC_REQUEST_TIMEOUT_MS instead */
   get GEMINI_REQUEST_TIMEOUT_MS() {
-    return Number(process.env.AI_ANALYSIS_GEMINI_REQUEST_TIMEOUT_MS) || 60000
+    return this.ANTHROPIC_REQUEST_TIMEOUT_MS
   },
 }
 

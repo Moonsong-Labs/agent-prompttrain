@@ -4,7 +4,7 @@ This guide covers security considerations and best practices for the AI-powered 
 
 ## Overview
 
-The AI analysis feature uses Google's Gemini API to analyze conversations. Security is implemented at multiple layers to protect sensitive data and prevent abuse.
+The AI analysis feature uses Claude API (via the local proxy) to analyze conversations. Security is implemented at multiple layers to protect sensitive data and prevent abuse.
 
 ## Security Architecture
 
@@ -35,7 +35,7 @@ CREATE POLICY tenant_isolation ON conversations
 
 ### 2. Input Validation & Sanitization
 
-All conversation content is sanitized before sending to the Gemini API:
+All conversation content is sanitized before sending to the Claude API:
 
 #### PII Redaction
 
@@ -91,17 +91,17 @@ X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 2024-01-01T00:00:00Z
 ```
 
-### 4. API Key Security
+### 4. Credential Security
 
-Gemini API key validation:
+Analysis requests are routed through the proxy's credential system:
 
-- Format validation on startup
-- Keys are never logged or exposed
-- Stored securely in environment variables
+- No separate API key required - uses the proxy's account pool
+- OAuth tokens are automatically refreshed
+- Credentials are managed centrally via the proxy's credential manager
 
 ### 5. Output Validation
 
-All Gemini responses are validated before storage:
+All Claude responses are validated before storage:
 
 - **Structure Validation**: Ensures required sections are present
 - **PII Scanning**: Detects and prevents PII leakage in output
@@ -146,9 +146,9 @@ AI_ANALYSIS_RATE_LIMIT_RETRIEVAL=100       # Per minute
 AI_ANALYSIS_REQUEST_TIMEOUT_MS=60000        # 60 seconds
 AI_ANALYSIS_MAX_RETRIES=2                   # Retry failed requests
 
-# API Configuration
-GEMINI_API_KEY=your-api-key-here            # Required
-GEMINI_MODEL_NAME=gemini-2.0-flash-exp      # Model selection
+# Analysis routing (via local proxy)
+AI_ANALYSIS_PROJECT_ID=your-project-id      # Required
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6    # Model selection
 ```
 
 ### Disabling Features
@@ -205,12 +205,11 @@ Configure alerts for:
 
 ## Best Practices
 
-### 1. API Key Management
+### 1. Credential Management
 
-- Rotate Gemini API keys regularly
-- Use separate keys for different environments
-- Monitor API usage through Google Cloud Console
-- Set up usage alerts and quotas
+- Credentials are managed through the proxy's account pool system
+- Monitor usage through the dashboard's account metrics
+- Set up usage alerts and quotas via the proxy's monitoring features
 
 ### 2. Database Security
 
@@ -248,13 +247,12 @@ Configure alerts for:
 3. Temporarily block the train ID if needed
 4. Update injection patterns if new attack vector found
 
-### API Key Compromise
+### Credential Compromise
 
-1. Immediately rotate the compromised key
-2. Update `GEMINI_API_KEY` environment variable
+1. Immediately rotate the compromised OAuth credentials via the dashboard
+2. Review the analysis project's linked accounts
 3. Restart the service
 4. Review audit logs for unauthorized usage
-5. Report to Google if significant abuse detected
 
 ### Data Breach
 

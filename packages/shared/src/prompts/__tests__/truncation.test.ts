@@ -50,7 +50,7 @@ describe('truncateConversation', () => {
       'should truncate long conversation preserving head and tail',
       () => {
         // Create a very long message to force truncation
-        // With ~12 chars per token (config default), we need ~10M chars to exceed 855k tokens
+        // With ~12 chars per token (config default), we need enough chars to exceed 171k token limit
         const longContent = 'The quick brown fox jumps over the lazy dog. '.repeat(5000) // ~225k chars
         const messages: Message[] = []
 
@@ -183,8 +183,10 @@ describe('truncateConversation', () => {
       'should place truncation marker between non-consecutive messages',
       () => {
         // Create scenario where we'll have gaps
-        // Need enough to trigger truncation: 100 messages * 120k chars = 12M chars ~= 1M tokens
-        const longContent = 'D'.repeat(120000)
+        // Need enough to trigger truncation with 171k token limit:
+        // 100 messages * 24k chars ≈ 2k tokens each ≈ 200k total (exceeds limit)
+        // But tail (20 msgs * 2k = 40k tokens) fits within budget
+        const longContent = 'D'.repeat(24000)
         const messages: Message[] = []
 
         for (let i = 0; i < 100; i++) {

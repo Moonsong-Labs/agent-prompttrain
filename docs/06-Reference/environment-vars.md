@@ -126,23 +126,23 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 ### Background Worker
 
-| Variable                                | Description                             | Default |
-| --------------------------------------- | --------------------------------------- | ------- |
-| `AI_WORKER_ENABLED`                     | Enable AI Analysis background worker    | `false` |
-| `AI_WORKER_POLL_INTERVAL_MS`            | Polling interval for new jobs (ms)      | `5000`  |
-| `AI_WORKER_MAX_CONCURRENT_JOBS`         | Max concurrent jobs per worker instance | `3`     |
-| `AI_WORKER_JOB_TIMEOUT_MINUTES`         | Timeout for stuck jobs (minutes)        | `5`     |
-| `AI_ANALYSIS_MAX_RETRIES`               | Maximum retry attempts for failed jobs  | `3`     |
-| `AI_ANALYSIS_GEMINI_REQUEST_TIMEOUT_MS` | Timeout for Gemini API requests (ms)    | `60000` |
+| Variable                         | Description                             | Default |
+| -------------------------------- | --------------------------------------- | ------- |
+| `AI_WORKER_ENABLED`              | Enable AI Analysis background worker    | `false` |
+| `AI_WORKER_POLL_INTERVAL_MS`     | Polling interval for new jobs (ms)      | `5000`  |
+| `AI_WORKER_MAX_CONCURRENT_JOBS`  | Max concurrent jobs per worker instance | `3`     |
+| `AI_WORKER_JOB_TIMEOUT_MINUTES`  | Timeout for stuck jobs (minutes)        | `5`     |
+| `AI_ANALYSIS_MAX_RETRIES`        | Maximum retry attempts for failed jobs  | `3`     |
+| `AI_ANALYSIS_REQUEST_TIMEOUT_MS` | Timeout for analysis API requests (ms)  | `60000` |
 
 ### Analysis Configuration
 
 | Variable                                     | Description                                         | Default               |
 | -------------------------------------------- | --------------------------------------------------- | --------------------- |
 | `AI_ANALYSIS_PROMPT_VERSION`                 | Version of analysis prompt to use                   | `v1`                  |
-| `AI_MAX_CONTEXT_TOKENS`                      | Maximum context window size for AI model            | `1000000`             |
-| `AI_MAX_PROMPT_TOKENS`                       | Maximum tokens for analysis prompt (overrides calc) | `855000` (calculated) |
-| `AI_MAX_PROMPT_TOKENS_BASE`                  | Base tokens before safety margin                    | `900000`              |
+| `AI_MAX_CONTEXT_TOKENS`                      | Maximum context window size for AI model            | `200000`              |
+| `AI_MAX_PROMPT_TOKENS`                       | Maximum tokens for analysis prompt (overrides calc) | `171000` (calculated) |
+| `AI_MAX_PROMPT_TOKENS_BASE`                  | Base tokens before safety margin                    | `180000`              |
 | `AI_TOKENIZER_SAFETY_MARGIN`                 | Safety margin for tokenizer discrepancies           | `0.95`                |
 | `AI_HEAD_MESSAGES`                           | Messages to keep from conversation start            | `5`                   |
 | `AI_TAIL_MESSAGES`                           | Messages to keep from conversation end              | `20`                  |
@@ -152,20 +152,21 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 | `AI_ANALYSIS_TRUNCATE_FIRST_N_TOKENS`        | Tokens to keep from conversation start              | `1000`                |
 | `AI_ANALYSIS_TRUNCATE_LAST_M_TOKENS`         | Tokens to keep from conversation end                | `4000`                |
 
-### Gemini API Configuration
+### AI Analysis Routing (via Proxy)
 
-| Variable            | Description                      | Default                                                   |
-| ------------------- | -------------------------------- | --------------------------------------------------------- |
-| `GEMINI_API_KEY`    | API key for Gemini AI            | -                                                         |
-| `GEMINI_API_URL`    | Base URL for Gemini API          | `https://generativelanguage.googleapis.com/v1beta/models` |
-| `GEMINI_MODEL_NAME` | Gemini model to use for analysis | `gemini-2.0-flash-exp`                                    |
+| Variable                   | Description                                                    | Default                   |
+| -------------------------- | -------------------------------------------------------------- | ------------------------- |
+| `AI_ANALYSIS_PROJECT_ID`   | Dedicated project ID for analysis (routes through local proxy) | -                         |
+| `ANTHROPIC_ANALYSIS_MODEL` | Claude model to use for analysis                               | `claude-opus-4-6`         |
+| `AI_ANALYSIS_API_KEY`      | Project API key (only needed when `ENABLE_CLIENT_AUTH=true`)   | -                         |
+| `AI_ANALYSIS_PROXY_URL`    | Override proxy URL for analysis requests                       | `http://localhost:{PORT}` |
 
 ### AI Analysis Security
 
 | Variable                                         | Description                                      | Default |
 | ------------------------------------------------ | ------------------------------------------------ | ------- |
 | `AI_ANALYSIS_MAX_RETRIES`                        | Maximum retry attempts for failed analyses       | `2`     |
-| `AI_ANALYSIS_REQUEST_TIMEOUT_MS`                 | Timeout for Gemini API requests (ms)             | `60000` |
+| `AI_ANALYSIS_REQUEST_TIMEOUT_MS`                 | Timeout for analysis API requests (ms)           | `60000` |
 | `AI_ANALYSIS_RATE_LIMIT_CREATION`                | Rate limit for analysis creation (per minute)    | `15`    |
 | `AI_ANALYSIS_RATE_LIMIT_RETRIEVAL`               | Rate limit for analysis retrieval (per minute)   | `100`   |
 | `AI_ANALYSIS_ENABLE_PII_REDACTION`               | Enable PII redaction in conversation content     | `true`  |
@@ -266,14 +267,14 @@ DASHBOARD_PORT=3001
 # Integrations
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
-# AI Analysis Worker
+# AI Analysis Worker (routes through local proxy)
 AI_WORKER_ENABLED=false
 AI_WORKER_POLL_INTERVAL_MS=5000
 AI_WORKER_MAX_CONCURRENT_JOBS=3
 AI_WORKER_JOB_TIMEOUT_MINUTES=5
-AI_WORKER_MAX_RETRIES=3
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL_NAME=gemini-2.0-flash-exp
+AI_ANALYSIS_MAX_RETRIES=3
+AI_ANALYSIS_PROJECT_ID=your-analysis-project-id
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6
 
 # Directories
 CREDENTIALS_DIR=./credentials

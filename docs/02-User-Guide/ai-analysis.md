@@ -1,12 +1,12 @@
 # AI Analysis Feature Setup Guide
 
-This guide will help you set up the AI-powered conversation analysis feature introduced in PR #80.
+This guide will help you set up the AI-powered conversation analysis feature.
 
 ## Prerequisites
 
 - PostgreSQL database
-- Gemini API key (for AI analysis)
 - Bun runtime installed
+- A configured project with a linked Anthropic account (for Claude API access)
 
 ## Setup Steps
 
@@ -29,7 +29,15 @@ These migrations will create:
 - `analysis_audit_log` table - Tracks all analysis operations
 - Required indexes for performance
 
-### 2. Environment Variables
+### 2. Create a Dedicated Analysis Project
+
+The AI analysis worker routes requests through the local proxy, using a dedicated project's credentials. This means you don't need a separate API key.
+
+1. Create a new project in the dashboard (e.g., "AI Analysis")
+2. Link an Anthropic account with Claude API access to this project
+3. Note the project ID
+
+### 3. Environment Variables
 
 Add the following to your `.env` file:
 
@@ -48,30 +56,20 @@ AI_WORKER_JOB_TIMEOUT_MINUTES=5            # Timeout for stuck jobs
 
 # Retry configuration
 AI_ANALYSIS_MAX_RETRIES=3                  # Max retry attempts for failed analyses
-AI_ANALYSIS_GEMINI_REQUEST_TIMEOUT_MS=60000 # Gemini API timeout (60 seconds)
+AI_ANALYSIS_REQUEST_TIMEOUT_MS=60000       # API timeout (60 seconds)
 
-# Gemini API Configuration (REQUIRED)
-GEMINI_API_KEY=your-actual-gemini-api-key-here
-GEMINI_API_URL=https://generativelanguage.googleapis.com/v1beta/models
-GEMINI_MODEL_NAME=gemini-2.0-flash-exp
+# Analysis routing (via local proxy)
+AI_ANALYSIS_PROJECT_ID=your-analysis-project-id  # REQUIRED: Project ID from step 2
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6          # Claude model to use
+
+# Optional: API key for the analysis project (only needed when ENABLE_CLIENT_AUTH=true)
+# AI_ANALYSIS_API_KEY=your-project-api-key
 
 # Token limits for conversation truncation
 AI_ANALYSIS_INPUT_TRUNCATION_TARGET_TOKENS=8192
 AI_ANALYSIS_TRUNCATE_FIRST_N_TOKENS=1000
 AI_ANALYSIS_TRUNCATE_LAST_M_TOKENS=4000
-
-# Optional: Prompt tuning
-# NOTE: This is for Gemini 2.0 models with 1M+ context windows
-AI_MAX_PROMPT_TOKENS=855000                # Override calculated token limit
-AI_HEAD_MESSAGES=10                        # Messages to keep from start
-AI_TAIL_MESSAGES=30                        # Messages to keep from end
 ```
-
-### 3. Get a Gemini API Key
-
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Replace `your-actual-gemini-api-key-here` in your `.env` file
 
 ### 4. Verify Setup
 
@@ -89,7 +87,12 @@ bun run dev:dashboard
 Check the logs for:
 
 ```
-[INFO] AI Analysis Worker: Started (polling every 5000ms)
+AI Analysis:
+  - Enabled: Yes
+  - Model: claude-opus-4-6
+  - Project: your-analysis-project-id
+  - Routing: Via local proxy
+✓ AI Analysis Worker started
 ```
 
 ### 5. Using the Feature
@@ -126,6 +129,21 @@ curl -X POST http://localhost:3001/api/analyses/550e8400-e29b-41d4-a716-44665544
   -H "X-Dashboard-Key: your-dashboard-api-key"
 ```
 
+## How It Works
+
+The AI analysis worker runs inside the proxy process and routes analysis requests through the proxy's own `/v1/messages` endpoint:
+
+```
+Analysis Worker → Local Proxy (/v1/messages) → Account Pool → Claude API
+```
+
+This approach:
+
+- Reuses the proxy's credential management and automatic token refresh
+- Benefits from account pool load balancing
+- Tracks analysis usage alongside regular traffic
+- Requires no separate API key management
+
 ## Monitoring
 
 ### Check Background Worker Status
@@ -155,14 +173,16 @@ SELECT * FROM analysis_audit_log ORDER BY timestamp DESC LIMIT 10;
 ### Worker Not Processing Jobs
 
 1. Check `AI_WORKER_ENABLED=true` in `.env`
-2. Verify `GEMINI_API_KEY` is valid
-3. Check proxy logs for errors
+2. Verify `AI_ANALYSIS_PROJECT_ID` is set and the project exists
+3. Verify the project has a linked Anthropic account
+4. Check proxy logs for errors
 
 ### Analysis Failing
 
 1. Check `error_message` in conversation_analyses table
 2. Review audit log for failure details
 3. Verify conversation has messages to analyze
+4. Check that the proxy is running and accessible
 
 ### Rate Limiting
 
@@ -173,14 +193,13 @@ The API has built-in rate limits:
 
 ## Cost Considerations
 
-Gemini API pricing (as of 2024):
-
-- Gemini 2.0 Flash: Free tier available
+- Claude Opus 4.6 usage is billed through your linked Anthropic account
 - Monitor token usage in `conversation_analyses.prompt_tokens` and `completion_tokens`
+- Consider using a lower-cost model via `ANTHROPIC_ANALYSIS_MODEL` if cost is a concern
 
 ## Security Notes
 
-1. The Gemini API key is sensitive - never commit it to git
+1. Analysis requests are routed through the proxy, leveraging existing credential security
 2. Analysis results are stored in your database
 3. Rate limiting prevents abuse
 4. Audit logging tracks all operations

@@ -99,6 +99,7 @@ export {
 } from './types/ai-analysis.js'
 export {
   ANALYSIS_PROMPT_CONFIG,
+  ANTHROPIC_ANALYSIS_CONFIG,
   GEMINI_CONFIG,
   AI_WORKER_CONFIG,
   AI_ANALYSIS_CONFIG,
@@ -107,9 +108,11 @@ export {
 // Export prompt utilities
 export {
   truncateConversation,
+  buildClaudeAnalysisPrompt,
   buildAnalysisPrompt,
   parseAnalysisResponse,
   getAnalysisPromptTemplate,
   type Message,
+  type ClaudeAnalysisMessage,
   type GeminiContent,
 } from './prompts/index.js'

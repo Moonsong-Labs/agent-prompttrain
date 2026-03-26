@@ -1,6 +1,6 @@
 import { AnalysisWorker } from './AnalysisWorker.js'
 import { logger } from '../../middleware/logger.js'
-import { AI_WORKER_CONFIG, GEMINI_CONFIG } from '@agent-prompttrain/shared/config'
+import { AI_WORKER_CONFIG } from '@agent-prompttrain/shared/config'
 
 let workerInstance: AnalysisWorker | null = null
 
@@ -18,15 +18,14 @@ export function startAnalysisWorker(): AnalysisWorker | null {
   }
 
   // Validate configuration before starting
-  if (!GEMINI_CONFIG.API_KEY) {
-    const error = new Error('GEMINI_API_KEY is not set in environment variables')
+  if (!process.env.AI_ANALYSIS_PROJECT_ID) {
+    const error = new Error('AI_ANALYSIS_PROJECT_ID is not set in environment variables')
     logger.error(
-      'FATAL: AI_WORKER_ENABLED is true, but GEMINI_API_KEY is not set. The AI Analysis Worker cannot start.',
+      'FATAL: AI_WORKER_ENABLED is true, but AI_ANALYSIS_PROJECT_ID is not set. Create a dedicated project for AI analysis and set its project ID.',
       {
         metadata: {
           worker: 'analysis-worker',
-          GEMINI_CONFIG_API_KEY: GEMINI_CONFIG.API_KEY || 'empty',
-          ENV_GEMINI_API_KEY: process.env.GEMINI_API_KEY ? 'SET' : 'NOT SET',
+          AI_ANALYSIS_PROJECT_ID: 'NOT SET',
         },
       }
     )
@@ -35,9 +34,6 @@ export function startAnalysisWorker(): AnalysisWorker | null {
 
   workerInstance = new AnalysisWorker()
   workerInstance.start()
-
-  // Don't register signal handlers here - let the main process handle shutdown
-  // The main process will call stop() on the worker instance
 
   return workerInstance
 }
