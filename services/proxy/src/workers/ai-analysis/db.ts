@@ -355,12 +355,21 @@ export async function fetchConversationMessages(
             typeof lastUserMessage.content === 'string'
               ? lastUserMessage.content
               : lastUserMessage.content
-                  .map((block: { type: string; text?: string }) =>
-                    block.type === 'text' ? block.text : ''
-                  )
+                  .map((block: { type: string; text?: string }) => {
+                    if (block.type === 'text') {
+                      return block.text || ''
+                    }
+                    if (block.type === 'tool_result') {
+                      return '[Tool Result]'
+                    }
+                    return ''
+                  })
+                  .filter(Boolean)
                   .join('\n')
 
-          messages.push({ role: 'user', content })
+          if (content.trim()) {
+            messages.push({ role: 'user', content })
+          }
         }
       }
 
@@ -368,7 +377,7 @@ export async function fetchConversationMessages(
         const assistantContent = row.response_body.content
           .map((block: { type: string; text?: string; name?: string }) => {
             if (block.type === 'text') {
-              return block.text
+              return block.text || ''
             }
             if (block.type === 'tool_use') {
               return `[Tool Use: ${block.name}]`
@@ -378,9 +387,12 @@ export async function fetchConversationMessages(
             }
             return ''
           })
+          .filter(Boolean)
           .join('\n')
 
-        messages.push({ role: 'model', content: assistantContent })
+        if (assistantContent.trim()) {
+          messages.push({ role: 'model', content: assistantContent })
+        }
       }
     }
 

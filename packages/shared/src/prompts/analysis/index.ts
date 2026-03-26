@@ -205,16 +205,46 @@ export function buildClaudeAnalysisPrompt(
 
   // 3. Build Claude messages array
   // Map 'model' role to 'assistant' for Claude API compatibility
-  const claudeMessages: ClaudeAnalysisMessage[] = [
-    ...truncatedMessages.map(msg => ({
-      role: (msg.role === 'model' ? 'assistant' : msg.role) as 'user' | 'assistant',
-      content: msg.content,
-    })),
-    {
+  const rawMessages: ClaudeAnalysisMessage[] = truncatedMessages.map(msg => ({
+    role: (msg.role === 'model' ? 'assistant' : msg.role) as 'user' | 'assistant',
+    content: msg.content,
+  }))
+
+  // Claude API requires alternating user/assistant roles.
+  // Merge consecutive same-role messages (can happen when empty messages are filtered).
+  const mergedMessages: ClaudeAnalysisMessage[] = []
+  for (const msg of rawMessages) {
+    const last = mergedMessages[mergedMessages.length - 1]
+    if (last && last.role === msg.role) {
+      last.content += '\n\n' + msg.content
+    } else {
+      mergedMessages.push({ ...msg })
+    }
+  }
+
+  // Ensure conversation starts with a user message (Claude API requirement)
+  if (mergedMessages.length > 0 && mergedMessages[0].role === 'assistant') {
+    mergedMessages.unshift({
+      role: 'user',
+      content: '[Conversation start]',
+    })
+  }
+
+  // Append the analysis instruction as a final user message
+  const lastMsg = mergedMessages[mergedMessages.length - 1]
+  const analysisInstruction = `Based on the preceding conversation, provide a complete analysis.\n\n${finalInstruction}`
+
+  if (lastMsg && lastMsg.role === 'user') {
+    // Merge with last user message to avoid consecutive user messages
+    lastMsg.content += '\n\n' + analysisInstruction
+  } else {
+    mergedMessages.push({
       role: 'user' as const,
-      content: `Based on the preceding conversation, provide a complete analysis.\n\n${finalInstruction}`,
-    },
-  ]
+      content: analysisInstruction,
+    })
+  }
+
+  const claudeMessages = mergedMessages
 
   // Use system prompt for Claude's system parameter
   const system = `You are analyzing a conversation between a user and Claude API.
