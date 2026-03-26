@@ -231,17 +231,18 @@ trainsUIRoutes.get('/', async c => {
                           ${train.isOwner
                             ? html`
                                 <form
-                                  hx-delete="/dashboard/projects/${train.id}/delete"
-                                  hx-confirm="Are you sure you want to delete '${train.project_id}'? This action cannot be undone."
+                                  hx-post="/dashboard/projects/${train.id}/toggle-disabled"
                                   hx-swap="outerHTML"
                                   hx-target="closest tr"
                                   style="margin: 0;"
                                 >
                                   <button
                                     type="submit"
-                                    style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
+                                    style="background: ${train.disabled
+                                      ? '#10b981'
+                                      : '#f59e0b'}; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
                                   >
-                                    Delete
+                                    ${train.disabled ? 'Enable' : 'Disable'}
                                   </button>
                                 </form>
                               `
@@ -1680,6 +1681,64 @@ trainsUIRoutes.delete('/:projectId/unlink-account/:credentialId', async c => {
         setTimeout(() => location.reload(), 1500)
       </script>
     `)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Toggle project disabled state (HTMX form submission - owner only)
+ */
+trainsUIRoutes.post('/:projectId/toggle-disabled', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  try {
+    const isOwner = await isProjectOwner(pool, projectId, auth.principal)
+    if (!isOwner) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only project owners can disable/enable projects
+        </div>
+      `)
+    }
+
+    const project = await getProjectById(pool, projectId)
+    if (!project) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Project not found
+        </div>
+      `)
+    }
+
+    const newDisabled = !project.disabled
+    await updateProject(pool, projectId, { disabled: newDisabled })
+
+    // Return updated row via HX-Redirect to refresh the page
+    c.header('HX-Redirect', '/dashboard/projects')
+    return c.html(html``)
   } catch (error) {
     return c.html(html`
       <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">

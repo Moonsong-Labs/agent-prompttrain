@@ -147,6 +147,7 @@ export interface CreateProjectRequest {
 
 export interface UpdateProjectRequest {
   name?: string
+  disabled?: boolean
   slack_enabled?: boolean
   slack_webhook_url?: string
   slack_channel?: string

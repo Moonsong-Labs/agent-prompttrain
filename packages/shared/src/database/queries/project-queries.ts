@@ -165,6 +165,10 @@ export async function updateProject(
     updates.push(`name = $${paramIndex++}`)
     values.push(request.name)
   }
+  if (request.disabled !== undefined) {
+    updates.push(`disabled = $${paramIndex++}`)
+    values.push(request.disabled)
+  }
   if (request.slack_enabled !== undefined) {
     updates.push(`slack_enabled = $${paramIndex++}`)
     values.push(request.slack_enabled)
