@@ -24,11 +24,7 @@ import {
   removeProjectAccount,
 } from '@agent-prompttrain/shared/database/queries'
 import { getErrorMessage } from '@agent-prompttrain/shared'
-import type {
-  CredentialSafe,
-  AnthropicCredentialSafe,
-  ProjectApiKeySafe,
-} from '@agent-prompttrain/shared/types'
+import type { CredentialSafe, ProjectApiKeySafe } from '@agent-prompttrain/shared/types'
 import type { AuthContext } from '../middleware/auth.js'
 
 export const trainsUIRoutes = new Hono<{ Variables: { auth: AuthContext } }>()
@@ -739,16 +735,16 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                             >
                             ${cred.provider === 'anthropic'
                               ? html`
-                                  • Expires:
-                                  ${new Date(
-                                    (cred as AnthropicCredentialSafe).oauth_expires_at
-                                  ).toLocaleDateString()}
-                                  ${new Date((cred as AnthropicCredentialSafe).oauth_expires_at) <
-                                  new Date()
-                                    ? html`<span style="color: #dc2626; font-weight: 600;"
-                                        >EXPIRED</span
-                                      >`
-                                    : ''}
+                                  <div
+                                    style="display: inline-flex; align-items: center; margin-left: 0.5rem; vertical-align: middle;"
+                                    hx-get="/dashboard/projects/${train.id}/account-utilization/${cred.account_id}"
+                                    hx-trigger="load"
+                                    hx-swap="innerHTML"
+                                  >
+                                    <span style="font-size: 0.7rem; color: #9ca3af;"
+                                      >Loading usage…</span
+                                    >
+                                  </div>
                                 `
                               : html`• Region: ${(cred as any).aws_region}`}
                           </div>
@@ -1687,6 +1683,62 @@ trainsUIRoutes.delete('/:projectId/unlink-account/:credentialId', async c => {
         Error: ${getErrorMessage(error)}
       </div>
     `)
+  }
+})
+
+/**
+ * GET /:projectId/account-utilization/:accountId - Returns HTML fragment with 7d utilization bar
+ * Used by HTMX lazy loading in the project accounts section
+ */
+trainsUIRoutes.get('/:projectId/account-utilization/:accountId', async c => {
+  const accountId = c.req.param('accountId')
+  const apiClient = container.getApiClient()
+
+  if (!apiClient) {
+    return c.html(html`<span style="font-size: 0.75rem; color: #9ca3af;">Usage unavailable</span>`)
+  }
+
+  try {
+    const usage = await apiClient.getOAuthUsage(accountId)
+
+    if (!usage || !usage.available || usage.windows.length === 0) {
+      return c.html(html`<span style="font-size: 0.75rem; color: #9ca3af;">No usage data</span>`)
+    }
+
+    // Find 7-day window utilization
+    const sevenDay = usage.windows.find(w => w.short_name === '7d')
+    const utilization = sevenDay ? sevenDay.utilization : 0
+    const resetsAt = sevenDay ? sevenDay.resets_at : ''
+
+    // Color based on utilization level
+    const barColor = utilization >= 80 ? '#ef4444' : utilization >= 50 ? '#f59e0b' : '#22c55e'
+    const bgColor = utilization >= 80 ? '#fee2e2' : utilization >= 50 ? '#fef3c7' : '#dcfce7'
+
+    return c.html(html`
+      <div
+        style="display: flex; align-items: center; gap: 0.5rem; min-width: 140px;"
+        title="7-day utilization: ${utilization.toFixed(1)}%${resetsAt
+          ? ` · Resets: ${resetsAt}`
+          : ''}${usage.is_estimated ? ' (estimated)' : ''}"
+      >
+        <div
+          style="flex: 1; height: 8px; background: ${bgColor}; border-radius: 4px; overflow: hidden; min-width: 80px;"
+        >
+          <div
+            style="height: 100%; width: ${Math.min(
+              utilization,
+              100
+            )}%; background: ${barColor}; border-radius: 4px; transition: width 0.3s ease;"
+          ></div>
+        </div>
+        <span
+          style="font-size: 0.7rem; font-weight: 600; color: ${barColor}; white-space: nowrap; min-width: 32px; text-align: right;"
+          >${utilization.toFixed(0)}%</span
+        >
+      </div>
+    `)
+  } catch {
+    return c.html(html`<span style="font-size: 0.75rem; color: #9ca3af;">—</span>`)
   }
 })
 

@@ -134,9 +134,8 @@ credentialsUIRoutes.get('/', async c => {
                           <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
                             ${cred.provider === 'anthropic'
                               ? html`
-                                  <div>
-                                    Expires:
-                                    ${new Date((cred as any).oauth_expires_at).toLocaleString()}
+                                  <div style="font-size: 0.75rem; color: #6b7280;">
+                                    OAuth token · auto-refreshes
                                   </div>
                                   <div
                                     style="margin-top: 0.25rem; font-size: 0.75rem; color: #6b7280;"
@@ -157,8 +156,8 @@ credentialsUIRoutes.get('/', async c => {
                             ${cred.provider === 'anthropic'
                               ? (cred as any).oauth_expires_at &&
                                 new Date((cred as any).oauth_expires_at) < new Date()
-                                ? html`<span style="color: #dc2626; font-weight: 600;"
-                                    >⚠️ EXPIRED</span
+                                ? html`<span style="color: #d97706; font-weight: 600;"
+                                    >🔄 Token refreshing</span
                                   >`
                                 : html`<span style="color: #059669; font-weight: 600;"
                                     >✅ Active</span
