@@ -134,8 +134,9 @@ credentialsUIRoutes.get('/', async c => {
                           <td style="padding: 0.75rem; font-size: 0.875rem; color: #111827;">
                             ${cred.provider === 'anthropic'
                               ? html`
-                                  <div style="font-size: 0.75rem; color: #6b7280;">
-                                    OAuth token · auto-refreshes
+                                  <div>
+                                    Auto-refreshes before
+                                    ${new Date((cred as any).oauth_expires_at).toLocaleString()}
                                   </div>
                                   <div
                                     style="margin-top: 0.25rem; font-size: 0.75rem; color: #6b7280;"

@@ -155,7 +155,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
         <h2 style="margin: 0 0 1.5rem 0;">Token Usage Overview - All Accounts</h2>
 
         <div class="section">
-          <div class="section-header">Active Accounts (7-Day View with 5-Hour Sliding Windows)</div>
+          <div class="section-header">All Accounts (7-Day View with 5-Hour Sliding Windows)</div>
           <div class="section-content">
             ${accountsData.accounts.length > 0
               ? html`
