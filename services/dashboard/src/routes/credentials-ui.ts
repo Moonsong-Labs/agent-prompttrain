@@ -157,8 +157,8 @@ credentialsUIRoutes.get('/', async c => {
                             ${cred.provider === 'anthropic'
                               ? (cred as any).oauth_expires_at &&
                                 new Date((cred as any).oauth_expires_at) < new Date()
-                                ? html`<span style="color: #dc2626; font-weight: 600;"
-                                    >⚠️ Needs Refresh</span
+                                ? html`<span style="color: #d97706; font-weight: 600;"
+                                    >🔄 Token refreshing</span
                                   >`
                                 : html`<span style="color: #059669; font-weight: 600;"
                                     >✅ Active</span

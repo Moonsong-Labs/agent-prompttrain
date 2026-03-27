@@ -597,16 +597,14 @@ The new section replaces lines 608-694:
                             >
                             ${cred.provider === 'anthropic'
                               ? html`
-                                  • Expires:
-                                  ${new Date(
-                                    (cred as AnthropicCredentialSafe).oauth_expires_at
-                                  ).toLocaleDateString()}
-                                  ${new Date((cred as AnthropicCredentialSafe).oauth_expires_at) <
-                                  new Date()
-                                    ? html`<span style="color: #dc2626; font-weight: 600;"
-                                        >EXPIRED</span
-                                      >`
-                                    : ''}
+                                  <div
+                                    style="display: inline-flex; align-items: center; margin-left: 0.5rem; vertical-align: middle;"
+                                    hx-get="/dashboard/projects/${train.id}/account-utilization/${cred.account_id}"
+                                    hx-trigger="load"
+                                    hx-swap="innerHTML"
+                                  >
+                                    <span style="font-size: 0.7rem; color: #9ca3af;">Loading usage…</span>
+                                  </div>
                                 `
                               : html`• Region: ${(cred as any).aws_region}`}
                           </div>
