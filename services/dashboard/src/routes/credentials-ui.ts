@@ -135,7 +135,7 @@ credentialsUIRoutes.get('/', async c => {
                             ${cred.provider === 'anthropic'
                               ? html`
                                   <div>
-                                    Expires:
+                                    Auto-refreshes before
                                     ${new Date((cred as any).oauth_expires_at).toLocaleString()}
                                   </div>
                                   <div
@@ -158,7 +158,7 @@ credentialsUIRoutes.get('/', async c => {
                               ? (cred as any).oauth_expires_at &&
                                 new Date((cred as any).oauth_expires_at) < new Date()
                                 ? html`<span style="color: #dc2626; font-weight: 600;"
-                                    >⚠️ EXPIRED</span
+                                    >⚠️ Needs Refresh</span
                                   >`
                                 : html`<span style="color: #059669; font-weight: 600;"
                                     >✅ Active</span
