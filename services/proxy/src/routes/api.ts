@@ -1186,10 +1186,10 @@ apiRoutes.get('/token-usage/accounts', async c => {
   }
 
   try {
-    // Get all accounts with usage in the last 5 hours
+    // Get all accounts from credentials table, with usage data from the last 5 hours
     const accountsQuery = `
       WITH account_usage AS (
-        SELECT 
+        SELECT
           account_id,
           SUM(output_tokens) as total_output_tokens,
           SUM(input_tokens) as total_input_tokens,
@@ -1201,7 +1201,7 @@ apiRoutes.get('/token-usage/accounts', async c => {
         GROUP BY account_id
       ),
       train_usage AS (
-        SELECT 
+        SELECT
           account_id,
           project_id,
           SUM(output_tokens) as train_output_tokens,
@@ -1211,11 +1211,11 @@ apiRoutes.get('/token-usage/accounts', async c => {
           AND timestamp >= NOW() - INTERVAL '5 hours'
         GROUP BY account_id, project_id
       )
-      SELECT 
-        au.account_id,
-        au.total_output_tokens,
-        au.total_input_tokens,
-        au.request_count,
+      SELECT
+        c.account_id,
+        COALESCE(au.total_output_tokens, 0) as total_output_tokens,
+        COALESCE(au.total_input_tokens, 0) as total_input_tokens,
+        COALESCE(au.request_count, 0) as request_count,
         au.last_request_time,
         COALESCE(
           json_agg(
@@ -1227,11 +1227,12 @@ apiRoutes.get('/token-usage/accounts', async c => {
           ) FILTER (WHERE tu.project_id IS NOT NULL),
           '[]'::json
         ) as train_ids
-      FROM account_usage au
-      LEFT JOIN train_usage tu ON au.account_id = tu.account_id
-      GROUP BY au.account_id, au.total_output_tokens, au.total_input_tokens, 
+      FROM credentials c
+      LEFT JOIN account_usage au ON c.account_id = au.account_id
+      LEFT JOIN train_usage tu ON c.account_id = tu.account_id
+      GROUP BY c.account_id, au.total_output_tokens, au.total_input_tokens,
                au.request_count, au.last_request_time
-      ORDER BY au.total_output_tokens DESC
+      ORDER BY COALESCE(au.total_output_tokens, 0) DESC
     `
 
     const result = await pool.query(accountsQuery)

@@ -739,14 +739,14 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                             >
                             ${cred.provider === 'anthropic'
                               ? html`
-                                  • Expires:
+                                  • Auto-refreshes before
                                   ${new Date(
                                     (cred as AnthropicCredentialSafe).oauth_expires_at
                                   ).toLocaleDateString()}
                                   ${new Date((cred as AnthropicCredentialSafe).oauth_expires_at) <
                                   new Date()
                                     ? html`<span style="color: #dc2626; font-weight: 600;"
-                                        >EXPIRED</span
+                                        >NEEDS REFRESH</span
                                       >`
                                     : ''}
                                 `
