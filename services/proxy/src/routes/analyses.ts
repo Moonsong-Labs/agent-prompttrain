@@ -11,6 +11,7 @@ import {
   conversationBranchParamsSchema,
   MSL_PROJECT_ID_HEADER_LOWER,
 } from '@agent-prompttrain/shared'
+import { ANTHROPIC_ANALYSIS_CONFIG } from '@agent-prompttrain/shared/config'
 
 // Request/Response schemas
 const createAnalysisSchema = z.object({
@@ -125,11 +126,17 @@ analysisRoutes.post('/', rateLimitAnalysisCreation(), async c => {
 
     // Create new analysis request
     const insertResult = await pool.query(
-      `INSERT INTO conversation_analyses 
-       (conversation_id, branch_id, status, custom_prompt, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW(), NOW())
+      `INSERT INTO conversation_analyses
+       (conversation_id, branch_id, status, model_used, custom_prompt, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
        RETURNING id`,
-      [conversationId, branchId, ConversationAnalysisStatus.PENDING, customPrompt || null]
+      [
+        conversationId,
+        branchId,
+        ConversationAnalysisStatus.PENDING,
+        ANTHROPIC_ANALYSIS_CONFIG.MODEL_NAME,
+        customPrompt || null,
+      ]
     )
 
     const analysisId = insertResult.rows[0].id
@@ -334,19 +341,30 @@ analysisRoutes.post(
         // Update existing analysis to pending
         analysisId = existingResult.rows[0].id
         await pool.query(
-          `UPDATE conversation_analyses 
-         SET status = $1, updated_at = NOW(), retry_count = retry_count + 1, custom_prompt = $3
+          `UPDATE conversation_analyses
+         SET status = $1, model_used = $3, updated_at = NOW(), retry_count = retry_count + 1, custom_prompt = $4
          WHERE id = $2`,
-          [ConversationAnalysisStatus.PENDING, analysisId, customPrompt || null]
+          [
+            ConversationAnalysisStatus.PENDING,
+            analysisId,
+            ANTHROPIC_ANALYSIS_CONFIG.MODEL_NAME,
+            customPrompt || null,
+          ]
         )
       } else {
         // Create new analysis
         const insertResult = await pool.query(
-          `INSERT INTO conversation_analyses 
-         (conversation_id, branch_id, status, custom_prompt, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
+          `INSERT INTO conversation_analyses
+         (conversation_id, branch_id, status, model_used, custom_prompt, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
          RETURNING id`,
-          [conversationId, branchId, ConversationAnalysisStatus.PENDING, customPrompt || null]
+          [
+            conversationId,
+            branchId,
+            ConversationAnalysisStatus.PENDING,
+            ANTHROPIC_ANALYSIS_CONFIG.MODEL_NAME,
+            customPrompt || null,
+          ]
         )
         analysisId = insertResult.rows[0].id
       }
