@@ -208,6 +208,62 @@ Updates proxy deployment.
 ./scripts/ops/update-proxy.sh
 ```
 
+## AI Analysis Scripts
+
+### list-analyses.ts
+
+Lists recent AI analyses as a formatted table. Shows status, model, token usage, duration, and error details for failed analyses.
+
+```bash
+# Show last 20 analyses (default)
+bun run scripts/list-analyses.ts
+
+# Show last N analyses
+bun run scripts/list-analyses.ts 50
+```
+
+Requires `DATABASE_URL` environment variable.
+
+### check-analysis-jobs.ts
+
+Checks the status of pending, processing, completed, and failed analysis jobs.
+
+```bash
+bun run scripts/check-analysis-jobs.ts
+```
+
+### check-analysis-content.ts
+
+Inspects the content and structured data of a specific analysis.
+
+```bash
+bun run scripts/check-analysis-content.ts <conversation_id>
+```
+
+### process-pending-analyses.ts
+
+Manually triggers processing of pending analysis jobs.
+
+```bash
+bun run scripts/process-pending-analyses.ts
+```
+
+### reset-stuck-analysis-jobs.ts
+
+Resets analysis jobs that have exceeded max retries back to pending.
+
+```bash
+bun run scripts/reset-stuck-analysis-jobs.ts
+```
+
+### fail-exceeded-retry-jobs.ts
+
+Marks analysis jobs that have exceeded max retries as permanently failed.
+
+```bash
+bun run scripts/fail-exceeded-retry-jobs.ts
+```
+
 ## Test Scripts (`test/`)
 
 Testing utilities and scripts for validating proxy functionality.
