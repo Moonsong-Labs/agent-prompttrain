@@ -416,20 +416,61 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             `
                                 : ''
                             }
+                            ${(() => {
+                              const now = new Date()
+                              const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000)
+                              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+                              const dateFmt = (d: Date) =>
+                                d.toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false,
+                                })
+                              const dateFmtShort = (d: Date) =>
+                                d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                              const window5h = `${dateFmt(fiveHoursAgo)} - ${dateFmt(now)}`
+                              const window7d = `${dateFmtShort(sevenDaysAgo)} - ${dateFmtShort(now)}`
+                              const total5h = account.outputTokens
+                              const total7d = account.trainIds.reduce(
+                                (sum: number, p: any) => sum + (p.outputTokens7d || 0),
+                                0
+                              )
+                              const activeProjects = account.trainIds.filter(
+                                (p: any) => p.outputTokens > 0 || (p.outputTokens7d || 0) > 0
+                              )
+                              if (activeProjects.length === 0) {
+                                return ''
+                              }
+                              return `
                             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-                              ${account.trainIds
-                                .map(
-                                  projectId => `
-                                <div style="font-size: 12px; color: #6b7280; background: ${projectId.isPrivate ? '#fef3c7' : '#f3f4f6'}; padding: 4px 8px; border-radius: 4px; ${projectId.outputTokens === 0 ? 'opacity: 0.6;' : ''}">
-                                  ${projectId.isPrivate ? '<span title="Private project">&#128274;</span> ' : ''}
-                                  <span style="color: #374151; font-weight: 500;">${escapeHtml(projectId.projectName || projectId.projectId)}:</span>
-                                  ${formatNumber(projectId.outputTokens)} tokens
-                                  ${account.outputTokens > 0 ? `(${((projectId.outputTokens / account.outputTokens) * 100).toFixed(0)}%)` : ''}
+                              ${activeProjects
+                                .map((projectId: any) => {
+                                  const pct5h =
+                                    total5h > 0
+                                      ? ((projectId.outputTokens / total5h) * 100).toFixed(0)
+                                      : '0'
+                                  const pct7d =
+                                    total7d > 0
+                                      ? (((projectId.outputTokens7d || 0) / total7d) * 100).toFixed(
+                                          0
+                                        )
+                                      : '0'
+                                  return `
+                                <div style="font-size: 12px; color: #6b7280; background: ${projectId.isPrivate ? '#fef3c7' : '#f3f4f6'}; padding: 6px 8px; border-radius: 4px; line-height: 1.5;">
+                                  <div>
+                                    ${projectId.isPrivate ? '<span title="Private project">&#128274;</span> ' : ''}
+                                    <span style="color: #374151; font-weight: 500;">${escapeHtml(projectId.projectName || projectId.projectId)}</span>
+                                  </div>
+                                  <div style="font-size: 11px; font-family: monospace;">5h <span style="color: #9ca3af;">(${window5h})</span>: <strong style="color: #374151;">${pct5h}%</strong></div>
+                                  <div style="font-size: 11px; font-family: monospace;">7d <span style="color: #9ca3af;">(${window7d})</span>: <strong style="color: #374151;">${pct7d}%</strong></div>
                                 </div>
                               `
-                                )
+                                })
                                 .join('')}
-                            </div>
+                            </div>`
+                            })()}
                           </div>
                           <div style="width: 300px; height: 80px; flex-shrink: 0;">
                             <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>

@@ -1213,6 +1213,17 @@ apiRoutes.get('/token-usage/accounts', async c => {
           AND timestamp >= NOW() - INTERVAL '5 hours'
         GROUP BY account_id, project_id
       ),
+      train_usage_7d AS (
+        SELECT
+          account_id,
+          project_id,
+          SUM(output_tokens) as train_output_tokens_7d,
+          COUNT(*) as train_requests_7d
+        FROM api_requests
+        WHERE account_id IS NOT NULL
+          AND timestamp >= NOW() - INTERVAL '7 days'
+        GROUP BY account_id, project_id
+      ),
       linked_projects AS (
         SELECT DISTINCT
           cr.account_id,
@@ -1239,15 +1250,20 @@ apiRoutes.get('/token-usage/accounts', async c => {
       ),
       combined_projects AS (
         SELECT
-          COALESCE(tu.account_id, lp.account_id) as account_id,
-          COALESCE(tu.project_id, lp.project_string_id) as project_id,
-          COALESCE(lp.project_name, tu.project_id) as project_name,
+          COALESCE(tu.account_id, tu7.account_id, lp.account_id) as account_id,
+          COALESCE(tu.project_id, tu7.project_id, lp.project_string_id) as project_id,
+          COALESCE(lp.project_name, tu.project_id, tu7.project_id) as project_name,
           COALESCE(lp.is_private, false) as is_private,
           COALESCE(tu.train_output_tokens, 0) as output_tokens,
-          COALESCE(tu.train_requests, 0) as requests
+          COALESCE(tu.train_requests, 0) as requests,
+          COALESCE(tu7.train_output_tokens_7d, 0) as output_tokens_7d,
+          COALESCE(tu7.train_requests_7d, 0) as requests_7d
         FROM train_usage tu
+        FULL OUTER JOIN train_usage_7d tu7
+          ON tu.account_id = tu7.account_id AND tu.project_id = tu7.project_id
         FULL OUTER JOIN all_linked lp
-          ON tu.account_id = lp.account_id AND tu.project_id = lp.project_string_id
+          ON COALESCE(tu.account_id, tu7.account_id) = lp.account_id
+          AND COALESCE(tu.project_id, tu7.project_id) = lp.project_string_id
       )
       SELECT
         c.account_id,
@@ -1262,8 +1278,10 @@ apiRoutes.get('/token-usage/accounts', async c => {
               'projectName', cp.project_name,
               'isPrivate', cp.is_private,
               'outputTokens', cp.output_tokens,
-              'requests', cp.requests
-            ) ORDER BY cp.output_tokens DESC
+              'requests', cp.requests,
+              'outputTokens7d', cp.output_tokens_7d,
+              'requests7d', cp.requests_7d
+            ) ORDER BY cp.output_tokens_7d DESC
           ) FILTER (WHERE cp.project_id IS NOT NULL),
           '[]'::json
         ) as train_ids

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Token Usage overview: projects with zero tokens are now hidden from the project list
+- Token Usage overview: project list now shows 2-line format with percentage of 5-hour and 7-day windows including date ranges
+- API `/api/token-usage/accounts` now returns `outputTokens7d` and `requests7d` per project for 7-day window usage
+
 ### Added
 
 - Project disable/enable feature: administrators can disable abandoned projects to prevent members from using them
