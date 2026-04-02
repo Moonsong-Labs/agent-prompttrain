@@ -152,7 +152,15 @@ export class ProxyService {
     // Apply project system prompt override (after conversation tracking, before forwarding)
     if (this.storageAdapter) {
       const pool = this.storageAdapter.getPool()
-      await applySystemPromptOverride(rawRequest, context.projectId, pool)
+      const overrideApplied = await applySystemPromptOverride(rawRequest, context.projectId, pool)
+
+      // If a custom system prompt was applied, ensure the request is stored.
+      // Without this, requests with few original system blocks (e.g. from simple clients)
+      // would be classified as 'query_evaluation' and skipped from storage,
+      // even though the project has meaningful configuration.
+      if (overrideApplied) {
+        request.upgradeToInference()
+      }
     }
 
     try {

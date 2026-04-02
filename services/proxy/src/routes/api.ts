@@ -1186,7 +1186,9 @@ apiRoutes.get('/token-usage/accounts', async c => {
   }
 
   try {
-    // Get all accounts from credentials table, with usage data from the last 5 hours
+    // Get all accounts from credentials table, with usage data from the last 5 hours.
+    // Also includes linked projects from project_accounts + projects tables so that
+    // all projects (including private ones) appear even without recent api_requests data.
     const accountsQuery = `
       WITH account_usage AS (
         SELECT
@@ -1210,6 +1212,42 @@ apiRoutes.get('/token-usage/accounts', async c => {
         WHERE account_id IS NOT NULL
           AND timestamp >= NOW() - INTERVAL '5 hours'
         GROUP BY account_id, project_id
+      ),
+      linked_projects AS (
+        SELECT DISTINCT
+          cr.account_id,
+          p.project_id as project_string_id,
+          p.name as project_name,
+          p.is_private
+        FROM credentials cr
+        JOIN project_accounts pa ON cr.id = pa.credential_id
+        JOIN projects p ON pa.project_id = p.id
+      ),
+      default_projects AS (
+        SELECT DISTINCT
+          cr.account_id,
+          p.project_id as project_string_id,
+          p.name as project_name,
+          p.is_private
+        FROM credentials cr
+        JOIN projects p ON p.default_account_id = cr.id
+      ),
+      all_linked AS (
+        SELECT * FROM linked_projects
+        UNION
+        SELECT * FROM default_projects
+      ),
+      combined_projects AS (
+        SELECT
+          COALESCE(tu.account_id, lp.account_id) as account_id,
+          COALESCE(tu.project_id, lp.project_string_id) as project_id,
+          COALESCE(lp.project_name, tu.project_id) as project_name,
+          COALESCE(lp.is_private, false) as is_private,
+          COALESCE(tu.train_output_tokens, 0) as output_tokens,
+          COALESCE(tu.train_requests, 0) as requests
+        FROM train_usage tu
+        FULL OUTER JOIN all_linked lp
+          ON tu.account_id = lp.account_id AND tu.project_id = lp.project_string_id
       )
       SELECT
         c.account_id,
@@ -1220,16 +1258,18 @@ apiRoutes.get('/token-usage/accounts', async c => {
         COALESCE(
           json_agg(
             json_build_object(
-              'projectId', tu.project_id,
-              'outputTokens', tu.train_output_tokens,
-              'requests', tu.train_requests
-            ) ORDER BY tu.train_output_tokens DESC
-          ) FILTER (WHERE tu.project_id IS NOT NULL),
+              'projectId', cp.project_id,
+              'projectName', cp.project_name,
+              'isPrivate', cp.is_private,
+              'outputTokens', cp.output_tokens,
+              'requests', cp.requests
+            ) ORDER BY cp.output_tokens DESC
+          ) FILTER (WHERE cp.project_id IS NOT NULL),
           '[]'::json
         ) as train_ids
       FROM credentials c
       LEFT JOIN account_usage au ON c.account_id = au.account_id
-      LEFT JOIN train_usage tu ON c.account_id = tu.account_id
+      LEFT JOIN combined_projects cp ON c.account_id = cp.account_id
       GROUP BY c.account_id, au.total_output_tokens, au.total_input_tokens,
                au.request_count, au.last_request_time
       ORDER BY COALESCE(au.total_output_tokens, 0) DESC

@@ -190,10 +190,11 @@ analyticsPartialRoutes.get('/partials/analytics', async c => {
                               .slice(0, 3)
                               .map(
                                 d => `
-                              <div style="font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 3px;">
-                                <span style="color: #374151;">${escapeHtml(d.projectId)}:</span>
+                              <div style="font-size: 11px; color: #6b7280; background: ${d.isPrivate ? '#fef3c7' : '#f3f4f6'}; padding: 2px 6px; border-radius: 3px; ${d.outputTokens === 0 ? 'opacity: 0.6;' : ''}">
+                                ${d.isPrivate ? '<span title="Private project">&#128274;</span> ' : ''}
+                                <span style="color: #374151;">${escapeHtml(d.projectName || d.projectId)}:</span>
                                 ${formatNumber(d.outputTokens)} tokens
-                                (${((d.outputTokens / account.outputTokens) * 100).toFixed(0)}%)
+                                ${account.outputTokens > 0 ? `(${((d.outputTokens / account.outputTokens) * 100).toFixed(0)}%)` : ''}
                               </div>
                             `
                               )
