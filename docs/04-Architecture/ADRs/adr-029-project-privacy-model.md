@@ -22,7 +22,12 @@ We implement a **selective privacy model** focused on protecting conversation co
    - Only project members can view conversations, requests, and message content
    - Non-members receive empty results when querying private project data
 
-3. **Member lists and API keys are visible** to all authenticated users
+3. **Token usage statistics include all projects** (public and private)
+   - Rationale: Aggregate usage stats (token counts, request counts) provide operational value without exposing conversation content
+   - Private projects appear with a privacy indicator in the token usage dashboard
+   - Linked projects from the `project_accounts` junction table are included even without recent activity
+
+4. **Member lists and API keys are visible** to all authenticated users
    - Rationale: This is an internal company dashboard where team composition transparency is valued
    - Partial API key visibility helps with debugging and audit trails
 

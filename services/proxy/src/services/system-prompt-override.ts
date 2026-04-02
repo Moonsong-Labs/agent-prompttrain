@@ -8,19 +8,21 @@ import { logger } from '../middleware/logger'
  * Mutates rawRequest.system if the project has an enabled, non-empty system prompt.
  * Must be called AFTER conversation tracking (which needs the original system)
  * and BEFORE forwarding to Claude API.
+ *
+ * @returns true if a system prompt override was applied, false otherwise
  */
 export async function applySystemPromptOverride(
   rawRequest: ClaudeMessagesRequest,
   projectId: string,
   pool: Pool
-): Promise<void> {
+): Promise<boolean> {
   try {
     const config = await getProjectSystemPrompt(pool, projectId)
     if (!config || !config.enabled) {
-      return
+      return false
     }
     if (!config.system_prompt || config.system_prompt.length === 0) {
-      return
+      return false
     }
 
     logger.debug('Applying project system prompt override', {
@@ -32,6 +34,7 @@ export async function applySystemPromptOverride(
     })
 
     rawRequest.system = config.system_prompt
+    return true
   } catch (error) {
     logger.warn('Failed to apply system prompt override, using original', {
       projectId,
@@ -39,5 +42,6 @@ export async function applySystemPromptOverride(
         error: error instanceof Error ? error.message : String(error),
       },
     })
+    return false
   }
 }

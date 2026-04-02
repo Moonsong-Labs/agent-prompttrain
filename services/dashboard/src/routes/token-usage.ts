@@ -420,10 +420,11 @@ tokenUsageRoutes.get('/token-usage', async c => {
                               ${account.trainIds
                                 .map(
                                   projectId => `
-                                <div style="font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">
-                                  <span style="color: #374151; font-weight: 500;">${escapeHtml(projectId.projectId)}:</span>
+                                <div style="font-size: 12px; color: #6b7280; background: ${projectId.isPrivate ? '#fef3c7' : '#f3f4f6'}; padding: 4px 8px; border-radius: 4px; ${projectId.outputTokens === 0 ? 'opacity: 0.6;' : ''}">
+                                  ${projectId.isPrivate ? '<span title="Private project">&#128274;</span> ' : ''}
+                                  <span style="color: #374151; font-weight: 500;">${escapeHtml(projectId.projectName || projectId.projectId)}:</span>
                                   ${formatNumber(projectId.outputTokens)} tokens
-                                  (${((projectId.outputTokens / account.outputTokens) * 100).toFixed(0)}%)
+                                  ${account.outputTokens > 0 ? `(${((projectId.outputTokens / account.outputTokens) * 100).toFixed(0)}%)` : ''}
                                 </div>
                               `
                                 )

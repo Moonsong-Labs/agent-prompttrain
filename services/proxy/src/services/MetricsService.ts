@@ -410,7 +410,10 @@ export class MetricsService {
     }
 
     // Skip storing internal Claude Code helper requests
-    if (this.isInternalClaudeCodeRequest(request.raw)) {
+    // But not when a project-level system prompt override was applied,
+    // since the overridden system prompt replaces the original and
+    // should not be matched against internal helper prefixes.
+    if (!request.hasCustomSystemPrompt && this.isInternalClaudeCodeRequest(request.raw)) {
       logger.debug('Skipping storage for internal Claude Code request', {
         requestId: context.requestId,
       })

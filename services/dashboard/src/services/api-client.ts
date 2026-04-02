@@ -556,6 +556,8 @@ export class ProxyApiClient {
       percentageUsed: number
       trainIds: Array<{
         projectId: string
+        projectName: string | null
+        isPrivate: boolean
         outputTokens: number
         requests: number
       }>
@@ -588,6 +590,8 @@ export class ProxyApiClient {
         percentageUsed: account.percentageUsed,
         trainIds: (account.trainIds || []).map((item: any) => ({
           projectId: item.projectId,
+          projectName: item.projectName || null,
+          isPrivate: item.isPrivate || false,
           outputTokens: item.outputTokens,
           requests: item.requests,
         })),

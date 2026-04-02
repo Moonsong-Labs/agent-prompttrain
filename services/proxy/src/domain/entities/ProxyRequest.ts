@@ -8,6 +8,7 @@ export type RequestType = 'query_evaluation' | 'inference' | 'quota' | 'internal
  */
 export class ProxyRequest {
   private _requestType: RequestType | null = null
+  private _hasCustomSystemPrompt = false
 
   constructor(
     public readonly raw: ClaudeMessagesRequest,
@@ -15,6 +16,11 @@ export class ProxyRequest {
     public readonly requestId: string,
     public readonly apiKey?: string
   ) {}
+
+  /** Whether this request had a project-level system prompt override applied */
+  get hasCustomSystemPrompt(): boolean {
+    return this._hasCustomSystemPrompt
+  }
 
   get isStreaming(): boolean {
     return this.raw.stream === true
@@ -29,6 +35,18 @@ export class ProxyRequest {
       this._requestType = this.determineRequestType()
     }
     return this._requestType
+  }
+
+  /**
+   * Upgrade request type to 'inference' if it was classified as non-storable.
+   * Used when a project has a custom system prompt override configured,
+   * meaning the request is meaningful regardless of the original system message count.
+   */
+  upgradeToInference(): void {
+    this._hasCustomSystemPrompt = true
+    if (this._requestType === 'query_evaluation') {
+      this._requestType = 'inference'
+    }
   }
 
   get systemMessageCount(): number {
