@@ -37,6 +37,7 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
   - Per-project tracking
   - 5-hour rolling window monitoring
   - Historical daily usage data
+  - Public status page at `/public/token-usage` (no auth required)
 - **Request type classification**:
   - Query evaluation
   - Inference requests

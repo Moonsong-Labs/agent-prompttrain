@@ -16,6 +16,7 @@ import { analysisPartialsRoutes } from './routes/partials/analysis.js'
 import { analyticsPartialRoutes } from './routes/partials/analytics.js'
 import { analyticsConversationPartialRoutes } from './routes/partials/analytics-conversation.js'
 import { csrfProtection } from './middleware/csrf.js'
+import { publicTokenUsageRoutes } from './routes/public-token-usage.js'
 import credentialsRoutes from './routes/credentials.js'
 import projectsRoutes from './routes/projects.js'
 import apiKeysRoutes from './routes/api-keys.js'
@@ -66,11 +67,25 @@ export async function createDashboardApp(): Promise<DashboardApp> {
   app.use('*', requestIdMiddleware()) // Generate request ID first
   app.use('*', loggingMiddleware()) // Then use it for logging
 
-  // Apply auth middleware first to set auth context
-  app.use('/*', dashboardAuth)
+  // Public routes — no authentication required
+  app.route('/public', publicTokenUsageRoutes)
 
-  // Apply CSRF protection after auth checks
-  app.use('/*', csrfProtection())
+  // Apply auth middleware to all routes except /public/* and /health
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.use('/*', async (c: any, next: any) => {
+    if (c.req.path.startsWith('/public/') || c.req.path === '/health') {
+      return next()
+    }
+    return dashboardAuth(c, next)
+  })
+
+  // Apply CSRF protection after auth checks (skip public routes)
+  app.use('/*', async (c, next) => {
+    if (c.req.path.startsWith('/public/')) {
+      return next()
+    }
+    return csrfProtection()(c, next)
+  })
 
   // Pass API client to routes instead of database pool
   app.use('/*', async (c, next) => {

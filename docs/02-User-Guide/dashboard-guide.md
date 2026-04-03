@@ -86,6 +86,16 @@ For Anthropic OAuth accounts, the Token Usage page displays real-time rate limit
 
 > Note: This feature requires Anthropic OAuth credentials. Bedrock accounts will show "N/A".
 
+#### Public Token Usage Status
+
+A public (unauthenticated) version of the token usage overview is available at `/public/token-usage`. It shows:
+
+- Account names with 5-hour and 7-day utilization progress bars
+- Time remaining until each window resets
+- Last checked timestamp per account
+
+This page does not expose project breakdowns, raw token counts, or account IDs. It only shows the OAuth utilization percentages from the Anthropic API.
+
 #### Current Window (5-hour)
 
 Monitor internal proxy rate limits:
