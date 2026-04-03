@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Public token usage status page at `/public/token-usage` (no authentication required)
+  - Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account
+  - Compact multi-column layout with progress bars, reset times, and last-checked timestamps
+  - Only Anthropic OAuth accounts shown; Bedrock accounts are filtered out
+  - Link added to the authenticated Token Usage Overview page ("Public Status Page" button)
 - Project disable/enable feature: administrators can disable abandoned projects to prevent members from using them
   - CLI script `scripts/disable-project.ts` to disable, re-enable, or list disabled projects
   - DB migration 021 adds `disabled` column to the `projects` table

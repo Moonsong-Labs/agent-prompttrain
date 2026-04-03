@@ -107,6 +107,8 @@ ENABLE_CLIENT_AUTH=false
 
 The dashboard requires mandatory user authentication via oauth2-proxy headers. There is no API key authentication mode.
 
+> **Note**: The `/public/*` path prefix is excluded from authentication. See [Public Endpoints](#public-endpoints) below.
+
 ### Production Authentication (MANDATORY)
 
 **⚠️ CRITICAL**: oauth2-proxy is MANDATORY for all production deployments. The dashboard authenticates users via SSO headers injected by oauth2-proxy.
@@ -135,6 +137,14 @@ INTERNAL_API_KEY=dev-internal-key
 ```
 
 **WARNING**: Never set `DASHBOARD_DEV_USER_EMAIL` in production environments. This bypasses all authentication and should only be used during local development.
+
+### Public Endpoints
+
+Routes under `/public/*` bypass authentication and CSRF middleware entirely. These are designed for status monitoring without requiring dashboard credentials.
+
+- **`/public/token-usage`** — Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account with reset times and last-checked timestamps. No sensitive data (token counts, project details, or API keys) is exposed. Data is fetched server-side via the proxy API.
+
+See [ADR-027](../04-Architecture/ADRs/adr-027-mandatory-user-authentication.md#public-endpoints-exception) for the security rationale.
 
 ## Claude API Authentication
 

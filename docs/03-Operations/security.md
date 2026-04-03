@@ -4,13 +4,30 @@ This guide covers security considerations and best practices for deploying Agent
 
 ## ⚠️ CRITICAL SECURITY NOTICE
 
-**Dashboard Authentication**: The dashboard requires mandatory user authentication via oauth2-proxy headers. There is no unauthenticated mode.
+**Dashboard Authentication**: The dashboard requires mandatory user authentication via oauth2-proxy headers. There is no unauthenticated mode for the main dashboard.
 
 **ALWAYS deploy with oauth2-proxy in production!**
 
 Without oauth2-proxy configured, the dashboard will only be accessible in development mode with `DASHBOARD_DEV_USER_EMAIL` set. Production deployments MUST use oauth2-proxy with proper SSO configuration.
 
 See [ADR-027: Mandatory User Authentication](../04-Architecture/ADRs/adr-027-mandatory-user-authentication.md) for detailed information about the authentication architecture.
+
+### Public Endpoints
+
+The following dashboard endpoints are intentionally public (no authentication required):
+
+| Endpoint                  | Data Exposed                                                       | Data NOT Exposed                                                    |
+| ------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `GET /public/token-usage` | Utilization %, reset times, account names, last-checked timestamps | Token counts, account IDs, project details, API keys, conversations |
+
+These endpoints are registered before the auth middleware in `app.ts` and bypass both authentication and CSRF protection. The proxy API key used to fetch data stays server-side and is never sent to the browser.
+
+**Security considerations for public endpoints:**
+
+- Only aggregate utilization percentages are shown — no raw token counts or usage details
+- Account display names (not internal IDs) are the only identifying information exposed
+- No links to the authenticated dashboard are provided
+- No project-level breakdown is available
 
 ## Authentication
 

@@ -102,6 +102,20 @@ type AuthContext = {
 - This is separate from user authentication
 - Used for internal service-to-service calls
 
+### Public Endpoints Exception
+
+The `/public/*` path prefix on the dashboard is excluded from the authentication middleware. These routes are intentionally unauthenticated for status monitoring purposes.
+
+**Current public endpoints:**
+
+- `GET /public/token-usage` — Shows Anthropic OAuth rate limit utilization (5h/7d windows) per account
+
+**What is exposed**: Utilization percentages, reset times, account display names, last-checked timestamps.
+
+**What is NOT exposed**: Raw token counts, account IDs, project breakdowns, API keys, conversation data, or any other sensitive information.
+
+The API key used to fetch data from the proxy service remains server-side and is never sent to the browser. This design allows sharing rate limit status with stakeholders without granting dashboard access.
+
 ## Consequences
 
 ### Positive
