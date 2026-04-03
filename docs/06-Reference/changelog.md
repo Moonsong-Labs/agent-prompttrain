@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI Analysis real-time progress feedback on conversation detail page
+  - Step-based progress indicator showing Queued / Generating / Results Ready states
+  - Elapsed time counter during analysis processing
+  - Success toast notification when analysis completes from polling
+  - Smooth slide-in animation on completion transition
 - Public token usage status page at `/public/token-usage` (no authentication required)
   - Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account
   - Compact multi-column layout with progress bars, reset times, and last-checked timestamps
