@@ -111,18 +111,12 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
       )
     )
 
-    // Build account rows HTML
+    // Build account rows HTML — only show accounts with Anthropic OAuth usage data
     const accountRows = oauthResults
-      .map(({ accountId, data }) => {
-        if (!data || !data.available || data.windows.length === 0) {
-          return `
-          <div class="card">
-            <div class="card-header">
-              <span class="account-name">${escapeHtml(accountId)}</span>
-              <span class="last-checked">${data?.error ? escapeHtml(data.error) : 'No data'}</span>
-            </div>
-          </div>`
-        }
+      .filter(({ data }) => data?.available && data.windows.length > 0)
+      .map(({ accountId, data: oauthData }) => {
+        // data is guaranteed non-null by the filter above
+        const data = oauthData!
 
         const windowBars = data.windows
           .map(w => {
