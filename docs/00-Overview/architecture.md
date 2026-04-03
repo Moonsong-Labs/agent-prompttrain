@@ -62,6 +62,7 @@ agent-prompttrain/
 - `GET /api/storage-stats` - Aggregated statistics
 - `GET /sse` - Server-sent events for real-time updates
 - `GET /health` - Health check
+- `GET /public/token-usage` - Public token usage status (no auth required)
 
 ## Deployment
 

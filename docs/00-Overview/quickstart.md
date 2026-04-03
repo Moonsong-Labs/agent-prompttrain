@@ -72,6 +72,7 @@ docker compose exec claude-cli /usr/local/bin/claude-cli "Hello!"
 - **View logs**: `docker compose logs -f proxy`
 - **Token stats**: `curl http://localhost:3000/token-stats`
 - **Dashboard**: http://localhost:3001 (authentication required - use `DASHBOARD_DEV_USER_EMAIL=dev@localhost` for local development)
+- **Public token usage**: http://localhost:3001/public/token-usage (no authentication required)
 
 ## Troubleshooting
 
