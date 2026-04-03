@@ -560,6 +560,8 @@ export class ProxyApiClient {
         isPrivate: boolean
         outputTokens: number
         requests: number
+        outputTokens7d: number
+        requests7d: number
       }>
       miniSeries: Array<{
         time: string
@@ -594,6 +596,8 @@ export class ProxyApiClient {
           isPrivate: item.isPrivate || false,
           outputTokens: item.outputTokens,
           requests: item.requests,
+          outputTokens7d: item.outputTokens7d || 0,
+          requests7d: item.requests7d || 0,
         })),
         miniSeries: account.miniSeries || [],
       }))
