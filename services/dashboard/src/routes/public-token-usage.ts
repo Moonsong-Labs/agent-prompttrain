@@ -116,12 +116,10 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
       .map(({ accountId, data }) => {
         if (!data || !data.available || data.windows.length === 0) {
           return `
-          <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-            <div style="font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">
-              ${escapeHtml(accountId)}
-            </div>
-            <div style="font-size: 13px; color: #9ca3af;">
-              ${data?.error ? escapeHtml(data.error) : 'No usage data available'}
+          <div class="card">
+            <div class="card-header">
+              <span class="account-name">${escapeHtml(accountId)}</span>
+              <span class="last-checked">${data?.error ? escapeHtml(data.error) : 'No data'}</span>
             </div>
           </div>`
         }
@@ -131,42 +129,32 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
             const color = getBarColor(w.utilization)
             const timeLeft = formatTimeLeft(w.resets_at_iso)
             return `
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="min-width: 110px; font-size: 13px; font-weight: 500; color: #374151;">
-                ${escapeHtml(w.name)}
-              </div>
-              <div style="flex: 1; max-width: 220px;">
-                <div style="position: relative; background: #f3f4f6; height: 22px; border-radius: 4px; overflow: hidden;">
-                  <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, w.utilization)}%; transition: width 0.3s ease;"></div>
-                  <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; color: #1f2937;">
-                    ${w.utilization.toFixed(1)}%
-                  </div>
+            <div class="window-row">
+              <div class="window-label">${escapeHtml(w.name)}</div>
+              <div class="bar-container">
+                <div class="bar-bg">
+                  <div class="bar-fill" style="background: ${color}; width: ${Math.min(100, w.utilization)}%;"></div>
+                  <div class="bar-text">${w.utilization.toFixed(1)}%</div>
                 </div>
               </div>
-              <div style="min-width: 100px; font-size: 12px; color: #6b7280;">
-                <strong style="color: #374151;">${timeLeft}</strong> left
-              </div>
+              <div class="time-left"><strong>${timeLeft}</strong> left</div>
             </div>`
           })
           .join('')
 
-        const lastChecked = data.is_estimated
-          ? `&#9888; Estimated (API rate limited) &bull; Last checked: ${formatRelativeTime(data.fetched_at)}`
-          : `Last checked: ${formatRelativeTime(data.fetched_at)}`
+        const lastCheckedText = data.is_estimated
+          ? `&#9888; Est. ${formatRelativeTime(data.fetched_at)}`
+          : formatRelativeTime(data.fetched_at)
 
         const lastCheckedColor = data.is_estimated ? '#92400e' : '#9ca3af'
 
         return `
-        <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-          <div style="font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">
-            ${escapeHtml(accountId)}
+        <div class="card">
+          <div class="card-header">
+            <span class="account-name">${escapeHtml(accountId)}</span>
+            <span class="last-checked" style="color: ${lastCheckedColor};">${lastCheckedText}</span>
           </div>
-          <div style="display: grid; gap: 8px; margin-bottom: 8px;">
-            ${windowBars}
-          </div>
-          <div style="font-size: 11px; color: ${lastCheckedColor}; margin-top: 4px;">
-            ${lastChecked}
-          </div>
+          <div class="windows">${windowBars}</div>
         </div>`
       })
       .join('')
@@ -187,21 +175,96 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               background: #f9fafb;
               color: #1f2937;
-              padding: 24px;
-              max-width: 700px;
-              margin: 0 auto;
+              padding: 16px;
             }
             h1 {
-              font-size: 22px;
+              font-size: 18px;
               font-weight: 700;
-              margin-bottom: 20px;
+              margin-bottom: 12px;
               color: #111827;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+              gap: 8px;
+            }
+            .card {
+              background: #fff;
+              border: 1px solid #e5e7eb;
+              border-radius: 6px;
+              padding: 10px 12px;
+            }
+            .card-header {
+              display: flex;
+              align-items: baseline;
+              justify-content: space-between;
+              margin-bottom: 6px;
+            }
+            .account-name {
+              font-size: 14px;
+              font-weight: 600;
+              color: #1f2937;
+            }
+            .last-checked {
+              font-size: 11px;
+              color: #9ca3af;
+            }
+            .windows {
+              display: grid;
+              gap: 4px;
+            }
+            .window-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .window-label {
+              min-width: 90px;
+              font-size: 12px;
+              font-weight: 500;
+              color: #374151;
+            }
+            .bar-container {
+              flex: 1;
+              max-width: 180px;
+            }
+            .bar-bg {
+              position: relative;
+              background: #f3f4f6;
+              height: 18px;
+              border-radius: 3px;
+              overflow: hidden;
+            }
+            .bar-fill {
+              position: absolute;
+              left: 0;
+              top: 0;
+              height: 100%;
+              transition: width 0.3s ease;
+            }
+            .bar-text {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 600;
+              font-size: 11px;
+              color: #1f2937;
+            }
+            .time-left {
+              min-width: 90px;
+              font-size: 11px;
+              color: #6b7280;
             }
           </style>
         </head>
         <body>
           <h1>Token Usage Status</h1>
-          ${raw(accountRows)}
+          <div class="grid">${raw(accountRows)}</div>
         </body>
       </html>`
 
@@ -218,16 +281,14 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               background: #f9fafb;
               color: #1f2937;
-              padding: 24px;
-              max-width: 700px;
-              margin: 0 auto;
+              padding: 16px;
             }
           </style>
         </head>
         <body>
-          <h1 style="font-size: 22px; margin-bottom: 16px;">Token Usage Status</h1>
+          <h1 style="font-size: 18px; margin-bottom: 12px;">Token Usage Status</h1>
           <div
-            style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; color: #991b1b;"
+            style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; color: #991b1b; font-size: 13px;"
           >
             <strong>Error:</strong> Unable to load token usage data. Please try again later.
           </div>
