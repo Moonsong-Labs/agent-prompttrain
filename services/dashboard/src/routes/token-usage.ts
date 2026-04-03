@@ -148,8 +148,17 @@ tokenUsageRoutes.get('/token-usage', async c => {
       })
 
       const content = html`
-        <div class="mb-6">
+        <div
+          class="mb-6"
+          style="display: flex; align-items: center; justify-content: space-between;"
+        >
           <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
+          <a
+            href="/public/token-usage"
+            target="_blank"
+            style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; color: #15803d; font-size: 13px; font-weight: 500; text-decoration: none;"
+            >Public Status Page ↗</a
+          >
         </div>
 
         <h2 style="margin: 0 0 1.5rem 0;">Token Usage Overview - All Accounts</h2>
