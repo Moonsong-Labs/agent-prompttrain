@@ -422,6 +422,15 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 (sum: number, p: any) => sum + (p.outputTokens7d || 0),
                                 0
                               )
+                              // Get OAuth window utilization to scale project percentages
+                              const util5h = oauthUsage?.available
+                                ? (oauthUsage.windows.find(w => w.short_name === '5h')
+                                    ?.utilization ?? null)
+                                : null
+                              const util7d = oauthUsage?.available
+                                ? (oauthUsage.windows.find(w => w.short_name === '7d')
+                                    ?.utilization ?? null)
+                                : null
                               const activeProjects = account.trainIds.filter(
                                 (p: any) => p.outputTokens > 0 || (p.outputTokens7d || 0) > 0
                               )
@@ -432,16 +441,25 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
                               ${activeProjects
                                 .map((projectId: any) => {
+                                  // Each project's % = its share of tokens * account window utilization
                                   const pct5h =
-                                    total5h > 0
-                                      ? ((projectId.outputTokens / total5h) * 100).toFixed(0)
-                                      : '0'
+                                    util5h !== null && total5h > 0
+                                      ? ((projectId.outputTokens / total5h) * util5h).toFixed(1)
+                                      : total5h > 0
+                                        ? ((projectId.outputTokens / total5h) * 100).toFixed(1)
+                                        : '0'
                                   const pct7d =
-                                    total7d > 0
-                                      ? (((projectId.outputTokens7d || 0) / total7d) * 100).toFixed(
-                                          0
-                                        )
-                                      : '0'
+                                    util7d !== null && total7d > 0
+                                      ? (
+                                          ((projectId.outputTokens7d || 0) / total7d) *
+                                          util7d
+                                        ).toFixed(1)
+                                      : total7d > 0
+                                        ? (
+                                            ((projectId.outputTokens7d || 0) / total7d) *
+                                            100
+                                          ).toFixed(1)
+                                        : '0'
                                   return `
                                 <div style="font-size: 12px; color: #6b7280; background: ${projectId.isPrivate ? '#fef3c7' : '#f3f4f6'}; padding: 6px 8px; border-radius: 4px; line-height: 1.5;">
                                   <div>

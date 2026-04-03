@@ -1248,22 +1248,37 @@ apiRoutes.get('/token-usage/accounts', async c => {
         UNION
         SELECT * FROM default_projects
       ),
+      all_project_keys AS (
+        SELECT account_id, project_id, project_id as project_name, false as is_private FROM train_usage
+        UNION
+        SELECT account_id, project_id, project_id as project_name, false as is_private FROM train_usage_7d
+        UNION
+        SELECT account_id, project_string_id as project_id, project_name, is_private FROM all_linked
+      ),
+      distinct_project_keys AS (
+        SELECT DISTINCT ON (account_id, project_id)
+          account_id, project_id,
+          project_name, is_private
+        FROM all_project_keys
+        ORDER BY account_id, project_id, is_private DESC
+      ),
       combined_projects AS (
         SELECT
-          COALESCE(tu.account_id, tu7.account_id, lp.account_id) as account_id,
-          COALESCE(tu.project_id, tu7.project_id, lp.project_string_id) as project_id,
-          COALESCE(lp.project_name, tu.project_id, tu7.project_id) as project_name,
-          COALESCE(lp.is_private, false) as is_private,
+          dpk.account_id,
+          dpk.project_id,
+          COALESCE(lp.project_name, dpk.project_name) as project_name,
+          COALESCE(lp.is_private, dpk.is_private) as is_private,
           COALESCE(tu.train_output_tokens, 0) as output_tokens,
           COALESCE(tu.train_requests, 0) as requests,
           COALESCE(tu7.train_output_tokens_7d, 0) as output_tokens_7d,
           COALESCE(tu7.train_requests_7d, 0) as requests_7d
-        FROM train_usage tu
-        FULL OUTER JOIN train_usage_7d tu7
-          ON tu.account_id = tu7.account_id AND tu.project_id = tu7.project_id
-        FULL OUTER JOIN all_linked lp
-          ON COALESCE(tu.account_id, tu7.account_id) = lp.account_id
-          AND COALESCE(tu.project_id, tu7.project_id) = lp.project_string_id
+        FROM distinct_project_keys dpk
+        LEFT JOIN train_usage tu
+          ON dpk.account_id = tu.account_id AND dpk.project_id = tu.project_id
+        LEFT JOIN train_usage_7d tu7
+          ON dpk.account_id = tu7.account_id AND dpk.project_id = tu7.project_id
+        LEFT JOIN all_linked lp
+          ON dpk.account_id = lp.account_id AND dpk.project_id = lp.project_string_id
       )
       SELECT
         c.account_id,
