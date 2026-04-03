@@ -417,21 +417,6 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 : ''
                             }
                             ${(() => {
-                              const now = new Date()
-                              const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000)
-                              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-                              const dateFmt = (d: Date) =>
-                                d.toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: false,
-                                })
-                              const dateFmtShort = (d: Date) =>
-                                d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                              const window5h = `${dateFmt(fiveHoursAgo)} - ${dateFmt(now)}`
-                              const window7d = `${dateFmtShort(sevenDaysAgo)} - ${dateFmtShort(now)}`
                               const total5h = account.outputTokens
                               const total7d = account.trainIds.reduce(
                                 (sum: number, p: any) => sum + (p.outputTokens7d || 0),
@@ -463,8 +448,8 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                     ${projectId.isPrivate ? '<span title="Private project">&#128274;</span> ' : ''}
                                     <span style="color: #374151; font-weight: 500;">${escapeHtml(projectId.projectName || projectId.projectId)}</span>
                                   </div>
-                                  <div style="font-size: 11px; font-family: monospace;">5h <span style="color: #9ca3af;">(${window5h})</span>: <strong style="color: #374151;">${pct5h}%</strong></div>
-                                  <div style="font-size: 11px; font-family: monospace;">7d <span style="color: #9ca3af;">(${window7d})</span>: <strong style="color: #374151;">${pct7d}%</strong></div>
+                                  <div style="font-size: 11px; font-family: monospace;">5h: <strong style="color: #374151;">${pct5h}%</strong></div>
+                                  <div style="font-size: 11px; font-family: monospace;">7d: <strong style="color: #374151;">${pct7d}%</strong></div>
                                 </div>
                               `
                                 })
