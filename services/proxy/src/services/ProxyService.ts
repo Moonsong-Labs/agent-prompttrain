@@ -253,6 +253,14 @@ export class ProxyService {
 
       return finalResponse
     } catch (error) {
+      // Flush test sample with error info so failed requests can be inspected
+      if (sampleId) {
+        await testSampleCollector.flushPendingSample(sampleId, {
+          message: error instanceof Error ? error.message : String(error),
+          status: (error as any).statusCode || 500,
+        })
+      }
+
       // Track error metrics
       await this.metricsService.trackError(
         request,

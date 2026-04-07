@@ -331,6 +331,40 @@ export class TestSampleCollector {
     return params
   }
 
+  /**
+   * Flush a pending sample to disk without response data (e.g., when the request failed).
+   * This allows inspecting the request even if no response was received.
+   */
+  async flushPendingSample(
+    sampleId: string,
+    error?: { message: string; status?: number }
+  ): Promise<void> {
+    if (!this.enabled || !sampleId) {
+      return
+    }
+
+    const pendingSample = this.pendingSamples.get(sampleId)
+    if (!pendingSample) {
+      return
+    }
+
+    try {
+      if (error) {
+        pendingSample.sample.response = {
+          status: error.status || 0,
+          headers: {},
+          body: { error: error.message },
+        }
+      }
+
+      const filepath = path.join(this.samplesDir, pendingSample.filename)
+      await fs.writeFile(filepath, JSON.stringify(pendingSample.sample, null, 2), 'utf-8')
+      this.pendingSamples.delete(sampleId)
+    } catch (flushError) {
+      console.error('Failed to flush pending test sample', flushError)
+    }
+  }
+
   // Get collected samples (useful for testing)
   async getCollectedSamples(): Promise<string[]> {
     if (!this.enabled) {
