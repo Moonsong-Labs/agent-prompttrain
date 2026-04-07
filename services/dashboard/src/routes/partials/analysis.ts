@@ -71,9 +71,17 @@ analysisPartialsRoutes.get('/status/:conversationId/:branchId', async c => {
     switch (response.status) {
       case 'pending':
       case 'processing':
-        return c.html(renderProcessingPanel(conversationId, branchId, pollCount))
+        return c.html(
+          renderProcessingPanel(
+            conversationId,
+            branchId,
+            pollCount,
+            response.status,
+            response.createdAt
+          )
+        )
       case 'completed':
-        return c.html(renderCompletedPanel(conversationId, branchId, response, auth))
+        return c.html(renderCompletedPanel(conversationId, branchId, response, auth, pollCount > 0))
       case 'failed':
         return c.html(renderFailedPanel(conversationId, branchId, response.error, auth))
       default:
@@ -292,18 +300,58 @@ ${defaultPrompt}</textarea
   `
 }
 
-function renderProcessingPanel(conversationId: string, branchId: string, pollCount: number = 0) {
-  // Progressive backoff: 2s, 3s, 5s, 10s, then every 10s
-  const pollIntervals = [2, 3, 5, 10, 10]
+function renderProcessingPanel(
+  conversationId: string,
+  branchId: string,
+  pollCount: number = 0,
+  analysisStatus: 'pending' | 'processing' = 'pending',
+  createdAt?: string
+) {
+  // Progressive backoff: 2s, 3s, 5s, 8s, then every 15s
+  const pollIntervals = [2, 3, 5, 8, 15]
   const interval = pollIntervals[Math.min(pollCount, pollIntervals.length - 1)]
+
+  // Calculate elapsed time for display
+  const elapsedSeconds = createdAt
+    ? Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000)
+    : 0
+  const elapsedDisplay =
+    elapsedSeconds >= 60
+      ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+      : `${elapsedSeconds}s`
+
+  // Determine progress steps
+  const isProcessing = analysisStatus === 'processing'
+
+  // Detect stalled analysis: still pending after 30s or processing after 3 minutes
+  const isStalled = (!isProcessing && elapsedSeconds > 30) || (isProcessing && elapsedSeconds > 180)
+
+  // Stop polling after 5 minutes - show stalled state permanently
+  const maxElapsedForPolling = 300
+  const shouldContinuePolling = elapsedSeconds < maxElapsedForPolling
+
+  // Step descriptions for each phase
+  let currentStepLabel: string
+  if (isStalled) {
+    currentStepLabel = isProcessing
+      ? 'Analysis is taking longer than expected. The AI worker may be under heavy load.'
+      : 'The analysis worker has not picked up this job yet. It may be offline or overloaded.'
+  } else {
+    currentStepLabel = isProcessing
+      ? 'Generating analysis with AI...'
+      : 'Queued, waiting for worker...'
+  }
 
   return html`
     <div
       id="analysis-panel"
       class="section"
-      hx-get="/partials/analysis/status/${conversationId}/${branchId}?pollCount=${pollCount + 1}"
-      hx-trigger="delay:${interval}s"
-      hx-swap="outerHTML"
+      ${shouldContinuePolling
+        ? raw(
+            `hx-get="/partials/analysis/status/${conversationId}/${branchId}?pollCount=${pollCount + 1}" hx-trigger="delay:${interval}s" hx-swap="outerHTML"`
+          )
+        : ''}
+      data-testid="analysis-processing-panel"
     >
       <div class="section-header" style="display: flex; align-items: center; gap: 0.75rem;">
         <svg
@@ -323,18 +371,201 @@ function renderProcessingPanel(conversationId: string, branchId: string, pollCou
         <h3 style="margin: 0; font-size: 1.125rem; font-weight: 600; color: #1f2937;">
           AI Analysis
         </h3>
+        ${createdAt
+          ? html`<span
+              id="analysis-elapsed-timer"
+              style="margin-left: auto; font-size: 0.75rem; color: ${isStalled
+                ? '#f59e0b'
+                : '#9ca3af'}; font-variant-numeric: tabular-nums;"
+              data-testid="analysis-elapsed-time"
+              data-created-at="${new Date(createdAt).toISOString()}"
+              >${elapsedDisplay} elapsed</span
+            >`
+          : ''}
       </div>
       <div class="section-content">
-        <div style="display: flex; align-items: center; gap: 0.75rem; color: #6b7280;">
-          <span class="spinner"></span>
-          <span>Analysis in progress... This may take a moment.</span>
+        <!-- Progress Steps -->
+        <div
+          style="display: flex; flex-direction: column; gap: 0.75rem;"
+          data-testid="analysis-progress-steps"
+        >
+          <!-- Step 1: Request Queued -->
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div
+              style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #10b981; color: white;"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                style="width: 0.875rem; height: 0.875rem;"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span style="font-size: 0.875rem; color: #6b7280;">Request queued</span>
+          </div>
+
+          <!-- Connector line -->
+          <div
+            style="width: 2px; height: 0.5rem; background: ${isProcessing
+              ? '#10b981'
+              : '#e5e7eb'}; margin-left: 0.6875rem;"
+          ></div>
+
+          <!-- Step 2: Processing -->
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            ${isProcessing
+              ? html`<span
+                  class="spinner"
+                  style="width: 1.5rem; height: 1.5rem; flex-shrink: 0;"
+                ></span>`
+              : isStalled
+                ? html`<div
+                    style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #f59e0b; color: white;"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="width: 0.875rem; height: 0.875rem;"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="3"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01" />
+                    </svg>
+                  </div>`
+                : html`<div
+                    style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid #d1d5db; background: white;"
+                  >
+                    <div
+                      style="width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #d1d5db;"
+                    ></div>
+                  </div>`}
+            <span
+              style="font-size: 0.875rem; color: ${isProcessing
+                ? '#1f2937'
+                : isStalled
+                  ? '#92400e'
+                  : '#9ca3af'}; ${isProcessing ? 'font-weight: 500;' : ''}"
+              >${isProcessing
+                ? 'Generating analysis with AI...'
+                : isStalled
+                  ? 'Waiting for worker...'
+                  : 'Generate analysis'}</span
+            >
+          </div>
+
+          <!-- Connector line -->
+          <div
+            style="width: 2px; height: 0.5rem; background: #e5e7eb; margin-left: 0.6875rem;"
+          ></div>
+
+          <!-- Step 3: Complete (always pending) -->
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div
+              style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid #d1d5db; background: white;"
+            >
+              <div
+                style="width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #d1d5db;"
+              ></div>
+            </div>
+            <span style="font-size: 0.875rem; color: #9ca3af;">Results ready</span>
+          </div>
         </div>
-        <div style="margin-top: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 0.5rem;">
-          <p style="font-size: 0.875rem; color: #6b7280; margin: 0;">
-            The AI is analyzing the conversation to extract insights, identify patterns, and provide
-            actionable recommendations.
-          </p>
+
+        <!-- Current status message -->
+        <div
+          style="margin-top: 1.25rem; padding: 0.875rem 1rem; background: ${isStalled
+            ? '#fffbeb'
+            : '#eff6ff'}; border: 1px solid ${isStalled
+            ? '#fcd34d'
+            : '#bfdbfe'}; border-radius: 0.5rem; display: flex; align-items: ${isStalled
+            ? 'flex-start'
+            : 'center'}; gap: 0.625rem;"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            style="width: 1rem; height: 1rem; color: ${isStalled
+              ? '#f59e0b'
+              : '#3b82f6'}; flex-shrink: 0; margin-top: ${isStalled ? '0.125rem' : '0'};"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="${isStalled
+                ? 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+                : 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"
+            />
+          </svg>
+          <div>
+            <p style="font-size: 0.813rem; color: ${isStalled ? '#92400e' : '#1e40af'}; margin: 0;">
+              ${currentStepLabel}
+            </p>
+            ${isStalled && !shouldContinuePolling
+              ? html`<p style="font-size: 0.75rem; color: #b45309; margin: 0.375rem 0 0 0;">
+                  Polling stopped after 5 minutes. You can try regenerating or refresh the page
+                  later.
+                </p>`
+              : isStalled
+                ? html`<p style="font-size: 0.75rem; color: #b45309; margin: 0.375rem 0 0 0;">
+                    Still checking... Will stop polling after 5 minutes.
+                  </p>`
+                : ''}
+          </div>
         </div>
+        ${isStalled
+          ? html`
+              <div style="margin-top: 0.75rem;">
+                <button
+                  ${raw(`hx-post="/partials/analysis/regenerate/${conversationId}/${branchId}"`)}
+                  ${raw('hx-target="#analysis-panel"')}
+                  ${raw('hx-swap="outerHTML"')}
+                  class="btn btn-secondary"
+                  style="font-size: 0.813rem; padding: 0.375rem 0.75rem; display: inline-flex; align-items: center; gap: 0.375rem;"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    style="width: 0.875rem; height: 0.875rem;"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Retry Analysis
+                </button>
+              </div>
+            `
+          : ''}
+        <!-- Live elapsed time updater -->
+        <script>
+          ;(function () {
+            var el = document.getElementById('analysis-elapsed-timer')
+            if (!el) return
+            var createdAt = new Date(el.getAttribute('data-created-at')).getTime()
+            var tid = setInterval(function () {
+              if (!document.getElementById('analysis-elapsed-timer')) {
+                clearInterval(tid)
+                return
+              }
+              var s = Math.floor((Date.now() - createdAt) / 1000)
+              el.textContent =
+                (s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's') + ' elapsed'
+            }, 1000)
+          })()
+        </script>
       </div>
     </div>
   `
@@ -365,7 +596,8 @@ function renderCompletedPanel(
   conversationId: string,
   branchId: string,
   analysisResponse: GetAnalysisResponse,
-  _auth?: { isAuthenticated: boolean; principal: string; source: 'dev' | 'sso' }
+  _auth?: { isAuthenticated: boolean; principal: string; source: 'dev' | 'sso' },
+  fromPolling: boolean = false
 ) {
   const formatDate = (date: string | Date) => {
     const d = new Date(date)
@@ -390,8 +622,85 @@ function renderCompletedPanel(
 
   const analysisData = analysisResponse.data
 
+  // Calculate processing duration for display
+  const processingDuration =
+    analysisResponse.createdAt && analysisResponse.completedAt
+      ? Math.round(
+          (new Date(analysisResponse.completedAt).getTime() -
+            new Date(analysisResponse.createdAt).getTime()) /
+            1000
+        )
+      : null
+
   return html`
-    <div id="analysis-panel" class="section">
+    <div id="analysis-panel" class="section" data-testid="analysis-completed-panel">
+      ${fromPolling
+        ? html`
+            <style>
+              @keyframes analysisSlideIn {
+                from {
+                  opacity: 0;
+                  transform: translateY(-8px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              @keyframes analysisFadeOut {
+                from {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+                to {
+                  opacity: 0;
+                  transform: translateY(-8px);
+                }
+              }
+            </style>
+            <div
+              class="analysis-toast"
+              data-testid="analysis-complete-toast"
+              style="position: fixed; top: 1rem; right: 1rem; z-index: 1000; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 0.5rem; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.625rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 24rem; animation: analysisSlideIn 0.3s ease-out;"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                style="width: 1.25rem; height: 1.25rem; color: #10b981; flex-shrink: 0;"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p style="margin: 0; font-size: 0.875rem; font-weight: 500; color: #065f46;">
+                  Analysis complete!
+                </p>
+                ${processingDuration !== null
+                  ? html`<p style="margin: 0; font-size: 0.75rem; color: #047857;">
+                      Completed in ${processingDuration}s
+                    </p>`
+                  : ''}
+              </div>
+            </div>
+            <script>
+              setTimeout(function () {
+                var toast = document.querySelector('[data-testid="analysis-complete-toast"]')
+                if (toast) {
+                  toast.style.animation = 'analysisFadeOut 0.3s ease-in forwards'
+                  setTimeout(function () {
+                    toast.remove()
+                  }, 300)
+                }
+              }, 4000)
+            </script>
+          `
+        : ''}
       <div
         class="section-header"
         style="display: flex; justify-content: space-between; align-items: center;"
