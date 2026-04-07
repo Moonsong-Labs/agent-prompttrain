@@ -633,84 +633,74 @@ function renderCompletedPanel(
       : null
 
   return html`
-    ${fromPolling
-      ? html`
-          <style>
-            @keyframes analysisSlideIn {
-              from {
-                opacity: 0;
-                transform: translateY(-8px);
+    <div id="analysis-panel" class="section" data-testid="analysis-completed-panel">
+      ${fromPolling
+        ? html`
+            <style>
+              @keyframes analysisSlideIn {
+                from {
+                  opacity: 0;
+                  transform: translateY(-8px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
               }
-              to {
-                opacity: 1;
-                transform: translateY(0);
+              @keyframes analysisFadeOut {
+                from {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+                to {
+                  opacity: 0;
+                  transform: translateY(-8px);
+                }
               }
-            }
-            @keyframes analysisFadeOut {
-              from {
-                opacity: 1;
-                transform: translateY(0);
-              }
-              to {
-                opacity: 0;
-                transform: translateY(-8px);
-              }
-            }
-            .analysis-toast {
-              animation: analysisSlideIn 0.3s ease-out;
-            }
-            .analysis-completed-panel {
-              animation: analysisSlideIn 0.4s ease-out;
-            }
-          </style>
-          <div
-            class="analysis-toast"
-            data-testid="analysis-complete-toast"
-            style="position: fixed; top: 1rem; right: 1rem; z-index: 1000; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 0.5rem; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.625rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 24rem;"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              style="width: 1.25rem; height: 1.25rem; color: #10b981; flex-shrink: 0;"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            </style>
+            <div
+              class="analysis-toast"
+              data-testid="analysis-complete-toast"
+              style="position: fixed; top: 1rem; right: 1rem; z-index: 1000; background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 0.5rem; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.625rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 24rem; animation: analysisSlideIn 0.3s ease-out;"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div>
-              <p style="margin: 0; font-size: 0.875rem; font-weight: 500; color: #065f46;">
-                Analysis complete!
-              </p>
-              ${processingDuration !== null
-                ? html`<p style="margin: 0; font-size: 0.75rem; color: #047857;">
-                    Completed in ${processingDuration}s
-                  </p>`
-                : ''}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                style="width: 1.25rem; height: 1.25rem; color: #10b981; flex-shrink: 0;"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p style="margin: 0; font-size: 0.875rem; font-weight: 500; color: #065f46;">
+                  Analysis complete!
+                </p>
+                ${processingDuration !== null
+                  ? html`<p style="margin: 0; font-size: 0.75rem; color: #047857;">
+                      Completed in ${processingDuration}s
+                    </p>`
+                  : ''}
+              </div>
             </div>
-          </div>
-          <script>
-            setTimeout(function () {
-              var toast = document.querySelector('[data-testid="analysis-complete-toast"]')
-              if (toast) {
-                toast.style.animation = 'analysisFadeOut 0.3s ease-in forwards'
-                setTimeout(function () {
-                  toast.remove()
-                }, 300)
-              }
-            }, 4000)
-          </script>
-        `
-      : ''}
-    <div
-      id="analysis-panel"
-      class="section ${fromPolling ? 'analysis-completed-panel' : ''}"
-      data-testid="analysis-completed-panel"
-    >
+            <script>
+              setTimeout(function () {
+                var toast = document.querySelector('[data-testid="analysis-complete-toast"]')
+                if (toast) {
+                  toast.style.animation = 'analysisFadeOut 0.3s ease-in forwards'
+                  setTimeout(function () {
+                    toast.remove()
+                  }, 300)
+                }
+              }, 4000)
+            </script>
+          `
+        : ''}
       <div
         class="section-header"
         style="display: flex; justify-content: space-between; align-items: center;"
