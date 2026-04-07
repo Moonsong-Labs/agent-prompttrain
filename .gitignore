@@ -248,3 +248,5 @@ test-results/
 
 # Prompt temporary files
 /prompts/
+
+.shapes
