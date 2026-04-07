@@ -373,10 +373,12 @@ function renderProcessingPanel(
         </h3>
         ${createdAt
           ? html`<span
+              id="analysis-elapsed-timer"
               style="margin-left: auto; font-size: 0.75rem; color: ${isStalled
                 ? '#f59e0b'
                 : '#9ca3af'}; font-variant-numeric: tabular-nums;"
               data-testid="analysis-elapsed-time"
+              data-created-at="${new Date(createdAt).toISOString()}"
               >${elapsedDisplay} elapsed</span
             >`
           : ''}
@@ -547,6 +549,23 @@ function renderProcessingPanel(
               </div>
             `
           : ''}
+        <!-- Live elapsed time updater -->
+        <script>
+          ;(function () {
+            var el = document.getElementById('analysis-elapsed-timer')
+            if (!el) return
+            var createdAt = new Date(el.getAttribute('data-created-at')).getTime()
+            var tid = setInterval(function () {
+              if (!document.getElementById('analysis-elapsed-timer')) {
+                clearInterval(tid)
+                return
+              }
+              var s = Math.floor((Date.now() - createdAt) / 1000)
+              el.textContent =
+                (s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's') + ' elapsed'
+            }, 1000)
+          })()
+        </script>
       </div>
     </div>
   `
