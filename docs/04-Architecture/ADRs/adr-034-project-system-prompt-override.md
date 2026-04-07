@@ -48,8 +48,14 @@ Add two columns to the `projects` table and a dedicated override function in the
 ```sql
 ALTER TABLE projects
   ADD COLUMN system_prompt_enabled BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN system_prompt JSONB DEFAULT NULL;
+  ADD COLUMN system_prompt JSONB DEFAULT NULL,
+  ADD COLUMN system_prompt_mode VARCHAR(10) NOT NULL DEFAULT 'replace';
 ```
+
+The `system_prompt_mode` column controls how the project system prompt interacts with client requests:
+
+- `'replace'` (default): Replaces the entire `system` field
+- `'prepend'`: Prepends the project system prompt blocks before the original request blocks
 
 The `system_prompt` column stores the full Claude API system content blocks array:
 
@@ -74,8 +80,9 @@ This ordering ensures conversation tracking integrity — the system hash reflec
 
 ### Override Behavior
 
-- **Enabled with non-empty array**: Replaces the entire `system` field regardless of original format (string or array)
-- **Enabled with null or empty array `[]`**: No override applied (pass-through)
+- **Replace mode** (default): Replaces the entire `system` field regardless of original format (string or array)
+- **Prepend mode**: Prepends the project's system prompt blocks before the original request blocks. If the original system is a string, it is normalized to a `[{ type: "text", text: "..." }]` array. If the request has no system prompt, the project blocks are used as-is.
+- **Enabled with null or empty array `[]`**: No override applied (pass-through), regardless of mode
 - **Disabled**: No override applied, prompt data preserved in database for re-enablement
 - **Error during lookup**: Gracefully falls back to original request (logged as warning)
 
@@ -106,7 +113,7 @@ Server-side validation via `validateSystemPrompt()`:
 
 - No audit trail of system prompt changes (only `updated_at` timestamp)
 - No versioning or rollback capability
-- System prompt replacement is all-or-nothing (no prepend/append modes)
+- ~~System prompt replacement is all-or-nothing (no prepend/append modes)~~ — resolved: prepend mode added alongside replace mode
 
 ### Risks and Mitigations
 

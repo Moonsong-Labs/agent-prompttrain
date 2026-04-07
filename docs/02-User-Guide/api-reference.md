@@ -861,16 +861,18 @@ Updates the system prompt configuration for a project. Requires project membersh
       "text": "You are a helpful assistant specialized in marketing.",
       "cache_control": { "type": "ephemeral" }
     }
-  ]
+  ],
+  "system_prompt_mode": "replace"
 }
 ```
 
 **Request Body Fields:**
 
-| Field                   | Type                                        | Description                                                                 |
-| ----------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
-| `system_prompt_enabled` | `boolean` (optional)                        | Enable or disable system prompt override. Defaults to `false`.              |
-| `system_prompt`         | `SystemContentBlock[]` or `null` (optional) | Array of content blocks to use as the system prompt, or `null` to clear it. |
+| Field                   | Type                                        | Description                                                                                                                                                                                     |
+| ----------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `system_prompt_enabled` | `boolean` (optional)                        | Enable or disable system prompt override. Defaults to `false`.                                                                                                                                  |
+| `system_prompt`         | `SystemContentBlock[]` or `null` (optional) | Array of content blocks to use as the system prompt, or `null` to clear it.                                                                                                                     |
+| `system_prompt_mode`    | `"replace"` or `"prepend"` (optional)       | How the project system prompt interacts with client requests. `"replace"` (default) replaces the entire system field. `"prepend"` places the project blocks before the original request blocks. |
 
 **`SystemContentBlock` Schema:**
 
@@ -897,14 +899,17 @@ interface SystemContentBlock {
         "text": "You are a helpful assistant specialized in marketing.",
         "cache_control": { "type": "ephemeral" }
       }
-    ]
+    ],
+    "system_prompt_mode": "replace"
   }
 }
 ```
 
 **Behavior:**
 
-- When `system_prompt_enabled` is `true` and a `system_prompt` is configured, the proxy replaces the `system` field of all incoming Claude API requests for that project with the stored system prompt.
+- When `system_prompt_enabled` is `true` and a `system_prompt` is configured:
+  - **Replace mode** (default): The proxy replaces the `system` field of all incoming Claude API requests for that project with the stored system prompt.
+  - **Prepend mode**: The proxy prepends the stored system prompt blocks before the original request's system prompt blocks. If the original system is a string, it is normalized to an array. If the request has no system prompt, the project blocks are used as-is.
 - When `system_prompt_enabled` is `false`, the original `system` field from client requests is passed through unchanged.
 - Sending `"system_prompt": null` clears the stored prompt without affecting `system_prompt_enabled`.
 

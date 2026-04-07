@@ -5,6 +5,8 @@ import type { SystemContentBlock } from './claude.js'
  * Database models for credential and project management
  */
 
+export type SystemPromptMode = 'replace' | 'prepend'
+
 export type ProviderType = 'anthropic' | 'bedrock'
 
 export interface BaseCredential {
@@ -68,6 +70,7 @@ export interface Project {
   is_private: boolean
   system_prompt_enabled: boolean
   system_prompt: SystemContentBlock[] | null
+  system_prompt_mode: SystemPromptMode
   created_at: Date
   updated_at: Date
 }
@@ -156,6 +159,7 @@ export interface UpdateProjectRequest {
   is_private?: boolean
   system_prompt_enabled?: boolean
   system_prompt?: SystemContentBlock[] | null
+  system_prompt_mode?: SystemPromptMode
 }
 
 export interface CreateApiKeyRequest {
