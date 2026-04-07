@@ -307,8 +307,8 @@ function renderProcessingPanel(
   analysisStatus: 'pending' | 'processing' = 'pending',
   createdAt?: string
 ) {
-  // Progressive backoff: 2s, 3s, 5s, 8s, then every 8s
-  const pollIntervals = [2, 3, 5, 8, 8]
+  // Progressive backoff: 2s, 3s, 5s, 8s, then every 15s
+  const pollIntervals = [2, 3, 5, 8, 15]
   const interval = pollIntervals[Math.min(pollCount, pollIntervals.length - 1)]
 
   // Calculate elapsed time for display
@@ -323,18 +323,34 @@ function renderProcessingPanel(
   // Determine progress steps
   const isProcessing = analysisStatus === 'processing'
 
+  // Detect stalled analysis: still pending after 30s or processing after 3 minutes
+  const isStalled = (!isProcessing && elapsedSeconds > 30) || (isProcessing && elapsedSeconds > 180)
+
+  // Stop polling after 5 minutes - show stalled state permanently
+  const maxElapsedForPolling = 300
+  const shouldContinuePolling = elapsedSeconds < maxElapsedForPolling
+
   // Step descriptions for each phase
-  const currentStepLabel = isProcessing
-    ? 'Generating analysis with AI...'
-    : 'Queued, waiting for worker...'
+  let currentStepLabel: string
+  if (isStalled) {
+    currentStepLabel = isProcessing
+      ? 'Analysis is taking longer than expected. The AI worker may be under heavy load.'
+      : 'The analysis worker has not picked up this job yet. It may be offline or overloaded.'
+  } else {
+    currentStepLabel = isProcessing
+      ? 'Generating analysis with AI...'
+      : 'Queued, waiting for worker...'
+  }
 
   return html`
     <div
       id="analysis-panel"
       class="section"
-      hx-get="/partials/analysis/status/${conversationId}/${branchId}?pollCount=${pollCount + 1}"
-      hx-trigger="delay:${interval}s"
-      hx-swap="outerHTML"
+      ${shouldContinuePolling
+        ? raw(
+            `hx-get="/partials/analysis/status/${conversationId}/${branchId}?pollCount=${pollCount + 1}" hx-trigger="delay:${interval}s" hx-swap="outerHTML"`
+          )
+        : ''}
       data-testid="analysis-processing-panel"
     >
       <div class="section-header" style="display: flex; align-items: center; gap: 0.75rem;">
@@ -357,7 +373,9 @@ function renderProcessingPanel(
         </h3>
         ${createdAt
           ? html`<span
-              style="margin-left: auto; font-size: 0.75rem; color: #9ca3af; font-variant-numeric: tabular-nums;"
+              style="margin-left: auto; font-size: 0.75rem; color: ${isStalled
+                ? '#f59e0b'
+                : '#9ca3af'}; font-variant-numeric: tabular-nums;"
               data-testid="analysis-elapsed-time"
               >${elapsedDisplay} elapsed</span
             >`
@@ -402,18 +420,39 @@ function renderProcessingPanel(
                   class="spinner"
                   style="width: 1.5rem; height: 1.5rem; flex-shrink: 0;"
                 ></span>`
-              : html`<div
-                  style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid #d1d5db; background: white;"
-                >
-                  <div
-                    style="width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #d1d5db;"
-                  ></div>
-                </div>`}
+              : isStalled
+                ? html`<div
+                    style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #f59e0b; color: white;"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="width: 0.875rem; height: 0.875rem;"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="3"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01" />
+                    </svg>
+                  </div>`
+                : html`<div
+                    style="width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid #d1d5db; background: white;"
+                  >
+                    <div
+                      style="width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #d1d5db;"
+                    ></div>
+                  </div>`}
             <span
               style="font-size: 0.875rem; color: ${isProcessing
                 ? '#1f2937'
-                : '#9ca3af'}; ${isProcessing ? 'font-weight: 500;' : ''}"
-              >${isProcessing ? 'Generating analysis with AI...' : 'Generate analysis'}</span
+                : isStalled
+                  ? '#92400e'
+                  : '#9ca3af'}; ${isProcessing ? 'font-weight: 500;' : ''}"
+              >${isProcessing
+                ? 'Generating analysis with AI...'
+                : isStalled
+                  ? 'Waiting for worker...'
+                  : 'Generate analysis'}</span
             >
           </div>
 
@@ -437,11 +476,19 @@ function renderProcessingPanel(
 
         <!-- Current status message -->
         <div
-          style="margin-top: 1.25rem; padding: 0.875rem 1rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.625rem;"
+          style="margin-top: 1.25rem; padding: 0.875rem 1rem; background: ${isStalled
+            ? '#fffbeb'
+            : '#eff6ff'}; border: 1px solid ${isStalled
+            ? '#fcd34d'
+            : '#bfdbfe'}; border-radius: 0.5rem; display: flex; align-items: ${isStalled
+            ? 'flex-start'
+            : 'center'}; gap: 0.625rem;"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            style="width: 1rem; height: 1rem; color: #3b82f6; flex-shrink: 0;"
+            style="width: 1rem; height: 1rem; color: ${isStalled
+              ? '#f59e0b'
+              : '#3b82f6'}; flex-shrink: 0; margin-top: ${isStalled ? '0.125rem' : '0'};"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -450,11 +497,56 @@ function renderProcessingPanel(
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              d="${isStalled
+                ? 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+                : 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"
             />
           </svg>
-          <p style="font-size: 0.813rem; color: #1e40af; margin: 0;">${currentStepLabel}</p>
+          <div>
+            <p style="font-size: 0.813rem; color: ${isStalled ? '#92400e' : '#1e40af'}; margin: 0;">
+              ${currentStepLabel}
+            </p>
+            ${isStalled && !shouldContinuePolling
+              ? html`<p style="font-size: 0.75rem; color: #b45309; margin: 0.375rem 0 0 0;">
+                  Polling stopped after 5 minutes. You can try regenerating or refresh the page
+                  later.
+                </p>`
+              : isStalled
+                ? html`<p style="font-size: 0.75rem; color: #b45309; margin: 0.375rem 0 0 0;">
+                    Still checking... Will stop polling after 5 minutes.
+                  </p>`
+                : ''}
+          </div>
         </div>
+        ${isStalled
+          ? html`
+              <div style="margin-top: 0.75rem;">
+                <button
+                  ${raw(`hx-post="/partials/analysis/regenerate/${conversationId}/${branchId}"`)}
+                  ${raw('hx-target="#analysis-panel"')}
+                  ${raw('hx-swap="outerHTML"')}
+                  class="btn btn-secondary"
+                  style="font-size: 0.813rem; padding: 0.375rem 0.75rem; display: inline-flex; align-items: center; gap: 0.375rem;"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    style="width: 0.875rem; height: 0.875rem;"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Retry Analysis
+                </button>
+              </div>
+            `
+          : ''}
       </div>
     </div>
   `
