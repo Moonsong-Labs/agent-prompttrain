@@ -107,7 +107,7 @@ All Claude responses are validated before storage:
 - **PII Scanning**: Detects and prevents PII leakage in output
 - **Sensitive Content Detection**: Scans for passwords, API keys, secrets
 
-Failed validations trigger retries with enhanced prompts or complete rejection.
+Failed validations trigger retries with enhanced prompts. After all retries are exhausted, the raw LLM text is stored as content with `data: null` so users can still view the unstructured output in the dashboard.
 
 ### 6. Audit Trail
 
