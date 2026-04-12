@@ -64,7 +64,7 @@ The project already uses feature flags extensively (`config.features.*`) and has
 Implement **Option 1: Single SERVICE_MODE environment variable** with three modes:
 
 - `full`: All endpoints (default, backward compatible)
-- `proxy`: Only Claude Code endpoints (`/v1/*`, `/mcp`, `/health`, `/token-stats`)
+- `proxy`: Only Claude Code endpoints (`/v1/*`, `/health`, `/token-stats`)
 - `api`: Only Dashboard API endpoints (`/api/*`, `/health`)
 
 ### Implementation Details

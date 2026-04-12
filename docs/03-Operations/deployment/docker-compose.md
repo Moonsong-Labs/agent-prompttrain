@@ -234,7 +234,7 @@ proxy:
     ENABLE_CLIENT_AUTH: 'true'
 ```
 
-**Available endpoints**: `/v1/messages`, `/mcp`, `/health`, `/token-stats`, `/oauth-metrics`
+**Available endpoints**: `/v1/messages`, `/health`, `/token-stats`, `/oauth-metrics`
 
 **Use case**: Lightweight proxy-only deployments, testing, or when dashboard is deployed separately.
 
