@@ -64,7 +64,6 @@ export const testData = {
     { path: '/dashboard', name: 'Main Dashboard' },
     { path: '/requests', name: 'Requests' },
     { path: '/token-usage', name: 'Token Usage' },
-    { path: '/prompts', name: 'Prompts' },
   ],
 
   // Critical user journeys

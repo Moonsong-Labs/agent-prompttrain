@@ -119,7 +119,6 @@ test.describe('Dark Mode Feature', () => {
       '/dashboard',
       '/dashboard/requests',
       '/dashboard/token-usage',
-      '/dashboard/prompts',
     ]
 
     for (const route of routes) {
