@@ -47,24 +47,12 @@ export const testData = {
     },
   },
 
-  // Prompt data for MCP
-  samplePrompt: {
-    name: 'test-prompt',
-    description: 'Test prompt for e2e testing',
-    template: 'You are {{role}}. Please {{action}}.',
-    variables: {
-      role: 'a helpful assistant',
-      action: 'help the user',
-    },
-  },
-
   // Dashboard routes to test
   dashboardRoutes: [
     { path: '/', name: 'Dashboard Home' },
     { path: '/dashboard', name: 'Main Dashboard' },
     { path: '/requests', name: 'Requests' },
     { path: '/token-usage', name: 'Token Usage' },
-    { path: '/prompts', name: 'Prompts' },
   ],
 
   // Critical user journeys

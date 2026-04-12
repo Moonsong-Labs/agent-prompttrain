@@ -203,7 +203,6 @@ Client → Proxy (auth, tracking) → Claude API → Response → Storage (Postg
 
 - REST API on port 3000 (proxy)
 - Web UI on port 3001 (dashboard)
-- MCP prompts on /mcp (see [ADR-017](docs/04-Architecture/ADRs/adr-017-mcp-prompt-sharing.md))
 
 ### Maintenance
 

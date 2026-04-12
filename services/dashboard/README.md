@@ -17,8 +17,6 @@ The dashboard service provides a web UI for monitoring and analyzing Claude API 
 - Domain-based filtering
 - Export capabilities
 - Responsive web UI
-- MCP (Model Context Protocol) prompts browser
-- Prompt template viewer with Handlebars syntax support
 
 ## Development
 
@@ -58,8 +56,6 @@ bun test
 - `GET /api/requests/:id` - Get request details
 - `GET /api/storage-stats` - Aggregated statistics
 - `GET /sse` - Server-sent events for real-time updates
-- `GET /dashboard/prompts` - MCP prompts listing
-- `GET /dashboard/prompts/:id` - Prompt details view
 
 ## Authentication
 

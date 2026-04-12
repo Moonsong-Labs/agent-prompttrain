@@ -75,7 +75,6 @@ Understanding these terms will help you navigate Agent Prompt Train effectively:
 - **🔤 Token**: The basic unit of text that Claude processes. Monitoring token usage helps track costs and stay within API limits.
 - **📊 Request**: A single API call to Claude, which may contain multiple messages. Conversations are built from multiple requests.
 - **🔧 Tool Use**: Claude's ability to use external tools (like file reading, web search, or spawning sub-tasks). Each tool invocation is tracked and displayed.
-- **📝 MCP (Model Context Protocol)**: A protocol for managing and sharing prompt templates across teams, with GitHub integration for version control.
 
 ### Dashboard Elements
 
@@ -102,12 +101,6 @@ Examine individual API requests and responses with syntax highlighting, tool res
 Leverage Gemini Pro to automatically analyze conversations for sentiment, quality, outcomes, and actionable insights. Get intelligent recommendations for improving your AI interactions.
 
 </kbd><img src="https://github.com/user-attachments/assets/63ed0346-ee2e-49b4-86df-49937516786f" alt="AI analysis panel showing comprehensive conversation insights" width="400"></kbd>
-
-### MCP Prompt Management
-
-Manage and sync Model Context Protocol prompts from GitHub repositories. Create reusable prompt templates that can be shared across your team and integrated with Claude Desktop.
-
-</kbd><img src="https://github.com/user-attachments/assets/6cb406d7-cb2a-4698-b03d-0b67b7b44702" alt="MCP prompts interface showing GitHub-synced prompt library" width="400"></kbd>
 
 ### Raw JSON Debugging
 

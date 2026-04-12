@@ -8,8 +8,6 @@ import { requestsRoutes } from './requests.js'
 import { requestDetailsRoutes } from './request-details.js'
 import { tokenUsageRoutes } from './token-usage.js'
 import { requestUsageRoutes } from './request-usage.js'
-import { promptsRoute } from './prompts.js'
-import { promptDetailRoute } from './prompt-detail.js'
 import { credentialsUIRoutes } from './credentials-ui.js'
 import { trainsUIRoutes } from './projects-ui.js'
 
@@ -27,7 +25,5 @@ dashboardRoutes.route('/', requestsRoutes)
 dashboardRoutes.route('/', requestDetailsRoutes)
 dashboardRoutes.route('/', tokenUsageRoutes)
 dashboardRoutes.route('/', requestUsageRoutes)
-dashboardRoutes.route('/prompts', promptsRoute)
-dashboardRoutes.route('/prompts', promptDetailRoute)
 dashboardRoutes.route('/credentials', credentialsUIRoutes)
 dashboardRoutes.route('/projects', trainsUIRoutes)

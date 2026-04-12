@@ -11,7 +11,6 @@ import { apiRoutes } from './routes/api.js'
 import { sparkApiRoutes } from './routes/spark-api.js'
 import { analysisRoutes } from './routes/analyses.js'
 import { initializeAnalysisRateLimiters } from './middleware/analysis-rate-limit.js'
-import { createMcpApiRoutes } from './routes/mcp-api.js'
 import { initializeSlack } from './services/slack.js'
 import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
@@ -174,61 +173,6 @@ export async function createProxyApp(): Promise<
     app.route('/api/analyses', analysisRoutes)
   }
 
-  // ============================================
-  // MCP ROUTES (Conditional based on mode and MCP_ENABLED)
-  // ============================================
-  if (config.mcp.enabled) {
-    const mcpHandler = container.getMcpHandler()
-    const promptRegistry = container.getPromptRegistry()
-    const syncService = container.getGitHubSyncService()
-    const syncScheduler = container.getSyncScheduler()
-
-    // MCP JSON-RPC endpoints (proxy mode - for Claude Code)
-    if (isProxyMode() && mcpHandler) {
-      // Apply client authentication to MCP routes
-      app.use('/mcp/*', clientAuthMiddleware())
-
-      // Project ID extraction for MCP routes
-      app.use('/mcp/*', projectIdExtractorMiddleware())
-
-      // Apply rate limiting to MCP routes
-      if (config.features.enableMetrics) {
-        app.use('/mcp/*', createRateLimiter())
-        app.use('/mcp/*', createTrainRateLimiter())
-      }
-
-      // MCP JSON-RPC endpoint (now protected by auth)
-      app.post('/mcp', c => mcpHandler.handle(c))
-
-      // MCP discovery endpoint (now protected by auth)
-      app.get('/mcp', c => {
-        return c.json({
-          name: 'agent-prompttrain-mcp-server',
-          version: '1.0.0',
-          capabilities: {
-            prompts: {
-              listPrompts: true,
-              getPrompt: true,
-            },
-          },
-        })
-      })
-    }
-
-    // MCP Dashboard API routes (api mode - for dashboard management)
-    if (isApiMode() && promptRegistry) {
-      const mcpApiRoutes = createMcpApiRoutes(
-        promptRegistry,
-        syncService || null,
-        syncScheduler || null
-      )
-      app.route('/api/mcp', mcpApiRoutes)
-      logger.info('MCP API routes registered at /api/mcp')
-    } else if (config.mcp.enabled && !promptRegistry) {
-      logger.warn('MCP API routes not registered - prompt registry not available')
-    }
-  }
-
   if (isProxyMode()) {
     // Client setup files (proxy mode)
     app.get('/client-setup/:filename', async c => {
@@ -361,24 +305,6 @@ export async function createProxyApp(): Promise<
     // Always available
     endpoints.health = '/health'
 
-    if (config.mcp.enabled) {
-      const mcpEndpoints: Record<string, unknown> = {}
-      if (isProxyMode()) {
-        mcpEndpoints.discovery = '/mcp'
-        mcpEndpoints.rpc = '/mcp'
-      }
-      if (isApiMode()) {
-        mcpEndpoints['dashboard-api'] = {
-          prompts: '/api/mcp/prompts',
-          sync: '/api/mcp/sync',
-          'sync-status': '/api/mcp/sync/status',
-        }
-      }
-      if (Object.keys(mcpEndpoints).length > 0) {
-        endpoints.mcp = mcpEndpoints
-      }
-    }
-
     return c.json({
       service: 'agent-prompttrain',
       version: process.env.npm_package_version || 'unknown',
@@ -435,24 +361,11 @@ async function initializeExternalServices(): Promise<void> {
         slack: config.slack.enabled,
         telemetry: config.telemetry.enabled,
         healthChecks: config.features.enableHealthChecks,
-        mcp: config.mcp.enabled,
       },
       endpoints: {
         proxyMode: isProxyMode(),
         apiMode: isApiMode(),
       },
-      mcp: config.mcp.enabled
-        ? {
-            github: {
-              owner: config.mcp.github.owner || 'not configured',
-              repo: config.mcp.github.repo || 'not configured',
-              path: config.mcp.github.path,
-            },
-            sync: {
-              interval: config.mcp.sync.interval,
-            },
-          }
-        : undefined,
     },
   })
 }

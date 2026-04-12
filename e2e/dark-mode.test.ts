@@ -115,12 +115,7 @@ test.describe('Dark Mode Feature', () => {
 
   test('should work across all dashboard pages', async ({ page }) => {
     // Test on different routes
-    const routes = [
-      '/dashboard',
-      '/dashboard/requests',
-      '/dashboard/token-usage',
-      '/dashboard/prompts',
-    ]
+    const routes = ['/dashboard', '/dashboard/requests', '/dashboard/token-usage']
 
     for (const route of routes) {
       await page.goto(route)

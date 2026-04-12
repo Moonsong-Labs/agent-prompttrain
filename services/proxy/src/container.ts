@@ -13,11 +13,6 @@ import { StorageAdapter } from './storage/StorageAdapter.js'
 import { TokenUsageService } from './services/TokenUsageService.js'
 import { config } from '@agent-prompttrain/shared/config'
 import { logger } from './middleware/logger.js'
-import { McpServer } from './mcp/McpServer.js'
-import { PromptRegistryService } from './mcp/PromptRegistryService.js'
-import { GitHubSyncService } from './mcp/GitHubSyncService.js'
-import { SyncScheduler } from './mcp/SyncScheduler.js'
-import { JsonRpcHandler } from './mcp/JsonRpcHandler.js'
 import { UsageCacheService } from './services/usage-cache-service.js'
 
 /**
@@ -37,11 +32,6 @@ class Container {
   private messageController?: MessageController
   private genericProxyController?: GenericProxyController
   private bedrockNativeController?: BedrockNativeController
-  private mcpServer?: McpServer
-  private promptRegistry?: PromptRegistryService
-  private githubSyncService?: GitHubSyncService
-  private syncScheduler?: SyncScheduler
-  private jsonRpcHandler?: JsonRpcHandler
   private usageCacheService?: UsageCacheService
   private initialized = false
   private initializationPromise?: Promise<void>
@@ -167,37 +157,6 @@ class Container {
       this.bedrockApiClient,
       this.metricsService
     )
-
-    // Initialize MCP services if enabled
-    if (config.mcp.enabled) {
-      this.promptRegistry = new PromptRegistryService()
-
-      // Initialize the registry
-      try {
-        await this.promptRegistry.initialize()
-        logger.info('MCP Prompt Registry initialized')
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err))
-        logger.error('Failed to initialize MCP Prompt Registry', {
-          error: { message: error.message, stack: error.stack },
-        })
-        throw error
-      }
-
-      this.mcpServer = new McpServer(this.promptRegistry)
-      this.jsonRpcHandler = new JsonRpcHandler(this.mcpServer)
-
-      // Only initialize GitHub sync if credentials are provided
-      if (config.mcp.github.owner && config.mcp.github.repo && config.mcp.github.token) {
-        this.githubSyncService = new GitHubSyncService(this.promptRegistry)
-        this.syncScheduler = new SyncScheduler(this.githubSyncService)
-
-        // Start the sync scheduler
-        this.syncScheduler.start()
-      } else {
-        logger.warn('MCP enabled but GitHub credentials not configured')
-      }
-    }
   }
 
   getDbPool(): Pool | undefined {
@@ -268,22 +227,6 @@ class Container {
     return this.bedrockNativeController
   }
 
-  getMcpHandler(): JsonRpcHandler | undefined {
-    return this.jsonRpcHandler
-  }
-
-  getPromptRegistry(): PromptRegistryService | undefined {
-    return this.promptRegistry
-  }
-
-  getGitHubSyncService(): GitHubSyncService | undefined {
-    return this.githubSyncService
-  }
-
-  getSyncScheduler(): SyncScheduler | undefined {
-    return this.syncScheduler
-  }
-
   getUsageCacheService(): UsageCacheService | undefined {
     return this.usageCacheService
   }
@@ -291,14 +234,6 @@ class Container {
   async cleanup(): Promise<void> {
     this.initialized = false
 
-    if (this.syncScheduler) {
-      this.syncScheduler.stop()
-      this.syncScheduler = undefined
-    }
-    if (this.promptRegistry) {
-      await this.promptRegistry.stop()
-      this.promptRegistry = undefined
-    }
     if (this.storageService) {
       await this.storageService.close()
       this.storageService = undefined
@@ -319,9 +254,6 @@ class Container {
     this.messageController = undefined
     this.genericProxyController = undefined
     this.bedrockNativeController = undefined
-    this.mcpServer = undefined
-    this.githubSyncService = undefined
-    this.jsonRpcHandler = undefined
     this.usageCacheService = undefined
   }
 }
@@ -384,22 +316,6 @@ class LazyContainer {
 
   getBedrockNativeController(): BedrockNativeController {
     return this.ensureInstance().getBedrockNativeController()
-  }
-
-  getMcpHandler(): JsonRpcHandler | undefined {
-    return this.ensureInstance().getMcpHandler()
-  }
-
-  getPromptRegistry(): PromptRegistryService | undefined {
-    return this.ensureInstance().getPromptRegistry()
-  }
-
-  getGitHubSyncService(): GitHubSyncService | undefined {
-    return this.ensureInstance().getGitHubSyncService()
-  }
-
-  getSyncScheduler(): SyncScheduler | undefined {
-    return this.ensureInstance().getSyncScheduler()
   }
 
   getUsageCacheService(): UsageCacheService | undefined {
