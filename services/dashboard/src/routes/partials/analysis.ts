@@ -956,6 +956,31 @@ ${getAnalysisPromptTemplate()}</textarea
           : ''}
         ${!analysisData && analysisResponse.content
           ? html`
+              <div
+                style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;"
+              >
+                <div
+                  style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    style="width: 1rem; height: 1rem; color: #d97706; flex-shrink: 0;"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span style="font-size: 0.8125rem; color: #92400e; font-weight: 500;">
+                    The analysis model returned an unstructured response. Showing raw output below.
+                  </span>
+                </div>
+              </div>
               <div style="background: #f9fafb; border-radius: 0.5rem; padding: 1rem;">
                 <p
                   style="color: #4b5563; white-space: pre-wrap; margin: 0; font-size: 0.875rem; line-height: 1.6;"
