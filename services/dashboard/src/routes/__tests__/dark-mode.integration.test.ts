@@ -36,6 +36,26 @@ describe('Dark Mode Integration', () => {
     expect(html).toContain('disabled')
   })
 
+  it('can omit optional third-party assets for lightweight pages', async () => {
+    app.get('/lite', c => {
+      return c.html(
+        layout('Lite Page', '<div>Lite Content</div>', '', c, {
+          assets: {
+            htmx: false,
+            codeViewer: false,
+          },
+        })
+      )
+    })
+
+    const res = await app.request('/lite')
+    const html = await res.text()
+
+    expect(html).not.toContain('highlight.min.js')
+    expect(html).not.toContain('@andypf/json-viewer')
+    expect(html).not.toContain('htmx.org@1.9.10')
+  })
+
   it('should set data-theme attribute based on localStorage', async () => {
     const res = await app.request('/test')
     const html = await res.text()

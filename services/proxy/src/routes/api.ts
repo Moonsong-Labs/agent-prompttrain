@@ -708,13 +708,13 @@ apiRoutes.get('/conversations', async c => {
       },
     })
 
+    const normalizedUserEmail = userEmail?.trim().toLowerCase()
     const conditions: string[] = []
     const values: any[] = []
     let paramCount = 0
 
-    // If userEmail is provided, it's always the first parameter
-    if (userEmail) {
-      values.push(userEmail)
+    if (normalizedUserEmail) {
+      values.push(normalizedUserEmail)
       paramCount++
     }
 
@@ -738,210 +738,164 @@ apiRoutes.get('/conversations', async c => {
       values.push(params.dateTo)
     }
 
-    // For non-privacy queries, remove the 'ar.' prefix from conditions
-    const whereClauseNoPrefix =
-      conditions.length > 0
-        ? `WHERE ${conditions.map(c => c.replace('ar.', '')).join(' AND ')}`
-        : ''
-    const whereConditions = conditions.length > 0 ? conditions.join(' AND ') : '' // With ar. prefix for privacy filtering
-
-    // Get conversations grouped by conversation_id with account info and subtask status
-    // Optimized query using "limit first, aggregate second" approach
-    let conversationsQuery: string
-
-    // For early pages without date filters, add a time bound to avoid full table scan
-    // (600K+ rows → ~5K rows). Falls back to full scan for deep pagination or date-filtered queries.
     const needsRows = params.offset + params.limit
-    const useTimeBound = !userEmail && !params.dateFrom && !params.dateTo && needsRows <= 200
-    const timeBoundClause = useTimeBound
-      ? `${whereClauseNoPrefix ? 'AND' : 'WHERE'} timestamp >= NOW() - INTERVAL '7 days'`
+    const useTimeBound =
+      !normalizedUserEmail && !params.dateFrom && !params.dateTo && needsRows <= 200
+    const baseFilters = ['ar.conversation_id IS NOT NULL', ...conditions]
+    if (useTimeBound) {
+      baseFilters.push(`ar.timestamp >= NOW() - INTERVAL '7 days'`)
+    }
+    const whereClause = `WHERE ${baseFilters.join(' AND ')}`
+
+    const privacyCte = normalizedUserEmail
+      ? `
+      accessible_projects AS (
+        SELECT DISTINCT p.project_id
+        FROM projects p
+        LEFT JOIN project_members pm
+          ON p.id = pm.project_id
+          AND LOWER(pm.user_email) = $1
+        WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
+      ),
+    `
+      : ''
+    const privacyJoin = normalizedUserEmail
+      ? 'JOIN accessible_projects ap ON ar.project_id = ap.project_id'
       : ''
 
-    if (userEmail) {
-      // With privacy filtering
-      conversationsQuery = `
-      -- STEP 1 (WITH PRIVACY): Get only the conversation IDs we need for this page with privacy filtering
-      WITH filtered_requests AS (
-        SELECT ar.*
-        FROM api_requests ar
-        JOIN projects p ON ar.project_id = p.project_id
-        LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($1)
-        WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
-          ${whereConditions ? 'AND (' + whereConditions + ')' : ''}
-      ),
-      paginated_conversations AS (
-        SELECT DISTINCT
-          conversation_id,
-          MAX(timestamp) as last_message_time
-        FROM filtered_requests
-        WHERE conversation_id IS NOT NULL
-        GROUP BY conversation_id
-        ORDER BY last_message_time DESC
-        LIMIT $${++paramCount}
-        OFFSET $${++paramCount}
-      ),
-      -- STEP 2: Get all request data ONLY for those paginated conversations
-      relevant_requests AS (
-        SELECT
-          r.request_id,
-          r.conversation_id,
-          r.project_id,
-          r.account_id,
-          r.timestamp,
-          r.input_tokens,
-          r.output_tokens,
-          r.branch_id,
-          r.model,
-          r.is_subtask,
-          r.parent_task_request_id,
-          r.response_body,
-          ROW_NUMBER() OVER (PARTITION BY r.conversation_id ORDER BY r.timestamp DESC, r.request_id DESC) as rn,
-          ROW_NUMBER() OVER (PARTITION BY r.conversation_id, r.is_subtask ORDER BY r.timestamp ASC, r.request_id ASC) as subtask_rn
-        FROM filtered_requests r
-        INNER JOIN paginated_conversations pc ON r.conversation_id = pc.conversation_id
-      ),
-      -- STEP 3: Aggregate data only for the paginated conversations
-      conversation_summary AS (
-        SELECT
-          conversation_id,
-          ARRAY_AGG(DISTINCT project_id) FILTER (WHERE project_id IS NOT NULL) as train_ids,
-          ARRAY_AGG(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) as account_ids,
-          MIN(timestamp) as first_message_time,
-          MAX(timestamp) as last_message_time,
-          COUNT(*) as message_count,
-          SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as total_tokens,
-          COUNT(DISTINCT branch_id) as branch_count,
-          -- Add branch type counts for the new feature
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id LIKE 'subtask_%') as subtask_branch_count,
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id LIKE 'compact_%') as compact_branch_count,
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL AND branch_id NOT LIKE 'subtask_%' AND branch_id NOT LIKE 'compact_%' AND branch_id != 'main') as user_branch_count,
-          ARRAY_AGG(DISTINCT model) FILTER (WHERE model IS NOT NULL) as models_used,
-          (array_agg(request_id ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_request_id,
-          (array_agg(model ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_model,
-          (array_agg(response_body ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_response_body,
-          BOOL_OR(is_subtask) as is_subtask,
-          -- Get the parent_task_request_id from the first subtask in the conversation
-          (array_agg(parent_task_request_id ORDER BY subtask_rn) FILTER (WHERE is_subtask = true AND subtask_rn = 1))[1] as parent_task_request_id,
-          COUNT(CASE WHEN is_subtask THEN 1 END) as subtask_message_count
-        FROM relevant_requests
-        GROUP BY conversation_id
-      )
-      -- STEP 4: Final select with parent conversation lookup and preserve order
-      SELECT 
-        cs.*,
-        parent_req.conversation_id as parent_conversation_id
-      FROM conversation_summary cs
-      LEFT JOIN api_requests parent_req ON cs.parent_task_request_id = parent_req.request_id
-      -- Join with paginated_conversations to preserve the original sort order
-      INNER JOIN paginated_conversations pc ON cs.conversation_id = pc.conversation_id
-      ORDER BY pc.last_message_time DESC
-    `
-    } else {
-      // Without privacy filtering
-      conversationsQuery = `
-      -- STEP 1 (NO PRIVACY): Get only the conversation IDs we need for this page
-      WITH paginated_conversations AS (
-        SELECT DISTINCT
-          conversation_id,
-          MAX(timestamp) as last_message_time
-        FROM api_requests
-        ${whereClauseNoPrefix}
-        ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
-        ${timeBoundClause}
-        GROUP BY conversation_id
-        ORDER BY last_message_time DESC
-        LIMIT $${++paramCount}
-        OFFSET $${++paramCount}
-      ),
-      -- STEP 2: Get all request data ONLY for those paginated conversations
-      relevant_requests AS (
-        SELECT
-          r.request_id,
-          r.conversation_id,
-          r.project_id,
-          r.account_id,
-          r.timestamp,
-          r.input_tokens,
-          r.output_tokens,
-          r.branch_id,
-          r.model,
-          r.is_subtask,
-          r.parent_task_request_id,
-          r.response_body,
-          ROW_NUMBER() OVER (PARTITION BY r.conversation_id ORDER BY r.timestamp DESC, r.request_id DESC) as rn,
-          ROW_NUMBER() OVER (PARTITION BY r.conversation_id, r.is_subtask ORDER BY r.timestamp ASC, r.request_id ASC) as subtask_rn
-        FROM api_requests r
-        INNER JOIN paginated_conversations pc ON r.conversation_id = pc.conversation_id
-      ),
-      -- STEP 3: Aggregate data only for the paginated conversations
-      conversation_summary AS (
-        SELECT
-          conversation_id,
-          ARRAY_AGG(DISTINCT project_id) FILTER (WHERE project_id IS NOT NULL) as train_ids,
-          ARRAY_AGG(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) as account_ids,
-          MIN(timestamp) as first_message_time,
-          MAX(timestamp) as last_message_time,
-          COUNT(*) as message_count,
-          SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as total_tokens,
-          COUNT(DISTINCT branch_id) as branch_count,
-          -- Add branch type counts for the new feature
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id LIKE 'subtask_%') as subtask_branch_count,
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id LIKE 'compact_%') as compact_branch_count,
-          COUNT(DISTINCT branch_id) FILTER (WHERE branch_id IS NOT NULL AND branch_id NOT LIKE 'subtask_%' AND branch_id NOT LIKE 'compact_%' AND branch_id != 'main') as user_branch_count,
-          ARRAY_AGG(DISTINCT model) FILTER (WHERE model IS NOT NULL) as models_used,
-          (array_agg(request_id ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_request_id,
-          (array_agg(model ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_model,
-          (array_agg(response_body ORDER BY rn) FILTER (WHERE rn = 1))[1] as latest_response_body,
-          BOOL_OR(is_subtask) as is_subtask,
-          -- Get the parent_task_request_id from the first subtask in the conversation
-          (array_agg(parent_task_request_id ORDER BY subtask_rn) FILTER (WHERE is_subtask = true AND subtask_rn = 1))[1] as parent_task_request_id,
-          COUNT(CASE WHEN is_subtask THEN 1 END) as subtask_message_count
-        FROM relevant_requests
-        GROUP BY conversation_id
-      )
-      -- STEP 4: Final select with parent conversation lookup and preserve order
-      SELECT
-        cs.*,
-        parent_req.conversation_id as parent_conversation_id
-      FROM conversation_summary cs
-      LEFT JOIN api_requests parent_req ON cs.parent_task_request_id = parent_req.request_id
-      -- Join with paginated_conversations to preserve the original sort order
-      INNER JOIN paginated_conversations pc ON cs.conversation_id = pc.conversation_id
-      ORDER BY pc.last_message_time DESC
-    `
+    const cacheKey = [
+      'conversations',
+      normalizedUserEmail || 'public',
+      params.projectId || '',
+      params.accountId || '',
+      params.dateFrom || '',
+      params.dateTo || '',
+      params.limit,
+      params.offset,
+      useTimeBound ? 'recent' : 'full',
+    ].join(':')
+
+    const cachedResponse = apiResponseCache.get<{
+      conversations: Array<Record<string, unknown>>
+      pagination: {
+        total: number
+        limit: number
+        offset: number
+        hasMore: boolean
+        page: number
+        totalPages: number
+      }
+    }>(cacheKey)
+    if (cachedResponse) {
+      return c.json(cachedResponse)
     }
 
-    // Add limit and offset parameters
+    const conversationsQuery = `
+      WITH
+      ${privacyCte}
+      paginated_conversations AS (
+        SELECT
+          ar.conversation_id,
+          MAX(ar.timestamp) AS last_message_time
+        FROM api_requests ar
+        ${privacyJoin}
+        ${whereClause}
+        GROUP BY ar.conversation_id
+        ORDER BY last_message_time DESC
+        LIMIT $${++paramCount}
+        OFFSET $${++paramCount}
+      ),
+      conversation_rollups AS (
+        SELECT
+          ar.conversation_id,
+          ARRAY_AGG(DISTINCT ar.project_id) FILTER (WHERE ar.project_id IS NOT NULL) AS train_ids,
+          ARRAY_AGG(DISTINCT ar.account_id) FILTER (WHERE ar.account_id IS NOT NULL) AS account_ids,
+          MIN(ar.timestamp) AS first_message_time,
+          MAX(ar.timestamp) AS last_message_time,
+          COUNT(*) AS message_count,
+          SUM(COALESCE(ar.input_tokens, 0) + COALESCE(ar.output_tokens, 0)) AS total_tokens,
+          COUNT(DISTINCT ar.branch_id) AS branch_count,
+          COUNT(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id LIKE 'subtask_%') AS subtask_branch_count,
+          COUNT(DISTINCT ar.branch_id) FILTER (WHERE ar.branch_id LIKE 'compact_%') AS compact_branch_count,
+          COUNT(DISTINCT ar.branch_id) FILTER (
+            WHERE ar.branch_id IS NOT NULL
+              AND ar.branch_id NOT LIKE 'subtask_%'
+              AND ar.branch_id NOT LIKE 'compact_%'
+              AND ar.branch_id != 'main'
+          ) AS user_branch_count,
+          ARRAY_AGG(DISTINCT ar.model) FILTER (WHERE ar.model IS NOT NULL) AS models_used,
+          BOOL_OR(ar.is_subtask) AS is_subtask,
+          COUNT(*) FILTER (WHERE ar.is_subtask) AS subtask_message_count
+        FROM api_requests ar
+        ${privacyJoin}
+        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
+        ${whereClause}
+        GROUP BY ar.conversation_id
+      ),
+      latest_requests AS (
+        SELECT DISTINCT ON (ar.conversation_id)
+          ar.conversation_id,
+          ar.request_id AS latest_request_id,
+          ar.model AS latest_model,
+          ar.response_body AS latest_response_body
+        FROM api_requests ar
+        ${privacyJoin}
+        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
+        ${whereClause}
+        ORDER BY ar.conversation_id, ar.timestamp DESC, ar.request_id DESC
+      ),
+      first_subtasks AS (
+        SELECT DISTINCT ON (ar.conversation_id)
+          ar.conversation_id,
+          ar.parent_task_request_id
+        FROM api_requests ar
+        ${privacyJoin}
+        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
+        ${whereClause}
+          AND ar.is_subtask = true
+        ORDER BY ar.conversation_id, ar.timestamp ASC, ar.request_id ASC
+      )
+      SELECT
+        cr.*,
+        lr.latest_request_id,
+        lr.latest_model,
+        lr.latest_response_body,
+        fs.parent_task_request_id,
+        parent_req.conversation_id AS parent_conversation_id
+      FROM conversation_rollups cr
+      INNER JOIN paginated_conversations pc ON cr.conversation_id = pc.conversation_id
+      LEFT JOIN latest_requests lr ON lr.conversation_id = cr.conversation_id
+      LEFT JOIN first_subtasks fs ON fs.conversation_id = cr.conversation_id
+      LEFT JOIN api_requests parent_req ON fs.parent_task_request_id = parent_req.request_id
+      ORDER BY pc.last_message_time DESC
+    `
+
     values.push(params.limit)
     values.push(params.offset)
 
-    // Get total count for pagination with privacy filtering
-    const countQuery = userEmail
+    const countQuery = normalizedUserEmail
       ? `
-      WITH filtered_requests AS (
-        SELECT ar.conversation_id
-        FROM api_requests ar
-        JOIN projects p ON ar.project_id = p.project_id
-        LEFT JOIN project_members pm ON p.id = pm.project_id AND LOWER(pm.user_email) = LOWER($1)
+      WITH
+      accessible_projects AS (
+        SELECT DISTINCT p.project_id
+        FROM projects p
+        LEFT JOIN project_members pm
+          ON p.id = pm.project_id
+          AND LOWER(pm.user_email) = $1
         WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
-          ${whereConditions ? 'AND (' + whereConditions + ')' : ''}
-          AND conversation_id IS NOT NULL
       )
-      SELECT COUNT(DISTINCT conversation_id) as total
-      FROM filtered_requests
+      SELECT COUNT(DISTINCT ar.conversation_id) AS total
+      FROM api_requests ar
+      JOIN accessible_projects ap ON ar.project_id = ap.project_id
+      ${whereClause}
     `
       : `
-      SELECT COUNT(DISTINCT conversation_id) as total
-      FROM api_requests
-      ${whereClauseNoPrefix}
-      ${whereClauseNoPrefix ? 'AND' : 'WHERE'} conversation_id IS NOT NULL
-      ${timeBoundClause}
+      SELECT COUNT(DISTINCT ar.conversation_id) AS total
+      FROM api_requests ar
+      ${whereClause}
     `
 
-    // Execute both queries in parallel
-    // For count query, exclude the last two values (limit and offset)
     const countValues = values.slice(0, values.length - 2)
-
     const [conversationsResult, countResult] = await Promise.all([
       pool.query(conversationsQuery, values),
       pool.query(countQuery, countValues),
@@ -950,46 +904,44 @@ apiRoutes.get('/conversations', async c => {
     const totalCount = parseInt(countResult.rows[0]?.total || 0)
     const hasMore = params.offset + params.limit < totalCount
 
-    const conversations = conversationsResult.rows.map(row => {
-      // Calculate context tokens from the latest response
-      let latestContextTokens = 0
-      if (row.latest_response_body?.usage) {
-        const usage = row.latest_response_body.usage
-        latestContextTokens =
-          (usage.input_tokens || 0) +
-          (usage.cache_read_input_tokens || 0) +
-          (usage.cache_creation_input_tokens || 0)
-      }
+    const responseData = {
+      conversations: conversationsResult.rows.map(row => {
+        // Calculate context tokens from the latest response
+        let latestContextTokens = 0
+        if (row.latest_response_body?.usage) {
+          const usage = row.latest_response_body.usage
+          latestContextTokens =
+            (usage.input_tokens || 0) +
+            (usage.cache_read_input_tokens || 0) +
+            (usage.cache_creation_input_tokens || 0)
+        }
 
-      return {
-        conversationId: row.conversation_id,
-        trainIds: row.train_ids || [],
-        accountIds: row.account_ids || [],
-        // Keep backward compatibility with single projectId/accountId (use first one)
-        projectId: (row.train_ids && row.train_ids[0]) || '',
-        accountId: (row.account_ids && row.account_ids[0]) || null,
-        firstMessageTime: row.first_message_time,
-        lastMessageTime: row.last_message_time,
-        messageCount: parseInt(row.message_count),
-        totalTokens: parseInt(row.total_tokens),
-        branchCount: parseInt(row.branch_count),
-        // Add new branch type counts
-        subtaskBranchCount: parseInt(row.subtask_branch_count || 0),
-        compactBranchCount: parseInt(row.compact_branch_count || 0),
-        userBranchCount: parseInt(row.user_branch_count || 0),
-        modelsUsed: row.models_used,
-        latestRequestId: row.latest_request_id,
-        latestModel: row.latest_model,
-        latestContextTokens,
-        isSubtask: row.is_subtask,
-        parentTaskRequestId: row.parent_task_request_id,
-        parentConversationId: row.parent_conversation_id,
-        subtaskMessageCount: parseInt(row.subtask_message_count || 0),
-      }
-    })
-
-    return c.json({
-      conversations,
+        return {
+          conversationId: row.conversation_id,
+          trainIds: row.train_ids || [],
+          accountIds: row.account_ids || [],
+          // Keep backward compatibility with single projectId/accountId (use first one)
+          projectId: (row.train_ids && row.train_ids[0]) || '',
+          accountId: (row.account_ids && row.account_ids[0]) || null,
+          firstMessageTime: row.first_message_time,
+          lastMessageTime: row.last_message_time,
+          messageCount: parseInt(row.message_count),
+          totalTokens: parseInt(row.total_tokens),
+          branchCount: parseInt(row.branch_count),
+          // Add new branch type counts
+          subtaskBranchCount: parseInt(row.subtask_branch_count || 0),
+          compactBranchCount: parseInt(row.compact_branch_count || 0),
+          userBranchCount: parseInt(row.user_branch_count || 0),
+          modelsUsed: row.models_used,
+          latestRequestId: row.latest_request_id,
+          latestModel: row.latest_model,
+          latestContextTokens,
+          isSubtask: row.is_subtask,
+          parentTaskRequestId: row.parent_task_request_id,
+          parentConversationId: row.parent_conversation_id,
+          subtaskMessageCount: parseInt(row.subtask_message_count || 0),
+        }
+      }),
       pagination: {
         total: totalCount,
         limit: params.limit,
@@ -998,7 +950,10 @@ apiRoutes.get('/conversations', async c => {
         page: Math.floor(params.offset / params.limit) + 1,
         totalPages: Math.ceil(totalCount / params.limit),
       },
-    })
+    }
+
+    apiResponseCache.set(cacheKey, responseData, 15)
+    return c.json(responseData)
   } catch (error) {
     if (error instanceof z.ZodError) {
       return c.json({ error: 'Invalid parameters', details: error.errors }, 400)

@@ -3,6 +3,13 @@ import { dashboardStyles } from './styles.js'
 import { Context } from 'hono'
 import { nexusLogo } from '../components/logo.js'
 
+type LayoutOptions = {
+  assets?: {
+    htmx?: boolean
+    codeViewer?: boolean
+  }
+}
+
 /**
  * Dashboard HTML layout template
  */
@@ -10,8 +17,12 @@ export const layout = (
   title: string,
   content: any,
   additionalScripts: string = '',
-  context?: Context
+  context?: Context,
+  options?: LayoutOptions
 ) => {
+  const includeHtmx = options?.assets?.htmx ?? true
+  const includeCodeViewer = options?.assets?.codeViewer ?? true
+
   // Get CSRF token if context is provided
   const csrfToken = context?.get('csrfToken') || ''
   // Get auth state if context is provided
@@ -30,10 +41,9 @@ export const layout = (
         <title>${title} - Agent Prompt Train Dashboard</title>
         ${csrfToken ? html`<meta name="csrf-token" content="${csrfToken}" />` : ''}
         <style>
-          ${raw(
-            dashboardStyles
-          )}
-        
+          ${raw(dashboardStyles)}
+          ${includeCodeViewer
+            ? raw(`
         /* Ultra-dense JSON viewer styles injected globally */
         andypf-json-viewer::part(json-viewer) {
             font-size: 10px !important;
@@ -52,132 +62,139 @@ export const layout = (
             line-height: 1.1 !important;
             padding: 0 !important;
           }
+        `)
+            : ''}
         </style>
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css"
-          id="hljs-light-theme"
-        />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
-          id="hljs-dark-theme"
-          disabled
-        />
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@andypf/json-viewer@2.1.10/dist/iife/index.js"></script>
-        <style>
-          /* JSON Viewer styling - Ultra Dense */
-          andypf-json-viewer {
-            display: block;
-            padding: 0.5rem;
-            border-radius: 0.25rem;
-            overflow: auto;
-            margin-bottom: 0.125rem;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
-            font-size: 10px;
-            line-height: 1.2;
-            letter-spacing: -0.03em;
-            --json-viewer-indent: 12px;
-            --json-viewer-key-color: #1e40af;
-            --json-viewer-value-string-color: #059669;
-            --json-viewer-value-number-color: #dc2626;
-            --json-viewer-value-boolean-color: #7c3aed;
-            --json-viewer-value-null-color: #6b7280;
-            --json-viewer-property-color: #1e40af;
-            --json-viewer-bracket-color: #6b7280;
-            --json-viewer-comma-color: #6b7280;
-          }
+        ${includeCodeViewer
+          ? html`
+              <link
+                rel="stylesheet"
+                href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css"
+                id="hljs-light-theme"
+              />
+              <link
+                rel="stylesheet"
+                href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
+                id="hljs-dark-theme"
+                disabled
+              />
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+              <script src="https://cdn.jsdelivr.net/npm/@andypf/json-viewer@2.1.10/dist/iife/index.js"></script>
+              <style>
+                /* JSON Viewer styling - Ultra Dense */
+                andypf-json-viewer {
+                  display: block;
+                  padding: 0.5rem;
+                  border-radius: 0.25rem;
+                  overflow: auto;
+                  margin-bottom: 0.125rem;
+                  font-family:
+                    'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+                  font-size: 10px;
+                  line-height: 1.2;
+                  letter-spacing: -0.03em;
+                  --json-viewer-indent: 12px;
+                  --json-viewer-key-color: #1e40af;
+                  --json-viewer-value-string-color: #059669;
+                  --json-viewer-value-number-color: #dc2626;
+                  --json-viewer-value-boolean-color: #7c3aed;
+                  --json-viewer-value-null-color: #6b7280;
+                  --json-viewer-property-color: #1e40af;
+                  --json-viewer-bracket-color: #6b7280;
+                  --json-viewer-comma-color: #6b7280;
+                }
 
-          /* Dark mode JSON viewer colors */
-          [data-theme='dark'] andypf-json-viewer {
-            --json-viewer-key-color: #60a5fa;
-            --json-viewer-value-string-color: #34d399;
-            --json-viewer-value-number-color: #f87171;
-            --json-viewer-value-boolean-color: #a78bfa;
-            --json-viewer-value-null-color: #94a3b8;
-            --json-viewer-property-color: #60a5fa;
-            --json-viewer-bracket-color: #94a3b8;
-            --json-viewer-comma-color: #94a3b8;
-          }
+                /* Dark mode JSON viewer colors */
+                [data-theme='dark'] andypf-json-viewer {
+                  --json-viewer-key-color: #60a5fa;
+                  --json-viewer-value-string-color: #34d399;
+                  --json-viewer-value-number-color: #f87171;
+                  --json-viewer-value-boolean-color: #a78bfa;
+                  --json-viewer-value-null-color: #94a3b8;
+                  --json-viewer-property-color: #60a5fa;
+                  --json-viewer-bracket-color: #94a3b8;
+                  --json-viewer-comma-color: #94a3b8;
+                }
 
-          /* Compact view - reduce padding on containers */
-          #request-json-container andypf-json-viewer,
-          #response-json-container andypf-json-viewer {
-            padding: 0.25rem;
-            margin-bottom: 0;
-          }
+                /* Compact view - reduce padding on containers */
+                #request-json-container andypf-json-viewer,
+                #response-json-container andypf-json-viewer {
+                  padding: 0.25rem;
+                  margin-bottom: 0;
+                }
 
-          /* Make the overall section more compact */
-          #raw-view .section-content {
-            padding: 0.25rem;
-          }
+                /* Make the overall section more compact */
+                #raw-view .section-content {
+                  padding: 0.25rem;
+                }
 
-          /* Reduce spacing between sections */
-          .section {
-            margin-bottom: 0.5rem;
-          }
+                /* Reduce spacing between sections */
+                .section {
+                  margin-bottom: 0.5rem;
+                }
 
-          .section-header {
-            padding: 0.375rem 0.5rem;
-            font-size: 0.875rem;
-          }
+                .section-header {
+                  padding: 0.375rem 0.5rem;
+                  font-size: 0.875rem;
+                }
 
-          .section-content {
-            padding: 0.375rem;
-          }
+                .section-content {
+                  padding: 0.375rem;
+                }
 
-          /* Dense view toggle buttons */
-          .view-toggle {
-            margin: 0.5rem 0;
-          }
+                /* Dense view toggle buttons */
+                .view-toggle {
+                  margin: 0.5rem 0;
+                }
 
-          .view-toggle button {
-            padding: 0.25rem 0.75rem;
-            font-size: 0.8125rem;
-          }
+                .view-toggle button {
+                  padding: 0.25rem 0.75rem;
+                  font-size: 0.8125rem;
+                }
 
-          /* Ensure code blocks in these containers have light backgrounds */
-          .hljs {
-            background: transparent !important;
-            color: #1f2937 !important;
-          }
+                /* Ensure code blocks in these containers have light backgrounds */
+                .hljs {
+                  background: transparent !important;
+                  color: #1f2937 !important;
+                }
 
-          /* Chunk containers */
-          #chunks-container > div > div {
-            background-color: white !important;
-          }
+                /* Chunk containers */
+                #chunks-container > div > div {
+                  background-color: white !important;
+                }
 
-          /* Tool use and conversation code blocks */
-          .message-content pre,
-          .message-content code,
-          .conversation-container pre,
-          .conversation-container code {
-            background-color: #f9fafb !important;
-            color: #1f2937 !important;
-            border: 1px solid #e5e7eb;
-          }
+                /* Tool use and conversation code blocks */
+                .message-content pre,
+                .message-content code,
+                .conversation-container pre,
+                .conversation-container code {
+                  background-color: #f9fafb !important;
+                  color: #1f2937 !important;
+                  border: 1px solid #e5e7eb;
+                }
 
-          .message-content pre code,
-          .conversation-container pre code {
-            background-color: transparent !important;
-            border: none;
-          }
+                .message-content pre code,
+                .conversation-container pre code {
+                  background-color: transparent !important;
+                  border: none;
+                }
 
-          /* Specific language code blocks */
-          .language-json,
-          .language-javascript,
-          .language-python,
-          .language-bash,
-          .language-shell,
-          pre.hljs,
-          code.hljs {
-            background-color: #f9fafb !important;
-            color: #1f2937 !important;
-          }
-        </style>
-        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-        ${csrfToken
+                /* Specific language code blocks */
+                .language-json,
+                .language-javascript,
+                .language-python,
+                .language-bash,
+                .language-shell,
+                pre.hljs,
+                code.hljs {
+                  background-color: #f9fafb !important;
+                  color: #1f2937 !important;
+                }
+              </style>
+            `
+          : ''}
+        ${includeHtmx ? html`<script src="https://unpkg.com/htmx.org@1.9.10"></script>` : ''}
+        ${includeHtmx && csrfToken
           ? raw(`
       <script>
         // Add CSRF token to all HTMX requests
@@ -308,6 +325,9 @@ export const layout = (
             }
 
             function updateHighlightTheme(theme) {
+              if (!hljsLightTheme || !hljsDarkTheme) {
+                return
+              }
               if (theme === 'dark') {
                 hljsLightTheme.disabled = true
                 hljsDarkTheme.disabled = false
