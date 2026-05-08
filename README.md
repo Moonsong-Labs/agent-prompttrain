@@ -35,6 +35,12 @@ Agent Prompt Train empowers development teams to maximize their Claude AI usage 
 - 📈 **Historical Analytics**: Comprehensive activity history enabling usage monitoring, pattern identification, and continuous improvement
 - 🤖 **Intelligent Insights**: AI-powered conversation analysis providing actionable prompt optimization suggestions and best practice recommendations
 
+## 🚀 Demo
+
+![Image](https://github.com/user-attachments/assets/d7200534-3be0-4225-8f9f-ac96b9bf3978)
+
+<img src="https://github.com/user-attachments/assets/aebffb8c-9535-4073-aa76-be31ee05a402" alt="Agent Prompt Train Dashboard" width="800">
+
 ## ✨ Features
 
 - 🚀 **High-Performance Proxy** - Built with Bun and Hono for minimal latency
