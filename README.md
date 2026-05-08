@@ -39,12 +39,6 @@ Agent Prompt Train empowers development teams to maximize their Claude AI usage 
 
 ![Image](https://github.com/user-attachments/assets/d7200534-3be0-4225-8f9f-ac96b9bf3978)
 
-Experience Agent Prompt Train in action with our live demo:
-
-👉 **[https://prompttrain-demo.moonsonglabs.dev](https://prompttrain-demo.moonsonglabs.dev)**
-
-_Note: This is a read-only demo showcasing real usage data from our development team._
-
 <img src="https://github.com/user-attachments/assets/aebffb8c-9535-4073-aa76-be31ee05a402" alt="Agent Prompt Train Dashboard" width="800">
 
 ## ✨ Features
