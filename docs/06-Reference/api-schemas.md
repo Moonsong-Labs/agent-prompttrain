@@ -26,9 +26,36 @@ interface Message {
 }
 
 interface ContentBlock {
-  type: 'text' | 'image'
+  type:
+    | 'text'
+    | 'image'
+    | 'tool_use'
+    | 'tool_result'
+    // Extended thinking blocks (Claude 4.x adaptive thinking). The
+    // `signature` field must be round-tripped unchanged when echoing
+    // assistant messages back to the API.
+    | 'thinking'
+    | 'redacted_thinking'
+    // Anthropic-hosted server tools (web_search, code_execution, MCP
+    // connector). `server_tool_use` is the call; the matching
+    // `*_tool_result` block is the response.
+    | 'server_tool_use'
+    | 'web_search_tool_result'
+    | 'code_execution_tool_result'
   text?: string // For text blocks
   source?: ImageSource // For image blocks
+  // tool_use / server_tool_use fields
+  id?: string
+  name?: string
+  input?: unknown
+  // tool_result / *_tool_result fields
+  tool_use_id?: string
+  content?: string | ContentBlock[] | unknown
+  // thinking-block fields
+  thinking?: string
+  signature?: string
+  // redacted_thinking field
+  data?: string
 }
 
 interface ImageSource {
@@ -51,7 +78,19 @@ interface MessagesResponse {
   role: 'assistant'
   content: ContentBlock[]
   model: string
-  stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence'
+  stop_reason:
+    | 'end_turn'
+    | 'max_tokens'
+    | 'stop_sequence'
+    | 'tool_use'
+    // Server-tool sequence paused; clients must continue with the same
+    // container id.
+    | 'pause_turn'
+    // Streaming-classifier safety refusal. Conversation context should
+    // be reset before retrying.
+    | 'refusal'
+    // Generation hit the context window (Claude 4.5+ behaviour).
+    | 'model_context_window_exceeded'
   stop_sequence?: string
   usage: TokenUsage
 }
@@ -61,6 +100,13 @@ interface TokenUsage {
   output_tokens: number
   cache_creation_input_tokens?: number
   cache_read_input_tokens?: number
+  // Per-TTL-tier breakdown for prompt caching. The sum equals
+  // `cache_creation_input_tokens`. Captured verbatim in the proxy's
+  // `usage_data` JSONB column.
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number
+    ephemeral_1h_input_tokens?: number
+  }
 }
 ```
 
@@ -98,15 +144,29 @@ interface MessageStartEvent {
 interface ContentBlockDeltaEvent {
   type: 'content_block_delta'
   index: number
-  delta: {
-    type: 'text_delta'
-    text: string
-  }
+  delta:
+    | { type: 'text_delta'; text: string }
+    | { type: 'input_json_delta'; partial_json: string }
+    // Extended-thinking deltas. `thinking_delta` carries the streamed
+    // thinking text; `signature_delta` is emitted once when the block
+    // closes and must be preserved by the client.
+    | { type: 'thinking_delta'; thinking: string }
+    | { type: 'signature_delta'; signature: string }
+    // Web-search citation deltas (forwarded verbatim by the proxy; not
+    // currently parsed for metrics).
+    | { type: 'citations_delta'; citation: unknown }
 }
 
 interface MessageStopEvent {
   type: 'message_stop'
-  stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence'
+  stop_reason:
+    | 'end_turn'
+    | 'max_tokens'
+    | 'stop_sequence'
+    | 'tool_use'
+    | 'pause_turn'
+    | 'refusal'
+    | 'model_context_window_exceeded'
   stop_sequence?: string
   usage?: TokenUsage // Final token counts
 }

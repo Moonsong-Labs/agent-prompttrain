@@ -1,5 +1,16 @@
-import { ClaudeMessagesResponse, ClaudeStreamEvent, hasToolUse } from '@agent-prompttrain/shared'
+import { ClaudeMessagesResponse, ClaudeStreamEvent } from '@agent-prompttrain/shared'
 import { logger } from '../../middleware/logger'
+
+// Content block types that represent a model-initiated tool invocation.
+// `tool_use` is the standard client-side tool; `server_tool_use` is an
+// Anthropic-hosted tool (web_search, code_execution, etc.) that the API
+// runs server-side. Both should be counted as tool calls for tracking
+// purposes; the `*_tool_result` blocks are responses, not calls.
+const TOOL_USE_BLOCK_TYPES = new Set(['tool_use', 'server_tool_use'])
+
+function isToolUseBlock(c: { type?: string } | undefined): boolean {
+  return !!c && typeof c.type === 'string' && TOOL_USE_BLOCK_TYPES.has(c.type)
+}
 
 /**
  * Domain entity representing a proxy response
@@ -12,6 +23,8 @@ export class ProxyResponse {
   private _cacheReadInputTokens: number = 0
   private _toolCallCount: number = 0
   private _content: string = ''
+  private _thinkingContent: string = ''
+  private _thinkingSignatures: string[] = []
   private _fullUsageData: any = null
   private _toolCalls: Array<{ name: string; id?: string; input?: any }> = []
   private _currentToolIndex: number = -1
@@ -58,6 +71,14 @@ export class ProxyResponse {
     return this._fullUsageData
   }
 
+  get thinkingContent(): string {
+    return this._thinkingContent
+  }
+
+  get thinkingSignatures(): string[] {
+    return this._thinkingSignatures
+  }
+
   /**
    * Process a non-streaming response
    */
@@ -79,9 +100,11 @@ export class ProxyResponse {
       },
     })
 
-    // Count tool calls and extract tool info
-    if (response.content && hasToolUse(response.content)) {
-      const toolUses = response.content.filter(c => c.type === 'tool_use')
+    // Count tool calls (both client-side `tool_use` and server-hosted
+    // `server_tool_use` blocks). `*_tool_result` blocks are responses,
+    // not calls, and are intentionally excluded.
+    if (response.content) {
+      const toolUses = response.content.filter(isToolUseBlock)
       this._toolCallCount = toolUses.length
       this._toolCalls = toolUses.map(tool => ({
         name: tool.name || 'unknown',
@@ -96,6 +119,23 @@ export class ProxyResponse {
         ?.filter(c => c.type === 'text')
         .map(c => c.text)
         .join('\n') || ''
+
+    // Capture thinking blocks separately so they're available for
+    // observability without polluting the human-visible `content` field.
+    if (response.content) {
+      for (const block of response.content) {
+        if (block.type === 'thinking') {
+          const thinking = (block as any).thinking as string | undefined
+          const signature = (block as any).signature as string | undefined
+          if (thinking) {
+            this._thinkingContent += thinking
+          }
+          if (signature) {
+            this._thinkingSignatures.push(signature)
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -174,26 +214,41 @@ export class ProxyResponse {
         break
 
       case 'content_block_start':
-        if (event.content_block?.type === 'tool_use') {
+        if (isToolUseBlock(event.content_block)) {
           this._toolCallCount++
           this._currentToolIndex = this._toolCalls.length
           this._toolInputAccumulator = ''
           this._toolCalls.push({
-            name: event.content_block.name || 'unknown',
-            id: event.content_block.id,
-            input: event.content_block.input || {},
+            name: event.content_block?.name || 'unknown',
+            id: event.content_block?.id,
+            input: event.content_block?.input || {},
           })
         }
         break
 
-      case 'content_block_delta':
-        if (event.delta?.type === 'text_delta' && event.delta.text) {
+      case 'content_block_delta': {
+        const deltaType = event.delta?.type
+        if (deltaType === 'text_delta' && event.delta?.text) {
           this._content += event.delta.text
-        } else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json) {
+        } else if (deltaType === 'input_json_delta' && event.delta?.partial_json) {
           // Accumulate tool input JSON
           this._toolInputAccumulator += event.delta.partial_json
+        } else if (deltaType === 'thinking_delta') {
+          const t = (event.delta as any)?.thinking
+          if (typeof t === 'string') {
+            this._thinkingContent += t
+          }
+        } else if (deltaType === 'signature_delta') {
+          const sig = (event.delta as any)?.signature
+          if (typeof sig === 'string' && sig.length > 0) {
+            this._thinkingSignatures.push(sig)
+          }
         }
+        // Unknown delta types (e.g. `citations_delta`) are intentionally
+        // ignored here — the raw SSE line is still forwarded verbatim to
+        // the client by the streaming pipeline.
         break
+      }
 
       case 'content_block_stop':
         // Parse accumulated tool input when block stops

@@ -849,6 +849,148 @@ describe('Dual Hash System - Message and System Hashing', () => {
       const hash2 = hashMessagesOnly(messagesWithoutDuplicates)
       expect(hash1).toBe(hash2)
     })
+
+    describe('modern content block types (B1 regression)', () => {
+      // Background: prior to this fix, the default branch in
+      // ConversationLinker.serializeContentItem returned `[N]<type>:unknown`
+      // for every unrecognized type. That meant every `thinking`,
+      // `server_tool_use`, etc. block in every conversation hashed to the
+      // same string, causing wrong parent matches when Claude Code uses
+      // adaptive thinking or server-side tools.
+
+      test('different thinking content produces different hashes', () => {
+        const base = (thinking: string, signature: string): ClaudeMessage[] => [
+          { role: 'user', content: 'tell me a story' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking, signature } as any,
+              { type: 'text', text: 'Here is a story...' },
+            ],
+          },
+        ]
+
+        const hash1 = hashMessagesOnly(base('Plot involves a cat.', 'sig-aaa'))
+        const hash2 = hashMessagesOnly(base('Plot involves a dog.', 'sig-bbb'))
+        expect(hash1).not.toBe(hash2)
+      })
+
+      test('thinking signature alone differentiates blocks', () => {
+        // Anthropic guarantees signature is deterministic for identical input,
+        // so the same signature must produce the same hash even if the
+        // thinking text is later truncated/redacted.
+        const base = (signature: string): ClaudeMessage[] => [
+          { role: 'user', content: 'tell me a story' },
+          {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: '', signature } as any],
+          },
+        ]
+
+        const h1 = hashMessagesOnly(base('signature-1'))
+        const h2 = hashMessagesOnly(base('signature-2'))
+        expect(h1).not.toBe(h2)
+      })
+
+      test('different redacted_thinking blocks produce different hashes', () => {
+        const make = (data: string): ClaudeMessage[] => [
+          { role: 'user', content: 'sensitive question' },
+          {
+            role: 'assistant',
+            content: [{ type: 'redacted_thinking', data } as any],
+          },
+        ]
+
+        const h1 = hashMessagesOnly(make('encrypted-payload-1'))
+        const h2 = hashMessagesOnly(make('encrypted-payload-2'))
+        expect(h1).not.toBe(h2)
+      })
+
+      test('different server_tool_use blocks produce different hashes', () => {
+        const make = (name: string, input: unknown): ClaudeMessage[] => [
+          { role: 'user', content: 'do research' },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'server_tool_use',
+                id: 'srv_1',
+                name,
+                input,
+              } as any,
+            ],
+          },
+        ]
+
+        const h1 = hashMessagesOnly(make('web_search', { query: 'cats' }))
+        const h2 = hashMessagesOnly(make('web_search', { query: 'dogs' }))
+        const h3 = hashMessagesOnly(make('code_execution', { code: 'print(1)' }))
+        expect(h1).not.toBe(h2)
+        expect(h1).not.toBe(h3)
+        expect(h2).not.toBe(h3)
+      })
+
+      test('different web_search_tool_result blocks produce different hashes', () => {
+        const make = (content: unknown): ClaudeMessage[] => [
+          { role: 'user', content: 'search' },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'web_search_tool_result',
+                tool_use_id: 'srv_1',
+                content,
+              } as any,
+            ],
+          },
+        ]
+
+        const h1 = hashMessagesOnly(make([{ url: 'https://a.com', title: 'A' }]))
+        const h2 = hashMessagesOnly(make([{ url: 'https://b.com', title: 'B' }]))
+        expect(h1).not.toBe(h2)
+      })
+
+      test('different code_execution_tool_result blocks produce different hashes', () => {
+        const make = (content: unknown): ClaudeMessage[] => [
+          { role: 'user', content: 'compute' },
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'code_execution_tool_result',
+                tool_use_id: 'srv_1',
+                content,
+              } as any,
+            ],
+          },
+        ]
+
+        const h1 = hashMessagesOnly(make({ stdout: '42' }))
+        const h2 = hashMessagesOnly(make({ stdout: '43' }))
+        expect(h1).not.toBe(h2)
+      })
+
+      test('identical modern blocks produce identical hashes', () => {
+        // Sanity check: serialization must still be deterministic.
+        const messages: ClaudeMessage[] = [
+          { role: 'user', content: 'q' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: 'deep thoughts', signature: 'sig-x' } as any,
+              {
+                type: 'server_tool_use',
+                id: 'srv_1',
+                name: 'web_search',
+                input: { query: 'q' },
+              } as any,
+            ],
+          },
+        ]
+
+        expect(hashMessagesOnly(messages)).toBe(hashMessagesOnly(messages))
+      })
+    })
   })
 
   describe('hashSystemPrompt', () => {

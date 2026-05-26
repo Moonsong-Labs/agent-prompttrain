@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Conversation tracking for modern Claude API traffic (Claude 4.x adaptive thinking, server tools): `ConversationLinker` previously hashed every unknown content block to the literal `[N]<type>:unknown`, so all `thinking`, `redacted_thinking`, and `server_tool_use` blocks collapsed to the same hash. Parent-message lookup could match wrong conversations when Claude Code or any other client produced extended-thinking turns. Distinct serializers are now used for `thinking` (keyed on `signature`), `redacted_thinking`, `server_tool_use`, `web_search_tool_result`, and `code_execution_tool_result` blocks.
+- `ProxyResponse` now counts `server_tool_use` blocks in `toolCallCount` and exposes them via `toolCalls` (previously only `tool_use` was counted, undercounting any turn that used web_search / code_execution).
+- Streaming `thinking_delta` and `signature_delta` events are now captured into new `thinkingContent` and `thinkingSignatures` getters instead of being dropped. Visible `content` is no longer polluted with thinking text. Unknown delta types (e.g. `citations_delta`) are forwarded but ignored for metrics.
+
 ### Changed
 
+- TypeScript types in `@agent-prompttrain/shared` updated to reflect 2026 Anthropic API surface: `ClaudeContent.type` union extended with `thinking`, `redacted_thinking`, `server_tool_use`, `web_search_tool_result`, `code_execution_tool_result`; `stop_reason` extended with `pause_turn`, `refusal`, `model_context_window_exceeded`; `ClaudeStreamEvent.delta.type` extended with `thinking_delta`, `signature_delta`, `citations_delta`.
 - Token Usage overview: projects with zero tokens are now hidden from the project list
 - Token Usage overview: project list now shows 2-line format with percentage of 5-hour and 7-day windows including date ranges
 - API `/api/token-usage/accounts` now returns `outputTokens7d` and `requests7d` per project for 7-day window usage
