@@ -757,9 +757,61 @@ export class ConversationLinker {
         return this.serializeToolUseItem(item, index)
       case 'tool_result':
         return this.serializeToolResultItem(item, index)
+      case 'thinking':
+        return this.serializeThinkingItem(item, index)
+      case 'redacted_thinking':
+        return this.serializeRedactedThinkingItem(item, index)
+      case 'server_tool_use':
+        return this.serializeServerToolUseItem(item, index)
+      case 'web_search_tool_result':
+      case 'code_execution_tool_result':
+        return this.serializeServerToolResultItem(item, index)
       default:
-        return `[${index}]${item.type}:unknown`
+        // Hash the full item so unknown future block types contribute
+        // their content to the hash instead of collapsing to a single
+        // sentinel string. JSON.stringify iterates own keys in insertion
+        // order, which is stable for objects parsed from the same JSON.
+        return `[${index}]${item.type}:${JSON.stringify(item)}`
     }
+  }
+
+  private serializeThinkingItem(item: ClaudeContent, index: number): string {
+    // The signature is the canonical, deterministic identifier of a
+    // thinking block (Anthropic returns the same signature for identical
+    // inputs and the client echoes it back verbatim on later turns). When
+    // absent (e.g. mid-stream before signature_delta arrives) we fall
+    // back to hashing the thinking text so identical text still hashes
+    // identically.
+    const signature = (item as any).signature as string | undefined
+    if (signature) {
+      return `[${index}]thinking:sig:${signature}`
+    }
+    const thinking = (item as any).thinking as string | undefined
+    const digest = createHash('sha256')
+      .update(thinking || '')
+      .digest('hex')
+    return `[${index}]thinking:text:${digest}`
+  }
+
+  private serializeRedactedThinkingItem(item: ClaudeContent, index: number): string {
+    const data = (item as any).data as string | undefined
+    const digest = createHash('sha256')
+      .update(data || '')
+      .digest('hex')
+    return `[${index}]redacted_thinking:${digest}`
+  }
+
+  private serializeServerToolUseItem(item: ClaudeContent, index: number): string {
+    return `[${index}]server_tool_use:${item.name}:${item.id}:${JSON.stringify(item.input)}`
+  }
+
+  private serializeServerToolResultItem(item: ClaudeContent, index: number): string {
+    // content is provider-defined (e.g. search results array, code output
+    // object); JSON.stringify keeps it bounded since the proxy already
+    // limits request size upstream.
+    const contentStr =
+      typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? '')
+    return `[${index}]${item.type}:${item.tool_use_id}:${contentStr}`
   }
 
   private serializeTextItem(item: ClaudeContent, index: number): string {

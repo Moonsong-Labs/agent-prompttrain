@@ -9,7 +9,22 @@ export interface ClaudeMessage {
 }
 
 export interface ClaudeContent {
-  type: 'text' | 'image' | 'tool_use' | 'tool_result'
+  type:
+    | 'text'
+    | 'image'
+    | 'tool_use'
+    | 'tool_result'
+    // Extended thinking — emitted by Claude 4.x adaptive-thinking turns
+    // and echoed back into the next request. Carries `thinking` text and
+    // a `signature` that the API uses to verify continuity.
+    | 'thinking'
+    | 'redacted_thinking'
+    // Anthropic-hosted server tools (web_search, code_execution, MCP
+    // connector, container runtime). `server_tool_use` is the request,
+    // the matching `*_tool_result` block is the response.
+    | 'server_tool_use'
+    | 'web_search_tool_result'
+    | 'code_execution_tool_result'
   text?: string
   source?: {
     type: 'base64'
@@ -20,7 +35,13 @@ export interface ClaudeContent {
   name?: string
   input?: any
   tool_use_id?: string
-  content?: string | ClaudeContent[]
+  content?: string | ClaudeContent[] | any
+  // Extended-thinking fields. `thinking` is the natural-language trace;
+  // `signature` is opaque and must be round-tripped untouched. `data` is
+  // the encrypted payload for `redacted_thinking` blocks.
+  thinking?: string
+  signature?: string
+  data?: string
 }
 
 export interface ClaudeTool {
@@ -75,7 +96,22 @@ export interface ClaudeMessagesResponse {
   role: 'assistant'
   content: ClaudeContent[]
   model: string
-  stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use' | null
+  stop_reason:
+    | 'end_turn'
+    | 'max_tokens'
+    | 'stop_sequence'
+    | 'tool_use'
+    // Returned when a server-tool sequence (e.g. heavy web_search) needs
+    // to be continued with a follow-up request that carries the same
+    // container id. Clients must re-issue rather than treat the turn as
+    // finished.
+    | 'pause_turn'
+    // Streaming-classifier safety refusal (Claude 4 models). The
+    // conversation context should be reset/rephrased before continuing.
+    | 'refusal'
+    // The model hit the context window mid-generation (Claude 4.5+).
+    | 'model_context_window_exceeded'
+    | null
   stop_sequence: string | null
   usage: {
     input_tokens: number
@@ -100,9 +136,21 @@ export interface ClaudeStreamEvent {
   index?: number
   content_block?: ClaudeContent
   delta?: {
-    type?: 'text_delta' | 'input_json_delta'
+    // `thinking_delta` carries extended-thinking text, `signature_delta`
+    // the signature for the just-closed thinking block, and
+    // `citations_delta` web-search citations. Older clients can ignore
+    // the new variants — the proxy forwards them verbatim.
+    type?:
+      | 'text_delta'
+      | 'input_json_delta'
+      | 'thinking_delta'
+      | 'signature_delta'
+      | 'citations_delta'
     text?: string
     partial_json?: string
+    thinking?: string
+    signature?: string
+    citation?: any
     stop_reason?: string
     stop_sequence?: string
   }
