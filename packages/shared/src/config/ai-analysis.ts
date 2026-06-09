@@ -39,7 +39,7 @@ export const ANALYSIS_PROMPT_CONFIG = {
 // Requests are routed through the local proxy using a dedicated project
 export const ANTHROPIC_ANALYSIS_CONFIG = {
   get MODEL_NAME() {
-    return process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-6'
+    return process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-8'
   },
   get PROJECT_ID() {
     return process.env.AI_ANALYSIS_PROJECT_ID || ''

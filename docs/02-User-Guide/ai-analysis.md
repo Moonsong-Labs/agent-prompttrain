@@ -60,7 +60,7 @@ AI_ANALYSIS_REQUEST_TIMEOUT_MS=60000       # API timeout (60 seconds)
 
 # Analysis routing (via local proxy)
 AI_ANALYSIS_PROJECT_ID=your-analysis-project-id  # REQUIRED: Project ID from step 2
-ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6          # Claude model to use
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-8          # Claude model to use
 
 # Optional: API key for the analysis project (only needed when ENABLE_CLIENT_AUTH=true)
 # AI_ANALYSIS_API_KEY=your-project-api-key
@@ -89,7 +89,7 @@ Check the logs for:
 ```
 AI Analysis:
   - Enabled: Yes
-  - Model: claude-opus-4-6
+  - Model: claude-opus-4-8
   - Project: your-analysis-project-id
   - Routing: Via local proxy
 ✓ AI Analysis Worker started

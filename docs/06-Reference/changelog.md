@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for new Claude models: Fable 5 (`claude-fable-5`) and Opus 4.7/4.8 (`claude-opus-4-7`, `claude-opus-4-8`)
+  - 1M context window rules for Fable 5 and Opus 4.6/4.7/4.8
+  - Centralized model pricing registry in `@agent-prompttrain/shared` (`getModelPricing`, `calculateRequestCost`)
+  - AWS Bedrock cost report pricing entries for Fable 5, Opus 4.6-4.8 and Sonnet 4.6
+
 ### Changed
 
+- Dashboard conversation analytics now estimates costs from the shared pricing registry instead of outdated hardcoded Claude 3 rates
+- Default AI analysis model bumped from `claude-opus-4-6` to `claude-opus-4-8` (override with `ANTHROPIC_ANALYSIS_MODEL`)
 - Token Usage overview: projects with zero tokens are now hidden from the project list
 - Token Usage overview: project list now shows 2-line format with percentage of 5-hour and 7-day windows including date ranges
 - API `/api/token-usage/accounts` now returns `outputTokens7d` and `requests7d` per project for 7-day window usage
