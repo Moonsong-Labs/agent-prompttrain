@@ -227,7 +227,7 @@ async function main() {
       if (process.env.AI_ANALYSIS_PROJECT_ID) {
         console.log('  - Enabled: Yes')
         console.log(
-          `  - Model: ${process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-6 (default)'}`
+          `  - Model: ${process.env.ANTHROPIC_ANALYSIS_MODEL || 'claude-opus-4-8 (default)'}`
         )
         console.log(`  - Project: ${process.env.AI_ANALYSIS_PROJECT_ID}`)
         console.log(`  - Routing: Via local proxy`)

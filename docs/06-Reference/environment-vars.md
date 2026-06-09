@@ -157,7 +157,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 | Variable                   | Description                                                    | Default                   |
 | -------------------------- | -------------------------------------------------------------- | ------------------------- |
 | `AI_ANALYSIS_PROJECT_ID`   | Dedicated project ID for analysis (routes through local proxy) | -                         |
-| `ANTHROPIC_ANALYSIS_MODEL` | Claude model to use for analysis                               | `claude-opus-4-6`         |
+| `ANTHROPIC_ANALYSIS_MODEL` | Claude model to use for analysis                               | `claude-opus-4-8`         |
 | `AI_ANALYSIS_API_KEY`      | Project API key (only needed when `ENABLE_CLIENT_AUTH=true`)   | -                         |
 | `AI_ANALYSIS_PROXY_URL`    | Override proxy URL for analysis requests                       | `http://localhost:{PORT}` |
 
@@ -274,7 +274,7 @@ AI_WORKER_MAX_CONCURRENT_JOBS=3
 AI_WORKER_JOB_TIMEOUT_MINUTES=5
 AI_ANALYSIS_MAX_RETRIES=3
 AI_ANALYSIS_PROJECT_ID=your-analysis-project-id
-ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-8
 
 # Directories
 CREDENTIALS_DIR=./credentials

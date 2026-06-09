@@ -443,23 +443,25 @@ LIMIT 10;
 
 ### Token Cost Calculation
 
-Track costs by model:
+Track costs by model using the shared pricing registry
+(`@agent-prompttrain/shared`):
 
 ```javascript
-const tokenCosts = {
-  'claude-3-opus-20240229': { input: 15, output: 75 }, // per million tokens
-  'claude-3-sonnet-20240229': { input: 3, output: 15 },
-  'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-}
+import { getModelPricing, calculateRequestCost } from '@agent-prompttrain/shared'
 
-function calculateCost(model, inputTokens, outputTokens) {
-  const costs = tokenCosts[model]
-  return {
-    input: (inputTokens / 1_000_000) * costs.input,
-    output: (outputTokens / 1_000_000) * costs.output,
-    total: (inputTokens / 1_000_000) * costs.input + (outputTokens / 1_000_000) * costs.output,
-  }
-}
+// Pattern-based pricing per million tokens, e.g.:
+// claude-fable-5:    { input: 10, output: 50 }
+// claude-opus-4-8:   { input: 5,  output: 25 }
+// claude-sonnet-4-6: { input: 3,  output: 15 }
+// claude-haiku-4-5:  { input: 1,  output: 5 }
+const { pricing } = getModelPricing('claude-opus-4-8')
+
+const totalCost = calculateRequestCost('claude-opus-4-8', {
+  inputTokens,
+  outputTokens,
+  cacheReadTokens,
+  cacheCreationTokens,
+})
 ```
 
 ### Budget Alerts
@@ -471,9 +473,9 @@ Set up cost alerts:
 WITH daily_costs AS (
   SELECT
     date_trunc('day', created_at) as day,
-    SUM(input_tokens * 0.000015 + output_tokens * 0.000075) as cost
+    SUM(input_tokens * 0.000005 + output_tokens * 0.000025) as cost
   FROM api_requests
-  WHERE model = 'claude-3-opus-20240229'
+  WHERE model = 'claude-opus-4-8'
   GROUP BY day
 )
 SELECT

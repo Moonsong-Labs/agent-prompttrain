@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../../services/api-client.js'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import { getErrorMessage, getModelPricing } from '@agent-prompttrain/shared'
 import type { ApiRequest } from '../../types/conversation.js'
 
 export const analyticsConversationPartialRoutes = new Hono<{
@@ -147,20 +147,11 @@ analyticsConversationPartialRoutes.get(
       }
 
       Object.entries(tokenStats.byModel).forEach(([model, stats]) => {
-        // Rough cost estimates per 1M tokens
-        const rates = {
-          'claude-3-opus': { input: 15, output: 75 },
-          'claude-3-sonnet': { input: 3, output: 15 },
-          'claude-3-haiku': { input: 0.25, output: 1.25 },
-          'claude-2': { input: 8, output: 24 },
-        }
+        // Cost estimates per 1M tokens from the shared model pricing registry
+        const { pricing } = getModelPricing(model)
 
-        const modelKey =
-          Object.keys(rates).find(key => model.toLowerCase().includes(key.split('-').pop()!)) ||
-          'claude-3-sonnet'
-        const rate = rates[modelKey as keyof typeof rates]
-
-        const cost = (stats.input / 1000000) * rate.input + (stats.output / 1000000) * rate.output
+        const cost =
+          (stats.input / 1000000) * pricing.input + (stats.output / 1000000) * pricing.output
         costs.byModel[model] = cost
         costs.total += cost
       })

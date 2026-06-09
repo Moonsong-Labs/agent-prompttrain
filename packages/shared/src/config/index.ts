@@ -280,7 +280,7 @@ export const config = {
   // Requests are routed through the local proxy using a dedicated project
   aiAnalysis: {
     get modelName() {
-      return env.string('ANTHROPIC_ANALYSIS_MODEL', 'claude-opus-4-6')
+      return env.string('ANTHROPIC_ANALYSIS_MODEL', 'claude-opus-4-8')
     },
     get projectId() {
       return env.string('AI_ANALYSIS_PROJECT_ID', '')

@@ -148,7 +148,7 @@ AI_ANALYSIS_MAX_RETRIES=2                   # Retry failed requests
 
 # Analysis routing (via local proxy)
 AI_ANALYSIS_PROJECT_ID=your-project-id      # Required
-ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-6    # Model selection
+ANTHROPIC_ANALYSIS_MODEL=claude-opus-4-8    # Model selection
 ```
 
 ### Disabling Features
