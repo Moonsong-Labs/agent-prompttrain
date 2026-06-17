@@ -177,6 +177,16 @@ SELECT * FROM analysis_audit_log ORDER BY timestamp DESC LIMIT 10;
 3. Verify the project has a linked Anthropic account
 4. Check proxy logs for errors
 
+### Analysis Shows Raw Text Instead of Structured View
+
+If the analysis model returns a response that does not match the expected JSON structure, the dashboard displays the raw text with an amber banner. This can happen when:
+
+1. The model ignores the structured format instructions
+2. The conversation is too short or ambiguous for structured analysis
+3. A custom prompt overrides the default format
+
+You can click "Regenerate" to retry with the standard prompt. If the issue persists, consider adjusting the model via `ANTHROPIC_ANALYSIS_MODEL`.
+
 ### Analysis Failing
 
 1. Check `error_message` in conversation_analyses table

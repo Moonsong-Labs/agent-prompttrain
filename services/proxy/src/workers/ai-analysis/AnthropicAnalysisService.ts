@@ -178,9 +178,25 @@ export class AnthropicAnalysisService {
           continue
         }
 
-        throw new Error(
-          `Analysis validation failed after ${maxRetries + 1} attempts: ${validation.issues.join(', ')}`
+        // All retries exhausted - return raw text so users can still see the LLM output
+        logger.warn(
+          'Analysis validation failed after all retries, returning raw text as fallback',
+          {
+            metadata: {
+              worker: 'analysis-worker',
+              attempt: attempt + 1,
+              issues: validation.issues,
+            },
+          }
         )
+
+        return {
+          content: redactedText,
+          data: null,
+          rawResponse: response,
+          promptTokens: response.usage.input_tokens,
+          completionTokens: response.usage.output_tokens,
+        }
       } catch (error) {
         lastError = error as Error
         logger.error('Claude API error (via proxy)', {

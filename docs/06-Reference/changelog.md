@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved
+
+- AI Analysis: when the LLM returns an unstructured response that fails validation after retries, the raw text is now stored and displayed instead of marking the job as failed
+- AI Analysis dashboard: raw/unstructured analysis responses are shown with an amber info banner explaining the non-standard format
+
 ### Changed
 
 - Token Usage overview: projects with zero tokens are now hidden from the project list
