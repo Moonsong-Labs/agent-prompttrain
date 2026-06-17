@@ -137,6 +137,7 @@ projects.put('/:id/system-prompt', requireProjectMembership, async c => {
       system_prompt_enabled?: boolean
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       system_prompt?: any[] | null
+      system_prompt_mode?: string
     }>()
 
     // Validate system prompt if provided
@@ -147,9 +148,19 @@ projects.put('/:id/system-prompt', requireProjectMembership, async c => {
       }
     }
 
+    // Validate system prompt mode if provided
+    if (
+      body.system_prompt_mode !== undefined &&
+      body.system_prompt_mode !== 'replace' &&
+      body.system_prompt_mode !== 'prepend'
+    ) {
+      return c.json({ error: 'Invalid system_prompt_mode: must be "replace" or "prepend"' }, 400)
+    }
+
     const train = await updateProject(pool, id, {
       system_prompt_enabled: body.system_prompt_enabled,
       system_prompt: body.system_prompt,
+      system_prompt_mode: body.system_prompt_mode as 'replace' | 'prepend' | undefined,
     })
 
     return c.json({ train })

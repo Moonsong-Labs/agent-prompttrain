@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- System prompt prepend mode: projects can now choose to prepend their system prompt before the original request prompt instead of replacing it entirely
+  - New `system_prompt_mode` column (`'replace'` or `'prepend'`, default `'replace'`) on projects table (migration 023)
+  - Mode toggle in the dashboard project settings page
+  - API support via `system_prompt_mode` field on `PUT /api/projects/:id/system-prompt`
+  - In prepend mode, string system prompts are normalized to content block arrays
 - Public token usage status page at `/public/token-usage` (no authentication required)
   - Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account
   - Compact multi-column layout with progress bars, reset times, and last-checked timestamps

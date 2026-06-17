@@ -6,6 +6,7 @@ import type {
   UpdateProjectRequest,
   Credential,
   SlackConfig,
+  SystemPromptMode,
 } from '../../types/credentials'
 import type { SystemContentBlock } from '../../types/claude.js'
 import { toSafeCredential } from './credential-queries-internal'
@@ -201,6 +202,10 @@ export async function updateProject(
     updates.push(`system_prompt = $${paramIndex++}`)
     values.push(request.system_prompt ? JSON.stringify(request.system_prompt) : null)
   }
+  if (request.system_prompt_mode !== undefined) {
+    updates.push(`system_prompt_mode = $${paramIndex++}`)
+    values.push(request.system_prompt_mode)
+  }
 
   if (updates.length === 0) {
     const train = await getProjectById(pool, id)
@@ -331,11 +336,19 @@ export async function getProjectStats(
 export async function getProjectSystemPrompt(
   pool: Pool,
   projectId: string
-): Promise<{ enabled: boolean; system_prompt: SystemContentBlock[] | null } | null> {
+): Promise<{
+  enabled: boolean
+  system_prompt: SystemContentBlock[] | null
+  mode: SystemPromptMode
+} | null> {
   const result = await pool.query<{
     system_prompt_enabled: boolean
     system_prompt: SystemContentBlock[] | null
-  }>(`SELECT system_prompt_enabled, system_prompt FROM projects WHERE project_id = $1`, [projectId])
+    system_prompt_mode: SystemPromptMode
+  }>(
+    `SELECT system_prompt_enabled, system_prompt, system_prompt_mode FROM projects WHERE project_id = $1`,
+    [projectId]
+  )
 
   if (result.rows.length === 0) {
     return null
@@ -345,6 +358,7 @@ export async function getProjectSystemPrompt(
   return {
     enabled: row.system_prompt_enabled,
     system_prompt: row.system_prompt,
+    mode: row.system_prompt_mode,
   }
 }
 

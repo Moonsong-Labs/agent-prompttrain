@@ -166,9 +166,10 @@ Each project has a settings page accessible from the project detail view. Settin
 
 #### System Prompt Override
 
-The System Prompt section lets project members define a prompt that replaces the `system` field in all incoming requests:
+The System Prompt section lets project members define a prompt that interacts with the `system` field in all incoming requests:
 
 - **Enable/disable toggle**: turn the override on or off without losing the saved prompt
+- **Mode selector**: choose between **Replace** (replaces the entire system prompt) and **Prepend** (places the project prompt before the original request prompt)
 - **JSON editor**: enter the system prompt as a JSON array of content blocks, for example:
 
   ```json
@@ -183,7 +184,12 @@ The System Prompt section lets project members define a prompt that replaces the
 
 - Changes are saved via `PUT /api/projects/:id/system-prompt` and take effect immediately for new requests.
 
-When the override is enabled, the original `system` value sent by clients is silently replaced. When disabled, the client's `system` field is forwarded unchanged.
+When the override is enabled:
+
+- **Replace mode**: the original `system` value sent by clients is replaced with the project's configured prompt.
+- **Prepend mode**: the project prompt blocks are placed before the original request's system prompt blocks.
+
+When disabled, the client's `system` field is forwarded unchanged.
 
 ### Account Management
 

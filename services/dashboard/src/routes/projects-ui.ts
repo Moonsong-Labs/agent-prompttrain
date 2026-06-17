@@ -601,8 +601,9 @@ trainsUIRoutes.get('/:projectId/view', async c => {
                   System Prompt Override
                 </h3>
                 <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 1rem;">
-                  When enabled, replaces the system prompt in all Claude API requests routed through
-                  this project. The original system prompt from the request is discarded.
+                  ${train.system_prompt_mode === 'prepend'
+                    ? 'When enabled, prepends the configured system prompt before the original system prompt in all Claude API requests routed through this project.'
+                    : 'When enabled, replaces the system prompt in all Claude API requests routed through this project. The original system prompt from the request is discarded.'}
                 </p>
 
                 <div
@@ -631,6 +632,34 @@ trainsUIRoutes.get('/:projectId/view', async c => {
                         : '#10b981'}; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
                     >
                       ${train.system_prompt_enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  </form>
+                </div>
+
+                <div
+                  style="background: #f3f4f6; padding: 1rem; border-radius: 0.25rem; margin-bottom: 0.75rem;"
+                >
+                  <form
+                    hx-post="/dashboard/projects/${train.id}/system-prompt-mode"
+                    hx-swap="outerHTML"
+                    hx-target="#system-prompt-settings"
+                    style="display: flex; align-items: center; justify-content: space-between;"
+                  >
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">
+                        Mode: ${train.system_prompt_mode === 'prepend' ? 'Prepend' : 'Replace'}
+                      </div>
+                      <div style="font-size: 0.75rem; color: #6b7280;">
+                        ${train.system_prompt_mode === 'prepend'
+                          ? 'Project prompt is added before the original request prompt.'
+                          : 'Project prompt fully replaces the original request prompt.'}
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      style="background: #6366f1; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.875rem;"
+                    >
+                      Switch to ${train.system_prompt_mode === 'prepend' ? 'Replace' : 'Prepend'}
                     </button>
                   </form>
                 </div>
@@ -2179,6 +2208,63 @@ trainsUIRoutes.post('/:projectId/toggle-system-prompt', async c => {
     await updateProject(pool, projectId, { system_prompt_enabled: newEnabled })
 
     // Redirect to reload the page with updated data
+    const updatedProject = await getProjectById(pool, projectId)
+    return c.redirect(`/dashboard/projects/${updatedProject!.project_id}/view`)
+  } catch (error) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Error: ${getErrorMessage(error)}
+      </div>
+    `)
+  }
+})
+
+/**
+ * Toggle system prompt mode between 'replace' and 'prepend'
+ */
+trainsUIRoutes.post('/:projectId/system-prompt-mode', async c => {
+  const projectId = c.req.param('projectId')
+  const pool = container.getPool()
+  const auth = c.get('auth')
+
+  if (!pool) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        Database not configured
+      </div>
+    `)
+  }
+
+  if (!auth.isAuthenticated) {
+    return c.html(html`
+      <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+        <strong>Error:</strong> Unauthorized - please log in
+      </div>
+    `)
+  }
+
+  try {
+    const isMember = await isProjectMember(pool, projectId, auth.principal)
+    if (!isMember) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          <strong>Error:</strong> Only project members can change system prompt settings
+        </div>
+      `)
+    }
+
+    const project = await getProjectById(pool, projectId)
+    if (!project) {
+      return c.html(html`
+        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
+          Project not found
+        </div>
+      `)
+    }
+
+    const newMode = project.system_prompt_mode === 'prepend' ? 'replace' : 'prepend'
+    await updateProject(pool, projectId, { system_prompt_mode: newMode })
+
     const updatedProject = await getProjectById(pool, projectId)
     return c.redirect(`/dashboard/projects/${updatedProject!.project_id}/view`)
   } catch (error) {
