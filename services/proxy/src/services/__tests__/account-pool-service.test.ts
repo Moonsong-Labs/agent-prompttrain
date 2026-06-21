@@ -341,8 +341,8 @@ describe('AccountPoolService', () => {
 
   // ── Scenario 7: Anthropic API failure ────────────────────────────────────
 
-  describe('Anthropic API failure (conservative)', () => {
-    test('treats account as over threshold when API returns error', async () => {
+  describe('Anthropic usage API failure', () => {
+    test('falls back to a linked account when usage is unavailable for all accounts', async () => {
       const cred1 = makeAnthropicCredential({
         id: 'cred-1',
         account_id: 'acct-1',
@@ -358,16 +358,39 @@ describe('AccountPoolService', () => {
       // Both accounts fail to return usage
       mockFetchFailure()
 
-      try {
-        await service.selectAccount('project-1')
-        expect(true).toBe(false)
-      } catch (error) {
-        // null usage -> maxUtilization = 1 -> all over threshold -> exhausted
-        expect(error).toBeInstanceOf(AccountPoolExhaustedError)
-      }
+      const result = await service.selectAccount('project-1')
+
+      expect(result.credential.id).toBe('cred-1')
+      expect(result.fromPool).toBe(true)
+      expect(result.maxUtilization).toBeNull()
     })
 
-    test('treats account as over threshold when getApiKey returns null', async () => {
+    test('prefers an account with known below-threshold usage over unavailable usage', async () => {
+      const cred1 = makeAnthropicCredential({
+        id: 'cred-1',
+        account_id: 'acct-1',
+        token_limit_threshold: 0.8,
+      })
+      const cred2 = makeAnthropicCredential({
+        id: 'cred-2',
+        account_id: 'acct-2',
+        token_limit_threshold: 0.8,
+      })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+      mockGetApiKey.mockImplementation((credId: string) =>
+        Promise.resolve(credId === 'cred-1' ? null : `token-${credId}`)
+      )
+      mockFetchWithUsage({
+        'cred-2': makeUsageResponse(45, 35),
+      })
+
+      const result = await service.selectAccount('project-1')
+
+      expect(result.credential.id).toBe('cred-2')
+      expect(result.maxUtilization).toBe(0.45)
+    })
+
+    test('falls back when getApiKey returns null for every usage check', async () => {
       const cred1 = makeAnthropicCredential({
         id: 'cred-1',
         token_limit_threshold: 0.8,
@@ -379,12 +402,11 @@ describe('AccountPoolService', () => {
       mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
       mockGetApiKey.mockImplementation(() => Promise.resolve(null))
 
-      try {
-        await service.selectAccount('project-1')
-        expect(true).toBe(false)
-      } catch (error) {
-        expect(error).toBeInstanceOf(AccountPoolExhaustedError)
-      }
+      const result = await service.selectAccount('project-1')
+
+      expect(result.credential.id).toBe('cred-1')
+      expect(result.fromPool).toBe(true)
+      expect(result.maxUtilization).toBeNull()
     })
   })
 

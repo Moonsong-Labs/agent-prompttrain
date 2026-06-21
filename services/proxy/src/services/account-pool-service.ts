@@ -31,10 +31,15 @@ export class AccountPoolExhaustedError extends Error {
 export interface AccountSelection {
   /** The selected credential to use for the request */
   credential: Credential
-  /** Highest utilization across 5h and 7d windows (0-1, normalized) */
-  maxUtilization: number
+  /** Highest utilization across 5h and 7d windows (0-1, normalized), or null when usage is unavailable */
+  maxUtilization: number | null
   /** True if selected from a multi-account pool, false if using default account */
   fromPool: boolean
+}
+
+interface UsageEvaluation {
+  credential: AnthropicCredential
+  maxUtilization: number | null
 }
 
 /**
@@ -94,7 +99,7 @@ export class AccountPoolService {
         const cachedEntry = await this.usageCacheService.getUsage(stickyCredential)
         const maxUtilization = this.computeMaxUtilization(cachedEntry?.usage ?? null)
 
-        if (maxUtilization < stickyCredential.token_limit_threshold) {
+        if (maxUtilization !== null && maxUtilization < stickyCredential.token_limit_threshold) {
           logger.debug('Reusing sticky account (under threshold)', {
             metadata: {
               projectId,
@@ -110,7 +115,7 @@ export class AccountPoolService {
           }
         }
 
-        logger.info('Sticky account over threshold, searching pool', {
+        logger.info('Sticky account unavailable or over threshold, searching pool', {
           metadata: {
             projectId,
             accountId: stickyCredential.account_id,
@@ -123,7 +128,7 @@ export class AccountPoolService {
 
     // Fetch usage for all Anthropic accounts in parallel
     const usageMap = await this.usageCacheService.getUsageMultiple(anthropicCredentials)
-    const usageResults = anthropicCredentials.map(credential => {
+    const usageResults: UsageEvaluation[] = anthropicCredentials.map(credential => {
       const entry = usageMap.get(credential.id)
       const maxUtilization = this.computeMaxUtilization(entry?.usage ?? null)
       return { credential, maxUtilization }
@@ -131,10 +136,42 @@ export class AccountPoolService {
 
     // Filter to accounts under their respective thresholds
     const available = usageResults.filter(
-      ({ credential, maxUtilization }) => maxUtilization < credential.token_limit_threshold
+      (result): result is UsageEvaluation & { maxUtilization: number } =>
+        result.maxUtilization !== null &&
+        result.maxUtilization < result.credential.token_limit_threshold
     )
 
     if (available.length === 0) {
+      const unknownUsage = usageResults.filter(r => r.maxUtilization === null)
+      if (unknownUsage.length > 0) {
+        const stickyFallback = stickyCredentialId
+          ? unknownUsage.find(r => r.credential.id === stickyCredentialId)
+          : undefined
+        const fallback = stickyFallback ?? unknownUsage[0]
+
+        this.stickyMap.set(projectId, fallback.credential.id)
+
+        logger.warn('OAuth usage unavailable for account pool; using fallback account', {
+          metadata: {
+            projectId,
+            accountId: fallback.credential.account_id,
+            unknownUsageCount: unknownUsage.length,
+            poolSize: anthropicCredentials.length,
+            utilizations: usageResults.map(r => ({
+              accountId: r.credential.account_id,
+              maxUtilization: r.maxUtilization,
+              threshold: r.credential.token_limit_threshold,
+            })),
+          },
+        })
+
+        return {
+          credential: fallback.credential,
+          maxUtilization: null,
+          fromPool: true,
+        }
+      }
+
       // Find the earliest reset time across all accounts for the error
       const estimatedReset = this.findEarliestReset(anthropicCredentials, usageMap)
 
@@ -202,11 +239,11 @@ export class AccountPoolService {
 
   /**
    * Compute the maximum utilization across 5-hour and 7-day windows.
-   * Returns 1 (treat as over threshold) if usage data is null (conservative).
+   * Returns null if usage data is unavailable.
    */
-  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null): number {
+  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null): number | null {
     if (!usage) {
-      return 1
+      return null
     }
 
     // API returns utilization as 0-100, normalize to 0-1 to match token_limit_threshold

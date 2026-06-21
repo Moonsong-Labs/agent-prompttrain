@@ -92,7 +92,8 @@ export class AuthenticationService {
         projectId,
         metadata: {
           accountId: selection.credential.account_id,
-          maxUtilization: Math.round(selection.maxUtilization * 100),
+          maxUtilization:
+            selection.maxUtilization === null ? null : Math.round(selection.maxUtilization * 100),
         },
       })
     }
