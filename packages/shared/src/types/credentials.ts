@@ -19,6 +19,7 @@ export interface BaseCredential {
 
 export interface AnthropicCredential extends BaseCredential {
   provider: 'anthropic'
+  account_email?: string | null
   oauth_access_token: string
   oauth_refresh_token: string
   oauth_expires_at: Date
@@ -44,7 +45,10 @@ export interface BedrockCredential extends BaseCredential {
 export type Credential = AnthropicCredential | BedrockCredential
 
 export interface AnthropicCredentialSafe
-  extends Omit<AnthropicCredential, 'oauth_access_token' | 'oauth_refresh_token'> {
+  extends Omit<
+    AnthropicCredential,
+    'oauth_access_token' | 'oauth_refresh_token' | 'account_email'
+  > {
   token_status: 'valid' | 'expiring_soon' | 'expired'
 }
 
@@ -114,6 +118,7 @@ export interface ProjectApiKeySafe {
 export interface CreateAnthropicCredentialRequest {
   account_id: string
   account_name: string
+  account_email?: string | null
   oauth_access_token: string
   oauth_refresh_token: string
   oauth_expires_at: Date

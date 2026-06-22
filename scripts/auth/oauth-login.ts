@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
 import { randomBytes, createHash } from 'crypto'
-import { createAnthropicCredential } from '../../packages/shared/src/database/queries/index.js'
+import {
+  getCredentialByAccountId,
+  upsertAnthropicCredential,
+} from '../../packages/shared/src/database/queries/index.js'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
@@ -26,7 +29,7 @@ function generateCodeChallenge(verifier: string): string {
   return base64URLEncode(createHash('sha256').update(verifier).digest())
 }
 
-function generateAuthorizationUrl(): { url: string; verifier: string } {
+export function generateAuthorizationUrl(): { url: string; verifier: string } {
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)
 
@@ -43,7 +46,7 @@ function generateAuthorizationUrl(): { url: string; verifier: string } {
   return { url: authUrl.toString(), verifier: codeVerifier }
 }
 
-async function promptInput(question: string): Promise<string> {
+export async function promptInput(question: string): Promise<string> {
   const readline = await import('readline')
   const rl = readline.createInterface({
     input: process.stdin,
@@ -58,7 +61,7 @@ async function promptInput(question: string): Promise<string> {
   })
 }
 
-async function exchangeCodeForTokens(
+export async function exchangeCodeForTokens(
   codeWithState: string,
   codeVerifier: string
 ): Promise<{
@@ -106,7 +109,7 @@ async function exchangeCodeForTokens(
   }
 }
 
-async function performOAuthLogin(): Promise<void> {
+export async function performOAuthLogin(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
     console.error('DATABASE_URL environment variable is required')
@@ -118,12 +121,33 @@ async function performOAuthLogin(): Promise<void> {
   try {
     console.log('Starting OAuth login flow...\n')
 
-    // Get account details
     const accountId = await promptInput('Enter account ID (e.g., acc_team_alpha): ')
-    const accountName = await promptInput('Enter account name (e.g., Team Alpha): ')
+    if (!accountId) {
+      console.error('Account ID is required')
+      process.exit(1)
+    }
 
-    if (!accountId || !accountName) {
-      console.error('Account ID and name are required')
+    const existing = await getCredentialByAccountId(pool, accountId)
+    if (existing && existing.provider !== 'anthropic') {
+      console.error(`Account ID ${accountId} already exists for provider ${existing.provider}`)
+      process.exit(1)
+    }
+
+    const existingAnthropic = existing?.provider === 'anthropic' ? existing : null
+    const accountNamePrompt = existingAnthropic
+      ? `Enter account name [${existingAnthropic.account_name}]: `
+      : 'Enter account name (e.g., Team Alpha): '
+    const accountNameInput = await promptInput(accountNamePrompt)
+    const accountName = accountNameInput || existingAnthropic?.account_name || ''
+
+    const accountEmailPrompt = existingAnthropic?.account_email
+      ? `Enter credential email [${existingAnthropic.account_email}]: `
+      : 'Enter credential email (optional, used by relogin scripts only): '
+    const accountEmailInput = await promptInput(accountEmailPrompt)
+    const accountEmail = accountEmailInput || existingAnthropic?.account_email || null
+
+    if (!accountName) {
+      console.error('Account name is required')
       process.exit(1)
     }
 
@@ -142,9 +166,10 @@ async function performOAuthLogin(): Promise<void> {
 
     // Save to database
     console.log('Saving credentials to database...')
-    const credential = await createAnthropicCredential(pool, {
+    const credential = await upsertAnthropicCredential(pool, {
       account_id: accountId,
       account_name: accountName,
+      account_email: accountEmail,
       oauth_access_token: tokens.accessToken,
       oauth_refresh_token: tokens.refreshToken,
       oauth_expires_at: tokens.expiresAt,
@@ -168,4 +193,6 @@ async function performOAuthLogin(): Promise<void> {
   }
 }
 
-performOAuthLogin()
+if (import.meta.main) {
+  performOAuthLogin()
+}
