@@ -5,10 +5,9 @@ import {
   maskSensitiveData,
   truncateString,
 } from '@agent-prompttrain/shared'
+import { config } from '@agent-prompttrain/shared/config'
 import { getRequestLogger } from './logger'
 
-// Request size limits
-const MAX_REQUEST_SIZE = 10 * 1024 * 1024 // 10MB
 // Validation middleware
 export function validationMiddleware() {
   return async (c: Context, next: Next) => {
@@ -27,11 +26,14 @@ export function validationMiddleware() {
       throw new ValidationError('Content-Type must be application/json')
     }
 
-    // Check request size
+    // Check request size. Matches the Claude API's own 32MB request limit by
+    // default (configurable via MAX_REQUEST_SIZE); a stricter cap here would
+    // reject requests Claude itself would accept.
+    const maxRequestSize = config.validation.maxRequestSize
     const contentLength = parseInt(c.req.header('content-length') || '0')
-    if (contentLength > MAX_REQUEST_SIZE) {
-      logger.warn('Request too large', { contentLength, limit: MAX_REQUEST_SIZE })
-      throw new ValidationError(`Request size exceeds limit of ${MAX_REQUEST_SIZE} bytes`)
+    if (contentLength > maxRequestSize) {
+      logger.warn('Request too large', { contentLength, limit: maxRequestSize })
+      throw new ValidationError(`Request size exceeds limit of ${maxRequestSize} bytes`)
     }
 
     // Parse and validate request body

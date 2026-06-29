@@ -155,8 +155,8 @@ export const config = {
   // Request validation
   validation: {
     get maxRequestSize() {
-      return env.int('MAX_REQUEST_SIZE', 10 * 1024 * 1024)
-    }, // 10MB
+      return env.int('MAX_REQUEST_SIZE', 32 * 1024 * 1024)
+    }, // 32MB — matches the Claude API request limit
     get maxMessageCount() {
       return env.int('MAX_MESSAGE_COUNT', 100)
     },
