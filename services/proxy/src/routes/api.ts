@@ -1706,6 +1706,25 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       }
     }
 
+    // Model-scoped limits from the structured limits[] array (e.g. the
+    // separate Claude Fable 5 weekly allowance). These have no legacy window
+    // field — without this, a saturated model limit is invisible while
+    // Anthropic rejects requests for that model with a 429.
+    for (const limit of entry.usage.limits ?? []) {
+      const scopedModelName = limit.scope?.model?.display_name || limit.scope?.model?.id
+      if (!scopedModelName) {
+        continue // unscoped kinds (session/weekly_all) duplicate 5h/7d above
+      }
+      const groupLabel = limit.group === 'session' ? 'Session' : '7-Day'
+      windows.push({
+        name: `${groupLabel} ${scopedModelName}`,
+        short_name: `${limit.group === 'session' ? '5h' : '7d'} ${scopedModelName}`,
+        utilization: limit.percent ?? 0,
+        resets_at: limit.resets_at ? formatResetTime(new Date(limit.resets_at)) : '—',
+        resets_at_iso: limit.resets_at ?? '',
+      })
+    }
+
     const oauthResponse = {
       success: true,
       data: {

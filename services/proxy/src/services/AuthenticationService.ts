@@ -35,7 +35,12 @@ export class AuthenticationService {
     this.accountPoolService = new AccountPoolService(this.pool, this.usageCacheService)
   }
 
-  async authenticate(context: RequestContext): Promise<AuthResult> {
+  /**
+   * @param model - The Claude model requested, when known. Passed to the
+   *   account pool so model-scoped limits (e.g. Claude Fable 5's separate
+   *   weekly allowance) gate accounts for that model only.
+   */
+  async authenticate(context: RequestContext, model?: string): Promise<AuthResult> {
     const requestedAccount = context.account
     const projectId = context.projectId
 
@@ -69,7 +74,7 @@ export class AuthenticationService {
     // Priority 2: Account pool or default account
     let selection
     try {
-      selection = await this.accountPoolService.selectAccount(projectId)
+      selection = await this.accountPoolService.selectAccount(projectId, model)
     } catch (error) {
       if (error instanceof AccountPoolExhaustedError) {
         throw error

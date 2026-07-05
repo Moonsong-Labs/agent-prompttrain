@@ -3,6 +3,7 @@ import type {
   Credential,
   AnthropicCredential,
   AnthropicOAuthUsageResponse,
+  OAuthLimitEntry,
 } from '@agent-prompttrain/shared'
 import {
   getProjectLinkedCredentials,
@@ -66,8 +67,12 @@ export class AccountPoolService {
    * 2. If sticky is over threshold, evaluates all linked Anthropic accounts
    * 3. Picks the account with the lowest max utilization that is under threshold
    * 4. Throws AccountPoolExhaustedError if no accounts are available
+   *
+   * @param model - The Claude model requested (e.g. "claude-fable-5"). When
+   *   provided, model-scoped limits from the usage response (e.g. the separate
+   *   Claude Fable 5 weekly allowance) gate accounts for that model only.
    */
-  async selectAccount(projectId: string): Promise<AccountSelection> {
+  async selectAccount(projectId: string, model?: string): Promise<AccountSelection> {
     // Try pool mode: check if project has 2+ linked accounts
     let linkedCredentials: Credential[] = []
     try {
@@ -92,7 +97,7 @@ export class AccountPoolService {
       const stickyCredential = anthropicCredentials.find(c => c.id === stickyCredentialId)
       if (stickyCredential) {
         const cachedEntry = await this.usageCacheService.getUsage(stickyCredential)
-        const maxUtilization = this.computeMaxUtilization(cachedEntry?.usage ?? null)
+        const maxUtilization = this.computeMaxUtilization(cachedEntry?.usage ?? null, model)
 
         if (maxUtilization < stickyCredential.token_limit_threshold) {
           logger.debug('Reusing sticky account (under threshold)', {
@@ -125,7 +130,7 @@ export class AccountPoolService {
     const usageMap = await this.usageCacheService.getUsageMultiple(anthropicCredentials)
     const usageResults = anthropicCredentials.map(credential => {
       const entry = usageMap.get(credential.id)
-      const maxUtilization = this.computeMaxUtilization(entry?.usage ?? null)
+      const maxUtilization = this.computeMaxUtilization(entry?.usage ?? null, model)
       return { credential, maxUtilization }
     })
 
@@ -136,7 +141,7 @@ export class AccountPoolService {
 
     if (available.length === 0) {
       // Find the earliest reset time across all accounts for the error
-      const estimatedReset = this.findEarliestReset(anthropicCredentials, usageMap)
+      const estimatedReset = this.findEarliestReset(anthropicCredentials, usageMap, model)
 
       logger.warn('All accounts in pool exhausted', {
         metadata: {
@@ -201,10 +206,16 @@ export class AccountPoolService {
   }
 
   /**
-   * Compute the maximum utilization across 5-hour and 7-day windows.
+   * Compute the maximum utilization across 5-hour and 7-day windows plus any
+   * applicable entries in the structured `limits` array.
    * Returns 1 (treat as over threshold) if usage data is null (conservative).
+   *
+   * Model-scoped limits (e.g. the separate Claude Fable 5 weekly allowance)
+   * only count when the requested `model` matches the limit's scope — a
+   * saturated Fable limit must not block Sonnet/Opus traffic. Unscoped active
+   * limits count for every request.
    */
-  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null): number {
+  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null, model?: string): number {
     if (!usage) {
       return 1
     }
@@ -212,7 +223,52 @@ export class AccountPoolService {
     // API returns utilization as 0-100, normalize to 0-1 to match token_limit_threshold
     const fiveHour = (usage.five_hour?.utilization ?? 0) / 100
     const sevenDay = (usage.seven_day?.utilization ?? 0) / 100
-    return Math.max(fiveHour, sevenDay)
+    let max = Math.max(fiveHour, sevenDay)
+
+    for (const limit of usage.limits ?? []) {
+      if (!this.limitApplies(limit, model)) {
+        continue
+      }
+      max = Math.max(max, (limit.percent ?? 0) / 100)
+    }
+
+    return max
+  }
+
+  /**
+   * Whether a limit entry applies to a request for the given model.
+   *
+   * - Inactive limits never apply.
+   * - Unscoped (global) limits always apply. These duplicate the legacy
+   *   five_hour/seven_day windows today, so including them is a no-op now and
+   *   a safety net if the legacy fields are ever dropped.
+   * - Model-scoped limits apply only when the requested model matches the
+   *   scope's `model.id` (exact) or `model.display_name` (substring, e.g.
+   *   display_name "Fable" matches "claude-fable-5"). With no model provided
+   *   (non-Messages endpoints), scoped limits are skipped — blocking all
+   *   traffic on a single-model limit would be worse than the upstream 429.
+   */
+  private limitApplies(limit: OAuthLimitEntry, model?: string): boolean {
+    if (!limit.is_active) {
+      return false
+    }
+
+    const scopedModel = limit.scope?.model
+    if (!scopedModel) {
+      return true
+    }
+
+    if (!model) {
+      return false
+    }
+
+    if (scopedModel.id) {
+      return scopedModel.id.toLowerCase() === model.toLowerCase()
+    }
+    if (scopedModel.display_name) {
+      return model.toLowerCase().includes(scopedModel.display_name.toLowerCase())
+    }
+    return false
   }
 
   /**
@@ -221,7 +277,8 @@ export class AccountPoolService {
    */
   private findEarliestReset(
     credentials: AnthropicCredential[],
-    usageMap: Map<string, CachedUsageEntry>
+    usageMap: Map<string, CachedUsageEntry>,
+    model?: string
   ): string | null {
     let earliest: string | null = null
 
@@ -234,6 +291,9 @@ export class AccountPoolService {
       const resetTimes = [
         cached.usage.five_hour?.resets_at,
         cached.usage.seven_day?.resets_at,
+        ...(cached.usage.limits ?? [])
+          .filter(limit => this.limitApplies(limit, model))
+          .map(limit => limit.resets_at),
       ].filter((t): t is string => t !== null && t !== undefined)
 
       for (const resetTime of resetTimes) {

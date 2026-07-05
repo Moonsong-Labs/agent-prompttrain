@@ -38,8 +38,8 @@ Add an `AccountPoolService` that automatically selects the best account from a p
 
 ### Key Design Decisions
 
-- **Usage source**: Anthropic OAuth usage API (`/api/oauth/usage`) — returns real utilization percentages for 5h and 7d windows
-- **Trigger**: Switch when EITHER the 5-hour OR 7-day utilization exceeds the per-account threshold
+- **Usage source**: Anthropic OAuth usage API (`/api/oauth/usage`) — returns real utilization percentages for 5h and 7d windows, plus a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance)
+- **Trigger**: Switch when EITHER the 5-hour OR 7-day utilization exceeds the per-account threshold, or (amended 2026-07-05) when an active model-scoped limit matching the requested model exceeds the threshold — scoped limits gate only requests for that model, so a saturated Fable limit never blocks Sonnet/Opus traffic
 - **Threshold config**: Per-account `token_limit_threshold` column in `credentials` table (0-1 scale, default 0.80)
 - **Selection strategy**: Sticky least-loaded — stay on current account until threshold exceeded, then switch to least-loaded alternative
 - **Exhaustion behavior**: Return HTTP 429 with `estimated_reset` from `resets_at` and `Retry-After` header

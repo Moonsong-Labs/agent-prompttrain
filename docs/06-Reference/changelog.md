@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Account pool no longer routes requests to accounts whose model-scoped limit is exhausted (fixes upstream `429 "This request could exceed your account's rate limit"` despite low 5h/7d usage)
+  - Anthropic's OAuth usage response now carries a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance); the legacy `seven_day_opus`/`seven_day_sonnet` fields are null in live responses
+  - Account selection is now model-aware: a saturated Fable-scoped limit exhausts the pool for Fable requests only, without blocking other models; sticky accounts are re-evaluated per requested model
+  - Pool-exhausted 429s now surface the scoped limit's reset time
+  - Dashboard/public token-usage pages now render model-scoped limit bars (e.g. "7-Day Fable") so exhausted limits are visible instead of only 5h/7d windows
+
 ### Changed
 
 - Token Usage overview: projects with zero tokens are now hidden from the project list
