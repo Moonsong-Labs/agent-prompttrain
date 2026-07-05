@@ -443,24 +443,30 @@ LIMIT 10;
 
 ### Token Cost Calculation
 
-Track costs by model:
+Costs are computed from the shared per-model pricing registry
+(`packages/shared/src/constants/model-pricing.ts`), which is the single source
+of truth for current rates (including Claude Fable 5 at $10/$50 per MTok). Do
+not hardcode rate tables — use the registry helpers:
 
 ```javascript
-const tokenCosts = {
-  'claude-3-opus-20240229': { input: 15, output: 75 }, // per million tokens
-  'claude-3-sonnet-20240229': { input: 3, output: 15 },
-  'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-}
+import { calculateRequestCost, calculateUsageCost } from '@agent-prompttrain/shared'
 
-function calculateCost(model, inputTokens, outputTokens) {
-  const costs = tokenCosts[model]
-  return {
-    input: (inputTokens / 1_000_000) * costs.input,
-    output: (outputTokens / 1_000_000) * costs.output,
-    total: (inputTokens / 1_000_000) * costs.input + (outputTokens / 1_000_000) * costs.output,
-  }
-}
+// Single model, from stored token counts:
+const cost = calculateRequestCost('claude-opus-4-8', {
+  inputTokens,
+  outputTokens,
+  cacheReadTokens,
+  cacheCreationTokens,
+})
+
+// Fallback-aware: pass the raw API `usage` object (with `iterations`) so a
+// Claude Fable 5 request re-served by an Opus 4.8 fallback is billed at the
+// model that actually ran each attempt (see ADR-035).
+const totalCost = calculateUsageCost(request.model, response.usage)
 ```
+
+See [ADR-035](../04-Architecture/ADRs/adr-035-model-pricing-registry-and-fallback-cost-attribution.md)
+for the registry design and fallback cost attribution.
 
 ### Budget Alerts
 

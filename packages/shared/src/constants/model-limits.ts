@@ -17,10 +17,11 @@ export interface ModelContextRule {
  * Model context window rules
  * Order matters - more specific patterns should come before general ones
  *
- * Claude Opus 4.6 and Sonnet 4.6 support 1M context windows (GA March 2026).
- * Models with "[1m]" suffix in their display name also indicate 1M context.
- * Earlier Claude 4.x models use 200k context windows.
+ * Claude Fable 5, Opus 4.6/4.7/4.8, Sonnet 5 and Sonnet 4.6 support 1M context
+ * windows. Models with "[1m]" suffix in their display name also indicate 1M
+ * context. Earlier Claude 4.x models use 200k context windows.
  *
+ * @see https://platform.claude.com/docs/en/about-claude/models/overview
  * @see https://claude.com/blog/1m-context-ga
  */
 export const MODEL_CONTEXT_RULES: ModelContextRule[] = [
@@ -32,9 +33,20 @@ export const MODEL_CONTEXT_RULES: ModelContextRule[] = [
     source: 'https://claude.com/blog/1m-context-ga',
   },
 
-  // Claude 4.6 (Opus & Sonnet) - 1M context window (GA March 2026)
+  // Claude Fable 5 / Mythos 5 - 1M context window (new top tier above Opus)
+  // Source: https://platform.claude.com/docs/en/about-claude/models/overview
+  { pattern: /claude-(fable|mythos)-5/i, limit: 1000000 },
+
+  // Claude Opus 4.6 / 4.7 / 4.8 - 1M context window
+  // Source: https://platform.claude.com/docs/en/about-claude/models/overview
+  { pattern: /claude-opus-4-[678]/i, limit: 1000000 },
+
+  // Claude Sonnet 5 - 1M context window
+  // Source: https://platform.claude.com/docs/en/about-claude/models/overview
+  { pattern: /claude-sonnet-5/i, limit: 1000000 },
+
+  // Claude Sonnet 4.6 - 1M context window (GA March 2026)
   // Source: https://claude.com/blog/1m-context-ga
-  { pattern: /claude-opus-4-6/i, limit: 1000000 },
   { pattern: /claude-sonnet-4-6/i, limit: 1000000 },
 
   // Claude 4.5 and earlier 4.x (new naming: claude-{family}-{version}) - 200k context

@@ -77,6 +77,22 @@ export {
   type ModelContextRule,
 } from './constants/model-limits.js'
 
+// Export model pricing configuration and fallback-aware cost attribution
+export {
+  MODEL_PRICING_RULES,
+  DEFAULT_MODEL_PRICING,
+  getModelPricing,
+  calculateRequestCost,
+  getBilledUsageByModel,
+  calculateUsageCost,
+  type ModelPricing,
+  type ModelPricingRule,
+  type TokenUsageInput,
+  type RawUsage,
+  type RawUsageIteration,
+  type BilledUsageEntry,
+} from './constants/model-pricing.js'
+
 export {
   MSL_PROJECT_ID_HEADER,
   MSL_PROJECT_ID_HEADER_LOWER,

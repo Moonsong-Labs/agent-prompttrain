@@ -1,7 +1,12 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
-import { getErrorMessage } from '@agent-prompttrain/shared'
-import { parseConversation, calculateCost } from '../utils/conversation.js'
+import {
+  getErrorMessage,
+  calculateUsageCost,
+  calculateRequestCost,
+  type RawUsage,
+} from '@agent-prompttrain/shared'
+import { parseConversation } from '../utils/conversation.js'
 import { formatDuration, escapeHtml } from '../utils/formatters.js'
 import { layout } from '../layout/index.js'
 import { isSparkRecommendation, parseSparkRecommendation } from '../utils/spark.js'
@@ -111,8 +116,16 @@ requestDetailsRoutes.get('/request/:id', async c => {
       timestamp: details.timestamp,
     })
 
-    // Calculate cost
-    const cost = calculateCost(conversation.totalInputTokens, conversation.totalOutputTokens)
+    // Calculate cost (model-aware; attributes Claude Fable 5 fallback iterations
+    // to the model that actually served each attempt)
+    const rawUsage = details.responseBody?.usage as RawUsage | undefined
+    const totalCost = rawUsage
+      ? calculateUsageCost(details.model || 'unknown', rawUsage)
+      : calculateRequestCost(details.model || 'unknown', {
+          inputTokens: conversation.totalInputTokens,
+          outputTokens: conversation.totalOutputTokens,
+        })
+    const cost = { totalCost, formattedTotal: `$${totalCost.toFixed(4)}` }
 
     // Detect Spark recommendations
     const sparkRecommendations: Array<{

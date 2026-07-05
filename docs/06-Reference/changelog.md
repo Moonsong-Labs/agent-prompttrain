@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Model pricing registry and Claude Fable 5 support (see [ADR-035](../04-Architecture/ADRs/adr-035-model-pricing-registry-and-fallback-cost-attribution.md))
+  - New `packages/shared` pricing registry (`getModelPricing`, `calculateRequestCost`) with current per-model rates, including Claude Fable 5 / Mythos 5 ($10/$50 per MTok); replaces the obsolete hardcoded Claude-3-era rate table in the dashboard
+  - Fallback-aware cost attribution (`getBilledUsageByModel`, `calculateUsageCost`): a Claude Fable 5 request re-served by an Opus 4.8 fallback is costed at the model that actually ran each attempt via the response `usage.iterations` array; pre-output declines are treated as unbilled
+  - Dashboard per-model token/cost breakdown and single-request cost now use the registry (model-aware, fallback-aware)
+  - Added Claude Fable 5 / Mythos 5, Opus 4.7 / 4.8, and Sonnet 5 to the 1M context-window rules
+  - Added an optional `iterations` field to the shared Claude `usage` type
 - Public token usage status page at `/public/token-usage` (no authentication required)
   - Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account
   - Compact multi-column layout with progress bars, reset times, and last-checked timestamps

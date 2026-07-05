@@ -32,40 +32,41 @@ What becomes easier or more difficult to do because of this change?
 
 ## Current ADRs
 
-| ADR                                                       | Title                                  | Status     | Date       |
-| --------------------------------------------------------- | -------------------------------------- | ---------- | ---------- |
-| [ADR-001](./adr-001-monorepo-structure.md)                | Monorepo Structure                     | Accepted   | 2024-01-15 |
-| [ADR-002](./adr-002-separate-docker-images.md)            | Separate Docker Images                 | Accepted   | 2024-01-20 |
-| [ADR-003](./adr-003-conversation-tracking.md)             | Conversation Tracking Design           | Accepted   | 2024-02-01 |
-| [ADR-004](./adr-004-proxy-authentication.md)              | Proxy-Level Authentication             | Accepted   | 2024-06-25 |
-| [ADR-005](./adr-005-token-usage-tracking.md)              | Comprehensive Token Usage Tracking     | Accepted   | 2024-06-25 |
-| [ADR-006](./adr-006-long-running-requests.md)             | Support for Long-Running Requests      | Accepted   | 2024-06-25 |
-| [ADR-007](./adr-007-subtask-tracking.md)                  | Sub-task Detection and Tracking        | Accepted   | 2024-06-25 |
-| [ADR-008](./adr-008-cicd-strategy.md)                     | CI/CD Strategy with GitHub Actions     | Accepted   | 2024-06-25 |
-| [ADR-009](./adr-009-dashboard-architecture.md)            | Dashboard Architecture with HTMX       | Accepted   | 2024-06-25 |
-| [ADR-010](./adr-010-docker-cli-integration.md)            | Docker-Based Claude CLI Integration    | Accepted   | 2024-06-25 |
-| [ADR-011](./adr-011-future-decisions.md)                  | Future Architectural Decisions         | Proposed   | 2024-06-25 |
-| [ADR-012](./adr-012-database-schema-evolution.md)         | Database Schema Evolution Strategy     | Accepted   | 2025-06-26 |
-| [ADR-013](./adr-013-typescript-project-references.md)     | TypeScript Project References          | Accepted   | 2025-06-27 |
-| [ADR-014](./adr-014-sql-query-logging.md)                 | SQL Query Logging                      | Accepted   | 2025-06-30 |
-| [ADR-015](./adr-015-subtask-conversation-migration.md)    | Subtask Conversation Migration         | Accepted   | 2025-01-07 |
-| [ADR-018](./adr-018-ai-powered-conversation-analysis.md)  | AI-Powered Conversation Analysis       | Accepted   | 2025-01-12 |
-| [ADR-019](./adr-019-dashboard-read-only-mode-security.md) | Dashboard Read-Only Mode Security      | Superseded | 2025-01-23 |
-| [ADR-020](./adr-020-circuit-breaker-removal.md)           | Circuit Breaker Removal                | Accepted   | 2025-08-04 |
-| [ADR-021](./adr-021-e2e-testing-strategy.md)              | E2E Testing Strategy                   | Accepted   | —          |
-| [ADR-022](./adr-022-multi-architecture-docker-support.md) | Multi-Architecture Docker Support      | Accepted   | —          |
-| [ADR-023](./adr-023-wildcard-subdomain-support.md)        | Wildcard Subtrain Support              | Superseded | —          |
-| [ADR-024](./adr-024-train-id-header-routing.md)           | Header-Based Train and Account Routing | Accepted   | 2025-09-17 |
-| [ADR-025](./adr-025-dashboard-sso-proxy.md)               | Dashboard SSO via OAuth2 Proxy         | Accepted   | —          |
-| [ADR-026](./adr-026-database-credential-storage.md)       | Database-Based Credential Storage      | Accepted   | —          |
-| [ADR-027](./adr-027-mandatory-user-authentication.md)     | Mandatory User Authentication          | Accepted   | 2025-08-19 |
-| [ADR-028](./adr-028-proxy-service-operational-modes.md)   | Proxy Service Operational Modes        | Accepted   | —          |
-| [ADR-029](./adr-029-project-privacy-model.md)             | Project Privacy Model                  | Accepted   | —          |
-| [ADR-030](./adr-030-multi-provider-support.md)            | Multi-Provider Support                 | Accepted   | —          |
-| [ADR-031](./adr-031-account-pool-auto-switching.md)       | Account Pool Auto-Switching            | Accepted   | —          |
-| [ADR-032](./adr-032-centralized-usage-cache.md)           | Centralized Usage Cache                | Accepted   | —          |
-| [ADR-033](./adr-033-api-key-lifecycle-management.md)      | API Key Lifecycle Management           | Accepted   | —          |
-| [ADR-034](./adr-034-project-system-prompt-override.md)    | Project System Prompt Override         | Accepted   | 2026-03-19 |
+| ADR                                                                          | Title                                              | Status     | Date       |
+| ---------------------------------------------------------------------------- | -------------------------------------------------- | ---------- | ---------- |
+| [ADR-001](./adr-001-monorepo-structure.md)                                   | Monorepo Structure                                 | Accepted   | 2024-01-15 |
+| [ADR-002](./adr-002-separate-docker-images.md)                               | Separate Docker Images                             | Accepted   | 2024-01-20 |
+| [ADR-003](./adr-003-conversation-tracking.md)                                | Conversation Tracking Design                       | Accepted   | 2024-02-01 |
+| [ADR-004](./adr-004-proxy-authentication.md)                                 | Proxy-Level Authentication                         | Accepted   | 2024-06-25 |
+| [ADR-005](./adr-005-token-usage-tracking.md)                                 | Comprehensive Token Usage Tracking                 | Accepted   | 2024-06-25 |
+| [ADR-006](./adr-006-long-running-requests.md)                                | Support for Long-Running Requests                  | Accepted   | 2024-06-25 |
+| [ADR-007](./adr-007-subtask-tracking.md)                                     | Sub-task Detection and Tracking                    | Accepted   | 2024-06-25 |
+| [ADR-008](./adr-008-cicd-strategy.md)                                        | CI/CD Strategy with GitHub Actions                 | Accepted   | 2024-06-25 |
+| [ADR-009](./adr-009-dashboard-architecture.md)                               | Dashboard Architecture with HTMX                   | Accepted   | 2024-06-25 |
+| [ADR-010](./adr-010-docker-cli-integration.md)                               | Docker-Based Claude CLI Integration                | Accepted   | 2024-06-25 |
+| [ADR-011](./adr-011-future-decisions.md)                                     | Future Architectural Decisions                     | Proposed   | 2024-06-25 |
+| [ADR-012](./adr-012-database-schema-evolution.md)                            | Database Schema Evolution Strategy                 | Accepted   | 2025-06-26 |
+| [ADR-013](./adr-013-typescript-project-references.md)                        | TypeScript Project References                      | Accepted   | 2025-06-27 |
+| [ADR-014](./adr-014-sql-query-logging.md)                                    | SQL Query Logging                                  | Accepted   | 2025-06-30 |
+| [ADR-015](./adr-015-subtask-conversation-migration.md)                       | Subtask Conversation Migration                     | Accepted   | 2025-01-07 |
+| [ADR-018](./adr-018-ai-powered-conversation-analysis.md)                     | AI-Powered Conversation Analysis                   | Accepted   | 2025-01-12 |
+| [ADR-019](./adr-019-dashboard-read-only-mode-security.md)                    | Dashboard Read-Only Mode Security                  | Superseded | 2025-01-23 |
+| [ADR-020](./adr-020-circuit-breaker-removal.md)                              | Circuit Breaker Removal                            | Accepted   | 2025-08-04 |
+| [ADR-021](./adr-021-e2e-testing-strategy.md)                                 | E2E Testing Strategy                               | Accepted   | —          |
+| [ADR-022](./adr-022-multi-architecture-docker-support.md)                    | Multi-Architecture Docker Support                  | Accepted   | —          |
+| [ADR-023](./adr-023-wildcard-subdomain-support.md)                           | Wildcard Subtrain Support                          | Superseded | —          |
+| [ADR-024](./adr-024-train-id-header-routing.md)                              | Header-Based Train and Account Routing             | Accepted   | 2025-09-17 |
+| [ADR-025](./adr-025-dashboard-sso-proxy.md)                                  | Dashboard SSO via OAuth2 Proxy                     | Accepted   | —          |
+| [ADR-026](./adr-026-database-credential-storage.md)                          | Database-Based Credential Storage                  | Accepted   | —          |
+| [ADR-027](./adr-027-mandatory-user-authentication.md)                        | Mandatory User Authentication                      | Accepted   | 2025-08-19 |
+| [ADR-028](./adr-028-proxy-service-operational-modes.md)                      | Proxy Service Operational Modes                    | Accepted   | —          |
+| [ADR-029](./adr-029-project-privacy-model.md)                                | Project Privacy Model                              | Accepted   | —          |
+| [ADR-030](./adr-030-multi-provider-support.md)                               | Multi-Provider Support                             | Accepted   | —          |
+| [ADR-031](./adr-031-account-pool-auto-switching.md)                          | Account Pool Auto-Switching                        | Accepted   | —          |
+| [ADR-032](./adr-032-centralized-usage-cache.md)                              | Centralized Usage Cache                            | Accepted   | —          |
+| [ADR-033](./adr-033-api-key-lifecycle-management.md)                         | API Key Lifecycle Management                       | Accepted   | —          |
+| [ADR-034](./adr-034-project-system-prompt-override.md)                       | Project System Prompt Override                     | Accepted   | 2026-03-19 |
+| [ADR-035](./adr-035-model-pricing-registry-and-fallback-cost-attribution.md) | Model Pricing Registry & Fallback Cost Attribution | Accepted   | 2026-07-05 |
 
 ## Creating a New ADR
 
