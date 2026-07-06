@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../../services/api-client.js'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import { getErrorMessage, getBilledUsageByModel, type RawUsage } from '@agent-prompttrain/shared'
 import type { ApiRequest } from '../../types/conversation.js'
 
 export const analyticsConversationPartialRoutes = new Hono<{
@@ -82,24 +82,36 @@ analyticsConversationPartialRoutes.get(
         timeline: [] as Array<{ timestamp: Date; cumulativeTokens: number; model: string }>,
       }
 
+      // Model-aware, fallback-aware cost accounting.
+      // For Claude Fable 5 requests re-served by a fallback model, usage.iterations
+      // splits tokens across the models that actually ran; getBilledUsageByModel
+      // attributes billed tokens/cost to each and drops unbilled pre-output declines.
+      const costs = {
+        total: 0,
+        byModel: {} as Record<string, number>,
+      }
+
       // Process each request
       filteredRequests.forEach((req: ApiRequest) => {
-        const usage = req.response_body?.usage
-        if (usage) {
-          const inputTokens = usage.input_tokens || 0
-          const outputTokens = usage.output_tokens || 0
-          const cacheReadTokens = usage.cache_read_input_tokens || 0
-          const cacheCreationTokens = usage.cache_creation_input_tokens || 0
+        const usage = req.response_body?.usage as RawUsage | undefined
+        const entries = getBilledUsageByModel(req.model || 'unknown', usage)
+        if (entries.length === 0) {
+          return
+        }
 
-          tokenStats.totalInputTokens += inputTokens
-          tokenStats.totalOutputTokens += outputTokens
-          tokenStats.totalCacheReadTokens += cacheReadTokens
-          tokenStats.totalCacheCreationTokens += cacheCreationTokens
+        let reqInput = 0
+        let reqOutput = 0
+        let servedModel = req.model || 'unknown'
 
-          // By model
-          const model = req.model || 'unknown'
-          if (!tokenStats.byModel[model]) {
-            tokenStats.byModel[model] = {
+        entries.forEach(entry => {
+          tokenStats.totalInputTokens += entry.inputTokens
+          tokenStats.totalOutputTokens += entry.outputTokens
+          tokenStats.totalCacheReadTokens += entry.cacheReadTokens
+          tokenStats.totalCacheCreationTokens += entry.cacheCreationTokens
+
+          // By model (attributed to the model that actually ran the attempt)
+          if (!tokenStats.byModel[entry.model]) {
+            tokenStats.byModel[entry.model] = {
               input: 0,
               output: 0,
               cacheRead: 0,
@@ -107,29 +119,37 @@ analyticsConversationPartialRoutes.get(
               requests: 0,
             }
           }
-          tokenStats.byModel[model].input += inputTokens
-          tokenStats.byModel[model].output += outputTokens
-          tokenStats.byModel[model].cacheRead += cacheReadTokens
-          tokenStats.byModel[model].cacheCreation += cacheCreationTokens
-          tokenStats.byModel[model].requests++
+          tokenStats.byModel[entry.model].input += entry.inputTokens
+          tokenStats.byModel[entry.model].output += entry.outputTokens
+          tokenStats.byModel[entry.model].cacheRead += entry.cacheReadTokens
+          tokenStats.byModel[entry.model].cacheCreation += entry.cacheCreationTokens
+          tokenStats.byModel[entry.model].requests++
 
-          // By account
-          const account = req.account_id || 'unknown'
-          if (!tokenStats.byAccount[account]) {
-            tokenStats.byAccount[account] = { input: 0, output: 0, total: 0, requests: 0 }
-          }
-          tokenStats.byAccount[account].input += inputTokens
-          tokenStats.byAccount[account].output += outputTokens
-          tokenStats.byAccount[account].total += inputTokens + outputTokens
-          tokenStats.byAccount[account].requests++
+          // Cost (per-model rates, incl. Claude Fable 5 at $10/$50 per MTok)
+          costs.byModel[entry.model] = (costs.byModel[entry.model] || 0) + entry.cost
+          costs.total += entry.cost
 
-          // Timeline
-          tokenStats.timeline.push({
-            timestamp: new Date(req.timestamp),
-            cumulativeTokens: inputTokens + outputTokens,
-            model,
-          })
+          reqInput += entry.inputTokens
+          reqOutput += entry.outputTokens
+          servedModel = entry.model
+        })
+
+        // By account
+        const account = req.account_id || 'unknown'
+        if (!tokenStats.byAccount[account]) {
+          tokenStats.byAccount[account] = { input: 0, output: 0, total: 0, requests: 0 }
         }
+        tokenStats.byAccount[account].input += reqInput
+        tokenStats.byAccount[account].output += reqOutput
+        tokenStats.byAccount[account].total += reqInput + reqOutput
+        tokenStats.byAccount[account].requests++
+
+        // Timeline (one point per request, attributed to the serving model)
+        tokenStats.timeline.push({
+          timestamp: new Date(req.timestamp),
+          cumulativeTokens: reqInput + reqOutput,
+          model: servedModel,
+        })
       })
 
       // Sort timeline and calculate cumulative
@@ -139,31 +159,6 @@ analyticsConversationPartialRoutes.get(
         ...point,
         cumulativeTokens: (cumulative += point.cumulativeTokens),
       }))
-
-      // Calculate costs (rough estimates)
-      const costs = {
-        total: 0,
-        byModel: {} as Record<string, number>,
-      }
-
-      Object.entries(tokenStats.byModel).forEach(([model, stats]) => {
-        // Rough cost estimates per 1M tokens
-        const rates = {
-          'claude-3-opus': { input: 15, output: 75 },
-          'claude-3-sonnet': { input: 3, output: 15 },
-          'claude-3-haiku': { input: 0.25, output: 1.25 },
-          'claude-2': { input: 8, output: 24 },
-        }
-
-        const modelKey =
-          Object.keys(rates).find(key => model.toLowerCase().includes(key.split('-').pop()!)) ||
-          'claude-3-sonnet'
-        const rate = rates[modelKey as keyof typeof rates]
-
-        const cost = (stats.input / 1000000) * rate.input + (stats.output / 1000000) * rate.output
-        costs.byModel[model] = cost
-        costs.total += cost
-      })
 
       const content = html`
         <div style="padding: 1.5rem;">

@@ -187,7 +187,9 @@ export class ProxyService {
           accountName: 'passthrough',
         }
       } else {
-        auth = await this.authService.authenticate(context)
+        // Pass the requested model so account selection can honor
+        // model-scoped limits (e.g. Claude Fable 5's separate weekly allowance)
+        auth = await this.authService.authenticate(context, rawRequest.model)
       }
 
       // Bedrock accounts are not supported on /v1/messages endpoint

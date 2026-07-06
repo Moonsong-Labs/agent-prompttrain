@@ -11,6 +11,12 @@ export interface BedrockModelConfig {
 /**
  * Map of Anthropic model names to Bedrock model IDs
  * Updated as of November 2025
+ *
+ * Note: Newer models (Claude Fable 5, Opus 4.6/4.7/4.8, Sonnet 4.6/5) have no
+ * verified `{region}.anthropic.{model}-vN:0` IDs for this legacy ARN-versioned
+ * Bedrock integration, so they intentionally have no entry here.
+ * `mapToBedrockModel()` passes unknown model IDs through unchanged, so
+ * first-party requests for these models are unaffected.
  */
 export const MODEL_MAPPING: Record<string, string> = {
   // Claude 4.5 Opus (Latest - November 2025)

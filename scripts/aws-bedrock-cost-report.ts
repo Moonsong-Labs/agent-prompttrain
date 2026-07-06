@@ -235,6 +235,74 @@ type ModelPricingEntry = {
 
 const MODEL_PRICING: readonly ModelPricingEntry[] = [
   {
+    alias: 'claude-fable-5',
+    displayName: 'Claude Fable 5',
+    matchers: ['fable'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.01, outputPerThousand: 0.05 },
+        batch: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.001,
+        cacheWritePerThousand: 0.0125,
+      },
+      us: {
+        standard: { inputPerThousand: 0.011, outputPerThousand: 0.055 },
+        batch: { inputPerThousand: 0.0055, outputPerThousand: 0.0275 },
+        cacheReadPerThousand: 0.0011,
+        cacheWritePerThousand: 0.01375,
+      },
+    },
+  },
+  {
+    alias: 'claude-mythos-5',
+    displayName: 'Claude Mythos 5',
+    matchers: ['mythos'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.01, outputPerThousand: 0.05 },
+        batch: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.001,
+        cacheWritePerThousand: 0.0125,
+      },
+    },
+  },
+  {
+    alias: 'claude-opus-4-8',
+    displayName: 'Claude Opus 4.8',
+    matchers: ['opus', '4-8'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.0005,
+        cacheWritePerThousand: 0.00625,
+      },
+    },
+  },
+  {
+    alias: 'claude-opus-4-7',
+    displayName: 'Claude Opus 4.7',
+    matchers: ['opus', '4-7'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.0005,
+        cacheWritePerThousand: 0.00625,
+      },
+    },
+  },
+  {
+    alias: 'claude-sonnet-5',
+    displayName: 'Claude Sonnet 5',
+    matchers: ['sonnet-5'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.003, outputPerThousand: 0.015 },
+        cacheReadPerThousand: 0.0003,
+        cacheWritePerThousand: 0.00375,
+      },
+    },
+  },
+  {
     alias: 'claude-haiku-4-5',
     displayName: 'Claude Haiku 4.5',
     matchers: ['haiku', '4-5'],

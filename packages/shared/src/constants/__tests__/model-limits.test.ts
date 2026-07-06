@@ -8,6 +8,29 @@ import {
 
 describe('Model Context Limits', () => {
   describe('getModelContextLimit', () => {
+    // Test 1M context models - Claude Fable 5 / Mythos 5
+    it('should return 1M for Claude Fable 5', () => {
+      expect(getModelContextLimit('claude-fable-5')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Mythos 5', () => {
+      expect(getModelContextLimit('claude-mythos-5')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    // Test 1M context models - Claude Opus 4.7 / 4.8
+    it('should return 1M for Claude Opus 4.7', () => {
+      expect(getModelContextLimit('claude-opus-4-7')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Opus 4.8', () => {
+      expect(getModelContextLimit('claude-opus-4-8')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    // Test 1M context models - Claude Sonnet 5
+    it('should return 1M for Claude Sonnet 5', () => {
+      expect(getModelContextLimit('claude-sonnet-5')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
     // Test 1M context models - Claude 4.6 (Opus & Sonnet)
     it('should return 1M for Claude Opus 4.6', () => {
       const result = getModelContextLimit('claude-opus-4-6')

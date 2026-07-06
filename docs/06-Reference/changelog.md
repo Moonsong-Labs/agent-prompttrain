@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Account pool no longer routes requests to accounts whose model-scoped limit is exhausted (fixes upstream `429 "This request could exceed your account's rate limit"` despite low 5h/7d usage)
+  - Anthropic's OAuth usage response now carries a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance); the legacy `seven_day_opus`/`seven_day_sonnet` fields are null in live responses
+  - Account selection is now model-aware: a saturated Fable-scoped limit exhausts the pool for Fable requests only, without blocking other models; sticky accounts are re-evaluated per requested model
+  - Pool-exhausted 429s now surface the scoped limit's reset time
+  - Dashboard/public token-usage pages now render model-scoped limit bars (e.g. "7-Day Fable") so exhausted limits are visible instead of only 5h/7d windows
+
 ### Changed
 
 - Token Usage overview: projects with zero tokens are now hidden from the project list
@@ -15,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Model pricing registry and Claude Fable 5 support (see [ADR-035](../04-Architecture/ADRs/adr-035-model-pricing-registry-and-fallback-cost-attribution.md))
+  - New `packages/shared` pricing registry (`getModelPricing`, `calculateRequestCost`) with current per-model rates, including Claude Fable 5 / Mythos 5 ($10/$50 per MTok); replaces the obsolete hardcoded Claude-3-era rate table in the dashboard
+  - Fallback-aware cost attribution (`getBilledUsageByModel`, `calculateUsageCost`): a Claude Fable 5 request re-served by an Opus 4.8 fallback is costed at the model that actually ran each attempt via the response `usage.iterations` array; pre-output declines are treated as unbilled
+  - Dashboard per-model token/cost breakdown and single-request cost now use the registry (model-aware, fallback-aware)
+  - Added Claude Fable 5 / Mythos 5, Opus 4.7 / 4.8, and Sonnet 5 to the 1M context-window rules
+  - Added an optional `iterations` field to the shared Claude `usage` type
 - Public token usage status page at `/public/token-usage` (no authentication required)
   - Shows Anthropic OAuth rate limit utilization (5h and 7d windows) per account
   - Compact multi-column layout with progress bars, reset times, and last-checked timestamps

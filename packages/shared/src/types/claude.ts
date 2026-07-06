@@ -68,6 +68,24 @@ export interface ClaudeMessagesRequest {
   [key: string]: any // Allow any additional fields in the request
 }
 
+/**
+ * A single attempt recorded in `usage.iterations` when server-side fallback
+ * runs (e.g. a Claude Fable 5 request re-served by Claude Opus 4.8). Each
+ * attempt is billed at its own model's rate; a decline before any output
+ * (`output_tokens === 0`) is not billed.
+ *
+ * @see https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback
+ */
+export interface ClaudeUsageIteration {
+  /** "message" = an attempt that ran/declined; "fallback_message" = the attempt that served the turn */
+  type?: 'message' | 'fallback_message'
+  model?: string
+  input_tokens?: number
+  output_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+}
+
 // Response types
 export interface ClaudeMessagesResponse {
   id: string
@@ -82,6 +100,8 @@ export interface ClaudeMessagesResponse {
     output_tokens: number
     cache_creation_input_tokens?: number
     cache_read_input_tokens?: number
+    /** Per-attempt token counts when server-side fallback ran (Claude Fable 5). */
+    iterations?: ClaudeUsageIteration[]
   }
 }
 

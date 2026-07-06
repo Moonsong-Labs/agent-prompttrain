@@ -487,9 +487,10 @@ function isValidProjectId(projectId: string): boolean {
 // Validate model
 function isValidModel(model: string): boolean {
   // Models follow pattern: claude-{tier}-{version}-{date}
-  // Examples: claude-opus-4-5-20251101, claude-sonnet-4-5-20250929
+  // Examples: claude-opus-4-8, claude-sonnet-5, claude-fable-5, claude-sonnet-4-5-20250929
   const validModelPatterns = [
-    /^claude-(opus|sonnet|haiku)-\d+-\d+(-\d{8})?$/,
+    /^claude-(fable|mythos)-\d+$/, // Claude Fable 5 / Mythos 5
+    /^claude-(opus|sonnet|haiku)-\d+(-\d+)?(-\d{8})?$/,
     /^claude-3(-5)?-(opus|sonnet|haiku)-\d{8}$/,
   ]
   return validModelPatterns.some(pattern => pattern.test(model))

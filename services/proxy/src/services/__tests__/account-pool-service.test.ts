@@ -501,4 +501,202 @@ describe('AccountPoolService', () => {
       expect(callsAfterSecond).toBeGreaterThan(callsAfterFirst)
     })
   })
+
+  // ── Scenario: model-scoped limits (limits[] array) ────────────────────────
+  //
+  // Anthropic's OAuth usage response carries a `limits` array with entries like
+  // {kind: "weekly_scoped", percent, scope: {model: {display_name: "Fable"}}, is_active}.
+  // A saturated model-scoped limit must gate requests FOR that model even when
+  // the overall five_hour/seven_day windows are low — but must NOT block other
+  // models. See the "429 despite plenty of tokens left" incident.
+
+  describe('model-scoped limits (limits[] array)', () => {
+    function makeUsageWithFableLimit(
+      fableUtilization: number,
+      fiveHour = 10,
+      sevenDay = 20
+    ): AnthropicOAuthUsageResponse {
+      return {
+        ...makeUsageResponse(fiveHour, sevenDay),
+        limits: [
+          {
+            kind: 'session',
+            group: 'session',
+            percent: fiveHour,
+            severity: 'normal',
+            resets_at: '2026-02-24T12:00:00Z',
+            scope: null,
+            is_active: true,
+          },
+          {
+            kind: 'weekly_all',
+            group: 'weekly',
+            percent: sevenDay,
+            severity: 'normal',
+            resets_at: '2026-02-28T00:00:00Z',
+            scope: null,
+            is_active: true,
+          },
+          {
+            kind: 'weekly_scoped',
+            group: 'weekly',
+            percent: fableUtilization,
+            severity: fableUtilization >= 100 ? 'exceeded' : 'normal',
+            resets_at: '2026-03-01T00:00:00Z',
+            scope: { model: { id: null, display_name: 'Fable' }, surface: null },
+            is_active: fableUtilization > 0,
+          },
+        ],
+      }
+    }
+
+    test('saturated Fable-scoped limit exhausts the pool for Fable requests', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      // Both accounts: overall windows low, Fable weekly limit saturated
+      mockFetchWithUsage({
+        'cred-1': makeUsageWithFableLimit(100),
+        'cred-2': makeUsageWithFableLimit(99),
+      })
+
+      await expect(service.selectAccount('project-1', 'claude-fable-5')).rejects.toThrow(
+        AccountPoolExhaustedError
+      )
+    })
+
+    test('saturated Fable-scoped limit does NOT block other models', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      mockFetchWithUsage({
+        'cred-1': makeUsageWithFableLimit(100),
+        'cred-2': makeUsageWithFableLimit(100),
+      })
+
+      const result = await service.selectAccount('project-1', 'claude-sonnet-5')
+      expect(result.fromPool).toBe(true)
+      // Overall windows are 10/20 → utilization reflects those, not the Fable limit
+      expect(result.maxUtilization).toBeLessThan(0.8)
+    })
+
+    test('prefers the account whose Fable-scoped limit is under threshold', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      mockFetchWithUsage({
+        'cred-1': makeUsageWithFableLimit(100), // Fable exhausted
+        'cred-2': makeUsageWithFableLimit(30), // Fable fine
+      })
+
+      const result = await service.selectAccount('project-1', 'claude-fable-5')
+      expect(result.credential.id).toBe('cred-2')
+    })
+
+    test('matches scoped limit via scope.model.id when present', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      const usage: AnthropicOAuthUsageResponse = {
+        ...makeUsageResponse(10, 20),
+        limits: [
+          {
+            kind: 'weekly_scoped',
+            group: 'weekly',
+            percent: 100,
+            severity: 'exceeded',
+            resets_at: '2026-03-01T00:00:00Z',
+            scope: { model: { id: 'claude-fable-5', display_name: null }, surface: null },
+            is_active: true,
+          },
+        ],
+      }
+      mockFetchWithUsage({ 'cred-1': usage, 'cred-2': usage })
+
+      await expect(service.selectAccount('project-1', 'claude-fable-5')).rejects.toThrow(
+        AccountPoolExhaustedError
+      )
+    })
+
+    test('sticky account over its scoped limit is abandoned for the requested model', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      // First request (sonnet) selects cred-1 (lowest overall) and makes it sticky
+      mockFetchWithUsage({
+        'cred-1': makeUsageWithFableLimit(100, 10, 20),
+        'cred-2': makeUsageWithFableLimit(0, 30, 40),
+      })
+      const first = await service.selectAccount('project-1', 'claude-sonnet-5')
+      expect(first.credential.id).toBe('cred-1')
+
+      // Fable request must NOT reuse sticky cred-1 (Fable limit saturated there)
+      usageCacheService.clearCache()
+      const second = await service.selectAccount('project-1', 'claude-fable-5')
+      expect(second.credential.id).toBe('cred-2')
+    })
+
+    test('inactive scoped limits are ignored', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      const usage: AnthropicOAuthUsageResponse = {
+        ...makeUsageResponse(10, 20),
+        limits: [
+          {
+            kind: 'weekly_scoped',
+            group: 'weekly',
+            percent: 0,
+            severity: 'normal',
+            resets_at: null,
+            scope: { model: { id: null, display_name: 'Fable' }, surface: null },
+            is_active: false,
+          },
+        ],
+      }
+      mockFetchWithUsage({ 'cred-1': usage, 'cred-2': usage })
+
+      const result = await service.selectAccount('project-1', 'claude-fable-5')
+      expect(result.fromPool).toBe(true)
+    })
+
+    test('legacy responses without limits[] keep the old behavior', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      mockFetchWithUsage({
+        'cred-1': makeUsageResponse(30, 20),
+        'cred-2': makeUsageResponse(50, 40),
+      })
+
+      const result = await service.selectAccount('project-1', 'claude-fable-5')
+      expect(result.credential.id).toBe('cred-1')
+    })
+
+    test('exhausted-pool error surfaces the scoped limit reset time', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+
+      mockFetchWithUsage({
+        'cred-1': makeUsageWithFableLimit(100),
+        'cred-2': makeUsageWithFableLimit(100),
+      })
+
+      try {
+        await service.selectAccount('project-1', 'claude-fable-5')
+        expect.unreachable('should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AccountPoolExhaustedError)
+        expect((error as AccountPoolExhaustedError).estimatedReset).not.toBeNull()
+      }
+    })
+  })
 })
