@@ -4,7 +4,7 @@ import {
   listAnthropicCredentials,
   upsertAnthropicCredential,
 } from '../../packages/shared/src/database/queries/index.js'
-import { exchangeCodeForTokens, generateAuthorizationUrl, promptInput } from './oauth-login.ts'
+import { authorizeOAuthCredential, promptInput, type OAuthFlowOptions } from './oauth-login.ts'
 
 type ReloginResult = {
   accountId: string
@@ -12,11 +12,51 @@ type ReloginResult = {
   error?: string
 }
 
-async function reloginAllOAuthCredentials(): Promise<void> {
+export interface ReloginCliOptions extends OAuthFlowOptions {
+  accountId?: string
+  help: boolean
+}
+
+export function parseReloginOptions(args: string[]): ReloginCliOptions {
+  const options: ReloginCliOptions = {
+    openBrowser: true,
+    useClipboard: true,
+    help: false,
+  }
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]
+    if (arg === '--account') {
+      const accountId = args[++index]
+      if (!accountId) {
+        throw new Error('--account requires an account ID')
+      }
+      options.accountId = accountId
+    } else if (arg.startsWith('--account=')) {
+      const accountId = arg.slice('--account='.length)
+      if (!accountId) {
+        throw new Error('--account requires an account ID')
+      }
+      options.accountId = accountId
+    } else if (arg === '--no-browser') {
+      options.openBrowser = false
+    } else if (arg === '--no-clipboard') {
+      options.useClipboard = false
+    } else if (arg === '--help' || arg === '-h') {
+      options.help = true
+    } else {
+      throw new Error(`Unknown option: ${arg}`)
+    }
+  }
+
+  return options
+}
+
+export async function reloginAllOAuthCredentials(options: ReloginCliOptions): Promise<number> {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
     console.error('DATABASE_URL environment variable is required')
-    process.exit(1)
+    return 1
   }
 
   const pool = new Pool({ connectionString: databaseUrl })
@@ -27,19 +67,26 @@ async function reloginAllOAuthCredentials(): Promise<void> {
     console.log('======================\n')
 
     const credentials = await listAnthropicCredentials(pool)
+    const selectedCredentials = options.accountId
+      ? credentials.filter(credential => credential.account_id === options.accountId)
+      : credentials
 
-    if (credentials.length === 0) {
-      console.log('No Anthropic OAuth credentials found in database.')
-      process.exit(0)
+    if (selectedCredentials.length === 0) {
+      console.error(
+        options.accountId
+          ? `Anthropic credential not found: ${options.accountId}`
+          : 'No Anthropic OAuth credentials found in database.'
+      )
+      return options.accountId ? 1 : 0
     }
 
-    console.log(`Found ${credentials.length} Anthropic OAuth credentials.`)
+    console.log(`Selected ${selectedCredentials.length} Anthropic OAuth credential(s).`)
     console.log('Each account will be reauthorized and overwritten in place.\n')
 
-    for (const [index, credential] of credentials.entries()) {
+    for (const [index, credential] of selectedCredentials.entries()) {
       const email = credential.account_email || '(email not stored)'
 
-      console.log(`\n[${index + 1}/${credentials.length}] ${credential.account_id}`)
+      console.log(`\n[${index + 1}/${selectedCredentials.length}] ${credential.account_id}`)
       console.log(`  Account Name: ${credential.account_name}`)
       console.log(`  Email to use: ${email}`)
 
@@ -61,18 +108,8 @@ async function reloginAllOAuthCredentials(): Promise<void> {
         continue
       }
 
-      const { url, verifier } = generateAuthorizationUrl()
-
-      console.log('\nPlease visit the following URL to authorize:')
-      console.log(url)
-      console.log(`\nSign in with: ${email}`)
-      console.log('After authorizing, copy the entire code (it should contain a # character).\n')
-
       try {
-        const code = await promptInput('Enter the authorization code: ')
-
-        console.log('Exchanging authorization code for tokens...')
-        const tokens = await exchangeCodeForTokens(code, verifier)
+        const tokens = await authorizeOAuthCredential(credential.account_email, options)
 
         await upsertAnthropicCredential(pool, {
           account_id: credential.account_id,
@@ -113,15 +150,27 @@ async function reloginAllOAuthCredentials(): Promise<void> {
       }
     }
 
-    process.exit(failed.length > 0 ? 1 : 0)
+    return failed.length > 0 ? 1 : 0
   } catch (error) {
     console.error('Error:', error)
-    process.exit(1)
+    return 1
   } finally {
     await pool.end()
   }
 }
 
 if (import.meta.main) {
-  reloginAllOAuthCredentials()
+  try {
+    const options = parseReloginOptions(process.argv.slice(2))
+    if (options.help) {
+      console.log(
+        'Usage: bun run scripts/auth/oauth-relogin-all.ts [--account <id>] [--no-browser] [--no-clipboard]'
+      )
+    } else {
+      process.exitCode = await reloginAllOAuthCredentials(options)
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  }
 }

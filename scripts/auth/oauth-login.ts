@@ -5,6 +5,12 @@ import {
   getCredentialByAccountId,
   upsertAnthropicCredential,
 } from '../../packages/shared/src/database/queries/index.js'
+import {
+  copyTextToClipboard,
+  openPrivateBrowser,
+  readTextFromClipboard,
+  validateAuthorizationCode,
+} from './oauth-browser.ts'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
@@ -15,6 +21,37 @@ const OAUTH_CONFIG = {
   redirectUri: 'https://console.anthropic.com/oauth/code/callback',
   scopes: ['org:create_api_key', 'user:profile', 'user:inference'],
   betaHeader: 'oauth-2025-04-20',
+}
+
+export interface OAuthFlowOptions {
+  openBrowser: boolean
+  useClipboard: boolean
+}
+
+export interface OAuthLoginCliOptions extends OAuthFlowOptions {
+  help: boolean
+}
+
+export function parseOAuthLoginOptions(args: string[]): OAuthLoginCliOptions {
+  const options: OAuthLoginCliOptions = {
+    openBrowser: true,
+    useClipboard: true,
+    help: false,
+  }
+
+  for (const arg of args) {
+    if (arg === '--no-browser') {
+      options.openBrowser = false
+    } else if (arg === '--no-clipboard') {
+      options.useClipboard = false
+    } else if (arg === '--help' || arg === '-h') {
+      options.help = true
+    } else {
+      throw new Error(`Unknown option: ${arg}`)
+    }
+  }
+
+  return options
 }
 
 function base64URLEncode(buffer: Buffer): string {
@@ -71,11 +108,7 @@ export async function exchangeCodeForTokens(
   scopes: string[]
   isMax: boolean
 }> {
-  const [code, state] = codeWithState.split('#')
-
-  if (!code || !state) {
-    throw new Error('Invalid authorization code format. Expected format: code#state')
-  }
+  const [code, state] = validateAuthorizationCode(codeWithState).split('#')
 
   const response = await fetch(OAUTH_CONFIG.tokenUrl, {
     method: 'POST',
@@ -105,15 +138,57 @@ export async function exchangeCodeForTokens(
     refreshToken: data.refresh_token,
     expiresAt: new Date(Date.now() + data.expires_in * 1000),
     scopes: data.scope ? data.scope.split(' ') : OAUTH_CONFIG.scopes,
-    isMax: data.is_max || true,
+    isMax: data.is_max ?? true,
   }
 }
 
-export async function performOAuthLogin(): Promise<void> {
+export async function authorizeOAuthCredential(
+  accountEmail: string | null | undefined,
+  options: OAuthFlowOptions
+): ReturnType<typeof exchangeCodeForTokens> {
+  const { url, verifier } = generateAuthorizationUrl()
+
+  if (accountEmail) {
+    console.log(`\nSign in with: ${accountEmail}`)
+    if (options.useClipboard) {
+      const copied = await copyTextToClipboard(accountEmail)
+      console.log(
+        copied
+          ? 'Credential email copied to the clipboard.'
+          : 'Clipboard integration unavailable; copy the email shown above.'
+      )
+    }
+  }
+
+  const browserOpened = options.openBrowser ? await openPrivateBrowser(url) : false
+  if (browserOpened) {
+    console.log('Opened a private browser window for authorization.')
+  } else if (options.openBrowser) {
+    console.log('Private browser launch unavailable; open the URL below manually.')
+  }
+
+  console.log('\nAuthorization URL (manual fallback):')
+  console.log(url)
+  console.log('\nComplete Anthropic email verification and approve access.')
+  console.log('Copy the complete authorization code (it must contain #).')
+
+  const input = await promptInput(
+    'Authorization code (paste it, or press Enter to read the clipboard): '
+  )
+  const clipboardValue = !input && options.useClipboard ? readTextFromClipboard() : null
+  if (!input && clipboardValue) {
+    console.log('Read authorization code from the clipboard.')
+  }
+
+  return exchangeCodeForTokens(validateAuthorizationCode(input || clipboardValue || ''), verifier)
+}
+
+export async function performOAuthLogin(options: OAuthFlowOptions): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
     console.error('DATABASE_URL environment variable is required')
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
 
   const pool = new Pool({ connectionString: databaseUrl })
@@ -124,13 +199,15 @@ export async function performOAuthLogin(): Promise<void> {
     const accountId = await promptInput('Enter account ID (e.g., acc_team_alpha): ')
     if (!accountId) {
       console.error('Account ID is required')
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
     const existing = await getCredentialByAccountId(pool, accountId)
     if (existing && existing.provider !== 'anthropic') {
       console.error(`Account ID ${accountId} already exists for provider ${existing.provider}`)
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
     const existingAnthropic = existing?.provider === 'anthropic' ? existing : null
@@ -148,24 +225,14 @@ export async function performOAuthLogin(): Promise<void> {
 
     if (!accountName) {
       console.error('Account name is required')
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
 
-    // Generate authorization URL
-    const { url, verifier } = generateAuthorizationUrl()
-
-    console.log('\nPlease visit the following URL to authorize:')
-    console.log(url)
-    console.log('\nAfter authorizing, you will see an authorization code.')
-    console.log('Copy the entire code (it should contain a # character).\n')
-
-    const code = await promptInput('Enter the authorization code: ')
-
-    console.log('Exchanging authorization code for tokens...')
-    const tokens = await exchangeCodeForTokens(code, verifier)
+    const tokens = await authorizeOAuthCredential(accountEmail, options)
 
     // Save to database
-    console.log('Saving credentials to database...')
+    console.log('\nSaving credentials to database...')
     const credential = await upsertAnthropicCredential(pool, {
       account_id: accountId,
       account_name: accountName,
@@ -187,12 +254,22 @@ export async function performOAuthLogin(): Promise<void> {
     console.log('3. Generate API keys for the project')
   } catch (err) {
     console.error('OAuth login failed:', err)
-    process.exit(1)
+    process.exitCode = 1
   } finally {
     await pool.end()
   }
 }
 
 if (import.meta.main) {
-  performOAuthLogin()
+  try {
+    const options = parseOAuthLoginOptions(process.argv.slice(2))
+    if (options.help) {
+      console.log('Usage: bun run scripts/auth/oauth-login.ts [--no-browser] [--no-clipboard]')
+    } else {
+      await performOAuthLogin(options)
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  }
 }

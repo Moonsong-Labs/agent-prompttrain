@@ -27,8 +27,9 @@ export async function createAnthropicCredential(
       oauth_refresh_token,
       oauth_expires_at,
       oauth_scopes,
-      oauth_is_max
-    ) VALUES ($1, $2, $3, 'anthropic', $4, $5, $6, $7, $8)
+      oauth_is_max,
+      last_refresh_at
+    ) VALUES ($1, $2, $3, 'anthropic', $4, $5, $6, $7, $8, NOW())
     RETURNING *
     `,
     [
@@ -76,7 +77,8 @@ export async function upsertAnthropicCredential(
       oauth_expires_at = EXCLUDED.oauth_expires_at,
       oauth_scopes = EXCLUDED.oauth_scopes,
       oauth_is_max = EXCLUDED.oauth_is_max,
-      updated_at = NOW()
+      updated_at = NOW(),
+      last_refresh_at = NOW()
     WHERE credentials.provider = 'anthropic'
     RETURNING *
     `,
