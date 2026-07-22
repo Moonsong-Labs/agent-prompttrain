@@ -21,18 +21,21 @@ export async function createAnthropicCredential(
     INSERT INTO credentials (
       account_id,
       account_name,
+      account_email,
       provider,
       oauth_access_token,
       oauth_refresh_token,
       oauth_expires_at,
       oauth_scopes,
-      oauth_is_max
-    ) VALUES ($1, $2, 'anthropic', $3, $4, $5, $6, $7)
+      oauth_is_max,
+      last_refresh_at
+    ) VALUES ($1, $2, $3, 'anthropic', $4, $5, $6, $7, $8, NOW())
     RETURNING *
     `,
     [
       request.account_id,
       request.account_name,
+      request.account_email ?? null,
       request.oauth_access_token,
       request.oauth_refresh_token,
       request.oauth_expires_at,
@@ -40,6 +43,62 @@ export async function createAnthropicCredential(
       request.oauth_is_max ?? true,
     ]
   )
+
+  return result.rows[0]
+}
+
+/**
+ * Create or overwrite an Anthropic credential by account_id.
+ * Existing email is preserved when request.account_email is omitted/null.
+ */
+export async function upsertAnthropicCredential(
+  pool: Pool,
+  request: CreateAnthropicCredentialRequest
+): Promise<AnthropicCredential> {
+  const result = await pool.query<AnthropicCredential>(
+    `
+    INSERT INTO credentials (
+      account_id,
+      account_name,
+      account_email,
+      provider,
+      oauth_access_token,
+      oauth_refresh_token,
+      oauth_expires_at,
+      oauth_scopes,
+      oauth_is_max
+    ) VALUES ($1, $2, $3, 'anthropic', $4, $5, $6, $7, $8)
+    ON CONFLICT (account_id) DO UPDATE
+    SET
+      account_name = EXCLUDED.account_name,
+      account_email = COALESCE(EXCLUDED.account_email, credentials.account_email),
+      oauth_access_token = EXCLUDED.oauth_access_token,
+      oauth_refresh_token = EXCLUDED.oauth_refresh_token,
+      oauth_expires_at = EXCLUDED.oauth_expires_at,
+      oauth_scopes = EXCLUDED.oauth_scopes,
+      oauth_is_max = EXCLUDED.oauth_is_max,
+      updated_at = NOW(),
+      last_refresh_at = NOW()
+    WHERE credentials.provider = 'anthropic'
+    RETURNING *
+    `,
+    [
+      request.account_id,
+      request.account_name,
+      request.account_email ?? null,
+      request.oauth_access_token,
+      request.oauth_refresh_token,
+      request.oauth_expires_at,
+      request.oauth_scopes,
+      request.oauth_is_max ?? true,
+    ]
+  )
+
+  if (result.rows.length === 0) {
+    throw new Error(
+      `Account ID ${request.account_id} already exists for a non-Anthropic credential`
+    )
+  }
 
   return result.rows[0]
 }
@@ -113,6 +172,23 @@ export async function getCredentialByAccountName(
 // Export toSafeCredential from internal for use in this file and train queries
 import { toSafeCredential } from './credential-queries-internal'
 export { toSafeCredential } from './credential-queries-internal'
+
+/**
+ * List all Anthropic credentials with OAuth token fields.
+ * Intended for trusted maintenance scripts and internal services.
+ */
+export async function listAnthropicCredentials(pool: Pool): Promise<AnthropicCredential[]> {
+  const result = await pool.query<AnthropicCredential>(
+    `
+    SELECT *
+    FROM credentials
+    WHERE provider = 'anthropic'
+    ORDER BY account_name ASC
+    `
+  )
+
+  return result.rows
+}
 
 /**
  * List all credentials (safe version without tokens)

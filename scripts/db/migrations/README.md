@@ -195,6 +195,12 @@ When a project has 2+ linked accounts, the proxy automatically switches
 to a less-loaded account when either the 5-hour or 7-day utilization
 (from Anthropic OAuth API) exceeds this threshold.
 
+### 023-add-credential-account-email.ts
+
+Adds an optional `account_email` column to `credentials` for OAuth maintenance
+scripts. The value is not included in safe credential payloads used by the
+dashboard.
+
 ## Future Migrations
 
 When adding new migrations:

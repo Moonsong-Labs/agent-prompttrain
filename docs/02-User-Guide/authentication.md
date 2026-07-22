@@ -164,11 +164,15 @@ The script will:
 
 1. Prompt for **Account ID** (e.g., `acc_team_alpha`)
 2. Prompt for **Account Name** (e.g., `Team Alpha`)
-3. Generate an authorization URL
-4. Open your browser to authorize with Anthropic
-5. Prompt you to paste the authorization code
-6. Exchange the code for OAuth tokens
-7. Save the credential to the database
+3. Prompt for the credential's login email
+4. Copy the email to the clipboard when supported
+5. Open the authorization URL in a private browser window when supported
+6. Accept a pasted authorization code, or read it from the clipboard after you press Enter
+7. Exchange the code for OAuth tokens
+8. Save the credential to the database
+
+Use `--no-browser` or `--no-clipboard` to disable either convenience. The authorization URL is
+always printed for headless or unsupported environments.
 
 Example session:
 
@@ -177,14 +181,18 @@ Starting OAuth login flow...
 
 Enter account ID (e.g., acc_team_alpha): acc_marketing
 Enter account name (e.g., Team Alpha): Marketing Team
+Enter credential email (optional, used by relogin scripts only): marketing@example.com
 
-Please visit the following URL to authorize:
+Credential email copied to the clipboard.
+Opened a private browser window for authorization.
+
+Authorization URL (manual fallback):
 https://claude.ai/oauth/authorize?code=true&client_id=...
 
 After authorizing, you will see an authorization code.
-Copy the entire code (it should contain a # character).
+Copy the entire code (it should contain a # character), then press Enter.
 
-Enter the authorization code: abc123def456#state789xyz
+Authorization code (paste it, or press Enter to read the clipboard):
 
 Exchanging authorization code for tokens...
 Saving credentials to database...
@@ -199,6 +207,23 @@ Next steps:
 2. Link this credential to the train
 3. Generate API keys for the train
 ```
+
+#### Reauthorizing Existing Credentials
+
+Use the bulk relogin script when refresh tokens are invalid or revoked. It overwrites tokens in
+place, so project associations do not need to be rebuilt:
+
+```bash
+# All Anthropic credentials
+bun run scripts/auth/oauth-relogin-all.ts
+
+# One credential only
+bun run scripts/auth/oauth-relogin-all.ts --account acc_marketing
+```
+
+Each account still requires Anthropic's email verification and authorization approval. The script
+automates opening a private browser window and clipboard handoffs, but does not access the user's
+inbox.
 
 #### Step 2: Create a Train
 

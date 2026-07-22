@@ -115,11 +115,36 @@ bun run scripts/auth/generate-api-key.ts
 
 ### oauth-login.ts
 
-Initiates OAuth login flow to add Anthropic credentials to the database. Interactive CLI that guides you through the OAuth process.
+Initiates OAuth login flow to add or replace Anthropic credentials in the database. The script
+opens the authorization URL in a private browser window when Chrome, Chromium, or Edge is
+available and copies the credential email to the system clipboard when supported.
 
 ```bash
 bun run scripts/auth/oauth-login.ts
 ```
+
+Use `--no-browser` or `--no-clipboard` for a fully manual flow.
+
+### oauth-relogin-all.ts
+
+Reauthorizes existing Anthropic credentials in place, preserving their account IDs and project
+links. Stored account emails are displayed and copied to the clipboard. After authorization, copy
+the complete `code#state` value and press Enter; the script reads it from the clipboard when the
+platform provides a clipboard command.
+
+```bash
+# Reauthorize every Anthropic credential
+bun run scripts/auth/oauth-relogin-all.ts
+
+# Reauthorize one account
+bun run scripts/auth/oauth-relogin-all.ts --account acc_team_alpha
+
+# Disable browser or clipboard assistance
+bun run scripts/auth/oauth-relogin-all.ts --no-browser --no-clipboard
+```
+
+The browser fallback always prints the authorization URL, so the workflow also works on headless
+hosts.
 
 ### bedrock-login.ts
 
