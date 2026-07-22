@@ -51,6 +51,30 @@ export function resolvePrivateBrowserCommand(
   return executable ? { executable, args: ['--incognito', '--new-window', url] } : null
 }
 
+export function resolveSystemBrowserCommand(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+  which: Which = command => Bun.which(command)
+): CommandSpec | null {
+  const candidates: Array<{ command: string; args: string[] }> =
+    platform === 'darwin'
+      ? [{ command: 'open', args: [url] }]
+      : platform === 'win32'
+        ? [{ command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', url] }]
+        : [
+            { command: 'xdg-open', args: [url] },
+            { command: 'gio', args: ['open', url] },
+          ]
+
+  for (const candidate of candidates) {
+    const executable = which(candidate.command)
+    if (executable) {
+      return { executable, args: candidate.args }
+    }
+  }
+  return null
+}
+
 export function resolveClipboardWriteCommand(
   platform: NodeJS.Platform = process.platform,
   which: Which = command => Bun.which(command)
@@ -127,6 +151,29 @@ export async function openPrivateBrowser(url: string): Promise<boolean> {
   }
 }
 
+export async function openSystemBrowser(url: string): Promise<boolean> {
+  if (process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
+    return false
+  }
+
+  const command = resolveSystemBrowserCommand(url)
+  if (!command) {
+    return false
+  }
+
+  try {
+    const subprocess = Bun.spawn([command.executable, ...command.args], {
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
+    })
+    subprocess.unref()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   const command = resolveClipboardWriteCommand()
   if (!command) {
@@ -169,11 +216,14 @@ export function readTextFromClipboard(): string | null {
   }
 }
 
-export function validateAuthorizationCode(value: string): string {
+export function validateAuthorizationCode(value: string, expectedState?: string): string {
   const code = value.trim()
   const [authorizationCode, state, ...extra] = code.split('#')
   if (!authorizationCode || !state || extra.length > 0) {
     throw new Error('Invalid authorization code format. Expected the complete code#state value.')
+  }
+  if (expectedState && state !== expectedState) {
+    throw new Error('Invalid authorization code state. The code belongs to a different OAuth flow.')
   }
   return code
 }

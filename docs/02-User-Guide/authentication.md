@@ -225,6 +225,64 @@ Each account still requires Anthropic's email verification and authorization app
 automates opening a private browser window and clipboard handoffs, but does not access the user's
 inbox.
 
+##### Gmail-Assisted Relogin
+
+Gmail assistance removes the inbox lookup and terminal copy/paste steps while keeping the final
+Anthropic approval explicit. It is opt-in and runs only on the operator's workstation; the deployed
+proxy and dashboard never receive Gmail access.
+
+One-time setup:
+
+1. Create a Google Cloud project and enable the Gmail API.
+2. Configure the OAuth consent screen for the Gmail account that receives the credential emails.
+3. Create an OAuth client with application type **Desktop app**.
+4. Download the client JSON to `credentials/gmail-oauth-client.json`.
+5. Ensure Google Chrome is installed, or install Playwright Chromium with
+   `bunx playwright install chromium`.
+6. Connect the mailbox:
+
+   ```bash
+   bun run auth:gmail-connect
+   ```
+
+The connection grants `gmail.readonly`. Google does not provide a scope that limits message-body
+access to one label, so a dedicated mailbox that receives only Anthropic authentication messages
+is recommended. The token is stored at `credentials/gmail-oauth-token.json`; both files are ignored
+by Git and must remain owner-readable only.
+
+Run the assisted relogin:
+
+```bash
+# All credentials
+bun run auth:oauth-relogin --gmail
+
+# One credential
+bun run auth:oauth-relogin --gmail --account acc_marketing
+```
+
+For each credential, the script creates a new non-persistent browser context, attempts to submit the
+stored email, waits for a fresh matching message, validates and opens the login link in the same
+context, and waits while you review and click **Authorize**. It reads and exchanges the resulting
+authorization code automatically. If the email field cannot be identified, enter the displayed
+email in the controlled browser; Gmail polling continues in the background.
+
+The Gmail-assisted flow rejects messages that predate the current attempt, do not come from
+`@mail.anthropic.com`, do not identify the expected recipient, or do not contain an HTTPS link on
+an Anthropic-controlled host. Message bodies, login links, and OAuth tokens are never logged.
+
+Optional local configuration:
+
+```bash
+GMAIL_OAUTH_CLIENT_FILE=credentials/gmail-oauth-client.json
+GMAIL_OAUTH_TOKEN_FILE=credentials/gmail-oauth-token.json
+GMAIL_AUTH_POLL_TIMEOUT_MS=180000
+OAUTH_BROWSER_CHANNEL=chrome
+OAUTH_APPROVAL_TIMEOUT_MS=300000
+```
+
+See [ADR-036](../04-Architecture/ADRs/adr-036-gmail-assisted-oauth-relogin.md) for the security
+model and alternatives.
+
 #### Step 2: Create a Train
 
 Create a train via the dashboard API:

@@ -3,6 +3,7 @@ import {
   resolveClipboardReadCommand,
   resolveClipboardWriteCommand,
   resolvePrivateBrowserCommand,
+  resolveSystemBrowserCommand,
   validateAuthorizationCode,
 } from './oauth-browser.ts'
 
@@ -42,6 +43,19 @@ describe('OAuth browser assistance', () => {
     ).toBeNull()
   })
 
+  test('uses the platform URL opener for normal browser sessions', () => {
+    expect(
+      resolveSystemBrowserCommand(
+        'https://accounts.google.com/o/oauth2/v2/auth',
+        'linux',
+        fakeWhich({ 'xdg-open': '/usr/bin/xdg-open' })
+      )
+    ).toEqual({
+      executable: '/usr/bin/xdg-open',
+      args: ['https://accounts.google.com/o/oauth2/v2/auth'],
+    })
+  })
+
   test('selects supported clipboard commands', () => {
     const write = resolveClipboardWriteCommand('linux', fakeWhich({ xclip: '/usr/bin/xclip' }))
     const read = resolveClipboardReadCommand('linux', fakeWhich({ xclip: '/usr/bin/xclip' }))
@@ -63,6 +77,9 @@ describe('OAuth browser assistance', () => {
     )
     expect(() => validateAuthorizationCode('code#state#extra')).toThrow(
       'Expected the complete code#state value'
+    )
+    expect(() => validateAuthorizationCode('code#other-state', 'expected-state')).toThrow(
+      'code belongs to a different OAuth flow'
     )
   })
 })

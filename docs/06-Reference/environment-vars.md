@@ -111,9 +111,17 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 ### OAuth Configuration
 
-| Variable                 | Description                | Default                                |
-| ------------------------ | -------------------------- | -------------------------------------- |
-| `CLAUDE_OAUTH_CLIENT_ID` | OAuth client ID for Claude | `9d1c250a-e61b-44d9-88ed-5944d1962f5e` |
+| Variable                     | Description                                         | Default                                |
+| ---------------------------- | --------------------------------------------------- | -------------------------------------- |
+| `CLAUDE_OAUTH_CLIENT_ID`     | OAuth client ID for Claude                          | `9d1c250a-e61b-44d9-88ed-5944d1962f5e` |
+| `GMAIL_OAUTH_CLIENT_FILE`    | Local Google OAuth Desktop client JSON              | `credentials/gmail-oauth-client.json`  |
+| `GMAIL_OAUTH_TOKEN_FILE`     | Local Gmail refresh/access token file               | `credentials/gmail-oauth-token.json`   |
+| `GMAIL_AUTH_POLL_TIMEOUT_MS` | Maximum wait for each Anthropic login email         | `180000`                               |
+| `OAUTH_BROWSER_CHANNEL`      | Playwright browser channel for Gmail-assisted OAuth | `chrome`                               |
+| `OAUTH_APPROVAL_TIMEOUT_MS`  | Maximum wait for manual Anthropic approval          | `300000`                               |
+
+Gmail configuration is used only by local authentication scripts and is not required by either
+deployed service. See the [Authentication Guide](../02-User-Guide/authentication.md#gmail-assisted-relogin).
 
 ## Directory Configuration
 
