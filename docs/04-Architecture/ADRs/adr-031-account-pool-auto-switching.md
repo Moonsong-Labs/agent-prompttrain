@@ -40,7 +40,7 @@ Add an `AccountPoolService` that automatically selects the best account from a p
 
 - **Usage source**: Anthropic OAuth usage API (`/api/oauth/usage`) — returns real utilization percentages for 5h and 7d windows, plus a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance)
 - **Trigger**: Switch when EITHER the 5-hour OR 7-day utilization exceeds the per-account threshold, or (amended 2026-07-05) when an active model-scoped limit matching the requested model exceeds the threshold — scoped limits gate only requests for that model, so a saturated Fable limit never blocks Sonnet/Opus traffic
-- **Threshold config**: Per-account `token_limit_threshold` column in `credentials` table (0-1 scale, default 0.80)
+- **Threshold config**: Per-account `token_limit_threshold` column in `credentials` table (0-1 scale, default 0.95; raised from 0.80 on 2026-07-24 via migration 024)
 - **Selection strategy**: Sticky least-loaded — stay on current account until threshold exceeded, then switch to least-loaded alternative
 - **Exhaustion behavior**: Return HTTP 429 with `estimated_reset` from `resets_at` and `Retry-After` header
 - **Pool activation**: Implicit — projects with 2+ linked Anthropic accounts use the pool; 0-1 accounts use default account directly
@@ -69,6 +69,8 @@ ALTER TABLE credentials
   ADD COLUMN token_limit_threshold DECIMAL(3,2) NOT NULL DEFAULT 0.80;
 ```
 
+> Amended 2026-07-24 (migration 024): the column default was raised to `0.95`, and existing accounts still at the old `0.80` default were migrated to `0.95`.
+
 **AuthenticationService integration:**
 
 ```
@@ -80,12 +82,13 @@ authenticate(context):
 
 ### Files
 
-| File                                                   | Description                                   |
-| ------------------------------------------------------ | --------------------------------------------- |
-| `services/proxy/src/services/account-pool-service.ts`  | Core pool selection logic with sticky routing |
-| `services/proxy/src/services/AuthenticationService.ts` | Delegates to AccountPoolService               |
-| `services/proxy/src/controllers/MessageController.ts`  | Handles AccountPoolExhaustedError as 429      |
-| `scripts/db/migrations/018-account-pool-threshold.ts`  | Adds `token_limit_threshold` column           |
+| File                                                                 | Description                                   |
+| -------------------------------------------------------------------- | --------------------------------------------- |
+| `services/proxy/src/services/account-pool-service.ts`                | Core pool selection logic with sticky routing |
+| `services/proxy/src/services/AuthenticationService.ts`               | Delegates to AccountPoolService               |
+| `services/proxy/src/controllers/MessageController.ts`                | Handles AccountPoolExhaustedError as 429      |
+| `scripts/db/migrations/018-account-pool-threshold.ts`                | Adds `token_limit_threshold` column           |
+| `scripts/db/migrations/024-update-account-pool-threshold-default.ts` | Raises default threshold from 0.80 to 0.95    |
 
 ## Consequences
 
@@ -107,7 +110,7 @@ authenticate(context):
 - **Risk**: Anthropic usage API rate limits
   - **Mitigation**: Addressed by [ADR-032](./adr-032-centralized-usage-cache.md) with shared caching and extrapolation
 - **Risk**: Usage API returns stale data
-  - **Mitigation**: Conservative threshold (80% default) provides headroom
+  - **Mitigation**: Configurable threshold (95% default) provides headroom before hard limits
 
 ## Links
 
