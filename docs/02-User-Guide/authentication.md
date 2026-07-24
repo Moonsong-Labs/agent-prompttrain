@@ -402,7 +402,7 @@ When a project has **2 or more linked accounts**, the proxy automatically enable
 
 ### Per-Account Threshold
 
-Each account has a `token_limit_threshold` (default: 80%) that controls when switching occurs. The threshold is stored in the `credentials` table and can be configured per account.
+Each account has a `token_limit_threshold` (default: 95%) that controls when switching occurs. The threshold is stored in the `credentials` table and can be configured per account.
 
 When either the 5-hour or 7-day utilization exceeds this threshold, the account is considered over-limit and the pool selects an alternative.
 

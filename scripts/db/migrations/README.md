@@ -201,6 +201,15 @@ Adds an optional `account_email` column to `credentials` for OAuth maintenance
 scripts. The value is not included in safe credential payloads used by the
 dashboard.
 
+### 024-update-account-pool-threshold-default.ts
+
+Raises the default `token_limit_threshold` (account pool auto-switching, ADR-031)
+from `0.80` to `0.95`:
+
+- Changes the column `DEFAULT` to `0.95` so newly-added accounts use the higher threshold
+- Migrates existing accounts still at the old `0.80` default to `0.95`
+  (rows with a customized value are left untouched)
+
 ## Future Migrations
 
 When adding new migrations:
