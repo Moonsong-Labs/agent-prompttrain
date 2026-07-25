@@ -22,6 +22,21 @@ describe('Model Pricing', () => {
       )
     })
 
+    it('prices Claude Mythos Preview the same as Fable 5', () => {
+      expect(getModelPricing('claude-mythos-preview').isEstimate).toBe(false)
+      expect(getModelPricing('claude-mythos-preview').pricing).toEqual(
+        getModelPricing('claude-fable-5').pricing
+      )
+    })
+
+    // Regression: without an explicit rule, Opus 5 fell through to the Sonnet-tier
+    // default, understating dashboard costs by ~40%.
+    it('prices Claude Opus 5 at $5 / $25 per MTok', () => {
+      const { pricing, isEstimate } = getModelPricing('claude-opus-5')
+      expect(isEstimate).toBe(false)
+      expect(pricing).toEqual({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 })
+    })
+
     it('prices Opus 4.8 at $5 / $25 per MTok', () => {
       const { pricing } = getModelPricing('claude-opus-4-8')
       expect(pricing).toEqual({ input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 })

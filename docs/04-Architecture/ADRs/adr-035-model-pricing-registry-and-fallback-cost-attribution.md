@@ -44,7 +44,7 @@ A single "Fable 5 request" can therefore incur Opus 4.8 token costs. Attributing
 
 Add a shared pricing module `packages/shared/src/constants/model-pricing.ts`:
 
-- `MODEL_PRICING_RULES` / `getModelPricing(model)` — regex-matched USD-per-MTok rates for input, output, cache read, and cache write, including `claude-fable-5`/`claude-mythos-5` ($10/$50), Opus 4.5–4.8 ($5/$25), legacy Opus (4.0/4.1/3) ($15/$75), all Sonnet generations incl. Sonnet 5 ($3/$15), and the Haiku/Claude-2 tiers. Unknown models fall back to `DEFAULT_MODEL_PRICING` (Sonnet-tier) with `isEstimate: true`.
+- `MODEL_PRICING_RULES` / `getModelPricing(model)` — regex-matched USD-per-MTok rates for input, output, cache read, and cache write, including `claude-fable-5`/`claude-mythos-5`/`claude-mythos-preview` ($10/$50), `claude-opus-5` and Opus 4.5–4.8 ($5/$25), legacy Opus (4.0/4.1/3) ($15/$75), all Sonnet generations incl. Sonnet 5 ($3/$15), and the Haiku/Claude-2 tiers. Unknown models fall back to `DEFAULT_MODEL_PRICING` (Sonnet-tier) with `isEstimate: true`.
 - `calculateRequestCost(model, usage)` — single-model cost from camelCase token counts.
 - `getBilledUsageByModel(topLevelModel, usage)` / `calculateUsageCost(...)` — **fallback-aware**: when `usage.iterations` is present, cost is attributed per iteration to the model that ran it, and attempts that declined before producing output (`output_tokens === 0`) are dropped because they are not billed. With no iterations, the top-level usage is attributed to the request's model.
 
@@ -53,7 +53,7 @@ Consumers:
 - Dashboard per-model breakdown (`analytics-conversation.ts`) now attributes tokens **and** cost to the model that actually ran each attempt, replacing the obsolete Claude-3 rate map.
 - Single-request cost (`request-details.ts`) uses the registry (fallback-aware) instead of the flat `calculateCost`. `calculateCost` itself is left in place as a generic env-configurable fallback.
 - `packages/shared/src/types/claude.ts` gains an optional `iterations?: ClaudeUsageIteration[]` on the response `usage` type.
-- 1M context-window rules (`model-limits.ts`) add Fable 5/Mythos 5, Opus 4.7/4.8, and Sonnet 5.
+- 1M context-window rules (`model-limits.ts`) add Fable 5/Mythos 5/Mythos Preview, Opus 5, Opus 4.7/4.8, and Sonnet 5. `inferContextLimitByGeneration` is a generational safety net: an unrecognised `claude-<family>-<n>` model with `n >= 5` is treated as 1M (200k for Haiku) and flagged `isEstimate: true`, so a newly released model no longer silently inherits the 200k default — that gap made the dashboard context gauge read 300%+ for Opus 5.
 - `model-mapping.ts` gets a clarifying comment: newer models have no verified legacy ARN-versioned Bedrock IDs and intentionally pass through unchanged.
 
 ### Implementation Details

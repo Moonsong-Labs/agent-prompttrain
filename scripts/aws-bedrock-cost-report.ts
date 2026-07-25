@@ -267,6 +267,19 @@ const MODEL_PRICING: readonly ModelPricingEntry[] = [
     },
   },
   {
+    // Bedrock ID: anthropic.claude-opus-5 — same $5/$25 per MTok tier as Opus 4.7/4.8
+    alias: 'claude-opus-5',
+    displayName: 'Claude Opus 5',
+    matchers: ['opus-5'],
+    regions: {
+      global: {
+        standard: { inputPerThousand: 0.005, outputPerThousand: 0.025 },
+        cacheReadPerThousand: 0.0005,
+        cacheWritePerThousand: 0.00625,
+      },
+    },
+  },
+  {
     alias: 'claude-opus-4-8',
     displayName: 'Claude Opus 4.8',
     matchers: ['opus', '4-8'],

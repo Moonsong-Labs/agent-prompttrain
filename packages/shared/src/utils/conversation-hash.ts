@@ -105,22 +105,54 @@ function normalizeMessageContent(content: string | any[]): string {
 // Use ConversationLinker.computeMessageHash for production code
 
 /**
+ * Volatile prelude Claude Code prepends to the system prompt, e.g.
+ * `x-anthropic-billing-header: cc_version=2.1.219.d53; cc_entrypoint=cli; ...`
+ *
+ * The `cc_version` changes with every Claude Code release, so leaving it in makes the
+ * system hash churn mid-session and defeats the exact (message + system) parent match.
+ */
+const BILLING_HEADER_PATTERN = /^[ \t]*x-anthropic-billing-header:.*$/gim
+
+/**
+ * Stable opening lines of the Claude Code system prompts. Everything after the marker is
+ * environment- and repo-specific (working directory, model name, git status), so the
+ * marker alone is hashed - mirroring the long-standing behaviour for the original
+ * "You are an interactive CLI tool..." prompt.
+ */
+const CLAUDE_CODE_PROMPT_MARKERS = [
+  'You are an interactive CLI tool that helps users with software engineering tasks',
+  "You are Claude Code, Anthropic's official CLI for Claude",
+  "You are an agent for Claude Code, Anthropic's official CLI for Claude",
+] as const
+
+/**
+ * Finds the Claude Code prompt marker the text starts with, if any.
+ */
+function matchClaudeCodePromptMarker(text: string): string | null {
+  const trimmed = text.trim()
+  return CLAUDE_CODE_PROMPT_MARKERS.find(marker => trimmed.startsWith(marker)) ?? null
+}
+
+/**
  * Removes transient/volatile context from system prompts to ensure stable hashing
  * @param systemPrompt - The system prompt content
  * @returns The stable part of the system prompt
  */
 function getStableSystemPrompt(systemPrompt: string | any[]): string {
   if (typeof systemPrompt === 'string') {
-    // Special case: If the system prompt starts with the CLI tool text,
+    // Drop the billing header prelude before looking for the prompt marker - since
+    // Claude Code 2.1 it is prepended ahead of the actual system prompt.
+    const withoutBillingHeader = systemPrompt.replace(BILLING_HEADER_PATTERN, '')
+
+    // Special case: If the system prompt starts with a known Claude Code prompt,
     // only include this stable snippet to avoid dynamic content differences
-    const cliToolPrefix =
-      'You are an interactive CLI tool that helps users with software engineering tasks'
-    if (systemPrompt.trim().startsWith(cliToolPrefix)) {
+    const marker = matchClaudeCodePromptMarker(withoutBillingHeader)
+    if (marker) {
       // Return just the stable prefix, ignoring all the dynamic content that follows
-      return cliToolPrefix
+      return marker
     }
 
-    let stable = systemPrompt
+    let stable = withoutBillingHeader
 
     // Remove transient_context blocks (future-proofing)
     stable = stable.replace(/<transient_context>[\s\S]*?<\/transient_context>/g, '')
@@ -128,9 +160,9 @@ function getStableSystemPrompt(systemPrompt: string | any[]): string {
     // Remove system-reminder blocks
     stable = stripSystemReminder(stable)
 
-    // Remove git status sections (common in Claude Code)
-    // Pattern: "gitStatus: " followed by content until double newline or end
-    stable = stable.replace(/gitStatus:[\s\S]*?(?:\n\n|$)/g, '\n\n')
+    // Remove the git status section. Claude Code appends it last and it changes on
+    // every commit, so everything from the marker onwards is dropped.
+    stable = stable.replace(/gitStatus:[\s\S]*$/, '')
 
     // Remove standalone Status: sections that contain git information
     // This captures multi-line status blocks that contain file changes
@@ -151,28 +183,33 @@ function getStableSystemPrompt(systemPrompt: string | any[]): string {
     return stable.trim()
   }
 
-  // For array content, check if any text item contains the CLI tool prefix
-  const cliToolPrefix =
-    'You are an interactive CLI tool that helps users with software engineering tasks'
-
   if (Array.isArray(systemPrompt)) {
-    for (const item of systemPrompt) {
-      if (
-        item.type === 'text' &&
-        typeof item.text === 'string' &&
-        item.text.trim().startsWith(cliToolPrefix)
-      ) {
-        // Found CLI tool text - return normalized content with just the first item and the CLI prefix
-        const stableContent = [
-          systemPrompt[0], // Keep the first item (usually "You are Claude Code...")
-          { type: 'text', text: cliToolPrefix }, // Replace the second item with just the prefix
-        ]
-        return normalizeMessageContent(stableContent)
+    // Drop the volatile billing-header block (cc_version changes every release)
+    const stableItems = systemPrompt.filter(
+      item =>
+        !(
+          item?.type === 'text' &&
+          typeof item.text === 'string' &&
+          /^\s*x-anthropic-billing-header:/i.test(item.text)
+        )
+    )
+
+    // If any block is a known Claude Code prompt, hash only that marker so the
+    // environment-specific tail (cwd, model, git status) cannot churn the hash.
+    for (const item of stableItems) {
+      if (item?.type !== 'text' || typeof item.text !== 'string') {
+        continue
+      }
+      const marker = matchClaudeCodePromptMarker(item.text)
+      if (marker) {
+        return normalizeMessageContent([{ type: 'text', text: marker }])
       }
     }
+
+    // No Claude Code prompt - apply normalization which already filters system-reminders
+    return normalizeMessageContent(stableItems)
   }
 
-  // For array content without CLI prefix, apply normalization which already filters system-reminders
   return normalizeMessageContent(systemPrompt)
 }
 
@@ -253,8 +290,16 @@ export function extractMessageHashes(
     throw new Error('Cannot extract hashes from empty messages array')
   }
 
+  // Injected `role: 'system'` messages are ephemeral and must not shift the
+  // parent-hash offsets - see ConversationLinker.filterConversationMessages
+  const conversationMessages = ConversationLinker.filterConversationMessages(messages)
+
+  if (conversationMessages.length === 0) {
+    throw new Error('Cannot extract hashes from empty messages array')
+  }
+
   // Hash messages only (no system) for conversation linking
-  const currentMessageHash = hashMessagesOnly(messages)
+  const currentMessageHash = hashMessagesOnly(conversationMessages)
 
   // Hash system separately for tracking context changes
   const systemHash = hashSystemPrompt(system)
@@ -264,18 +309,18 @@ export function extractMessageHashes(
   // If we have 1-2 messages, this is likely a new conversation
   let parentMessageHash: string | null = null
 
-  if (messages.length === 1) {
+  if (conversationMessages.length === 1) {
     // First message in conversation, no parent
     parentMessageHash = null
-  } else if (messages.length === 2) {
+  } else if (conversationMessages.length === 2) {
     // This shouldn't happen in normal Claude conversations (should be user -> assistant -> user)
     // But handle it anyway - parent would be first message only
-    parentMessageHash = hashMessagesOnly(messages.slice(0, 1))
+    parentMessageHash = hashMessagesOnly(conversationMessages.slice(0, 1))
   } else {
     // Normal case: we have at least 3 messages
     // The parent request would have had all messages except the last 2
     // (removing the most recent user message and the assistant response before it)
-    parentMessageHash = hashMessagesOnly(messages.slice(0, -2))
+    parentMessageHash = hashMessagesOnly(conversationMessages.slice(0, -2))
   }
 
   return { currentMessageHash, parentMessageHash, systemHash }

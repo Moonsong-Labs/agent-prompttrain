@@ -141,8 +141,17 @@ export class ConversationLinker {
     }
 
     try {
+      // Work from the durable transcript only - injected `role: 'system'` messages are
+      // ephemeral and would otherwise shift the parent-hash offsets (see
+      // ConversationLinker.filterConversationMessages).
+      const conversationMessages = ConversationLinker.filterConversationMessages(messages)
+
+      if (conversationMessages.length === 0) {
+        throw new Error('Cannot compute hash: no user or assistant messages in request')
+      }
+
       // Compute hashes with error handling
-      const currentMessageHash = this.computeMessageHash(messages)
+      const currentMessageHash = this.computeMessageHash(conversationMessages)
 
       // Convert system prompt to string if it's an array
       let systemPromptStr: string | undefined
@@ -163,21 +172,25 @@ export class ConversationLinker {
           currentMessageHash,
           systemHash,
           messageCount: messages.length,
+          conversationMessageCount: conversationMessages.length,
         },
       })
 
       // Case 1: Single message handling
-      if (messages.length === 1) {
+      if (conversationMessages.length === 1) {
         this.logger.debug('Processing single message', {
           projectId,
           metadata: {
             ...traceMeta,
-            messageRole: messages[0].role,
+            messageRole: conversationMessages[0].role,
           },
         })
 
         // Check for subtask first
-        const subtaskResult = await this.detectSubtask(request, traceMeta)
+        const subtaskResult = await this.detectSubtask(
+          { ...request, messages: conversationMessages },
+          traceMeta
+        )
         if (
           subtaskResult.isSubtask &&
           subtaskResult.parentTaskRequestId &&
@@ -222,7 +235,7 @@ export class ConversationLinker {
           }
         }
 
-        const compactInfo = this.detectCompactConversation(messages[0])
+        const compactInfo = this.detectCompactConversation(conversationMessages[0])
         if (compactInfo) {
           this.logger.debug('Detected compact conversation', {
             projectId,
@@ -287,13 +300,14 @@ export class ConversationLinker {
 
       // Case 2: Multiple messages - check if we can compute parent hash
       // First deduplicate to see how many unique messages we have
-      const deduplicatedMessages = this.deduplicateMessages(messages)
+      const deduplicatedMessages = this.deduplicateMessages(conversationMessages)
 
       this.logger.debug('Processing multiple messages', {
         projectId,
         metadata: {
           ...traceMeta,
           originalCount: messages.length,
+          conversationCount: conversationMessages.length,
           deduplicatedCount: deduplicatedMessages.length,
         },
       })
@@ -609,6 +623,28 @@ export class ConversationLinker {
     }
   }
 
+  /**
+   * Keeps only messages that are part of the durable conversation transcript.
+   *
+   * Claude Code injects `role: 'system'` messages into the `messages` array to carry
+   * ephemeral context (system-reminders, hook output, tool nudges). They are volatile
+   * in three ways that break prefix hashing:
+   *  - they appear and disappear between turns, so a turn can grow by 3 messages
+   *    instead of the 2 the parent-hash offset assumes;
+   *  - the same reminder is sent as a plain string in one request and as a content
+   *    block array (with `cache_control`) in the next;
+   *  - their text changes even when the conversation has not.
+   *
+   * Excluding them keeps `currentMessageHash` stable across requests, which is what
+   * lets a request find its parent.
+   *
+   * @param messages - Raw messages from the request
+   * @returns Only the user/assistant messages, in order
+   */
+  public static filterConversationMessages(messages: ClaudeMessage[]): ClaudeMessage[] {
+    return messages.filter(message => message?.role === 'user' || message?.role === 'assistant')
+  }
+
   public computeMessageHash(messages: ClaudeMessage[]): string {
     try {
       const hash = createHash('sha256')
@@ -617,8 +653,9 @@ export class ConversationLinker {
         throw new Error('Cannot compute hash for empty messages array')
       }
 
-      // Deduplicate messages first
-      const deduplicatedMessages = this.deduplicateMessages(messages)
+      // Drop injected system messages, then deduplicate
+      const conversationMessages = ConversationLinker.filterConversationMessages(messages)
+      const deduplicatedMessages = this.deduplicateMessages(conversationMessages)
 
       for (const message of deduplicatedMessages) {
         if (!message || !message.role) {
@@ -684,8 +721,20 @@ export class ConversationLinker {
   }
 
   private normalizeStringContent(content: string): string {
-    // Normalize string content to match array format for consistency
-    return `[0]text:${content.trim().replace(/\r\n/g, '\n')}`
+    // Normalize string content to match array format for consistency.
+    // System-reminders must be stripped here too: Claude Code sends the same
+    // reminder as a plain string in one request and as a content block array in
+    // the next, and the array path already strips them (filterSystemReminders +
+    // serializeTextItem). Without this, the two representations hash differently.
+    const cleanText = stripSystemReminder(content).trim().replace(/\r\n/g, '\n')
+
+    // An all-reminder string collapses to nothing, matching the array path where
+    // every block gets filtered out and serialization yields an empty string.
+    if (cleanText.length === 0) {
+      return ''
+    }
+
+    return `[0]text:${cleanText}`
   }
 
   private filterSystemReminders(content: ClaudeContent[]): ClaudeContent[] {

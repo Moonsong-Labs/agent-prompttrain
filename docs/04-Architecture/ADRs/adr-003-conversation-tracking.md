@@ -187,7 +187,53 @@ To support accurate historical rebuilds and prevent future data from affecting p
 
 This enhancement is particularly important for systems that need to rebuild or analyze historical conversation data, ensuring that the reconstructed state accurately reflects what existed at any given point in time.
 
+### Enhancement: Injected `system` Messages Excluded from Hashing (2026-07-25)
+
+Claude Code 2.1 changed the wire format in ways that broke parent matching: a single session
+fragmented into many one- or two-request conversations. Measured over 10 hours of production
+traffic, only 72% of requests found a parent; after the fix, 93%.
+
+**What changed on the client side:**
+
+1. **`role: 'system'` messages inside the `messages` array.** Claude Code injects ephemeral
+   context (system-reminders, `SessionStart` hook output, tool nudges) as extra messages rather
+   than only inside `user` messages. These are volatile in three ways:
+   - they appear and disappear between turns, so a turn can grow the array by **3** messages
+     instead of the 2 that `parentMessageHash = messages.slice(0, -2)` assumes;
+   - the **same** reminder is sent as a plain string in one request and as a content block array
+     (carrying `cache_control`) in the next;
+   - their text changes even when the conversation does not.
+2. **`x-anthropic-billing-header:` prepended to the system prompt**, carrying `cc_version`. It
+   changes on every Claude Code release, so `system_hash` churned mid-session and the
+   priority-i (message + system) parent match almost always missed.
+3. **New system prompt openings** — `You are Claude Code, Anthropic's official CLI for Claude`
+   and `You are an agent for Claude Code, ...` — replacing the
+   `You are an interactive CLI tool...` prefix that the stable-prompt special case matched.
+
+**Changes:**
+
+1. **`ConversationLinker.filterConversationMessages()`**: keeps only `user`/`assistant` messages.
+   Applied before hashing, before the parent/grandparent offset arithmetic, and before
+   single-message compact/subtask detection — so subtask detection works again for subagent
+   requests, whose first request is now `[user, system]` rather than `[user]`.
+2. **`normalizeStringContent()`** now strips `<system-reminder>` blocks (and collapses to an
+   empty string when nothing remains), matching what the content-block path already did. String
+   and array representations of the same message now hash identically.
+3. **`getStableSystemPrompt()`** drops `x-anthropic-billing-header:` lines, recognises the new
+   Claude Code prompt markers, and truncates everything from `gitStatus:` onwards (previously a
+   non-greedy regex removed only the first paragraph).
+
+**Consequences:**
+
+- Hashes for requests containing injected `system` messages differ from those stored before this
+  change. Conversations already recorded keep their existing (fragmented) `conversation_id`;
+  run `bun run scripts/db/rebuild-conversations.ts` to re-link historical data.
+- Two requests differing only in injected `system` messages now hash identically and are treated
+  as siblings by the existing branch-detection logic.
+- `message_count` semantics are unchanged: it still counts every message in the request,
+  including injected `system` messages.
+
 ---
 
-Date: 2024-02-01 (Updated: 2025-06-28, 2025-07-02)
+Date: 2024-02-01 (Updated: 2025-06-28, 2025-07-02, 2026-07-25)
 Authors: Development Team

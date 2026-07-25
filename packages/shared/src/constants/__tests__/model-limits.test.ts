@@ -3,6 +3,7 @@ import {
   getModelContextLimit,
   getBatteryColor,
   getBatteryLevel,
+  inferContextLimitByGeneration,
   BATTERY_THRESHOLDS,
 } from '../model-limits'
 
@@ -15,6 +16,20 @@ describe('Model Context Limits', () => {
 
     it('should return 1M for Claude Mythos 5', () => {
       expect(getModelContextLimit('claude-mythos-5')).toEqual({ limit: 1000000, isEstimate: false })
+    })
+
+    it('should return 1M for Claude Mythos Preview', () => {
+      expect(getModelContextLimit('claude-mythos-preview')).toEqual({
+        limit: 1000000,
+        isEstimate: false,
+      })
+    })
+
+    // Test 1M context models - Claude Opus 5
+    // Regression: a missing rule here made the dashboard context gauge read 300%+
+    // because a ~780k-token Opus 5 context was measured against the 200k default.
+    it('should return 1M for Claude Opus 5', () => {
+      expect(getModelContextLimit('claude-opus-5')).toEqual({ limit: 1000000, isEstimate: false })
     })
 
     // Test 1M context models - Claude Opus 4.7 / 4.8
@@ -131,6 +146,43 @@ describe('Model Context Limits', () => {
     it('should match partial model names', () => {
       const result = getModelContextLimit('claude-3-sonnet')
       expect(result).toEqual({ limit: 200000, isEstimate: false })
+    })
+
+    // Generational safety net: an unreleased model must not silently inherit 200k
+    it('should infer 1M (as an estimate) for a future Opus generation', () => {
+      expect(getModelContextLimit('claude-opus-6')).toEqual({ limit: 1000000, isEstimate: true })
+    })
+
+    it('should infer 1M (as an estimate) for a future Sonnet generation', () => {
+      expect(getModelContextLimit('claude-sonnet-6-20270101')).toEqual({
+        limit: 1000000,
+        isEstimate: true,
+      })
+    })
+
+    it('should infer 200k (as an estimate) for a future Haiku generation', () => {
+      expect(getModelContextLimit('claude-haiku-5')).toEqual({ limit: 200000, isEstimate: true })
+    })
+  })
+
+  describe('inferContextLimitByGeneration', () => {
+    it('returns 1M for frontier families from generation 5 onwards', () => {
+      expect(inferContextLimitByGeneration('claude-opus-5')).toBe(1000000)
+      expect(inferContextLimitByGeneration('claude-sonnet-7')).toBe(1000000)
+      expect(inferContextLimitByGeneration('claude-fable-6')).toBe(1000000)
+    })
+
+    it('returns 200k for Haiku regardless of generation', () => {
+      expect(inferContextLimitByGeneration('claude-haiku-6')).toBe(200000)
+    })
+
+    it('returns null for pre-5 generations so explicit rules stay authoritative', () => {
+      expect(inferContextLimitByGeneration('claude-opus-4-5')).toBeNull()
+    })
+
+    it('returns null for unrecognised model id shapes', () => {
+      expect(inferContextLimitByGeneration('gpt-4')).toBeNull()
+      expect(inferContextLimitByGeneration('claude-x-experimental')).toBeNull()
     })
   })
 
