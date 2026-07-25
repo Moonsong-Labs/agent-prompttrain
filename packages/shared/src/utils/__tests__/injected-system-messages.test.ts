@@ -106,6 +106,13 @@ describe('Claude Code injected system messages', () => {
       expect(linker.computeMessageHash(asString)).toBe(linker.computeMessageHash(asBlocks))
     })
 
+    test('refuses to hash a request with no user or assistant messages', () => {
+      // Guards against every all-system request sharing the hash of an empty input
+      expect(() =>
+        linker.computeMessageHash([{ role: 'system', content: SKILLS_REMINDER }])
+      ).toThrow('no user or assistant messages')
+    })
+
     test('strips system-reminders from string content', () => {
       const withReminder: ClaudeMessage[] = [
         { role: 'user', content: `Real question\n${SKILLS_REMINDER}` },

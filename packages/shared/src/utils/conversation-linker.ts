@@ -655,6 +655,13 @@ export class ConversationLinker {
 
       // Drop injected system messages, then deduplicate
       const conversationMessages = ConversationLinker.filterConversationMessages(messages)
+
+      // Guard the invariant that a hash always covers at least one real message -
+      // otherwise every all-system request would share the hash of an empty input.
+      if (conversationMessages.length === 0) {
+        throw new Error('Cannot compute hash: no user or assistant messages in request')
+      }
+
       const deduplicatedMessages = this.deduplicateMessages(conversationMessages)
 
       for (const message of deduplicatedMessages) {
