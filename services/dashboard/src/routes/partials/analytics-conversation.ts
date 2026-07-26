@@ -86,6 +86,8 @@ analyticsConversationPartialRoutes.get(
       // For Claude Fable 5 requests re-served by a fallback model, usage.iterations
       // splits tokens across the models that actually ran; getBilledUsageByModel
       // attributes billed tokens/cost to each and drops unbilled pre-output declines.
+      // Each request is priced at its own timestamp so models under introductory
+      // pricing keep the rate that was in effect when they ran.
       const costs = {
         total: 0,
         byModel: {} as Record<string, number>,
@@ -94,7 +96,11 @@ analyticsConversationPartialRoutes.get(
       // Process each request
       filteredRequests.forEach((req: ApiRequest) => {
         const usage = req.response_body?.usage as RawUsage | undefined
-        const entries = getBilledUsageByModel(req.model || 'unknown', usage)
+        const entries = getBilledUsageByModel(
+          req.model || 'unknown',
+          usage,
+          req.timestamp ? new Date(req.timestamp) : undefined
+        )
         if (entries.length === 0) {
           return
         }

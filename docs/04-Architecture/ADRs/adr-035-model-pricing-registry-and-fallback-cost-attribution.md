@@ -44,9 +44,12 @@ A single "Fable 5 request" can therefore incur Opus 4.8 token costs. Attributing
 
 Add a shared pricing module `packages/shared/src/constants/model-pricing.ts`:
 
-- `MODEL_PRICING_RULES` / `getModelPricing(model)` — regex-matched USD-per-MTok rates for input, output, cache read, and cache write, including `claude-fable-5`/`claude-mythos-5`/`claude-mythos-preview` ($10/$50), `claude-opus-5` and Opus 4.5–4.8 ($5/$25), legacy Opus (4.0/4.1/3) ($15/$75), all Sonnet generations incl. Sonnet 5 ($3/$15), and the Haiku/Claude-2 tiers. Unknown models fall back to `DEFAULT_MODEL_PRICING` (Sonnet-tier) with `isEstimate: true`.
-- `calculateRequestCost(model, usage)` — single-model cost from camelCase token counts.
-- `getBilledUsageByModel(topLevelModel, usage)` / `calculateUsageCost(...)` — **fallback-aware**: when `usage.iterations` is present, cost is attributed per iteration to the model that ran it, and attempts that declined before producing output (`output_tokens === 0`) are dropped because they are not billed. With no iterations, the top-level usage is attributed to the request's model.
+- `MODEL_PRICING_RULES` / `getModelPricing(model, servedAt?)` — regex-matched USD-per-MTok rates for input, output, cache read, and cache write, including `claude-fable-5`/`claude-mythos-5`/`claude-mythos-preview` ($10/$50), `claude-opus-5` and Opus 4.5–4.8 ($5/$25), legacy Opus (4.0/4.1/3) ($15/$75), all Sonnet generations ($3/$15), and the Haiku/Claude-2 tiers. Unknown models fall back to `DEFAULT_MODEL_PRICING` (Sonnet-tier) with `isEstimate: true`.
+- **Time-aware introductory pricing.** A rule may carry an optional `introductory: { pricing, until }`, applied to requests served strictly before the cutover. Claude Sonnet 5 launched at $2/$10 per MTok with the standard $3/$15 taking effect 2026-09-01 ([docs](https://platform.claude.com/docs/en/about-claude/pricing#claude-sonnet-5-introductory-pricing)). Anthropic publishes these boundaries as calendar dates with no timezone, so `SONNET_5_STANDARD_PRICING_START` encodes UTC midnight.
+- `calculateRequestCost(model, usage, servedAt?)` — single-model cost from camelCase token counts.
+- `getBilledUsageByModel(topLevelModel, usage, servedAt?)` / `calculateUsageCost(...)` — **fallback-aware**: when `usage.iterations` is present, cost is attributed per iteration to the model that ran it, and attempts that declined before producing output (`output_tokens === 0`) are dropped because they are not billed. With no iterations, the top-level usage is attributed to the request's model.
+
+`servedAt` is the timestamp of the request being priced, and callers must pass it: a request is billed at the rate in effect when it ran, so a July 2026 Sonnet 5 request keeps its $2/$10 rate when its cost is displayed in September. Omitting `servedAt` prices at the current wall clock, which is correct only for live traffic. The Bedrock cost report (`scripts/aws-bedrock-cost-report.ts`) intentionally does **not** apply the discount: partner-operated platforms set their own rates.
 
 Consumers:
 
