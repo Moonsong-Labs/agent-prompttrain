@@ -5,6 +5,7 @@ import {
   getBilledUsageByModel,
   calculateUsageCost,
   DEFAULT_MODEL_PRICING,
+  SONNET_5_STANDARD_PRICING_START,
   type RawUsage,
 } from '../model-pricing'
 
@@ -47,8 +48,8 @@ describe('Model Pricing', () => {
       expect(getModelPricing('claude-3-opus-20240229').pricing.output).toBe(75)
     })
 
-    it('prices Sonnet 5 and Sonnet 4.x at $3 / $15 per MTok', () => {
-      expect(getModelPricing('claude-sonnet-5').pricing.input).toBe(3)
+    it('prices Sonnet 4.x at $3 / $15 per MTok', () => {
+      expect(getModelPricing('claude-sonnet-4-6').pricing.input).toBe(3)
       expect(getModelPricing('claude-sonnet-4-6').pricing.output).toBe(15)
     })
 
@@ -56,6 +57,75 @@ describe('Model Pricing', () => {
       const { pricing, isEstimate } = getModelPricing('some-future-model')
       expect(isEstimate).toBe(true)
       expect(pricing).toEqual(DEFAULT_MODEL_PRICING)
+    })
+  })
+
+  /**
+   * Sonnet 5 launched at $2/$10 per MTok; standard $3/$15 starts September 1, 2026.
+   * @see https://platform.claude.com/docs/en/about-claude/pricing#claude-sonnet-5-introductory-pricing
+   */
+  describe('Sonnet 5 introductory pricing', () => {
+    const beforeCutover = new Date('2026-08-31T23:59:59.000Z')
+    const atCutover = SONNET_5_STANDARD_PRICING_START
+    const afterCutover = new Date('2026-09-01T00:00:01.000Z')
+
+    it('bills $2 / $10 per MTok before the cutover', () => {
+      const { pricing, isEstimate } = getModelPricing('claude-sonnet-5', beforeCutover)
+      expect(isEstimate).toBe(false)
+      expect(pricing).toEqual({ input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 })
+    })
+
+    it('bills $3 / $15 per MTok from the cutover onwards', () => {
+      // The cutover instant itself is already standard pricing (exclusive bound)
+      expect(getModelPricing('claude-sonnet-5', atCutover).pricing).toEqual({
+        input: 3,
+        output: 15,
+        cacheRead: 0.3,
+        cacheWrite: 3.75,
+      })
+      expect(getModelPricing('claude-sonnet-5', afterCutover).pricing.input).toBe(3)
+    })
+
+    it('does not apply introductory pricing to other Sonnet generations', () => {
+      expect(getModelPricing('claude-sonnet-4-6', beforeCutover).pricing.input).toBe(3)
+      expect(getModelPricing('claude-sonnet-4-5-20250929', beforeCutover).pricing.input).toBe(3)
+    })
+
+    it('does not apply introductory pricing to other model families', () => {
+      expect(getModelPricing('claude-opus-5', beforeCutover).pricing.input).toBe(5)
+      expect(getModelPricing('claude-fable-5', beforeCutover).pricing.input).toBe(10)
+    })
+
+    it('prices a request at the rate in effect when it was served', () => {
+      const usage = { inputTokens: 1_000_000, outputTokens: 1_000_000 }
+
+      expect(calculateRequestCost('claude-sonnet-5', usage, beforeCutover)).toBeCloseTo(12, 6)
+      expect(calculateRequestCost('claude-sonnet-5', usage, afterCutover)).toBeCloseTo(18, 6)
+    })
+
+    it('applies the served-at rate through fallback attribution', () => {
+      const usage: RawUsage = {
+        input_tokens: 1_000_000,
+        output_tokens: 1_000_000,
+        iterations: [
+          { model: 'claude-fable-5', input_tokens: 0, output_tokens: 0 }, // pre-output decline, unbilled
+          { model: 'claude-sonnet-5', input_tokens: 1_000_000, output_tokens: 1_000_000 },
+        ],
+      }
+
+      const before = getBilledUsageByModel('claude-fable-5', usage, beforeCutover)
+      expect(before).toHaveLength(1)
+      expect(before[0].model).toBe('claude-sonnet-5')
+      expect(before[0].cost).toBeCloseTo(12, 6)
+
+      expect(calculateUsageCost('claude-fable-5', usage, afterCutover)).toBeCloseTo(18, 6)
+    })
+
+    it('falls back to current wall-clock pricing when no timestamp is given', () => {
+      // Only correct for live traffic; historical rows must pass their own timestamp.
+      const now = new Date()
+      const expected = now < SONNET_5_STANDARD_PRICING_START ? 2 : 3
+      expect(getModelPricing('claude-sonnet-5').pricing.input).toBe(expected)
     })
   })
 

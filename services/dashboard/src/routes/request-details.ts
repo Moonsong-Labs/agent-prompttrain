@@ -117,14 +117,20 @@ requestDetailsRoutes.get('/request/:id', async c => {
     })
 
     // Calculate cost (model-aware; attributes Claude Fable 5 fallback iterations
-    // to the model that actually served each attempt)
+    // to the model that actually served each attempt). The request timestamp is passed
+    // so models under introductory pricing keep the rate in effect when they ran.
     const rawUsage = details.responseBody?.usage as RawUsage | undefined
+    const servedAt = details.timestamp ? new Date(details.timestamp) : undefined
     const totalCost = rawUsage
-      ? calculateUsageCost(details.model || 'unknown', rawUsage)
-      : calculateRequestCost(details.model || 'unknown', {
-          inputTokens: conversation.totalInputTokens,
-          outputTokens: conversation.totalOutputTokens,
-        })
+      ? calculateUsageCost(details.model || 'unknown', rawUsage, servedAt)
+      : calculateRequestCost(
+          details.model || 'unknown',
+          {
+            inputTokens: conversation.totalInputTokens,
+            outputTokens: conversation.totalOutputTokens,
+          },
+          servedAt
+        )
     const cost = { totalCost, formattedTotal: `$${totalCost.toFixed(4)}` }
 
     // Detect Spark recommendations
