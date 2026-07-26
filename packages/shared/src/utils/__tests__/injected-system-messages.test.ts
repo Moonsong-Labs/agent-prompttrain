@@ -256,6 +256,171 @@ describe('Claude Code injected system messages', () => {
   })
 })
 
+/**
+ * Excluding injected `system` messages makes hashing more permissive, so these tests pin
+ * the opposite property: unrelated transcripts must not end up in one conversation.
+ *
+ * The one case where discrimination is genuinely reduced is two sessions whose transcript
+ * is byte-identical up to a divergence point (e.g. the same subagent prompt launched
+ * twice). Hash-based tracking cannot tell those apart by design (ADR-003); what matters is
+ * that the divergence surfaces as a branch rather than a silently interleaved chain.
+ */
+describe('Conversation isolation', () => {
+  /** Minimal in-memory stand-in for writer.findParentRequests. */
+  function createStore() {
+    const rows: Array<{
+      request_id: string
+      conversation_id: string
+      branch_id: string
+      current_message_hash: string
+      parent_message_hash: string | null
+      system_hash: string | null
+    }> = []
+
+    const queryExecutor: QueryExecutor = async (criteria: ParentQueryCriteria) =>
+      rows
+        .filter(r => {
+          if (
+            criteria.currentMessageHash &&
+            r.current_message_hash !== criteria.currentMessageHash
+          ) {
+            return false
+          }
+          if (criteria.parentMessageHash && r.parent_message_hash !== criteria.parentMessageHash) {
+            return false
+          }
+          if (criteria.systemHash && r.system_hash !== criteria.systemHash) {
+            return false
+          }
+          if (criteria.excludeRequestId && r.request_id === criteria.excludeRequestId) {
+            return false
+          }
+          if (criteria.conversationId && r.conversation_id !== criteria.conversationId) {
+            return false
+          }
+          return true
+        })
+        .map(r => ({
+          request_id: r.request_id,
+          conversation_id: r.conversation_id,
+          branch_id: r.branch_id,
+          current_message_hash: r.current_message_hash,
+          system_hash: r.system_hash,
+        }))
+
+    return { rows, queryExecutor }
+  }
+
+  test('does not link a request whose prefix matches nothing', async () => {
+    const { rows, queryExecutor } = createStore()
+    const isolated = new ConversationLinker(queryExecutor, noopLogger)
+
+    // An unrelated conversation already exists
+    rows.push({
+      request_id: 'other-request',
+      conversation_id: 'other-conv',
+      branch_id: 'main',
+      current_message_hash: isolated.computeMessageHash([
+        { role: 'user', content: 'Unrelated topic' },
+      ]),
+      parent_message_hash: null,
+      system_hash: null,
+    })
+
+    const result = await isolated.linkConversation({
+      projectId: 'test-project',
+      messages: [
+        { role: 'user', content: 'A different topic entirely' },
+        { role: 'system', content: SKILLS_REMINDER },
+        { role: 'assistant', content: 'Sure' },
+        { role: 'user', content: 'Continue' },
+      ],
+      systemPrompt: 'Test system prompt',
+      requestId: 'new-request',
+      messageCount: 4,
+    })
+
+    expect(result.conversationId).toBeNull()
+    expect(result.parentRequestId).toBeNull()
+  })
+
+  test('keeps transcripts that differ only in user content apart', () => {
+    const hasher = new ConversationLinker(async () => [], noopLogger)
+    const withSameInjection = (question: string): ClaudeMessage[] => [
+      { role: 'user', content: question },
+      { role: 'system', content: SKILLS_REMINDER },
+    ]
+
+    expect(hasher.computeMessageHash(withSameInjection('Question A'))).not.toBe(
+      hasher.computeMessageHash(withSameInjection('Question B'))
+    )
+  })
+
+  test('keeps transcripts that differ only in assistant content apart', () => {
+    const hasher = new ConversationLinker(async () => [], noopLogger)
+    const withReply = (reply: string): ClaudeMessage[] => [
+      { role: 'user', content: 'Same question' },
+      { role: 'assistant', content: reply },
+      { role: 'user', content: 'Same follow-up' },
+    ]
+
+    expect(hasher.computeMessageHash(withReply('Answer A'))).not.toBe(
+      hasher.computeMessageHash(withReply('Answer B'))
+    )
+  })
+
+  test('surfaces a divergent continuation of a shared prefix as a branch', async () => {
+    const { rows, queryExecutor } = createStore()
+    const isolated = new ConversationLinker(queryExecutor, noopLogger)
+
+    // Two sessions opening with a byte-identical prompt: the root request is stored once,
+    // because both sessions hash to it.
+    const rootHash = isolated.computeMessageHash([{ role: 'user', content: 'Identical prompt' }])
+    rows.push({
+      request_id: 'root-request',
+      conversation_id: 'shared-conv',
+      branch_id: 'main',
+      current_message_hash: rootHash,
+      parent_message_hash: null,
+      system_hash: null,
+    })
+
+    const continueWith = (reply: string, followUp: string): LinkingRequest => ({
+      projectId: 'test-project',
+      messages: [
+        { role: 'user', content: 'Identical prompt' },
+        { role: 'system', content: SKILLS_REMINDER },
+        { role: 'assistant', content: reply },
+        { role: 'user', content: followUp },
+      ],
+      systemPrompt: 'Test system prompt',
+      requestId: `child-${reply}`,
+      messageCount: 4,
+    })
+
+    const first = await isolated.linkConversation(continueWith('Answer A', 'Follow-up A'))
+    expect(first.conversationId).toBe('shared-conv')
+    expect(first.branchId).toBe('main')
+
+    rows.push({
+      request_id: 'child-a',
+      conversation_id: first.conversationId!,
+      branch_id: first.branchId,
+      current_message_hash: first.currentMessageHash,
+      parent_message_hash: first.parentMessageHash,
+      system_hash: first.systemHash,
+    })
+
+    // The second session diverges from the same root - it must not be appended to the
+    // first session's chain, it must open a branch.
+    const second = await isolated.linkConversation(continueWith('Answer B', 'Follow-up B'))
+    expect(second.conversationId).toBe('shared-conv')
+    expect(second.branchId).not.toBe('main')
+    expect(second.branchId).toStartWith('branch_')
+    expect(second.currentMessageHash).not.toBe(first.currentMessageHash)
+  })
+})
+
 describe('System prompt hash stability', () => {
   const claudeCodePrompt = [
     "You are Claude Code, Anthropic's official CLI for Claude.",
