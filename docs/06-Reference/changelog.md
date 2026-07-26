@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Conversation detection no longer fragments a single Claude Code session into many 1-2 request conversations (see [ADR-003](../04-Architecture/ADRs/adr-003-conversation-tracking.md))
+  - Claude Code 2.1 injects `role: 'system'` messages into the `messages` array (system-reminders, hook output, tool nudges). They appear and disappear between turns and flip between plain-string and content-block form, which broke the prefix hashing that links a request to its parent
+  - `ConversationLinker` now hashes the durable transcript only (`user`/`assistant` messages), and applies the same filter to the parent/grandparent offsets and to single-message compact/subtask detection — restoring subtask linking for subagent requests, whose first request is now `[user, system]`
+  - String message content now has `<system-reminder>` blocks stripped, matching the content-block path, so both wire representations of the same message hash identically
+  - Measured on 10 hours of production traffic: parent-link rate 72% → 93%, i.e. 76% fewer conversations created
+  - Existing rows keep their fragmented `conversation_id`; run `bun run scripts/db/rebuild-conversations.ts` to re-link historical data
+- System prompt hash no longer churns mid-session: the `x-anthropic-billing-header:` prelude (whose `cc_version` changes on every Claude Code release) is dropped, the new Claude Code prompt markers (`You are Claude Code, ...`, `You are an agent for Claude Code, ...`) are recognised, and the whole `gitStatus:` tail is removed instead of only its first paragraph
+- Dashboard context gauge ("battery") no longer shows impossible percentages such as 300%+
+  - `claude-opus-5` had no context-window rule, so its ~780k-token contexts were measured against the 200k default
+  - Added rules for Claude Opus 5 and Mythos Preview (1M), plus `inferContextLimitByGeneration` so an unrecognised `claude-<family>-<n>` model with `n >= 5` is treated as 1M (200k for Haiku) and flagged as an estimate rather than silently defaulting to 200k
+- Claude Opus 5 costs are no longer understated: it had no pricing rule and fell back to the Sonnet-tier default ($3/$15 instead of the correct $5/$25). Also added `claude-mythos-preview` (Fable 5 rates) and an Opus 5 entry to `scripts/aws-bedrock-cost-report.ts`
 - Account pool no longer routes requests to accounts whose model-scoped limit is exhausted (fixes upstream `429 "This request could exceed your account's rate limit"` despite low 5h/7d usage)
   - Anthropic's OAuth usage response now carries a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance); the legacy `seven_day_opus`/`seven_day_sonnet` fields are null in live responses
   - Account selection is now model-aware: a saturated Fable-scoped limit exhausts the pool for Fable requests only, without blocking other models; sticky accounts are re-evaluated per requested model

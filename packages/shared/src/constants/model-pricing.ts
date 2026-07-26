@@ -49,9 +49,16 @@ export interface ModelPricingRule {
  */
 export const MODEL_PRICING_RULES: ModelPricingRule[] = [
   // Claude Fable 5 / Mythos 5 — top tier above Opus ($10 / $50 per MTok)
+  // Mythos Preview shares Fable 5's specs and pricing (Project Glasswing).
   {
-    pattern: /claude-(fable|mythos)-5/i,
+    pattern: /claude-(fable|mythos)-5|claude-mythos-preview/i,
     pricing: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  },
+
+  // Claude Opus 5 ($5 / $25 per MTok)
+  {
+    pattern: /claude-opus-5/i,
+    pricing: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   },
 
   // Claude Opus 4.5 / 4.6 / 4.7 / 4.8 ($5 / $25 per MTok)

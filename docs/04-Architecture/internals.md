@@ -157,47 +157,75 @@ class StreamingHandler {
 
 #### Message Hashing Algorithm
 
+`ConversationLinker` (`packages/shared/src/utils/conversation-linker.ts`) is the source of truth.
+The hash covers the **durable transcript only**: messages whose role is not `user` or `assistant`
+are dropped first, because Claude Code injects `role: 'system'` messages carrying ephemeral
+context (see [ADR-003](ADRs/adr-003-conversation-tracking.md)).
+
 ```typescript
-export function generateMessageHash(message: Message): string {
-  // 1. Normalize content
-  const normalizedContent = normalizeContent(message.content)
+// Simplified shape of ConversationLinker.computeMessageHash
+export function computeMessageHash(messages: Message[]): string {
+  const hash = crypto.createHash('sha256')
 
-  // 2. Create hash input
-  const hashInput = `${message.role}:${normalizedContent}`
+  // 1. Drop injected system messages, then drop messages with duplicated tool ids
+  const conversation = messages.filter(m => m.role === 'user' || m.role === 'assistant')
 
-  // 3. Generate SHA-256 hash
-  return crypto.createHash('sha256').update(hashInput).digest('hex')
+  for (const message of deduplicateMessages(conversation)) {
+    // 2. role, then normalized content, each newline-terminated
+    hash.update(`${message.role}\n`)
+    hash.update(`${normalizeContent(message.content)}\n`)
+  }
+
+  return hash.digest('hex')
 }
 
 function normalizeContent(content: string | ContentBlock[]): string {
+  // String and array forms must normalize identically - Claude Code sends the same
+  // message either way between requests
   if (typeof content === 'string') {
-    return content
+    const clean = stripSystemReminder(content).trim()
+    return clean.length === 0 ? '' : `[0]text:${clean}`
   }
 
-  // Filter system reminders and normalize
+  // Drop blocks that are nothing but a system-reminder, then serialize positionally
   return content
-    .filter(block => {
+    .filter(block => block.type !== 'text' || stripSystemReminder(block.text).trim().length > 0)
+    .map((block, i) => {
       if (block.type === 'text') {
-        return !block.text.startsWith('<system-reminder>')
+        return `[${i}]text:${stripSystemReminder(block.text).trim()}`
       }
-      return true
-    })
-    .map(block => {
-      if (block.type === 'text') return block.text
-      if (block.type === 'image') return `[image:${block.source.type}]`
-      return '[unknown]'
+      if (block.type === 'image') {
+        return `[${i}]image:${block.source.media_type}:${sha256(block.source.data)}`
+      }
+      if (block.type === 'tool_use') {
+        return `[${i}]tool_use:${block.name}:${block.id}:${JSON.stringify(block.input)}`
+      }
+      if (block.type === 'tool_result') {
+        return `[${i}]tool_result:${block.tool_use_id}:${normalizeToolResult(block.content)}`
+      }
+      return `[${i}]${block.type}:unknown`
     })
     .join('\n')
 }
 ```
 
+The system prompt is hashed separately (`hashSystemPrompt`) after volatile sections are removed:
+the `x-anthropic-billing-header:` prelude (its `cc_version` changes with every Claude Code
+release), `<system-reminder>` blocks, and everything from `gitStatus:` onwards.
+
 #### Conversation Linking
+
+Hashes cover the whole transcript, not a single message: the parent hash is the hash of the same
+transcript minus the last two conversation messages (the assistant reply and the user turn that
+followed it). A stored request whose `current_message_hash` equals that value is the parent.
 
 ```typescript
 async function linkConversation(messages: Message[], requestId: string): Promise<ConversationInfo> {
-  // 1. Generate hashes
-  const currentHash = generateMessageHash(messages[messages.length - 1])
-  const parentHash = messages.length > 1 ? generateMessageHash(messages[messages.length - 2]) : null
+  // 1. Generate hashes over user/assistant messages only
+  const conversation = messages.filter(m => m.role === 'user' || m.role === 'assistant')
+  const currentHash = computeMessageHash(conversation)
+  // A turn adds exactly two messages, so the parent is the transcript minus the last two
+  const parentHash = conversation.length >= 3 ? computeMessageHash(conversation.slice(0, -2)) : null
 
   // 2. Find existing conversation
   if (parentHash) {
