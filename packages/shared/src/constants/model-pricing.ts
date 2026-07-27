@@ -38,10 +38,34 @@ export interface ModelPricing {
   cacheWrite: number
 }
 
+/**
+ * Time-limited launch pricing that applies before the standard rate takes effect.
+ */
+export interface IntroductoryPricing {
+  pricing: ModelPricing
+  /**
+   * Exclusive cutover instant: a request served at or after this time is billed at the
+   * standard rate. Anthropic publishes these boundaries as calendar dates without a
+   * timezone, so they are encoded as UTC midnight.
+   */
+  until: Date
+}
+
 export interface ModelPricingRule {
   pattern: RegExp
+  /** The standard (post-introductory) rate. */
   pricing: ModelPricing
+  /** Optional launch pricing in effect until {@link IntroductoryPricing.until}. */
+  introductory?: IntroductoryPricing
 }
+
+/**
+ * Claude Sonnet 5 launched with introductory pricing of $2/$10 per MTok; the standard
+ * $3/$15 rate takes effect on September 1, 2026.
+ *
+ * @see https://platform.claude.com/docs/en/about-claude/pricing#claude-sonnet-5-introductory-pricing
+ */
+export const SONNET_5_STANDARD_PRICING_START = new Date('2026-09-01T00:00:00.000Z')
 
 /**
  * Model pricing rules.
@@ -73,9 +97,19 @@ export const MODEL_PRICING_RULES: ModelPricingRule[] = [
     pricing: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   },
 
-  // Claude Sonnet 5 / 4.x / 3.x (all Sonnet generations share this price point)
+  // Claude Sonnet 5 — $3/$15 standard, $2/$10 introductory through August 31, 2026
   {
-    pattern: /claude-sonnet-5|claude-sonnet-4|claude-3.*sonnet|claude-4.*sonnet/i,
+    pattern: /claude-sonnet-5/i,
+    pricing: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    introductory: {
+      pricing: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+      until: SONNET_5_STANDARD_PRICING_START,
+    },
+  },
+
+  // Claude Sonnet 4.x / 3.x (all earlier Sonnet generations share this price point)
+  {
+    pattern: /claude-sonnet-4|claude-3.*sonnet|claude-4.*sonnet/i,
     pricing: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   },
 
@@ -115,13 +149,27 @@ export const DEFAULT_MODEL_PRICING: ModelPricing = {
 }
 
 /**
- * Get the pricing for a given model.
+ * Get the pricing for a given model, as of the moment the request was served.
+ *
+ * Pass `servedAt` whenever the timestamp is known — a model under introductory pricing is
+ * billed at the rate in effect when the request ran, so a request from July 2026 keeps its
+ * $2/$10 Sonnet 5 rate even when the cost is displayed in September. Omitting it prices at
+ * the current wall clock, which is only correct for live traffic.
+ *
  * @param model - The model identifier (e.g., "claude-fable-5")
+ * @param servedAt - When the request was served; defaults to now
  * @returns The pricing and whether it's an estimate (unknown model → default)
  */
-export function getModelPricing(model: string): { pricing: ModelPricing; isEstimate: boolean } {
+export function getModelPricing(
+  model: string,
+  servedAt?: Date
+): { pricing: ModelPricing; isEstimate: boolean } {
   for (const rule of MODEL_PRICING_RULES) {
     if (rule.pattern.test(model)) {
+      const introductory = rule.introductory
+      if (introductory && (servedAt ?? new Date()) < introductory.until) {
+        return { pricing: introductory.pricing, isEstimate: false }
+      }
       return { pricing: rule.pricing, isEstimate: false }
     }
   }
@@ -138,9 +186,15 @@ export interface TokenUsageInput {
 
 /**
  * Calculate the estimated cost (USD) for token usage on a single model.
+ *
+ * @param servedAt - When the request was served; see {@link getModelPricing}
  */
-export function calculateRequestCost(model: string, usage: TokenUsageInput): number {
-  const { pricing } = getModelPricing(model)
+export function calculateRequestCost(
+  model: string,
+  usage: TokenUsageInput,
+  servedAt?: Date
+): number {
+  const { pricing } = getModelPricing(model, servedAt)
   return (
     ((usage.inputTokens ?? 0) / 1_000_000) * pricing.input +
     ((usage.outputTokens ?? 0) / 1_000_000) * pricing.output +
@@ -199,14 +253,19 @@ export interface BilledUsageEntry {
  *
  * @param topLevelModel - The model recorded for the request (used when there are no iterations, and as a fallback for iterations missing a model).
  * @param usage - The raw API `usage` object.
+ * @param servedAt - When the request was served; see {@link getModelPricing}
  */
-export function getBilledUsageByModel(topLevelModel: string, usage?: RawUsage): BilledUsageEntry[] {
+export function getBilledUsageByModel(
+  topLevelModel: string,
+  usage?: RawUsage,
+  servedAt?: Date
+): BilledUsageEntry[] {
   const toEntry = (model: string, u: RawUsageIteration | RawUsage): BilledUsageEntry => {
     const inputTokens = u.input_tokens ?? 0
     const outputTokens = u.output_tokens ?? 0
     const cacheReadTokens = u.cache_read_input_tokens ?? 0
     const cacheCreationTokens = u.cache_creation_input_tokens ?? 0
-    const { isEstimate } = getModelPricing(model)
+    const { isEstimate } = getModelPricing(model, servedAt)
     return {
       model,
       inputTokens,
@@ -214,12 +273,16 @@ export function getBilledUsageByModel(topLevelModel: string, usage?: RawUsage): 
       cacheReadTokens,
       cacheCreationTokens,
       isEstimate,
-      cost: calculateRequestCost(model, {
-        inputTokens,
-        outputTokens,
-        cacheReadTokens,
-        cacheCreationTokens,
-      }),
+      cost: calculateRequestCost(
+        model,
+        {
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheCreationTokens,
+        },
+        servedAt
+      ),
     }
   }
 
@@ -244,7 +307,16 @@ export function getBilledUsageByModel(topLevelModel: string, usage?: RawUsage): 
 /**
  * Calculate the total estimated cost (USD) for a request's raw API usage,
  * attributing fallback iterations to the model that actually ran each attempt.
+ *
+ * @param servedAt - When the request was served; see {@link getModelPricing}
  */
-export function calculateUsageCost(topLevelModel: string, usage?: RawUsage): number {
-  return getBilledUsageByModel(topLevelModel, usage).reduce((sum, entry) => sum + entry.cost, 0)
+export function calculateUsageCost(
+  topLevelModel: string,
+  usage?: RawUsage,
+  servedAt?: Date
+): number {
+  return getBilledUsageByModel(topLevelModel, usage, servedAt).reduce(
+    (sum, entry) => sum + entry.cost,
+    0
+  )
 }

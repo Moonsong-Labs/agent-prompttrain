@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `claude-opus-5` had no context-window rule, so its ~780k-token contexts were measured against the 200k default
   - Added rules for Claude Opus 5 and Mythos Preview (1M), plus `inferContextLimitByGeneration` so an unrecognised `claude-<family>-<n>` model with `n >= 5` is treated as 1M (200k for Haiku) and flagged as an estimate rather than silently defaulting to 200k
 - Claude Opus 5 costs are no longer understated: it had no pricing rule and fell back to the Sonnet-tier default ($3/$15 instead of the correct $5/$25). Also added `claude-mythos-preview` (Fable 5 rates) and an Opus 5 entry to `scripts/aws-bedrock-cost-report.ts`
+- Claude Sonnet 5 costs are no longer overstated by 50%: its [introductory pricing](https://platform.claude.com/docs/en/about-claude/pricing#claude-sonnet-5-introductory-pricing) of $2/$10 per MTok (cache write $2.50, cache read $0.20) is in effect through 2026-08-31, but the registry only carried the post-cutover $3/$15 rate
+  - Pricing rules can now declare `introductory: { pricing, until }`; `getModelPricing`, `calculateRequestCost`, `getBilledUsageByModel` and `calculateUsageCost` take an optional `servedAt` timestamp
+  - Dashboard cost paths pass each request's own timestamp, so a request priced under the introductory rate keeps that rate after the 2026-09-01 cutover instead of being retroactively re-priced
+  - Measured on 7 days of traffic: Sonnet 5 spend $328.77 → $219.18 (−33.3%, exactly 2/3 of standard); all other models unchanged
+  - The Bedrock cost report is intentionally left at $3/$15 — partner-operated platforms set their own rates
 - Account pool no longer routes requests to accounts whose model-scoped limit is exhausted (fixes upstream `429 "This request could exceed your account's rate limit"` despite low 5h/7d usage)
   - Anthropic's OAuth usage response now carries a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance); the legacy `seven_day_opus`/`seven_day_sonnet` fields are null in live responses
   - Account selection is now model-aware: a saturated Fable-scoped limit exhausts the pool for Fable requests only, without blocking other models; sticky accounts are re-evaluated per requested model
