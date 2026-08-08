@@ -172,7 +172,9 @@ app.post('/my-endpoint', async c => {
 # Analyze conversation structure
 bun run db:analyze-conversations
 
-# Rebuild conversation data
+# Rebuild conversation data (re-links existing rows using the current linking logic;
+# needed after a linking fix, e.g. to re-attach Claude Code 2.1 subagents and
+# post-compaction requests that were stored as separate conversations)
 bun run db:rebuild-conversations
 
 # Create backup before changes

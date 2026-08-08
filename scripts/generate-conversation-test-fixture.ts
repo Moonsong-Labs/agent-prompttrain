@@ -125,11 +125,15 @@ function extractSummaryContent(childBody: any): string | undefined {
   }
 
   // Just return the raw content after the marker - no normalization
-  // The test will handle the normalization comparison
-  const markerIndex = fullContent.indexOf('The conversation is summarized below:')
-  if (markerIndex > -1) {
-    const startIndex = markerIndex + 'The conversation is summarized below:'.length
-    return fullContent.substring(startIndex).trim()
+  // The test will handle the normalization comparison.
+  // Markers mirror SUMMARY_MARKERS in packages/shared/src/utils/conversation-linker.ts
+  // (which is the source of truth): Claude Code 2.1 replaced the "summarized below" wording
+  // with a bare "Summary:" heading. Legacy marker first, so pre-2.1 fixtures are unchanged.
+  for (const marker of ['The conversation is summarized below:', 'Summary:']) {
+    const markerIndex = fullContent.indexOf(marker)
+    if (markerIndex > -1) {
+      return fullContent.substring(markerIndex + marker.length).trim()
+    }
   }
 
   return undefined

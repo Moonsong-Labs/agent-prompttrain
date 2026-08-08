@@ -13,6 +13,7 @@ import {
   type ClaudeMessage,
   type ParentQueryCriteria,
   type TaskInvocation,
+  SUBAGENT_TOOL_NAMES,
 } from '@agent-prompttrain/shared'
 // import { TaskInvocationCache } from './TaskInvocationCache.js' // Removed - using SQL query instead
 
@@ -510,9 +511,21 @@ export class StorageAdapter {
     let params: any[]
 
     if (subtaskPrompt) {
-      // Optimized query using @> containment operator for exact prompt matching
+      // Optimized query using @> containment operator for exact prompt matching.
+      // One containment test per subagent tool name, so the GIN index on response_body
+      // still applies. Names are bound as parameters ($4 onwards).
       // Note: We intentionally do NOT filter by project_id here
       // This allows subtasks to be detected even when switching between accounts
+      const containmentClauses = SUBAGENT_TOOL_NAMES.map(
+        (_, index) => `r.response_body->'content' @> jsonb_build_array(
+            jsonb_build_object(
+              'type', 'tool_use',
+              'name', $${index + 4}::text,
+              'input', jsonb_build_object('prompt', $3::text)
+            )
+          )`
+      ).join('\n          OR ')
+
       query = `
         SELECT
           r.request_id,
@@ -522,17 +535,18 @@ export class StorageAdapter {
         WHERE r.timestamp >= $1
           AND r.timestamp <= $2
           AND r.response_body IS NOT NULL
-          AND r.response_body->'content' @> jsonb_build_array(
-            jsonb_build_object(
-              'type', 'tool_use',
-              'name', 'Task',
-              'input', jsonb_build_object('prompt', $3::text)
-            )
+          AND (
+            ${containmentClauses}
           )
         ORDER BY r.timestamp DESC
         LIMIT 10
       `
-      params = [timeWindowStart, timestamp, subtaskPrompt.replace(/\\n/g, '\n')]
+      params = [
+        timeWindowStart,
+        timestamp,
+        subtaskPrompt.replace(/\\n/g, '\n'),
+        ...SUBAGENT_TOOL_NAMES,
+      ]
 
       if (debugMode) {
         logger.debug('Using optimized subtask query with prompt filter', {
@@ -552,7 +566,9 @@ export class StorageAdapter {
         WHERE r.timestamp >= $1
           AND r.timestamp <= $2
           AND r.response_body IS NOT NULL
-          AND jsonb_path_exists(r.response_body, '$.content[*] ? (@.type == "tool_use" && @.name == "Task")')
+          AND jsonb_path_exists(r.response_body, '$.content[*] ? (@.type == "tool_use" && (${SUBAGENT_TOOL_NAMES.map(
+            name => `@.name == "${name}"`
+          ).join(' || ')}))')
         ORDER BY r.timestamp DESC
         LIMIT 100
       `
@@ -573,7 +589,11 @@ export class StorageAdapter {
       for (const row of result.rows) {
         if (row.response_body?.content) {
           for (const content of row.response_body.content) {
-            if (content.type === 'tool_use' && content.name === 'Task' && content.input?.prompt) {
+            if (
+              content.type === 'tool_use' &&
+              SUBAGENT_TOOL_NAMES.includes(content.name) &&
+              content.input?.prompt
+            ) {
               // If we're filtering by prompt, the database already ensured it matches
               // Otherwise, include all Task invocations
               recentInvocations.push({

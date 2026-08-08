@@ -10,8 +10,36 @@ const BRANCH_PREFIX = 'branch_'
 const COMPACT_PREFIX = 'compact_'
 const COMPACT_CONVERSATION_PREFIX =
   'This session is being continued from a previous conversation that ran out of context'
-const SUMMARY_MARKER = 'The conversation is summarized below:'
-const SUMMARY_SUFFIX_MARKER = 'Please continue the conversation'
+/**
+ * Markers that introduce the carried-over summary body in a compact continuation
+ * message. Tried in order, so the legacy marker keeps precedence for pre-2.1
+ * transcripts. Claude Code 2.1 reworded the preamble to "The summary below covers the
+ * earlier portion of the conversation." followed by a bare `Summary:` heading.
+ */
+const SUMMARY_MARKERS = [
+  'The conversation is summarized below:', // Claude Code <= 2.0
+  'Summary:', // Claude Code 2.1+
+]
+/**
+ * Trailing instructions Claude Code appends after the summary body. They are not part
+ * of the summary the model produced, so they must be cut off before matching the
+ * summary against the summarizing response.
+ */
+const SUMMARY_SUFFIX_MARKERS = [
+  'Please continue the conversation', // Claude Code <= 2.0
+  'If you need specific details from before compaction', // Claude Code 2.1+
+  'Continue the conversation from where it left off', // Claude Code 2.1+
+]
+
+/**
+ * Tool names Claude Code uses to launch a subagent. Claude Code 2.1 renamed `Task` to
+ * `Agent`; both are accepted so subtask linking works for current traffic and for
+ * historical rebuilds of pre-2.1 data.
+ *
+ * These are compile-time constants and are interpolated into SQL predicates by
+ * callers - keep them literal identifiers.
+ */
+export const SUBAGENT_TOOL_NAMES: readonly string[] = ['Agent', 'Task']
 const SUMMARIZATION_SYSTEM_PROMPT =
   'You are a helpful AI assistant tasked with summarizing conversations'
 const COMPACT_SEARCH_DAYS = 7 // Search window for compact conversations
@@ -62,7 +90,7 @@ export interface ParentQueryCriteria {
   conversationId?: string
 }
 
-interface ParentRequest {
+export interface ParentRequest {
   request_id: string
   conversation_id: string
   branch_id: string
@@ -524,6 +552,61 @@ export class ConversationLinker {
         }
       }
 
+      // Compact fallback: Claude Code 2.1 auto-compact carries the tail of the previous
+      // transcript over alongside the summary, so the first request after a compaction
+      // arrives with several conversation messages instead of a lone summary message.
+      // Prefix matching cannot link it - its computed parent hash covers only the summary
+      // message, which was never sent as a request on its own. Recover the link the same
+      // way the single-message path does, by matching the carried-over summary against the
+      // response that produced it. Runs last so a genuine prefix match always wins.
+      if (!parent) {
+        const compactInfo = this.detectCompactConversation(conversationMessages[0])
+        if (compactInfo) {
+          this.logger.debug('Detected compact conversation in multi-message request', {
+            projectId,
+            metadata: {
+              ...traceMeta,
+              conversationMessageCount: conversationMessages.length,
+              summaryLength: compactInfo.summaryContent.length,
+            },
+          })
+
+          const compactParent = await this.findCompactParent(
+            projectId,
+            compactInfo.summaryContent,
+            timestamp,
+            traceMeta
+          )
+
+          if (compactParent) {
+            const branchId = this.generateCompactBranchId(timestamp)
+
+            this.logger.info('Linked as compact conversation', {
+              projectId,
+              metadata: {
+                ...traceMeta,
+                outcome: 'compact_conversation',
+                conversationId: compactParent.conversation_id,
+                parentRequestId: compactParent.request_id,
+                branchId,
+                matchType: 'compact_multi_message',
+              },
+            })
+
+            return {
+              conversationId: compactParent.conversation_id,
+              parentRequestId: compactParent.request_id,
+              branchId,
+              currentMessageHash,
+              // Point at the real parent request so the graph stays connected; the
+              // transcript-derived parent hash has no corresponding request.
+              parentMessageHash: compactParent.current_message_hash,
+              systemHash,
+            }
+          }
+        }
+      }
+
       if (parent) {
         // Check if the parent is on a compact branch
         const isParentCompactBranch = parent.branch_id.startsWith(COMPACT_PREFIX)
@@ -913,16 +996,18 @@ export class ConversationLinker {
         }
 
         if (textContent && textContent.includes(COMPACT_CONVERSATION_PREFIX)) {
-          // Extract the summary content after the marker
-          const summaryStart = textContent.indexOf(SUMMARY_MARKER)
-          if (summaryStart > -1) {
-            const summaryContent = this.extractSummaryContent(
-              textContent,
-              summaryStart + SUMMARY_MARKER.length
-            )
-            return {
-              isCompact: true,
-              summaryContent,
+          // Extract the summary content after the first marker that appears
+          for (const marker of SUMMARY_MARKERS) {
+            const summaryStart = textContent.indexOf(marker)
+            if (summaryStart > -1) {
+              const summaryContent = this.extractSummaryContent(
+                textContent,
+                summaryStart + marker.length
+              )
+              return {
+                isCompact: true,
+                summaryContent,
+              }
             }
           }
         }
@@ -940,8 +1025,15 @@ export class ConversationLinker {
     // Extract the core summary content, removing common suffixes
     let summary = content.substring(startIndex).trim()
 
-    // Remove the "Please continue..." suffix if present
-    const suffixIndex = summary.indexOf(SUMMARY_SUFFIX_MARKER)
+    // Cut at the earliest trailing instruction block, whichever variant is present.
+    // Taking the minimum index matters because the markers are not in text order.
+    let suffixIndex = -1
+    for (const marker of SUMMARY_SUFFIX_MARKERS) {
+      const index = summary.indexOf(marker)
+      if (index > -1 && (suffixIndex === -1 || index < suffixIndex)) {
+        suffixIndex = index
+      }
+    }
     if (suffixIndex > -1) {
       summary = summary.substring(0, suffixIndex).trim()
     }

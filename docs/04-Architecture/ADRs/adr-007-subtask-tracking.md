@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Claude's Task tool (agent spawning) allows AI assistants to create sub-agents for complex tasks. These sub-tasks appear as separate conversations, making it difficult to:
+Claude Code's subagent tool (`Agent` in Claude Code 2.1+, `Task` in 2.0 and earlier) allows AI assistants to create sub-agents for complex tasks. Both names are recognised via `SUBAGENT_TOOL_NAMES` in `packages/shared/src/utils/conversation-linker.ts`, so detection works for current traffic and for rebuilds of historical data — see [ADR-003](adr-003-conversation-tracking.md) for the rename. These sub-tasks appear as separate conversations, making it difficult to:
 
 - Understand the relationship between parent and child tasks
 - Track token usage across an entire task hierarchy
@@ -31,7 +31,7 @@ We needed a way to automatically detect and link these sub-tasks to provide bett
    - Cons: Requires client changes, breaks existing code
 
 2. **Response Analysis**
-   - Description: Parse responses for Task tool invocations
+   - Description: Parse responses for subagent tool invocations
    - Pros: Works with existing clients, automatic
    - Cons: Parsing overhead, potential false positives
 
@@ -76,14 +76,15 @@ We implemented **single-phase subtask detection** entirely within the Conversati
 2. **Phase 2 - Task Invocation Extraction and Matching**:
 
    ```typescript
-   // Extract Task tool invocations from response
+   // Extract subagent tool invocations from response
    function extractTaskInvocations(response: any): TaskInvocation[] {
      const invocations = []
 
      // Check content blocks for tool_use
      if (response.content) {
        for (const block of response.content) {
-         if (block.type === 'tool_use' && block.name === 'Task') {
+         // SUBAGENT_TOOL_NAMES covers both 'Agent' (2.1+) and 'Task' (<= 2.0)
+         if (block.type === 'tool_use' && SUBAGENT_TOOL_NAMES.includes(block.name)) {
            invocations.push({
              tool_use_id: block.id,
              prompt: block.input.prompt,

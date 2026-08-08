@@ -219,6 +219,22 @@ Hashes cover the whole transcript, not a single message: the parent hash is the 
 transcript minus the last two conversation messages (the assistant reply and the user turn that
 followed it). A stored request whose `current_message_hash` equals that value is the parent.
 
+Two kinds of request cannot be linked by prefix hashing at all, and have dedicated fallbacks:
+
+- **Subagent requests.** A subagent starts a fresh transcript, so it has no prefix in common with
+  the session that launched it. It is matched by looking for a subagent `tool_use` in a recent
+  response whose `input.prompt` equals the subagent's opening message, and inherits that request's
+  `conversation_id` on a `subtask_N` branch. `SUBAGENT_TOOL_NAMES` covers `Agent` (Claude Code
+  2.1+) and `Task` (2.0 and earlier).
+- **Auto-compact continuations.** After a compaction the transcript is replaced by a summary plus
+  the carried-over tail of the previous one, so the computed parent hash refers to a summary
+  message that was never sent as a request. These are matched by searching recent responses for
+  the carried-over summary text, and continue on a `compact_HHMMSS` branch. This runs only after
+  prefix and grandparent matching fail, so ordinary follow-up requests in a compacted session
+  still link by hash and keep their branch.
+
+See [ADR-003](ADRs/adr-003-conversation-tracking.md) for the wire-format changes behind both.
+
 ```typescript
 async function linkConversation(messages: Message[], requestId: string): Promise<ConversationInfo> {
   // 1. Generate hashes over user/assistant messages only
