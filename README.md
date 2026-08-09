@@ -62,7 +62,7 @@ Understanding these terms will help you navigate Agent Prompt Train effectively:
 - **🗣️ Conversation**: A complete interaction session between a user and Claude, consisting of multiple message exchanges. Each conversation has a unique ID and can span multiple requests.
 - **🌳 Branch**: When you edit an earlier message in a conversation and continue from there, it creates a new branch - similar to Git branches. This allows exploring alternative conversation paths without losing the original.
 - **📦 Compact**: When a conversation exceeds Claude's context window, it's automatically summarized and continued as a "compact" conversation, preserving the essential context while staying within token limits.
-- **🤖 Sub-task**: When Claude spawns another AI agent using the Task tool, it creates a sub-task. These are tracked separately but linked to their parent conversation for complete visibility.
+- **🤖 Sub-task**: When Claude spawns another AI agent using the subagent tool (`Agent`, or `Task` in Claude Code 2.0 and earlier), it creates a sub-task. These are tracked separately but linked to their parent conversation for complete visibility.
 
 ### Technical Terms
 

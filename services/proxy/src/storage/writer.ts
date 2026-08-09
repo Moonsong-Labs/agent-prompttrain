@@ -3,6 +3,20 @@ import { createHash } from 'crypto'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { logger } from '../middleware/logger.js'
+import { SUBAGENT_TOOL_NAMES } from '@agent-prompttrain/shared'
+
+/**
+ * Length of the compact-summary prefix used to locate the summarizing response.
+ * Long enough to be unique across concurrent compact chains (see
+ * findParentByResponseContent), short enough to keep the scan cheap.
+ */
+const COMPACT_SUMMARY_PROBE_CHARS = 2000
+
+/**
+ * Below this length a summary prefix is not discriminating enough to match on, and an
+ * empty probe would make `strpos(text, '') > 0` true for every row.
+ */
+const COMPACT_SUMMARY_MIN_CHARS = 100
 
 interface StorageRequest {
   requestId: string
@@ -326,12 +340,32 @@ export class StorageWriter {
     system_hash: string | null
   } | null> {
     try {
-      // Clean up the summary content for better matching
+      // A summary this short cannot identify a parent, and an empty probe would match
+      // every row (strpos returns 1 for the empty needle).
+      if (summaryContent.trim().length < COMPACT_SUMMARY_MIN_CHARS) {
+        logger.debug('Skipping compact parent search - summary too short to match', {
+          metadata: { projectId, summaryLength: summaryContent.trim().length },
+        })
+        return null
+      }
+
+      // Legacy normalization: pre-2.1 Claude Code emitted the summary as the very start
+      // of the response text, so the whole summary was compared with starts_with.
       const cleanSummary = summaryContent
         .toLocaleLowerCase()
         .replace(/^Analysis:/i, '<analysis>')
         .replace(/\n\nSummary:/i, '\n</analysis>\n\n<summary>')
         .trim()
+
+      // Claude Code 2.1 wraps the summary in an <analysis>...</analysis><summary> envelope,
+      // so the response no longer *starts* with the summary - it contains it. Probe with a
+      // bounded prefix of the summary instead. The prefix must stay long enough to be
+      // unique: measured on production traffic, 200 chars collided across 7 of 17 compact
+      // chains (they share a boilerplate opening) while 2000 chars had zero collisions.
+      const summaryProbe = summaryContent
+        .toLocaleLowerCase()
+        .trim()
+        .slice(0, COMPACT_SUMMARY_PROBE_CHARS)
 
       // Note: We intentionally do NOT filter by project_id here
       // This allows compact conversations to continue even when switching between accounts
@@ -345,18 +379,19 @@ export class StorageWriter {
           response_body
         FROM api_requests
         WHERE timestamp >= $1
-          ${beforeTimestamp ? 'AND timestamp < $3' : ''}
+          ${beforeTimestamp ? 'AND timestamp < $4' : ''}
           AND request_type = 'inference'
           AND response_body IS NOT NULL
           AND jsonb_typeof(response_body->'content') = 'array'
           AND (
-            starts_with(LOWER(response_body->'content'->0->>'text'), $2)
+            strpos(LOWER(response_body->'content'->0->>'text'), $3) > 0
+            OR starts_with(LOWER(response_body->'content'->0->>'text'), $2)
           )
         ORDER BY timestamp DESC
         LIMIT 1
       `
 
-      const params = [afterTimestamp, cleanSummary]
+      const params: Array<string | Date> = [afterTimestamp, cleanSummary, summaryProbe]
 
       if (beforeTimestamp) {
         params.push(beforeTimestamp)
@@ -502,7 +537,8 @@ export class StorageWriter {
   }
 
   /**
-   * Find Task tool invocations in a response
+   * Find subagent tool invocations in a response.
+   * Matches every name in SUBAGENT_TOOL_NAMES - Claude Code 2.1 renamed `Task` to `Agent`.
    */
   findTaskToolInvocations(responseBody: any): Array<{ id: string; name: string; input: any }> {
     const taskInvocations: Array<{ id: string; name: string; input: any }> = []
@@ -512,7 +548,7 @@ export class StorageWriter {
     }
 
     for (const content of responseBody.content) {
-      if (content.type === 'tool_use' && content.name === 'Task') {
+      if (content.type === 'tool_use' && SUBAGENT_TOOL_NAMES.includes(content.name)) {
         taskInvocations.push({
           id: content.id,
           name: content.name,
@@ -603,10 +639,9 @@ export class StorageWriter {
     timestamp: Date
   ): Promise<{ request_id: string; timestamp: Date } | null> {
     try {
-      // Looking for matching Task invocation
-
-      // Look for Task invocations in the last 30 seconds
-      // Using 30-second window to match migration script for consistency
+      // Look for a subagent invocation whose prompt matches, within the last 12 hours.
+      // Matching is on the stored task_tool_invocation prompt/description, so it is
+      // independent of the tool's name (see SUBAGENT_TOOL_NAMES).
       const query = `
         SELECT request_id, timestamp
         FROM api_requests

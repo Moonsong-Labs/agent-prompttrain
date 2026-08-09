@@ -44,7 +44,7 @@ The main dashboard displays:
 - **Total Requests**: Cumulative request count
 - **Total Tokens**: Combined input/output token usage
 - **Active Trains**: Number of trains using the proxy
-- **Total Sub-tasks**: Count of Task tool invocations
+- **Total Sub-tasks**: Count of subagent tool invocations (`Agent`, or `Task` in Claude Code 2.0 and earlier)
 - **Success Rate**: Percentage of successful requests
 - **Average Latency**: Mean response time
 - **Conversations Per Week**: Bar chart showing the number of new conversations started each week over the last 12 weeks, useful for tracking service adoption and usage trends

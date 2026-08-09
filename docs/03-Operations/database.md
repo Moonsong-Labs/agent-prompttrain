@@ -142,12 +142,12 @@ Messages are automatically linked into conversations using:
 
 ### Sub-task Tracking
 
-Sub-tasks spawned via Claude's Task tool are automatically detected and linked:
+Sub-tasks spawned via Claude Code's subagent tool (`Agent` in 2.1+, `Task` in 2.0 and earlier) are automatically detected and linked:
 
 - `parent_task_request_id` - Links sub-tasks to their parent request
 - `is_subtask` - Boolean flag for quick sub-task filtering
-- `task_tool_invocation` - Stores Task tool details (prompt, description, linked conversation)
-- Automatic linking based on prompt matching within 30-second window
+- `task_tool_invocation` - Stores subagent tool details (prompt, description, linked conversation)
+- Automatic linking based on exact prompt matching within a 12-hour window
 - GIN index enables efficient queries on JSONB task data
 
 ### Request Types

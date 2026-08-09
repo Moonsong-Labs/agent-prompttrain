@@ -214,8 +214,8 @@ traffic, only 72% of requests found a parent; after the fix, 93%.
 
 1. **`ConversationLinker.filterConversationMessages()`**: keeps only `user`/`assistant` messages.
    Applied before hashing, before the parent/grandparent offset arithmetic, and before
-   single-message compact/subtask detection — so subtask detection works again for subagent
-   requests, whose first request is now `[user, system]` rather than `[user]`.
+   compact/subtask detection — so subtask detection works again for subagent requests, whose
+   first request is now `[user, system]` rather than `[user]`.
 2. **`normalizeStringContent()`** now strips `<system-reminder>` blocks (and collapses to an
    empty string when nothing remains), matching what the content-block path already did. String
    and array representations of the same message now hash identically.
@@ -235,5 +235,63 @@ traffic, only 72% of requests found a parent; after the fix, 93%.
 
 ---
 
-Date: 2024-02-01 (Updated: 2025-06-28, 2025-07-02, 2026-07-25)
+### Enhancement: Subagent Rename and Auto-Compact Continuations (2026-08-08)
+
+Two further Claude Code 2.1 changes kept fragmenting sessions even after the injected-`system`
+fix. Measured on one project's production traffic, 53 stored conversations over 6 hours were
+really **2**: one long session plus one unrelated single request.
+
+**What changed on the client side:**
+
+1. **The subagent tool was renamed `Task` → `Agent`.** Subtask detection matched the literal name
+   `Task`, so it found nothing: every subagent became its own root conversation instead of a
+   `subtask_N` branch of the session that launched it.
+2. **Auto-compact now carries the tail of the previous transcript over** alongside the summary.
+   The first request after a compaction therefore arrives as
+   `[summary, assistant(tool_use), user(tool_result), …]` rather than a lone summary message.
+   Compact detection only ran on single-message requests, so it never fired — and the request's
+   computed parent hash covers only the summary message, which was never sent as a request on its
+   own, so prefix matching could not link it either.
+3. **The compact preamble was reworded.** 2.1 emits `The summary below covers the earlier portion
+of the conversation.` followed by a bare `Summary:` heading, then trailing resume instructions
+   (`If you need specific details from before compaction…`, `Continue the conversation from where
+it left off…`). The previous marker `The conversation is summarized below:` and suffix
+   `Please continue the conversation` no longer appear.
+4. **The summarizing response is wrapped.** It now begins `<analysis>…</analysis>` before
+   `<summary>`, so the summary is _contained in_ the response rather than starting it.
+
+**Changes:**
+
+1. **`SUBAGENT_TOOL_NAMES`** (exported from `conversation-linker.ts`) lists `Agent` and `Task`.
+   Both are matched by `StorageAdapter.loadTaskInvocations` and by
+   `StorageWriter.findTaskToolInvocations` (which populates `task_tool_invocation`), so current
+   traffic links and historical rebuilds of pre-2.1 data keep working.
+2. **`SUMMARY_MARKERS` / `SUMMARY_SUFFIX_MARKERS`** replace the single marker constants. Markers
+   are tried in order with the legacy wording first; the summary is cut at the _earliest_ trailing
+   marker present, since the markers are not in text order.
+3. **Compact detection now also runs for multi-message requests**, as a fallback after exact,
+   summarization, fallback and grandparent matching have all failed. Ordering matters: later
+   requests in a compacted session still carry the summary as message 0 and must link by prefix
+   hash, keeping their branch, rather than opening a new `compact_` branch every turn.
+4. **`StorageWriter.findParentByResponseContent`** matches a bounded prefix of the summary as a
+   substring (`strpos`) instead of requiring the response to start with it. The prefix is capped
+   at 2000 characters: measured across 17 concurrent compact chains, a 200-character probe
+   collided in 7 cases (they share a boilerplate opening) while 2000 collided in none. Summaries
+   shorter than 100 characters are rejected outright, because an empty needle makes `strpos`
+   match every row. The legacy `starts_with` comparison is kept as an alternative so pre-2.1 data
+   still matches.
+
+**Consequences:**
+
+- A compact continuation is linked with `parentMessageHash` set to the parent request's
+  `current_message_hash` rather than the transcript-derived hash, which has no corresponding
+  stored request. This matches what the single-message compact path already did.
+- Existing rows keep their fragmented `conversation_id`; run
+  `bun run scripts/db/rebuild-conversations.ts` to re-link historical data.
+- Hash-based tracking still cannot separate two sessions whose transcripts are byte-identical up
+  to a divergence point (see the isolation tests) — that limitation is unchanged.
+
+---
+
+Date: 2024-02-01 (Updated: 2025-06-28, 2025-07-02, 2026-07-25, 2026-08-08)
 Authors: Development Team

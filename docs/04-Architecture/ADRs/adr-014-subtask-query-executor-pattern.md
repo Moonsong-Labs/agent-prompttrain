@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The proxy system needs to detect when a request is a subtask spawned by the Task tool. Previously, this was implemented using a two-phase approach:
+The proxy system needs to detect when a request is a subtask spawned by Claude Code's subagent tool (`Agent` in 2.1+, `Task` in 2.0 and earlier — see `SUBAGENT_TOOL_NAMES`). Previously, this was implemented using a two-phase approach:
 
 1. ConversationLinker would detect potential subtasks
 2. The proxy service would confirm by querying the database
@@ -42,22 +42,38 @@ export type SubtaskQueryExecutor = (
 When a subtask prompt is provided, the executor uses an optimized query:
 
 ```sql
-SELECT request_id, response_body, timestamp
-FROM api_requests
-WHERE project_id = $1
-  AND timestamp BETWEEN $2 AND $3
-  AND response_body @> jsonb_build_object(
-    'content', jsonb_build_array(
+-- One containment test per name in SUBAGENT_TOOL_NAMES, bound as $4 onwards
+-- ('Agent' for Claude Code 2.1+, 'Task' for 2.0 and earlier).
+-- Note: project_id is deliberately NOT filtered, so a subtask is still matched
+-- when the parent and child requests used different accounts.
+SELECT r.request_id, r.response_body, r.timestamp
+FROM api_requests r
+WHERE r.timestamp >= $1
+  AND r.timestamp <= $2
+  AND r.response_body IS NOT NULL
+  AND (
+    r.response_body->'content' @> jsonb_build_array(
       jsonb_build_object(
         'type', 'tool_use',
-        'name', 'Task',
-        'input', jsonb_build_object('prompt', $4::text)
+        'name', $4::text,
+        'input', jsonb_build_object('prompt', $3::text)
+      )
+    )
+    OR r.response_body->'content' @> jsonb_build_array(
+      jsonb_build_object(
+        'type', 'tool_use',
+        'name', $5::text,
+        'input', jsonb_build_object('prompt', $3::text)
       )
     )
   )
+ORDER BY r.timestamp DESC
+LIMIT 10
 ```
 
-This query leverages a GIN index on `response_body` for efficient lookups.
+Containment (`@>`) keeps the query servable by the GIN index on `response_body`. In practice the
+24-hour `timestamp` range is selective enough that the planner prefers the timestamp index; either
+way the predicate stays index-friendly rather than degrading to a full scan.
 
 ## Consequences
 
