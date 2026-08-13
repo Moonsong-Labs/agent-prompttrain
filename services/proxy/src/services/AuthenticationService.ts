@@ -5,6 +5,7 @@ import {
   type AnthropicCredential,
   type BedrockCredential,
   type ProviderType,
+  type UpstreamError,
 } from '@agent-prompttrain/shared'
 import { RequestContext } from '../domain/value-objects/RequestContext'
 import { getApiKey } from '../credentials'
@@ -21,6 +22,14 @@ export interface AuthResult {
   accountId: string
   accountName: string
   region?: string
+  credentialId?: string
+  fromPool?: boolean
+  reserved?: boolean
+  explicitlySelected?: boolean
+}
+
+export interface AuthenticationOptions {
+  excludeCredentialIds?: string[]
 }
 
 const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
@@ -30,9 +39,10 @@ export class AuthenticationService {
 
   constructor(
     private readonly pool: Pool,
-    private readonly usageCacheService: UsageCacheService
+    usageCacheService?: UsageCacheService
   ) {
-    this.accountPoolService = new AccountPoolService(this.pool, this.usageCacheService)
+    const sharedUsageCache = usageCacheService ?? new UsageCacheService(pool)
+    this.accountPoolService = new AccountPoolService(this.pool, sharedUsageCache)
   }
 
   /**
@@ -40,7 +50,11 @@ export class AuthenticationService {
    *   account pool so model-scoped limits (e.g. Claude Fable 5's separate
    *   weekly allowance) gate accounts for that model only.
    */
-  async authenticate(context: RequestContext, model?: string): Promise<AuthResult> {
+  async authenticate(
+    context: RequestContext,
+    model?: string,
+    options: AuthenticationOptions = {}
+  ): Promise<AuthResult> {
     const requestedAccount = context.account
     const projectId = context.projectId
 
@@ -68,13 +82,17 @@ export class AuthenticationService {
         })
       }
 
-      return this.buildAuthResult(allCredentials.rows[0], context)
+      return this.buildAuthResult(allCredentials.rows[0], context, {
+        fromPool: false,
+        reserved: false,
+        explicitlySelected: true,
+      })
     }
 
     // Priority 2: Account pool or default account
     let selection
     try {
-      selection = await this.accountPoolService.selectAccount(projectId, model)
+      selection = await this.accountPoolService.selectAccount(projectId, model, options)
     } catch (error) {
       if (error instanceof AccountPoolExhaustedError) {
         throw error
@@ -102,24 +120,86 @@ export class AuthenticationService {
       })
     }
 
-    return this.buildAuthResult(selection.credential, context)
+    try {
+      return await this.buildAuthResult(selection.credential, context, {
+        fromPool: selection.fromPool,
+        reserved: selection.reserved,
+        explicitlySelected: false,
+      })
+    } catch (error) {
+      if (selection.reserved) {
+        try {
+          await this.accountPoolService.releaseAccount(selection.credential.id)
+        } catch (releaseError) {
+          logger.error('Failed to release reservation after authentication error', {
+            metadata: {
+              credentialId: selection.credential.id,
+              error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+            },
+          })
+        }
+      }
+      throw error
+    }
+  }
+
+  async release(auth: AuthResult): Promise<void> {
+    if (auth.reserved && auth.credentialId) {
+      auth.reserved = false
+      try {
+        await this.accountPoolService.releaseAccount(auth.credentialId)
+      } catch (error) {
+        logger.error('Failed to release account-pool reservation', {
+          metadata: {
+            credentialId: auth.credentialId,
+            accountId: auth.accountId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+      }
+    }
+  }
+
+  async markRateLimited(
+    auth: AuthResult,
+    model: string | undefined,
+    error: UpstreamError
+  ): Promise<string | null> {
+    if (!auth.credentialId || auth.explicitlySelected || auth.accountId === 'passthrough') {
+      return null
+    }
+    try {
+      return await this.accountPoolService.markRateLimited(auth.credentialId, model, error)
+    } catch (stateError) {
+      logger.error('Failed to persist account rate-limit cooldown', {
+        metadata: {
+          credentialId: auth.credentialId,
+          accountId: auth.accountId,
+          model: model ?? '*',
+          error: stateError instanceof Error ? stateError.message : String(stateError),
+        },
+      })
+      return null
+    }
   }
 
   private async buildAuthResult(
     credential: Credential,
-    context: RequestContext
+    context: RequestContext,
+    routing: Pick<AuthResult, 'fromPool' | 'reserved' | 'explicitlySelected'>
   ): Promise<AuthResult> {
     if (credential.provider === 'bedrock') {
-      return this.buildBedrockAuthResult(credential, context)
+      return this.buildBedrockAuthResult(credential, context, routing)
     }
 
     // Default to Anthropic when provider is missing (backwards compatibility)
-    return this.buildAnthropicAuthResult(credential, context)
+    return this.buildAnthropicAuthResult(credential, context, routing)
   }
 
   private async buildAnthropicAuthResult(
     credential: AnthropicCredential,
-    context: RequestContext
+    context: RequestContext,
+    routing: Pick<AuthResult, 'fromPool' | 'reserved' | 'explicitlySelected'>
   ): Promise<AuthResult> {
     // Get current access token (will refresh if needed)
     const accessToken = await getApiKey(credential.id, this.pool)
@@ -152,12 +232,15 @@ export class AuthenticationService {
       betaHeader: OAUTH_BETA_HEADER,
       accountId: credential.account_id,
       accountName: credential.account_name,
+      credentialId: credential.id,
+      ...routing,
     }
   }
 
   private buildBedrockAuthResult(
     credential: BedrockCredential,
-    context: RequestContext
+    context: RequestContext,
+    routing: Pick<AuthResult, 'fromPool' | 'reserved' | 'explicitlySelected'>
   ): AuthResult {
     logger.info('Using Bedrock API key credentials for account', {
       requestId: context.requestId,
@@ -180,6 +263,8 @@ export class AuthenticationService {
       accountId: credential.account_id,
       accountName: credential.account_name,
       region: credential.aws_region,
+      credentialId: credential.id,
+      ...routing,
     }
   }
 

@@ -210,6 +210,15 @@ from `0.80` to `0.95`:
 - Migrates existing accounts still at the old `0.80` default to `0.95`
   (rows with a customized value are left untouched)
 
+### 025-cluster-account-pool-coordination.ts
+
+Adds PostgreSQL coordination for multi-instance account pooling:
+
+- separate 90% five-hour and 95% seven-day credential thresholds
+- shared successful usage data, refresh leases, and failure backoff
+- per-credential/model upstream cooldowns
+- shared project affinity and in-flight request counts
+
 ## Future Migrations
 
 When adding new migrations:

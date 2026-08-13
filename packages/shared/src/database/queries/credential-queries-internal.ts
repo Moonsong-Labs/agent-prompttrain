@@ -36,6 +36,8 @@ function toSafeAnthropicCredential(credential: AnthropicCredential): AnthropicCr
     created_at: credential.created_at,
     updated_at: credential.updated_at,
     token_limit_threshold: credential.token_limit_threshold,
+    five_hour_limit_threshold: credential.five_hour_limit_threshold,
+    seven_day_limit_threshold: credential.seven_day_limit_threshold,
     last_refresh_at: credential.last_refresh_at,
     token_status: tokenStatus,
   }
@@ -55,6 +57,8 @@ function toSafeBedrockCredential(credential: BedrockCredential): BedrockCredenti
     created_at: credential.created_at,
     updated_at: credential.updated_at,
     token_limit_threshold: credential.token_limit_threshold,
+    five_hour_limit_threshold: credential.five_hour_limit_threshold,
+    seven_day_limit_threshold: credential.seven_day_limit_threshold,
   }
 }
 

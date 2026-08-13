@@ -10,6 +10,7 @@ import {
   generateConversationId,
   config,
   ValidationError,
+  UpstreamError,
 } from '@agent-prompttrain/shared'
 import { getProjectSlackConfig } from '@agent-prompttrain/shared/database/queries'
 import { logger } from '../middleware/logger'
@@ -163,6 +164,8 @@ export class ProxyService {
       }
     }
 
+    let activeAuth: AuthResult | undefined
+
     try {
       // Authenticate
       let auth: AuthResult
@@ -191,6 +194,7 @@ export class ProxyService {
         // model-scoped limits (e.g. Claude Fable 5's separate weekly allowance)
         auth = await this.authService.authenticate(context, rawRequest.model)
       }
+      activeAuth = auth
 
       // Bedrock accounts are not supported on /v1/messages endpoint
       // They must use the native Bedrock endpoints: /model/{modelId}/invoke
@@ -226,7 +230,41 @@ export class ProxyService {
         })
       }
 
-      const claudeResponse = await this.apiClient.forward(request, auth, clientHeaders)
+      let claudeResponse: Response
+      try {
+        claudeResponse = await this.apiClient.forward(request, auth, clientHeaders)
+      } catch (error) {
+        if (this.isUpstreamRateLimit(error)) {
+          await this.authService.markRateLimited(auth, rawRequest.model, error)
+
+          const failedCredentialId = auth.credentialId
+          await this.authService.release(auth)
+
+          if (auth.fromPool && failedCredentialId && !context.account) {
+            log.warn('Upstream account rate-limited; trying one alternate account', {
+              accountId: auth.accountId,
+              model: rawRequest.model,
+            })
+            auth = await this.authService.authenticate(context, rawRequest.model, {
+              excludeCredentialIds: [failedCredentialId],
+            })
+            activeAuth = auth
+
+            try {
+              claudeResponse = await this.apiClient.forward(request, auth, clientHeaders)
+            } catch (alternateError) {
+              if (this.isUpstreamRateLimit(alternateError)) {
+                await this.authService.markRateLimited(auth, rawRequest.model, alternateError)
+              }
+              throw alternateError
+            }
+          } else {
+            throw error
+          }
+        } else {
+          throw error
+        }
+      }
 
       // Process response based on streaming mode
       let finalResponse: Response
@@ -241,20 +279,32 @@ export class ProxyService {
           conversationData,
           sampleId
         )
+        // The stream processor owns the reservation until its background work
+        // completes, so the outer error handler must not release it early.
+        activeAuth = undefined
       } else {
-        finalResponse = await this.handleNonStreamingResponse(
-          claudeResponse,
-          request,
-          response,
-          context,
-          auth,
-          conversationData,
-          sampleId
-        )
+        try {
+          finalResponse = await this.handleNonStreamingResponse(
+            claudeResponse,
+            request,
+            response,
+            context,
+            auth,
+            conversationData,
+            sampleId
+          )
+        } finally {
+          await this.authService.release(auth)
+          activeAuth = undefined
+        }
       }
 
       return finalResponse
     } catch (error) {
+      if (activeAuth) {
+        await this.authService.release(activeAuth)
+        activeAuth = undefined
+      }
       // Flush test sample with error info so failed requests can be inspected
       if (sampleId) {
         await testSampleCollector.flushPendingSample(sampleId, {
@@ -483,30 +533,34 @@ export class ProxyService {
       auth,
       conversationData,
       sampleId
-    ).catch(async error => {
-      log.error(
-        'Stream processing error',
-        error instanceof Error ? error : new Error(String(error))
-      )
-
-      // Try to send error to client in SSE format
-      try {
-        const encoder = new TextEncoder()
-        const errorEvent = {
-          type: 'error',
-          error: {
-            type: 'stream_error',
-            message: error instanceof Error ? error.message : String(error),
-          },
-        }
-        await writer.write(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`))
-      } catch (writeError) {
+    )
+      .catch(async error => {
         log.error(
-          'Failed to write error to stream',
-          writeError instanceof Error ? writeError : undefined
+          'Stream processing error',
+          error instanceof Error ? error : new Error(String(error))
         )
-      }
-    })
+
+        // Try to send error to client in SSE format
+        try {
+          const encoder = new TextEncoder()
+          const errorEvent = {
+            type: 'error',
+            error: {
+              type: 'stream_error',
+              message: error instanceof Error ? error.message : String(error),
+            },
+          }
+          await writer.write(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`))
+        } catch (writeError) {
+          log.error(
+            'Failed to write error to stream',
+            writeError instanceof Error ? writeError : undefined
+          )
+        }
+      })
+      .finally(async () => {
+        await this.authService.release(auth)
+      })
 
     // Return streaming response immediately
     return new Response(readable, {
@@ -677,6 +731,10 @@ export class ProxyService {
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
     }
+  }
+
+  private isUpstreamRateLimit(error: unknown): error is UpstreamError {
+    return error instanceof UpstreamError && error.upstreamStatus === 429
   }
 
   /**

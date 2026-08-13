@@ -1,6 +1,6 @@
 import { Context } from 'hono'
 import { RequestContext } from '../domain/value-objects/RequestContext.js'
-import { AuthenticationService } from '../services/AuthenticationService.js'
+import { AuthenticationService, type AuthResult } from '../services/AuthenticationService.js'
 import { BedrockApiClient } from '../services/BedrockApiClient.js'
 import { MetricsService } from '../services/MetricsService.js'
 import { extractBedrockRegion } from '@agent-prompttrain/shared/config/model-mapping'
@@ -95,9 +95,10 @@ export class BedrockNativeController {
       )
     }
 
+    let authResult: AuthResult | undefined
     try {
       // Authenticate to get Bedrock credentials
-      const authResult = await this.authService.authenticate(requestContext)
+      authResult = await this.authService.authenticate(requestContext)
 
       // Verify this is a Bedrock account
       if (authResult.provider !== 'bedrock') {
@@ -271,6 +272,10 @@ export class BedrockNativeController {
         },
         statusCode as 500
       )
+    } finally {
+      if (authResult) {
+        await this.authService.release(authResult)
+      }
     }
   }
 

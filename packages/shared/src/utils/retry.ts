@@ -233,21 +233,36 @@ export const retryConfigs = {
 
 // Helper to extract retry-after header
 export function getRetryAfter(error: any): number | null {
-  if (error.response?.headers) {
-    const retryAfter = error.response.headers['retry-after']
-    if (retryAfter) {
-      // Parse as seconds
-      const seconds = parseInt(retryAfter)
-      if (!isNaN(seconds)) {
-        return seconds * 1000 // Convert to milliseconds
-      }
+  const headerSources = [error?.upstreamHeaders, error?.response?.headers, error?.context?.headers]
+  let retryAfter: string | null = null
 
-      // Parse as HTTP date
-      const date = new Date(retryAfter)
-      if (!isNaN(date.getTime())) {
-        return Math.max(0, date.getTime() - Date.now())
-      }
+  for (const headers of headerSources) {
+    if (!headers) {
+      continue
     }
+    if (typeof headers.get === 'function') {
+      retryAfter = headers.get('retry-after')
+    } else {
+      const key = Object.keys(headers).find(name => name.toLowerCase() === 'retry-after')
+      retryAfter = key ? String(headers[key]) : null
+    }
+    if (retryAfter) {
+      break
+    }
+  }
+
+  if (!retryAfter) {
+    return null
+  }
+
+  const seconds = Number(retryAfter)
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000)
+  }
+
+  const date = new Date(retryAfter)
+  if (!Number.isNaN(date.getTime())) {
+    return Math.max(0, date.getTime() - Date.now())
   }
 
   return null

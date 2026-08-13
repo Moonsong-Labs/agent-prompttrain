@@ -395,16 +395,19 @@ When a project has **2 or more linked accounts**, the proxy automatically enable
 
 ### How It Works
 
-1. **Sticky routing**: The proxy sticks to the current account for a project until its utilization exceeds the configured threshold
-2. **Usage monitoring**: The proxy checks both the 5-hour and 7-day utilization windows via the Anthropic OAuth usage API (cached for 60 seconds)
-3. **Automatic switching**: When the current account exceeds its threshold in either window, the proxy switches to the least-loaded available account
-4. **Exhaustion handling**: If all accounts exceed their thresholds, the proxy returns HTTP 429 with an estimated reset time
+1. **Sticky routing**: PostgreSQL shares project affinity across all proxy instances
+2. **Usage monitoring**: One cluster-wide refresh per account caches Anthropic usage for five minutes
+3. **Automatic switching**: The proxy switches at 90% five-hour/session usage or 95% seven-day/weekly usage
+4. **Reactive failover**: An upstream 429 cools down that account/model and immediately tries one different pooled account
+5. **Exhaustion handling**: If no account remains, the proxy returns HTTP 429 with a `Retry-After` value based on upstream reset information
 
 ### Per-Account Threshold
 
-Each account has a `token_limit_threshold` (default: 95%) that controls when switching occurs. The threshold is stored in the `credentials` table and can be configured per account.
+Each account has `five_hour_limit_threshold` (default: 90%) and
+`seven_day_limit_threshold` (default: 95%) values in the `credentials` table.
 
-When either the 5-hour or 7-day utilization exceeds this threshold, the account is considered over-limit and the pool selects an alternative.
+Session limits use the five-hour threshold. Weekly and model-scoped weekly
+limits use the seven-day threshold.
 
 ### Pool Activation
 

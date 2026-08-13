@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test'
-import type {
-  AnthropicCredential,
-  AnthropicOAuthUsageResponse,
-  BedrockCredential,
-  Credential,
+import {
+  UpstreamError,
+  type AnthropicCredential,
+  type AnthropicOAuthUsageResponse,
+  type BedrockCredential,
+  type Credential,
 } from '@agent-prompttrain/shared'
 
 // ── Mock functions ──────────────────────────────────────────────────────────
@@ -56,6 +57,8 @@ function makeAnthropicCredential(
     account_name: 'Test Account 1',
     provider: 'anthropic',
     token_limit_threshold: 0.8,
+    five_hour_limit_threshold: 0.9,
+    seven_day_limit_threshold: 0.95,
     oauth_access_token: 'access-token',
     oauth_refresh_token: 'refresh-token',
     oauth_expires_at: new Date(Date.now() + 3600_000),
@@ -75,6 +78,8 @@ function makeBedrockCredential(overrides: Partial<BedrockCredential> = {}): Bedr
     account_name: 'Bedrock Account',
     provider: 'bedrock',
     token_limit_threshold: 0.8,
+    five_hour_limit_threshold: 0.9,
+    seven_day_limit_threshold: 0.95,
     aws_region: 'us-east-1',
     aws_api_key: 'fake-key',
     created_at: new Date(),
@@ -85,8 +90,8 @@ function makeBedrockCredential(overrides: Partial<BedrockCredential> = {}): Bedr
 
 function makeUsageResponse(fiveHour = 50, sevenDay = 30): AnthropicOAuthUsageResponse {
   return {
-    five_hour: { utilization: fiveHour, resets_at: '2026-02-24T12:00:00Z' },
-    seven_day: { utilization: sevenDay, resets_at: '2026-02-28T00:00:00Z' },
+    five_hour: { utilization: fiveHour, resets_at: '2027-02-24T12:00:00Z' },
+    seven_day: { utilization: sevenDay, resets_at: '2027-02-28T00:00:00Z' },
     seven_day_oauth_apps: null,
     seven_day_opus: null,
     seven_day_sonnet: null,
@@ -222,7 +227,7 @@ describe('AccountPoolService', () => {
       // Now cred-1 five_hour spikes above threshold, cred-2 is still under
       usageCacheService.clearCache()
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(85, 20), // 5h over 0.80 threshold
+        'cred-1': makeUsageResponse(90, 20), // 5h reaches the 90% threshold
         'cred-2': makeUsageResponse(50, 40),
       })
 
@@ -259,7 +264,7 @@ describe('AccountPoolService', () => {
       // Now cred-1 seven_day goes over threshold, but five_hour stays low
       usageCacheService.clearCache()
       mockFetchWithUsage({
-        'cred-1': makeUsageResponse(30, 85), // 7d over 0.80 threshold
+        'cred-1': makeUsageResponse(30, 95), // 7d reaches the 95% threshold
         'cred-2': makeUsageResponse(50, 40),
       })
 
@@ -298,7 +303,7 @@ describe('AccountPoolService', () => {
         expect(error).toBeInstanceOf(AccountPoolExhaustedError)
         const poolError = error as AccountPoolExhaustedError
         expect(poolError.statusCode).toBe(429)
-        expect(poolError.estimatedReset).toBe('2026-02-24T12:00:00Z')
+        expect(poolError.estimatedReset).toBe('2027-02-24T12:00:00.000Z')
         expect(poolError.message).toContain('project-1')
         expect(poolError.message).toContain('2')
       }
@@ -502,6 +507,55 @@ describe('AccountPoolService', () => {
     })
   })
 
+  describe('shared upstream cooldowns', () => {
+    test('skips a rate-limited credential for the affected model', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1', account_id: 'acct-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2', account_id: 'acct-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+      mockFetchWithUsage({
+        'cred-1': makeUsageResponse(20, 10),
+        'cred-2': makeUsageResponse(40, 30),
+      })
+
+      const first = await service.selectAccount('project-1', 'claude-sonnet-5')
+      expect(first.credential.id).toBe('cred-1')
+
+      const reset = await service.markRateLimited(
+        first.credential.id,
+        'claude-sonnet-5',
+        new UpstreamError('rate_limit_error: exhausted', 429, undefined, undefined, {
+          'retry-after': '120',
+        })
+      )
+      await service.releaseAccount(first.credential.id)
+
+      const second = await service.selectAccount('project-1', 'claude-sonnet-5')
+      expect(second.credential.id).toBe('cred-2')
+      expect(new Date(reset).getTime()).toBeGreaterThan(Date.now() + 115_000)
+    })
+
+    test('keeps cooldowns model-specific', async () => {
+      const cred1 = makeAnthropicCredential({ id: 'cred-1', account_id: 'acct-1' })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2', account_id: 'acct-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+      mockFetchWithUsage({
+        'cred-1': makeUsageResponse(20, 10),
+        'cred-2': makeUsageResponse(40, 30),
+      })
+
+      const first = await service.selectAccount('project-1', 'claude-fable-5')
+      await service.markRateLimited(
+        first.credential.id,
+        'claude-fable-5',
+        new UpstreamError('rate limited', 429, undefined, undefined, { 'retry-after': '120' })
+      )
+      await service.releaseAccount(first.credential.id)
+
+      const sonnet = await service.selectAccount('project-1', 'claude-sonnet-5')
+      expect(sonnet.credential.id).toBe('cred-1')
+    })
+  })
+
   // ── Scenario: model-scoped limits (limits[] array) ────────────────────────
   //
   // Anthropic's OAuth usage response carries a `limits` array with entries like
@@ -524,7 +578,7 @@ describe('AccountPoolService', () => {
             group: 'session',
             percent: fiveHour,
             severity: 'normal',
-            resets_at: '2026-02-24T12:00:00Z',
+            resets_at: '2027-02-24T12:00:00Z',
             scope: null,
             is_active: true,
           },
@@ -533,7 +587,7 @@ describe('AccountPoolService', () => {
             group: 'weekly',
             percent: sevenDay,
             severity: 'normal',
-            resets_at: '2026-02-28T00:00:00Z',
+            resets_at: '2027-02-28T00:00:00Z',
             scope: null,
             is_active: true,
           },
@@ -542,7 +596,7 @@ describe('AccountPoolService', () => {
             group: 'weekly',
             percent: fableUtilization,
             severity: fableUtilization >= 100 ? 'exceeded' : 'normal',
-            resets_at: '2026-03-01T00:00:00Z',
+            resets_at: '2027-03-01T00:00:00Z',
             scope: { model: { id: null, display_name: 'Fable' }, surface: null },
             is_active: fableUtilization > 0,
           },
@@ -609,7 +663,7 @@ describe('AccountPoolService', () => {
             group: 'weekly',
             percent: 100,
             severity: 'exceeded',
-            resets_at: '2026-03-01T00:00:00Z',
+            resets_at: '2027-03-01T00:00:00Z',
             scope: { model: { id: 'claude-fable-5', display_name: null }, surface: null },
             is_active: true,
           },

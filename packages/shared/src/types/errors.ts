@@ -67,15 +67,18 @@ export class RateLimitError extends BaseError {
 
 export class UpstreamError extends BaseError {
   public readonly upstreamResponse?: any
+  public readonly upstreamHeaders?: Record<string, string>
 
   constructor(
     message: string,
     public readonly upstreamStatus?: number,
     context?: Record<string, any>,
-    upstreamResponse?: any
+    upstreamResponse?: any,
+    upstreamHeaders?: Record<string, string>
   ) {
     super('UPSTREAM_ERROR', message, upstreamStatus || 502, context)
     this.upstreamResponse = upstreamResponse
+    this.upstreamHeaders = upstreamHeaders
   }
 }
 
