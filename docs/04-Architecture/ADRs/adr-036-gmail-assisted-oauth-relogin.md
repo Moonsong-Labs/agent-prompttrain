@@ -63,6 +63,10 @@ Add an opt-in Gmail-assisted mode to the local OAuth scripts:
 - The user must review and click the final Anthropic authorization control.
 - The browser reads the resulting `code#state` value. The state must exactly match the PKCE flow
   before token exchange.
+- `--own-browser` keeps Gmail assistance but replaces the controlled browser with a private window
+  of the operator's own browser. The script opens the validated login link in that same private
+  session, so the sign-in completes without a verification code, and the final authorization code is
+  pasted or read from the clipboard.
 - `--no-browser` retains the existing fully manual flow; Gmail assistance is never required by the
   proxy runtime.
 
@@ -80,6 +84,12 @@ credentials must not be stored in PostgreSQL or committed to Git.
 
 ### Negative
 
+- claude.ai fronts the login form with Cloudflare and hCaptcha. A Playwright-controlled browser is
+  frequently served a challenge instead of the login email, and the emailed link now renders a
+  verification code that must be typed back into the originating tab, which the automated context
+  cannot submit. `--own-browser` exists because the operator's normal browser clears these checks;
+  the controlled-browser mode is best-effort and reports the challenge rather than waiting for a
+  message that will never arrive.
 - Operators must create a Google OAuth desktop client and authorize Gmail once.
 - `gmail.readonly` is a restricted scope with mailbox-wide read capability; Gmail does not provide
   a per-label read scope.

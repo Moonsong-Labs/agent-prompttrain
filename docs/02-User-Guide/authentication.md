@@ -253,18 +253,24 @@ by Git and must remain owner-readable only.
 Run the assisted relogin:
 
 ```bash
-# All credentials
-bun run auth:oauth-relogin --gmail
+# All credentials, signing in from your own browser (recommended)
+bun run auth:oauth-relogin --gmail --own-browser
 
 # One credential
-bun run auth:oauth-relogin --gmail --account acc_marketing
+bun run auth:oauth-relogin --gmail --own-browser --account acc_marketing
 ```
 
-For each credential, the script creates a new non-persistent browser context, attempts to submit the
-stored email, waits for a fresh matching message, validates and opens the login link in the same
-context, and waits while you review and click **Authorize**. It reads and exchanges the resulting
-authorization code automatically. If the email field cannot be identified, enter the displayed
-email in the controlled browser; Gmail polling continues in the background.
+With `--own-browser`, the script copies the credential email to the clipboard and opens the
+authorization URL in a private window of your normal browser. You enter the address and request the
+login email; the script waits for the matching message and opens the validated login link in the
+same private session, so the sign-in completes without a verification code. After you approve
+access, paste the authorization code (or press Enter to read it from the clipboard).
+
+Without `--own-browser`, the script drives a non-persistent Playwright context instead: it submits
+the stored email, opens the login link in the same context, waits while you click **Authorize**, and
+reads the authorization code automatically. This needs no clipboard step, but claude.ai protects the
+login form with Cloudflare and hCaptcha, and an automated browser is frequently challenged. The
+script reports `claude.ai served a bot challenge` when that happens; rerun with `--own-browser`.
 
 The Gmail-assisted flow rejects messages that predate the current attempt, do not come from
 `@mail.anthropic.com`, do not identify the expected recipient, or do not contain an HTTPS link on
@@ -275,7 +281,7 @@ Optional local configuration:
 ```bash
 GMAIL_OAUTH_CLIENT_FILE=credentials/gmail-oauth-client.json
 GMAIL_OAUTH_TOKEN_FILE=credentials/gmail-oauth-token.json
-GMAIL_AUTH_POLL_TIMEOUT_MS=180000
+GMAIL_AUTH_POLL_TIMEOUT_MS=180000  # --own-browser defaults to 300000
 OAUTH_BROWSER_CHANNEL=chrome
 OAUTH_APPROVAL_TIMEOUT_MS=300000
 ```
