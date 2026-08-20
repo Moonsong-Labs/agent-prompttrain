@@ -74,6 +74,7 @@
     "auth:oauth-status": "bun run scripts/auth/check-oauth-status.ts",
     "auth:oauth-refresh": "bun run scripts/auth/oauth-refresh-all.ts",
     "auth:oauth-relogin": "bun run scripts/auth/oauth-relogin-all.ts",
+    "auth:gmail-connect": "bun run scripts/auth/gmail-connect.ts",
     "test:generate-fixture": "bun run scripts/generate-conversation-test-fixture.ts",
     "ai:check-jobs": "bun run scripts/check-analysis-jobs.ts",
     "ai:check-content": "bun run scripts/check-analysis-content.ts",

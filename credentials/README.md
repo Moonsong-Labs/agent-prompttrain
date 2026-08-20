@@ -7,9 +7,11 @@ credentials/
 ├── accounts/                # Anthropic account credentials
 │   ├── account-primary.credentials.json
 │   └── account-secondary.credentials.json
-└── train-client-keys/       # Proxy client API keys per train
-    ├── train-alpha.client-keys.json
-    └── train-beta.client-keys.json
+├── train-client-keys/       # Proxy client API keys per train
+│   ├── train-alpha.client-keys.json
+│   └── train-beta.client-keys.json
+├── gmail-oauth-client.json  # Optional local Gmail Desktop OAuth client
+└── gmail-oauth-token.json   # Optional local Gmail token (mode 0600)
 ```
 
 ## Account Credential Files
@@ -101,3 +103,4 @@ Neither header is forwarded to Anthropic.
 - Keep production secrets out of version control
 - Rotate Anthropic keys and client tokens regularly
 - Separate credentials per environment (development, staging, production)
+- Prefer a dedicated mailbox for Gmail-assisted relogin; Gmail read-only access is mailbox-wide

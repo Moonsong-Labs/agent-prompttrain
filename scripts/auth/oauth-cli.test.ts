@@ -28,6 +28,7 @@ describe('OAuth CLI options', () => {
     expect(parseOAuthLoginOptions(['--no-browser', '--no-clipboard'])).toEqual({
       openBrowser: false,
       useClipboard: false,
+      gmailAssisted: false,
       help: false,
     })
   })
@@ -37,8 +38,22 @@ describe('OAuth CLI options', () => {
       accountId: 'acc_team_alpha',
       openBrowser: false,
       useClipboard: true,
+      gmailAssisted: false,
       help: false,
     })
+  })
+
+  test('enables Gmail assistance and rejects incompatible browser options', () => {
+    expect(parseReloginOptions(['--gmail', '--account=acc_team_alpha'])).toEqual({
+      accountId: 'acc_team_alpha',
+      openBrowser: true,
+      useClipboard: true,
+      gmailAssisted: true,
+      help: false,
+    })
+    expect(() => parseReloginOptions(['--gmail', '--no-browser'])).toThrow(
+      '--gmail cannot be combined with --no-browser'
+    )
   })
 
   test('rejects missing or unknown options', () => {

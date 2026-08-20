@@ -26,6 +26,7 @@ const OAUTH_CONFIG = {
 export interface OAuthFlowOptions {
   openBrowser: boolean
   useClipboard: boolean
+  gmailAssisted: boolean
 }
 
 export interface OAuthLoginCliOptions extends OAuthFlowOptions {
@@ -36,6 +37,7 @@ export function parseOAuthLoginOptions(args: string[]): OAuthLoginCliOptions {
   const options: OAuthLoginCliOptions = {
     openBrowser: true,
     useClipboard: true,
+    gmailAssisted: false,
     help: false,
   }
 
@@ -44,6 +46,8 @@ export function parseOAuthLoginOptions(args: string[]): OAuthLoginCliOptions {
       options.openBrowser = false
     } else if (arg === '--no-clipboard') {
       options.useClipboard = false
+    } else if (arg === '--gmail') {
+      options.gmailAssisted = true
     } else if (arg === '--help' || arg === '-h') {
       options.help = true
     } else {
@@ -108,7 +112,7 @@ export async function exchangeCodeForTokens(
   scopes: string[]
   isMax: boolean
 }> {
-  const [code, state] = validateAuthorizationCode(codeWithState).split('#')
+  const [code, state] = validateAuthorizationCode(codeWithState, codeVerifier).split('#')
 
   const response = await fetch(OAUTH_CONFIG.tokenUrl, {
     method: 'POST',
@@ -147,6 +151,53 @@ export async function authorizeOAuthCredential(
   options: OAuthFlowOptions
 ): ReturnType<typeof exchangeCodeForTokens> {
   const { url, verifier } = generateAuthorizationUrl()
+
+  if (options.gmailAssisted) {
+    if (!accountEmail) {
+      throw new Error('Gmail-assisted relogin requires a stored credential email.')
+    }
+    if (!options.openBrowser) {
+      throw new Error('Gmail-assisted relogin requires the controlled browser.')
+    }
+
+    const [{ createGmailClient, waitForAnthropicLoginLink }, { launchControlledOAuthBrowser }] =
+      await Promise.all([import('./gmail-auth.ts'), import('./oauth-controlled-browser.ts')])
+    const gmail = await createGmailClient()
+    const browser = await launchControlledOAuthBrowser()
+
+    try {
+      console.log(`\nOpening an isolated browser for ${accountEmail}.`)
+      await browser.openAuthorization(url)
+
+      const requestedAfter = Date.now()
+      const emailSubmitted = await browser.submitAccountEmail(accountEmail)
+      if (emailSubmitted) {
+        console.log('Submitted the stored credential email. Waiting for Gmail...')
+      } else {
+        console.log(`Enter ${accountEmail} in the controlled browser and request the login email.`)
+        console.log('Waiting for Gmail while you complete that step...')
+      }
+
+      const configuredTimeout = Number(process.env.GMAIL_AUTH_POLL_TIMEOUT_MS)
+      const loginLink = await waitForAnthropicLoginLink(gmail, {
+        accountEmail,
+        requestedAfter,
+        timeoutMs:
+          Number.isFinite(configuredTimeout) && configuredTimeout > 0
+            ? configuredTimeout
+            : undefined,
+      })
+
+      console.log('Received and validated a fresh Anthropic login email.')
+      await browser.openLoginLink(loginLink.url)
+      console.log('Review the Anthropic request and click Authorize in the browser.')
+      const authorizationCode = await browser.waitForAuthorizationCode(verifier)
+      console.log('Authorization approved. Exchanging the code...')
+      return exchangeCodeForTokens(authorizationCode, verifier)
+    } finally {
+      await browser.close()
+    }
+  }
 
   if (accountEmail) {
     console.log(`\nSign in with: ${accountEmail}`)
@@ -264,7 +315,9 @@ if (import.meta.main) {
   try {
     const options = parseOAuthLoginOptions(process.argv.slice(2))
     if (options.help) {
-      console.log('Usage: bun run scripts/auth/oauth-login.ts [--no-browser] [--no-clipboard]')
+      console.log(
+        'Usage: bun run scripts/auth/oauth-login.ts [--gmail] [--no-browser] [--no-clipboard]'
+      )
     } else {
       await performOAuthLogin(options)
     }

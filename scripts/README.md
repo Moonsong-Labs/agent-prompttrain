@@ -146,6 +146,28 @@ bun run scripts/auth/oauth-relogin-all.ts --no-browser --no-clipboard
 The browser fallback always prints the authorization URL, so the workflow also works on headless
 hosts.
 
+After completing the one-time Gmail connection described below, add `--gmail` to use a controlled
+browser that finds and opens each fresh Anthropic login email and captures the final authorization
+code. The final Anthropic approval remains manual.
+
+```bash
+bun run auth:oauth-relogin --gmail
+bun run auth:oauth-relogin --gmail --account acc_team_alpha
+```
+
+### gmail-connect.ts
+
+Authorizes local, read-only Gmail access for assisted Anthropic OAuth relogin. Create a Google OAuth
+Desktop app, download its client JSON to `credentials/gmail-oauth-client.json`, then run:
+
+```bash
+bun run auth:gmail-connect
+```
+
+The resulting token is written to `credentials/gmail-oauth-token.json` with owner-only permissions.
+Both paths are ignored by Git. Prefer a dedicated mailbox because Gmail's read-only scope is not
+limited to matching messages or labels.
+
 ### bedrock-login.ts
 
 Adds AWS Bedrock credentials to the database. Interactive CLI that prompts for AWS API key, account details, and region.
