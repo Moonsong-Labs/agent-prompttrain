@@ -1,315 +1,388 @@
-import { Pool } from 'pg'
-import type {
-  Credential,
-  AnthropicCredential,
-  AnthropicOAuthUsageResponse,
-  OAuthLimitEntry,
+import type { Pool } from 'pg'
+import {
+  getRetryAfter,
+  type Credential,
+  type AnthropicCredential,
+  type AnthropicOAuthUsageResponse,
+  type OAuthLimitEntry,
+  type UpstreamError,
 } from '@agent-prompttrain/shared'
 import {
   getProjectLinkedCredentials,
   getProjectCredentials,
 } from '@agent-prompttrain/shared/database/queries'
 import { UsageCacheService, type CachedUsageEntry } from './usage-cache-service'
+import { AccountPoolStateService, type AccountCandidate } from './account-pool-state-service'
 import { logger } from '../middleware/logger'
 
-/**
- * Thrown when all accounts in a pool have exceeded their utilization threshold.
- */
+const DEFAULT_FIVE_HOUR_THRESHOLD = 0.9
+const DEFAULT_SEVEN_DAY_THRESHOLD = 0.95
+const FALLBACK_COOLDOWN_MS = 60_000
+
 export class AccountPoolExhaustedError extends Error {
   readonly statusCode = 429
-  readonly estimatedReset: string | null
+  readonly retryAfterSeconds: number | null
 
-  constructor(message: string, estimatedReset: string | null = null) {
+  constructor(
+    message: string,
+    readonly estimatedReset: string | null = null
+  ) {
     super(message)
     this.name = 'AccountPoolExhaustedError'
-    this.estimatedReset = estimatedReset
+    this.retryAfterSeconds = estimatedReset
+      ? Math.max(0, Math.ceil((new Date(estimatedReset).getTime() - Date.now()) / 1000))
+      : null
   }
 }
 
-/**
- * Result of selecting an account from the pool.
- */
 export interface AccountSelection {
-  /** The selected credential to use for the request */
   credential: Credential
-  /** Highest utilization across 5h and 7d windows (0-1, normalized) */
   maxUtilization: number
-  /** True if selected from a multi-account pool, false if using default account */
   fromPool: boolean
+  reserved: boolean
 }
 
-/**
- * AccountPoolService selects the best account for a project based on real-time
- * OAuth utilization data from the Anthropic API. When a project has 2+ linked
- * accounts, it automatically switches to the least-utilized account that is
- * still under its configured threshold.
- *
- * Uses sticky routing to maintain account affinity per project until the
- * current account exceeds its threshold.
- */
+export interface AccountSelectionOptions {
+  excludeCredentialIds?: string[]
+}
+
+interface UsageEvaluation {
+  maxUtilization: number
+  pressure: number
+  available: boolean
+}
+
+/** Selects and reserves Anthropic accounts using shared PostgreSQL state. */
 export class AccountPoolService {
-  /** Sticky mapping: projectId -> credentialId */
-  private stickyMap: Map<string, string> = new Map()
+  private readonly stateService: AccountPoolStateService
 
   constructor(
     private readonly pool: Pool,
-    private readonly usageCacheService: UsageCacheService
-  ) {}
+    private readonly usageCacheService: UsageCacheService,
+    stateService?: AccountPoolStateService
+  ) {
+    this.stateService = stateService ?? usageCacheService.stateService
+  }
 
-  /**
-   * Select the best account for a project.
-   *
-   * If the project has fewer than 2 linked accounts, falls back to the
-   * project's default account (non-pool mode).
-   *
-   * If the project has 2+ linked accounts, enters pool mode:
-   * 1. Checks sticky account first and reuses it if under threshold
-   * 2. If sticky is over threshold, evaluates all linked Anthropic accounts
-   * 3. Picks the account with the lowest max utilization that is under threshold
-   * 4. Throws AccountPoolExhaustedError if no accounts are available
-   *
-   * @param model - The Claude model requested (e.g. "claude-fable-5"). When
-   *   provided, model-scoped limits from the usage response (e.g. the separate
-   *   Claude Fable 5 weekly allowance) gate accounts for that model only.
-   */
-  async selectAccount(projectId: string, model?: string): Promise<AccountSelection> {
-    // Try pool mode: check if project has 2+ linked accounts
+  async selectAccount(
+    projectId: string,
+    model?: string,
+    options: AccountSelectionOptions = {}
+  ): Promise<AccountSelection> {
     let linkedCredentials: Credential[] = []
     try {
       linkedCredentials = await getProjectLinkedCredentials(this.pool, projectId)
     } catch {
-      // project_accounts table may not exist yet — fall back to default account
+      // A rolling deployment may not have project_accounts yet.
     }
 
-    // Filter to Anthropic accounts (only these support usage checks for pool mode)
-    const anthropicCredentials = linkedCredentials.filter(
-      (c): c is AnthropicCredential => c.provider === 'anthropic'
+    const allAnthropicCredentials = linkedCredentials.filter(
+      (credential): credential is AnthropicCredential => credential.provider === 'anthropic'
     )
+    const excluded = new Set(options.excludeCredentialIds ?? [])
 
-    // Pool mode requires 2+ Anthropic accounts; otherwise use default account
-    if (anthropicCredentials.length < 2) {
-      return this.selectDefaultAccount(projectId)
+    if (allAnthropicCredentials.length < 2) {
+      return this.selectDefaultAccount(projectId, model, excluded)
     }
 
-    // Check sticky account first
-    const stickyCredentialId = this.stickyMap.get(projectId)
-    if (stickyCredentialId) {
-      const stickyCredential = anthropicCredentials.find(c => c.id === stickyCredentialId)
-      if (stickyCredential) {
-        const cachedEntry = await this.usageCacheService.getUsage(stickyCredential)
-        const maxUtilization = this.computeMaxUtilization(cachedEntry?.usage ?? null, model)
-
-        if (maxUtilization < stickyCredential.token_limit_threshold) {
-          logger.debug('Reusing sticky account (under threshold)', {
-            metadata: {
-              projectId,
-              accountId: stickyCredential.account_id,
-              maxUtilization,
-              threshold: stickyCredential.token_limit_threshold,
-            },
-          })
-          return {
-            credential: stickyCredential,
-            maxUtilization,
-            fromPool: true,
-          }
-        }
-
-        logger.info('Sticky account over threshold, searching pool', {
-          metadata: {
-            projectId,
-            accountId: stickyCredential.account_id,
-            maxUtilization,
-            threshold: stickyCredential.token_limit_threshold,
-          },
-        })
-      }
-    }
-
-    // Fetch usage for all Anthropic accounts in parallel
-    const usageMap = await this.usageCacheService.getUsageMultiple(anthropicCredentials)
-    const usageResults = anthropicCredentials.map(credential => {
-      const entry = usageMap.get(credential.id)
-      const maxUtilization = this.computeMaxUtilization(entry?.usage ?? null, model)
-      return { credential, maxUtilization }
-    })
-
-    // Filter to accounts under their respective thresholds
-    const available = usageResults.filter(
-      ({ credential, maxUtilization }) => maxUtilization < credential.token_limit_threshold
-    )
+    const credentials = allAnthropicCredentials.filter(credential => !excluded.has(credential.id))
+    const usageMap = await this.usageCacheService.getUsageMultiple(credentials)
+    const evaluated = credentials.map(credential => ({
+      credential,
+      evaluation: this.evaluateUsage(credential, usageMap.get(credential.id)?.usage ?? null, model),
+    }))
+    const available = evaluated.filter(result => result.evaluation.available)
 
     if (available.length === 0) {
-      // Find the earliest reset time across all accounts for the error
-      const estimatedReset = this.findEarliestReset(anthropicCredentials, usageMap, model)
-
-      logger.warn('All accounts in pool exhausted', {
-        metadata: {
-          projectId,
-          accountCount: anthropicCredentials.length,
-          utilizations: usageResults.map(r => ({
-            accountId: r.credential.account_id,
-            maxUtilization: r.maxUtilization,
-            threshold: r.credential.token_limit_threshold,
-          })),
-          estimatedReset,
-        },
-      })
-
+      const estimatedReset = this.findEarliestReset(credentials, usageMap, model)
+      this.logExhaustion(projectId, evaluated, estimatedReset)
       throw new AccountPoolExhaustedError(
-        `All ${anthropicCredentials.length} accounts in pool for project "${projectId}" have exceeded their utilization threshold`,
+        `All ${allAnthropicCredentials.length} accounts in pool for project "${projectId}" are unavailable or over their utilization thresholds`,
         estimatedReset
       )
     }
 
-    // Pick the account with the lowest max utilization
-    available.sort((a, b) => a.maxUtilization - b.maxUtilization)
-    const best = available[0]
+    const candidates: AccountCandidate[] = available.map(({ credential, evaluation }) => ({
+      credentialId: credential.id,
+      pressure: evaluation.pressure,
+    }))
+    const reservation = await this.stateService.reserveBestAccount(projectId, model, candidates)
+    if (!reservation.credentialId) {
+      this.logExhaustion(projectId, evaluated, reservation.earliestCooldownReset)
+      throw new AccountPoolExhaustedError(
+        `All ${allAnthropicCredentials.length} accounts in pool for project "${projectId}" are cooling down after upstream rate limits`,
+        reservation.earliestCooldownReset
+      )
+    }
 
-    // Update sticky map
-    this.stickyMap.set(projectId, best.credential.id)
+    const selected = available.find(result => result.credential.id === reservation.credentialId)
+    if (!selected) {
+      throw new Error(`Reserved credential ${reservation.credentialId} was not a pool candidate`)
+    }
+    const { credential, evaluation } = selected
 
     logger.info('Selected account from pool', {
       metadata: {
         projectId,
-        accountId: best.credential.account_id,
-        maxUtilization: best.maxUtilization,
-        threshold: best.credential.token_limit_threshold,
-        poolSize: anthropicCredentials.length,
+        accountId: credential.account_id,
+        maxUtilization: evaluation.maxUtilization,
+        fiveHourThreshold: this.fiveHourThreshold(credential),
+        sevenDayThreshold: this.sevenDayThreshold(credential),
+        poolSize: allAnthropicCredentials.length,
         availableCount: available.length,
       },
     })
 
     return {
-      credential: best.credential,
-      maxUtilization: best.maxUtilization,
+      credential,
+      maxUtilization: evaluation.maxUtilization,
       fromPool: true,
+      reserved: true,
     }
   }
 
-  /**
-   * Fall back to the project's default account (non-pool mode).
-   */
-  private async selectDefaultAccount(projectId: string): Promise<AccountSelection> {
-    const credentials = await getProjectCredentials(this.pool, projectId)
+  async releaseAccount(credentialId: string): Promise<void> {
+    await this.stateService.releaseAccount(credentialId)
+  }
 
+  async markRateLimited(
+    credentialId: string,
+    model: string | undefined,
+    error: UpstreamError
+  ): Promise<string> {
+    const retryAfterMs = getRetryAfter(error)
+    const headerReset = this.findHeaderReset(error.upstreamHeaders)
+    const usageReset = await this.findCredentialReset(credentialId, model)
+    const resetTimestamp =
+      retryAfterMs !== null
+        ? Date.now() + retryAfterMs
+        : (headerReset ?? usageReset ?? Date.now() + FALLBACK_COOLDOWN_MS)
+    const cooldownUntil = new Date(Math.max(Date.now(), resetTimestamp))
+    const retryAfterSeconds = Math.max(0, Math.ceil((cooldownUntil.getTime() - Date.now()) / 1000))
+
+    await this.stateService.markCooldown(
+      credentialId,
+      model,
+      cooldownUntil,
+      retryAfterSeconds,
+      error.message
+    )
+
+    logger.warn('Account placed in shared model cooldown after upstream 429', {
+      metadata: {
+        credentialId,
+        model: model ?? '*',
+        cooldownUntil: cooldownUntil.toISOString(),
+        retryAfterSeconds,
+      },
+    })
+    return cooldownUntil.toISOString()
+  }
+
+  clearStickyState(): void {
+    this.stateService.clearInMemoryState()
+  }
+
+  private async selectDefaultAccount(
+    projectId: string,
+    model: string | undefined,
+    excluded: Set<string>
+  ): Promise<AccountSelection> {
+    const credentials = await getProjectCredentials(this.pool, projectId)
     if (credentials.length === 0) {
       throw new Error(`No default credential found for project "${projectId}"`)
     }
 
     const credential = credentials[0]
-    return {
-      credential,
-      maxUtilization: 0,
-      fromPool: false,
+    if (excluded.has(credential.id)) {
+      throw new AccountPoolExhaustedError(
+        `No alternative account is available for project "${projectId}"`
+      )
     }
+
+    if (credential.provider !== 'anthropic') {
+      return { credential, maxUtilization: 0, fromPool: false, reserved: false }
+    }
+
+    const reservation = await this.stateService.reserveBestAccount(projectId, model, [
+      { credentialId: credential.id, pressure: 0 },
+    ])
+    if (!reservation.credentialId) {
+      throw new AccountPoolExhaustedError(
+        `The account for project "${projectId}" is cooling down after an upstream rate limit`,
+        reservation.earliestCooldownReset
+      )
+    }
+
+    return { credential, maxUtilization: 0, fromPool: false, reserved: true }
   }
 
-  /**
-   * Compute the maximum utilization across 5-hour and 7-day windows plus any
-   * applicable entries in the structured `limits` array.
-   * Returns 1 (treat as over threshold) if usage data is null (conservative).
-   *
-   * Model-scoped limits (e.g. the separate Claude Fable 5 weekly allowance)
-   * only count when the requested `model` matches the limit's scope — a
-   * saturated Fable limit must not block Sonnet/Opus traffic. Unscoped active
-   * limits count for every request.
-   */
-  private computeMaxUtilization(usage: AnthropicOAuthUsageResponse | null, model?: string): number {
+  private evaluateUsage(
+    credential: AnthropicCredential,
+    usage: AnthropicOAuthUsageResponse | null,
+    model?: string
+  ): UsageEvaluation {
     if (!usage) {
-      return 1
+      return { maxUtilization: 1, pressure: Number.POSITIVE_INFINITY, available: false }
     }
 
-    // API returns utilization as 0-100, normalize to 0-1 to match token_limit_threshold
-    const fiveHour = (usage.five_hour?.utilization ?? 0) / 100
-    const sevenDay = (usage.seven_day?.utilization ?? 0) / 100
-    let max = Math.max(fiveHour, sevenDay)
+    let fiveHour = (usage.five_hour?.utilization ?? 0) / 100
+    let sevenDay = (usage.seven_day?.utilization ?? 0) / 100
 
     for (const limit of usage.limits ?? []) {
       if (!this.limitApplies(limit, model)) {
         continue
       }
-      max = Math.max(max, (limit.percent ?? 0) / 100)
+      const utilization = (limit.percent ?? 0) / 100
+      if (this.isSessionLimit(limit)) {
+        fiveHour = Math.max(fiveHour, utilization)
+      } else {
+        sevenDay = Math.max(sevenDay, utilization)
+      }
     }
 
-    return max
+    const fiveHourThreshold = this.fiveHourThreshold(credential)
+    const sevenDayThreshold = this.sevenDayThreshold(credential)
+    return {
+      maxUtilization: Math.max(fiveHour, sevenDay),
+      pressure: Math.max(fiveHour / fiveHourThreshold, sevenDay / sevenDayThreshold),
+      available: fiveHour < fiveHourThreshold && sevenDay < sevenDayThreshold,
+    }
   }
 
-  /**
-   * Whether a limit entry applies to a request for the given model.
-   *
-   * - Inactive limits never apply.
-   * - Unscoped (global) limits always apply. These duplicate the legacy
-   *   five_hour/seven_day windows today, so including them is a no-op now and
-   *   a safety net if the legacy fields are ever dropped.
-   * - Model-scoped limits apply only when the requested model matches the
-   *   scope's `model.id` (exact) or `model.display_name` (substring, e.g.
-   *   display_name "Fable" matches "claude-fable-5"). With no model provided
-   *   (non-Messages endpoints), scoped limits are skipped — blocking all
-   *   traffic on a single-model limit would be worse than the upstream 429.
-   */
   private limitApplies(limit: OAuthLimitEntry, model?: string): boolean {
     if (!limit.is_active) {
       return false
     }
-
     const scopedModel = limit.scope?.model
     if (!scopedModel) {
       return true
     }
-
     if (!model) {
       return false
     }
-
     if (scopedModel.id) {
       return scopedModel.id.toLowerCase() === model.toLowerCase()
     }
-    if (scopedModel.display_name) {
-      return model.toLowerCase().includes(scopedModel.display_name.toLowerCase())
-    }
-    return false
+    return scopedModel.display_name
+      ? model.toLowerCase().includes(scopedModel.display_name.toLowerCase())
+      : false
   }
 
-  /**
-   * Find the earliest reset time from cached usage data for the given credentials.
-   * Returns null if no reset times are available.
-   */
+  private isSessionLimit(limit: OAuthLimitEntry): boolean {
+    const kind = limit.kind.toLowerCase()
+    const group = limit.group?.toLowerCase() ?? ''
+    return kind.includes('session') || kind.includes('hour') || group.includes('session')
+  }
+
+  private fiveHourThreshold(credential: AnthropicCredential): number {
+    return Number(credential.five_hour_limit_threshold ?? DEFAULT_FIVE_HOUR_THRESHOLD)
+  }
+
+  private sevenDayThreshold(credential: AnthropicCredential): number {
+    return Number(credential.seven_day_limit_threshold ?? DEFAULT_SEVEN_DAY_THRESHOLD)
+  }
+
   private findEarliestReset(
     credentials: AnthropicCredential[],
     usageMap: Map<string, CachedUsageEntry>,
     model?: string
   ): string | null {
-    let earliest: string | null = null
+    const accountResets = credentials
+      .map(credential => {
+        const usage = usageMap.get(credential.id)?.usage
+        return usage ? this.blockingReset(usage, model, credential) : null
+      })
+      .filter((value): value is string => Boolean(value))
+    return this.earliestReset(accountResets)
+  }
 
-    for (const credential of credentials) {
-      const cached = usageMap.get(credential.id)
-      if (!cached?.usage) {
+  private async findCredentialReset(credentialId: string, model?: string): Promise<number | null> {
+    const usage = (await this.usageCacheService.getLastKnownUsage(credentialId))?.usage
+    const reset = usage ? this.blockingReset(usage, model) : null
+    return reset ? new Date(reset).getTime() : null
+  }
+
+  private blockingReset(
+    usage: AnthropicOAuthUsageResponse,
+    model?: string,
+    credential?: AnthropicCredential
+  ): string | null {
+    const fiveHourThreshold = credential
+      ? this.fiveHourThreshold(credential)
+      : DEFAULT_FIVE_HOUR_THRESHOLD
+    const sevenDayThreshold = credential
+      ? this.sevenDayThreshold(credential)
+      : DEFAULT_SEVEN_DAY_THRESHOLD
+    const blockingResets: string[] = []
+
+    if (usage.five_hour && usage.five_hour.utilization / 100 >= fiveHourThreshold) {
+      blockingResets.push(usage.five_hour.resets_at)
+    }
+    if (usage.seven_day && usage.seven_day.utilization / 100 >= sevenDayThreshold) {
+      blockingResets.push(usage.seven_day.resets_at)
+    }
+    for (const limit of usage.limits ?? []) {
+      if (!this.limitApplies(limit, model) || !limit.resets_at) {
         continue
       }
-
-      const resetTimes = [
-        cached.usage.five_hour?.resets_at,
-        cached.usage.seven_day?.resets_at,
-        ...(cached.usage.limits ?? [])
-          .filter(limit => this.limitApplies(limit, model))
-          .map(limit => limit.resets_at),
-      ].filter((t): t is string => t !== null && t !== undefined)
-
-      for (const resetTime of resetTimes) {
-        if (!earliest || new Date(resetTime).getTime() < new Date(earliest).getTime()) {
-          earliest = resetTime
-        }
+      const threshold = this.isSessionLimit(limit) ? fiveHourThreshold : sevenDayThreshold
+      if ((limit.percent ?? 0) / 100 >= threshold) {
+        blockingResets.push(limit.resets_at)
       }
     }
 
-    return earliest
+    if (blockingResets.length === 0) {
+      return null
+    }
+
+    // An account blocked by multiple windows is eligible only after all of its
+    // blocking windows reset, so use the latest reset for that account.
+    const timestamps = blockingResets
+      .map(reset => new Date(reset).getTime())
+      .filter(timestamp => Number.isFinite(timestamp) && timestamp > Date.now())
+    return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null
   }
 
-  /**
-   * Clear sticky routing state. Useful for testing.
-   */
-  clearStickyState(): void {
-    this.stickyMap.clear()
+  private findHeaderReset(headers?: Record<string, string>): number | null {
+    if (!headers) {
+      return null
+    }
+    const timestamps = Object.entries(headers)
+      .filter(([name]) => name.toLowerCase().startsWith('anthropic-ratelimit-'))
+      .filter(([name]) => name.toLowerCase().endsWith('-reset'))
+      .map(([, value]) => new Date(value).getTime())
+      .filter(timestamp => Number.isFinite(timestamp) && timestamp > Date.now())
+    // Retry-After is preferred above. Without it, use the most conservative
+    // reset because the response headers describe multiple independent
+    // limiters and do not reliably identify which one produced the 429.
+    return timestamps.length ? Math.max(...timestamps) : null
+  }
+
+  private earliestReset(resetTimes: string[]): string | null {
+    const timestamps = resetTimes
+      .map(resetTime => new Date(resetTime).getTime())
+      .filter(timestamp => Number.isFinite(timestamp) && timestamp > Date.now())
+    return timestamps.length ? new Date(Math.min(...timestamps)).toISOString() : null
+  }
+
+  private logExhaustion(
+    projectId: string,
+    evaluated: Array<{ credential: AnthropicCredential; evaluation: UsageEvaluation }>,
+    estimatedReset: string | null
+  ): void {
+    logger.warn('All accounts in pool exhausted', {
+      metadata: {
+        projectId,
+        accountCount: evaluated.length,
+        utilizations: evaluated.map(({ credential, evaluation }) => ({
+          accountId: credential.account_id,
+          maxUtilization: evaluation.maxUtilization,
+          fiveHourThreshold: this.fiveHourThreshold(credential),
+          sevenDayThreshold: this.sevenDayThreshold(credential),
+        })),
+        estimatedReset,
+      },
+    })
   }
 }

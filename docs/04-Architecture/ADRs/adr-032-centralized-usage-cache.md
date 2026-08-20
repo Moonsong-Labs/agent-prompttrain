@@ -18,7 +18,7 @@ With multiple accounts and frequent requests, this hammers the Anthropic usage e
 - **API call reduction**: Minimize calls to Anthropic usage endpoint (~60x reduction target)
 - **Rate limit resilience**: Graceful degradation when API is unavailable
 - **Dashboard freshness**: Users need to know when data was last checked and whether it's estimated
-- **Simplicity**: In-memory caching, no external dependencies
+- **Simplicity**: Reuse PostgreSQL rather than introduce another dependency
 
 ## Considered Options
 
@@ -27,27 +27,35 @@ With multiple accounts and frequent requests, this hammers the Anthropic usage e
    - Pros: Minimal code change
    - Cons: Two caches still make independent API calls; no deduplication
 
-2. **Shared centralized cache (selected)**
+2. **Process-local centralized cache (initially selected)**
    - Description: Single UsageCacheService shared by both consumers
    - Pros: Single source of truth, deduplication, background refresh, extrapolation
    - Cons: More code, new service to maintain
 
-3. **External cache (Redis)**
+3. **PostgreSQL-coordinated cache (selected for multi-instance deployments)**
+   - Description: Store successful usage, refresh leases, and backoff in PostgreSQL
+   - Pros: Cross-instance deduplication using an existing required dependency
+   - Cons: Adds lightweight database operations to cache access
+
+4. **External cache (Redis)**
    - Description: Use Redis for cross-process caching
    - Pros: Survives restarts, works across instances
    - Cons: New dependency, overkill for single-process deployment
 
 ## Decision
 
-Extract usage fetching and caching into a single `UsageCacheService` singleton shared by both the account pool and dashboard API route.
+Keep a single `UsageCacheService` API shared by the account pool and dashboard,
+but coordinate durable state and refresh leases through PostgreSQL as described
+in [ADR-036](./adr-036-postgresql-account-pool-coordination.md).
 
 ### Key Design Decisions
 
 - **5-minute cache TTL** with background refresh at 80% (4 minutes)
-- **In-flight request deduplication**: `Map<string, Promise>` ensures at most 1 concurrent API call per credential
+- **Cluster-wide refresh deduplication**: a PostgreSQL lease ensures at most one OAuth usage call per credential across all proxy instances
 - **Rate-limit-aware extrapolation**: On API failure with previous data, estimate `lastValue + (elapsedMinutes / 10) * 2`, capped at 100
-- **Force refresh with 30s cooldown**: Dashboard manual refresh bypasses cache but respects cooldown
-- **Lazy evaluation in AccountPoolService**: Check sticky account first (1 cache lookup), only fetch all accounts when sticky exceeds threshold
+- **Failure backoff**: retain stale data and set `next_refresh_at` with exponential backoff and jitter
+- **Force refresh with 30s cooldown**: Dashboard manual refresh bypasses the normal TTL but respects a cluster-wide cooldown
+- **Parallel shared reads in AccountPoolService**: Evaluate all eligible accounts from hot/shared data before reserving the best account
 - **Uses existing `AnthropicOAuthUsageResponse` type** from `packages/shared` to preserve all windows including `extra_usage`
 
 ### Implementation Details
@@ -58,8 +66,8 @@ Extract usage fetching and caching into a single `UsageCacheService` singleton s
 AccountPoolService ──┐
                      ├──→ UsageCacheService ──→ Anthropic API
 Dashboard API route ─┘         │
-                          In-memory cache
-                          (5 min TTL, background refresh)
+                          PostgreSQL shared state
+                          + process-local hot cache
 ```
 
 **Cache entry shape:**
@@ -70,6 +78,8 @@ interface CachedUsageEntry {
   fetchedAt: number
   isEstimated: boolean
   lastSuccessfulUsage?: AnthropicOAuthUsageResponse
+  nextRefreshAt?: number
+  failureCount?: number
 }
 ```
 
@@ -79,25 +89,29 @@ interface CachedUsageEntry {
 getUsage(credential)
   ├─ Cache hit & age < 4 min (fresh) → return immediately
   ├─ Cache hit & age 4-5 min (stale) → return cached + background refresh
-  └─ Cache miss or age > 5 min → blocking fetch (deduplicated)
+  └─ Cache miss or age > 5 min → claim shared refresh lease
+       ├─ Lease held elsewhere → serve stale shared data
+       └─ Lease acquired → fetch from Anthropic
        ├─ Success → cache with isEstimated=false
-       └─ Failure + has lastSuccessfulUsage → extrapolate (isEstimated=true)
+       └─ Failure + has lastSuccessfulUsage → extrapolate and back off (isEstimated=true)
        └─ Failure + no previous data → return null (conservative)
 ```
 
-**Extrapolation behavior during extended outage:** Values increase toward 100% cap. An account at 50% reaches the 80% default threshold after ~2.5 hours. Once the API recovers, the next successful fetch replaces extrapolated data. `extra_usage` (billing data) is never extrapolated.
+**Extrapolation behavior during extended outage:** Values increase toward the 100% cap. An account at 50% reaches the 90% five-hour threshold after about 3 hours 20 minutes. Once the API recovers, the next successful fetch replaces extrapolated data. `extra_usage` (billing data) is never extrapolated.
 
 **Dashboard changes:** The Token Usage page shows relative time ("3 minutes ago"), an "estimated" badge when rate-limited, and a manual refresh button per account.
 
 ### Constants
 
-| Constant                       | Value           | Purpose                                   |
-| ------------------------------ | --------------- | ----------------------------------------- |
-| `USAGE_CACHE_TTL_MS`           | 300,000 (5 min) | Cache entry staleness threshold           |
-| `BACKGROUND_REFRESH_THRESHOLD` | 0.8 (4 min)     | When to trigger async background refresh  |
-| `EXTRAPOLATION_RATE_PER_10MIN` | 2               | Percentage increase per 10 minutes        |
-| `EXTRAPOLATION_CAP`            | 100             | Maximum extrapolated utilization          |
-| `FORCE_REFRESH_COOLDOWN_MS`    | 30,000 (30s)    | Minimum interval between manual refreshes |
+| Constant                       | Value            | Purpose                                   |
+| ------------------------------ | ---------------- | ----------------------------------------- |
+| `USAGE_CACHE_TTL_MS`           | 300,000 (5 min)  | Cache entry staleness threshold           |
+| `BACKGROUND_REFRESH_AT_MS`     | 240,000 (4 min)  | When to trigger async background refresh  |
+| `EXTRAPOLATION_RATE_PER_10MIN` | 2                | Percentage increase per 10 minutes        |
+| `EXTRAPOLATION_CAP`            | 100              | Maximum extrapolated utilization          |
+| `FORCE_REFRESH_COOLDOWN_MS`    | 30,000 (30s)     | Minimum interval between manual refreshes |
+| `FAILURE_BACKOFF_BASE_MS`      | 30,000 (30s)     | Initial failed-refresh backoff            |
+| `FAILURE_BACKOFF_MAX_MS`       | 900,000 (15 min) | Maximum failed-refresh backoff            |
 
 ### Files
 
@@ -118,12 +132,12 @@ getUsage(credential)
 - ~60x fewer API calls to Anthropic usage endpoint
 - Graceful degradation via extrapolation instead of failure on rate limits
 - Dashboard shows data freshness and estimation status
-- No new external dependencies (pure in-memory)
+- No new external service dependency
 - Background refresh keeps data fresh without blocking requests
 
 ### Negative
 
-- Cache is lost on process restart (acceptable — rebuilds within 5 minutes)
+- Each cache access performs a small shared-state lookup after the local hot entry becomes stale
 - Extrapolated values may diverge from reality during long outages (mitigated by conservative cap at 100%)
 
 ### Risks and Mitigations
@@ -136,6 +150,7 @@ getUsage(credential)
 ## Links
 
 - [ADR-031: Account Pool Auto-Switching](./adr-031-account-pool-auto-switching.md)
+- [ADR-036: PostgreSQL Account Pool Coordination](./adr-036-postgresql-account-pool-coordination.md)
 
 ---
 

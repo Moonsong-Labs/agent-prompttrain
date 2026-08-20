@@ -39,12 +39,14 @@ Add an `AccountPoolService` that automatically selects the best account from a p
 ### Key Design Decisions
 
 - **Usage source**: Anthropic OAuth usage API (`/api/oauth/usage`) — returns real utilization percentages for 5h and 7d windows, plus a structured `limits[]` array with model-scoped weekly limits (e.g. a separate Claude Fable 5 allowance)
-- **Trigger**: Switch when EITHER the 5-hour OR 7-day utilization exceeds the per-account threshold, or (amended 2026-07-05) when an active model-scoped limit matching the requested model exceeds the threshold — scoped limits gate only requests for that model, so a saturated Fable limit never blocks Sonnet/Opus traffic
-- **Threshold config**: Per-account `token_limit_threshold` column in `credentials` table (0-1 scale, default 0.95; raised from 0.80 on 2026-07-24 via migration 024)
+- **Trigger**: Switch at 90% five-hour/session utilization or 95% seven-day/weekly utilization. Active model-scoped weekly limits gate only requests for that model, so a saturated Fable limit never blocks Sonnet/Opus traffic.
+- **Threshold config**: Per-account `five_hour_limit_threshold` and `seven_day_limit_threshold` columns in `credentials` (0-1 scale, defaults 0.90 and 0.95). The legacy `token_limit_threshold` remains for rolling-deployment compatibility.
 - **Selection strategy**: Sticky least-loaded — stay on current account until threshold exceeded, then switch to least-loaded alternative
-- **Exhaustion behavior**: Return HTTP 429 with `estimated_reset` from `resets_at` and `Retry-After` header
+- **Reactive failover**: An upstream account-level 429 starts a shared credential/model cooldown and triggers one immediate attempt on a different eligible pooled account. The same credential is not retried.
+- **Exhaustion behavior**: Return HTTP 429 with reset information from `Retry-After`, Anthropic rate-limit reset headers, or cached usage `resets_at`
 - **Pool activation**: Implicit — projects with 2+ linked Anthropic accounts use the pool; 0-1 accounts use default account directly
 - **Bedrock accounts**: Excluded from pool (OAuth usage API is Anthropic-only)
+- **Coordination**: PostgreSQL stores affinity, model cooldowns, and in-flight counts across proxy instances; see [ADR-036](./adr-036-postgresql-account-pool-coordination.md)
 
 ### Implementation Details
 
@@ -54,11 +56,10 @@ Add an `AccountPoolService` that automatically selects the best account from a p
 selectAccount(projectId):
   1. Get linked credentials, filter to Anthropic only
      - If < 2 Anthropic accounts -> use default account (no pooling)
-  2. Check sticky account (in-memory map per project)
-     - If sticky is under threshold -> return immediately (fast path)
-  3. Fetch usage for ALL Anthropic accounts in parallel
-     - Filter to accounts under their threshold
-     - Pick lowest utilization -> set as new sticky
+  2. Read shared usage for all eligible Anthropic accounts in parallel
+     - Filter to accounts under both window-specific thresholds
+  3. Atomically reserve an account using shared affinity, cooldowns, utilization,
+     and in-flight counts
   4. If all over threshold -> throw AccountPoolExhaustedError (HTTP 429)
 ```
 
@@ -66,10 +67,12 @@ selectAccount(projectId):
 
 ```sql
 ALTER TABLE credentials
-  ADD COLUMN token_limit_threshold DECIMAL(3,2) NOT NULL DEFAULT 0.80;
+  ADD COLUMN five_hour_limit_threshold DECIMAL(3,2) NOT NULL DEFAULT 0.90,
+  ADD COLUMN seven_day_limit_threshold DECIMAL(3,2) NOT NULL DEFAULT 0.95;
 ```
 
-> Amended 2026-07-24 (migration 024): the column default was raised to `0.95`, and existing accounts still at the old `0.80` default were migrated to `0.95`.
+> The original `token_limit_threshold` was raised to `0.95` by migration 024.
+> Migration 025 supersedes it with separate five-hour and seven-day gates.
 
 **AuthenticationService integration:**
 
@@ -82,13 +85,15 @@ authenticate(context):
 
 ### Files
 
-| File                                                                 | Description                                   |
-| -------------------------------------------------------------------- | --------------------------------------------- |
-| `services/proxy/src/services/account-pool-service.ts`                | Core pool selection logic with sticky routing |
-| `services/proxy/src/services/AuthenticationService.ts`               | Delegates to AccountPoolService               |
-| `services/proxy/src/controllers/MessageController.ts`                | Handles AccountPoolExhaustedError as 429      |
-| `scripts/db/migrations/018-account-pool-threshold.ts`                | Adds `token_limit_threshold` column           |
-| `scripts/db/migrations/024-update-account-pool-threshold-default.ts` | Raises default threshold from 0.80 to 0.95    |
+| File                                                                 | Description                                 |
+| -------------------------------------------------------------------- | ------------------------------------------- |
+| `services/proxy/src/services/account-pool-service.ts`                | Core threshold and account selection logic  |
+| `services/proxy/src/services/account-pool-state-service.ts`          | PostgreSQL coordination and cooldown state  |
+| `services/proxy/src/services/AuthenticationService.ts`               | Delegates to AccountPoolService             |
+| `services/proxy/src/controllers/MessageController.ts`                | Handles AccountPoolExhaustedError as 429    |
+| `scripts/db/migrations/018-account-pool-threshold.ts`                | Adds `token_limit_threshold` column         |
+| `scripts/db/migrations/024-update-account-pool-threshold-default.ts` | Raises legacy threshold from 0.80 to 0.95   |
+| `scripts/db/migrations/025-cluster-account-pool-coordination.ts`     | Shared state and separate window thresholds |
 
 ## Consequences
 
@@ -102,7 +107,7 @@ authenticate(context):
 ### Negative
 
 - Depends on Anthropic OAuth usage API availability
-- In-memory sticky state is lost on process restart (acceptable — re-selects on next request)
+- Selection now performs lightweight PostgreSQL coordination operations
 - Only works for Anthropic accounts (Bedrock has no equivalent usage API)
 
 ### Risks and Mitigations
@@ -110,11 +115,12 @@ authenticate(context):
 - **Risk**: Anthropic usage API rate limits
   - **Mitigation**: Addressed by [ADR-032](./adr-032-centralized-usage-cache.md) with shared caching and extrapolation
 - **Risk**: Usage API returns stale data
-  - **Mitigation**: Configurable threshold (95% default) provides headroom before hard limits
+  - **Mitigation**: The 90% five-hour and 95% seven-day gates provide headroom before hard limits
 
 ## Links
 
 - [ADR-032: Centralized Usage Cache](./adr-032-centralized-usage-cache.md)
+- [ADR-036: PostgreSQL Account Pool Coordination](./adr-036-postgresql-account-pool-coordination.md)
 - [ADR-030: Multi-Provider Support](./adr-030-multi-provider-support.md)
 
 ---

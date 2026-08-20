@@ -8,6 +8,7 @@ import {
   ClaudeStreamEvent,
   isClaudeError,
   getErrorMessage,
+  isRetryableError,
 } from '@agent-prompttrain/shared'
 import { logger } from '../middleware/logger'
 import { retryWithBackoff, retryConfigs } from '../utils/retry'
@@ -47,7 +48,16 @@ export class ClaudeApiClient {
     // Use retry logic for transient failures
     return retryWithBackoff(
       async () => this.makeRequest(url, request, headers),
-      retryConfigs.standard,
+      {
+        ...retryConfigs.standard,
+        // Account-level quota exhaustion is handled by ProxyService, which
+        // immediately rotates credentials once. Never sleep and retry the same
+        // credential on a 429.
+        retryCondition: error => {
+          const status = (error as UpstreamError).upstreamStatus ?? (error as any).statusCode
+          return status !== 429 && isRetryableError(error)
+        },
+      },
       { requestId: request.requestId, operation: 'claude_api_call' }
     )
   }
@@ -90,6 +100,11 @@ export class ClaudeApiClient {
           parsedError = { error: { message: errorBody, type: 'api_error' } }
         }
 
+        const upstreamHeaders: Record<string, string> = {}
+        response.headers.forEach((value, key) => {
+          upstreamHeaders[key] = value
+        })
+
         throw new UpstreamError(
           errorMessage,
           response.status,
@@ -98,7 +113,8 @@ export class ClaudeApiClient {
             status: response.status,
             body: errorBody,
           },
-          parsedError
+          parsedError,
+          upstreamHeaders
         )
       }
 

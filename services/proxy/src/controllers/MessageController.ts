@@ -1,7 +1,12 @@
 import { Context } from 'hono'
 import { ProxyService } from '../services/ProxyService'
 import { RequestContext } from '../domain/value-objects/RequestContext'
-import { validateClaudeRequest, ValidationError, serializeError } from '@agent-prompttrain/shared'
+import {
+  validateClaudeRequest,
+  ValidationError,
+  serializeError,
+  UpstreamError,
+} from '@agent-prompttrain/shared'
 import { getRequestLogger } from '../middleware/logger'
 import { AccountPoolExhaustedError } from '../services/account-pool-service'
 
@@ -54,12 +59,16 @@ export class MessageController {
 
       // Handle account pool exhaustion with Claude API error format
       if (error instanceof AccountPoolExhaustedError) {
+        if (error.retryAfterSeconds !== null) {
+          c.header('Retry-After', String(error.retryAfterSeconds))
+        }
         return c.json(
           {
             type: 'error',
             error: {
               type: 'rate_limit_error',
               message: error.message,
+              estimated_reset: error.estimatedReset,
             },
           },
           429
@@ -69,6 +78,20 @@ export class MessageController {
       // Serialize error for response
       const errorObj = error instanceof Error ? error : new Error(String(error))
       const errorResponse = serializeError(errorObj)
+
+      if (error instanceof UpstreamError && error.upstreamHeaders) {
+        for (const [name, value] of Object.entries(error.upstreamHeaders)) {
+          const normalized = name.toLowerCase()
+          if (
+            normalized === 'retry-after' ||
+            normalized === 'request-id' ||
+            normalized === 'x-request-id' ||
+            normalized.startsWith('anthropic-ratelimit-')
+          ) {
+            c.header(name, value)
+          }
+        }
+      }
 
       // Determine status code
       let statusCode = 500

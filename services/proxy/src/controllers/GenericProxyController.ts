@@ -2,7 +2,7 @@ import { Context } from 'hono'
 import { RequestContext } from '../domain/value-objects/RequestContext.js'
 import { BedrockEmulationService } from '../services/BedrockEmulationService.js'
 import { ClaudeApiClient } from '../services/ClaudeApiClient.js'
-import { AuthenticationService } from '../services/AuthenticationService.js'
+import { AuthenticationService, type AuthResult } from '../services/AuthenticationService.js'
 import { getRequestLogger } from '../middleware/logger.js'
 
 /**
@@ -23,9 +23,10 @@ export class GenericProxyController {
     const requestContext = RequestContext.fromHono(c)
     const path = c.req.path
 
+    let authResult: AuthResult | undefined
     try {
       // Authenticate to determine provider
-      const authResult = await this.authService.authenticate(requestContext)
+      authResult = await this.authService.authenticate(requestContext)
 
       logger.info('Handling generic proxy request', {
         path,
@@ -78,6 +79,10 @@ export class GenericProxyController {
         },
         statusCode as any
       )
+    } finally {
+      if (authResult) {
+        await this.authService.release(authResult)
+      }
     }
   }
 }

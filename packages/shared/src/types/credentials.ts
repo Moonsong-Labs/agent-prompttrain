@@ -14,7 +14,10 @@ export interface BaseCredential {
   provider: ProviderType
   created_at: Date
   updated_at: Date
+  /** @deprecated Use the window-specific thresholds. */
   token_limit_threshold: number
+  five_hour_limit_threshold?: number
+  seven_day_limit_threshold?: number
 }
 
 export interface AnthropicCredential extends BaseCredential {
