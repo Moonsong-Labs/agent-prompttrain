@@ -37,6 +37,21 @@ describe('OAuth browser assistance', () => {
     expect(command?.args[0]).toBe('--incognito')
   })
 
+  test('falls back to Windows install paths when the browser is not on PATH', () => {
+    const command = resolvePrivateBrowserCommand(
+      'https://example.com/oauth',
+      'win32',
+      fakeWhich({}),
+      path => path === 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      { ProgramFiles: 'C:\\Program Files' }
+    )
+
+    expect(command).toEqual({
+      executable: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      args: ['--incognito', '--new-window', 'https://example.com/oauth'],
+    })
+  })
+
   test('returns null when no private-capable browser is available', () => {
     expect(
       resolvePrivateBrowserCommand('https://example.com/oauth', 'linux', fakeWhich({}))
