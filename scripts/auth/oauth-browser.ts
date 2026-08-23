@@ -19,6 +19,22 @@ const linuxBrowserCandidates = [
 
 const windowsBrowserCandidates = ['chrome.exe', 'msedge.exe', 'chromium.exe', 'chrome', 'msedge']
 
+// Windows installers register browsers in the registry rather than on PATH, so Bun.which() misses
+// them; probe the standard install roots before giving up.
+const windowsBrowserRelativePaths = [
+  'Google\\Chrome\\Application\\chrome.exe',
+  'Microsoft\\Edge\\Application\\msedge.exe',
+  'Chromium\\Application\\chrome.exe',
+]
+
+export function listWindowsBrowserPaths(env: NodeJS.ProcessEnv = process.env): string[] {
+  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA].filter(
+    (root): root is string => Boolean(root)
+  )
+
+  return windowsBrowserRelativePaths.flatMap(relative => roots.map(root => `${root}\\${relative}`))
+}
+
 const macBrowserCandidates = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
@@ -39,7 +55,8 @@ export function resolvePrivateBrowserCommand(
   url: string,
   platform: NodeJS.Platform = process.platform,
   which: Which = command => Bun.which(command),
-  pathExists: PathExists = existsSync
+  pathExists: PathExists = existsSync,
+  env: NodeJS.ProcessEnv = process.env
 ): CommandSpec | null {
   if (platform === 'darwin') {
     const executable = macBrowserCandidates.find(pathExists)
@@ -47,7 +64,9 @@ export function resolvePrivateBrowserCommand(
   }
 
   const candidates = platform === 'win32' ? windowsBrowserCandidates : linuxBrowserCandidates
-  const executable = findExecutable(candidates, which)
+  const executable =
+    findExecutable(candidates, which) ??
+    (platform === 'win32' ? (listWindowsBrowserPaths(env).find(pathExists) ?? null) : null)
   return executable ? { executable, args: ['--incognito', '--new-window', url] } : null
 }
 

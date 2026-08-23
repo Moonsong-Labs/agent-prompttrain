@@ -13,6 +13,8 @@ import {
 } from './oauth-browser.ts'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+// Signing in from your own browser needs time to type the address, so allow a longer Gmail poll.
+const OWN_BROWSER_POLL_TIMEOUT_MS = 300_000
 
 const OAUTH_CONFIG = {
   clientId: process.env.CLAUDE_OAUTH_CLIENT_ID || DEFAULT_OAUTH_CLIENT_ID,
@@ -27,6 +29,7 @@ export interface OAuthFlowOptions {
   openBrowser: boolean
   useClipboard: boolean
   gmailAssisted: boolean
+  ownBrowser: boolean
 }
 
 export interface OAuthLoginCliOptions extends OAuthFlowOptions {
@@ -38,6 +41,7 @@ export function parseOAuthLoginOptions(args: string[]): OAuthLoginCliOptions {
     openBrowser: true,
     useClipboard: true,
     gmailAssisted: false,
+    ownBrowser: false,
     help: false,
   }
 
@@ -48,6 +52,8 @@ export function parseOAuthLoginOptions(args: string[]): OAuthLoginCliOptions {
       options.useClipboard = false
     } else if (arg === '--gmail') {
       options.gmailAssisted = true
+    } else if (arg === '--own-browser') {
+      options.ownBrowser = true
     } else if (arg === '--help' || arg === '-h') {
       options.help = true
     } else {
@@ -146,6 +152,17 @@ export async function exchangeCodeForTokens(
   }
 }
 
+async function readAuthorizationCode(options: OAuthFlowOptions): Promise<string> {
+  const input = await promptInput(
+    'Authorization code (paste it, or press Enter to read the clipboard): '
+  )
+  const clipboardValue = !input && options.useClipboard ? readTextFromClipboard() : null
+  if (!input && clipboardValue) {
+    console.log('Read authorization code from the clipboard.')
+  }
+  return validateAuthorizationCode(input || clipboardValue || '')
+}
+
 export async function authorizeOAuthCredential(
   accountEmail: string | null | undefined,
   options: OAuthFlowOptions
@@ -157,35 +174,80 @@ export async function authorizeOAuthCredential(
       throw new Error('Gmail-assisted relogin requires a stored credential email.')
     }
     if (!options.openBrowser) {
-      throw new Error('Gmail-assisted relogin requires the controlled browser.')
+      throw new Error('Gmail-assisted relogin requires a browser.')
     }
 
-    const [{ createGmailClient, waitForAnthropicLoginLink }, { launchControlledOAuthBrowser }] =
-      await Promise.all([import('./gmail-auth.ts'), import('./oauth-controlled-browser.ts')])
+    const { createGmailClient, waitForAnthropicLoginLink } = await import('./gmail-auth.ts')
     const gmail = await createGmailClient()
+    const configuredTimeout = Number(process.env.GMAIL_AUTH_POLL_TIMEOUT_MS)
+    const pollTimeoutMs =
+      Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : undefined
+
+    if (options.ownBrowser) {
+      const requestedAfter = Date.now()
+
+      if (options.useClipboard) {
+        const copied = await copyTextToClipboard(accountEmail)
+        console.log(
+          copied
+            ? `Credential email copied to the clipboard.`
+            : `Clipboard integration unavailable; copy ${accountEmail} manually.`
+        )
+      }
+
+      const browserOpened = await openPrivateBrowser(url)
+      if (!browserOpened) {
+        console.log('Private browser launch unavailable; open this URL in a private window:')
+        console.log(url)
+        console.log('Keep that window open: the login link is opened in the same private session.')
+      }
+
+      console.log(`\nSign in with ${accountEmail} and request the login email.`)
+      console.log('Waiting for Gmail while you complete that step...')
+
+      const loginLink = await waitForAnthropicLoginLink(gmail, {
+        accountEmail,
+        requestedAfter,
+        timeoutMs: pollTimeoutMs ?? OWN_BROWSER_POLL_TIMEOUT_MS,
+      })
+
+      console.log('Received and validated a fresh Anthropic login email.')
+      const linkOpened = await openPrivateBrowser(loginLink.url)
+      console.log(
+        linkOpened
+          ? 'Opened the login link in the same private session; no verification code is needed.'
+          : 'Could not open the login link automatically; check the private browser window.'
+      )
+      console.log('Review the Anthropic request and approve access.')
+      console.log('Copy the complete authorization code (it must contain #).')
+
+      return exchangeCodeForTokens(await readAuthorizationCode(options), verifier)
+    }
+
+    const { launchControlledOAuthBrowser } = await import('./oauth-controlled-browser.ts')
+    console.log(`\nOpening an isolated browser for ${accountEmail}...`)
     const browser = await launchControlledOAuthBrowser()
 
     try {
-      console.log(`\nOpening an isolated browser for ${accountEmail}.`)
       await browser.openAuthorization(url)
 
       const requestedAfter = Date.now()
-      const emailSubmitted = await browser.submitAccountEmail(accountEmail)
-      if (emailSubmitted) {
+      const submission = await browser.submitAccountEmail(accountEmail)
+      if (submission === 'submitted') {
         console.log('Submitted the stored credential email. Waiting for Gmail...')
       } else {
+        if (submission === 'challenged') {
+          console.log('claude.ai served a bot challenge instead of sending the login email.')
+          console.log('Rerun with --own-browser to sign in from your normal browser instead.')
+        }
         console.log(`Enter ${accountEmail} in the controlled browser and request the login email.`)
         console.log('Waiting for Gmail while you complete that step...')
       }
 
-      const configuredTimeout = Number(process.env.GMAIL_AUTH_POLL_TIMEOUT_MS)
       const loginLink = await waitForAnthropicLoginLink(gmail, {
         accountEmail,
         requestedAfter,
-        timeoutMs:
-          Number.isFinite(configuredTimeout) && configuredTimeout > 0
-            ? configuredTimeout
-            : undefined,
+        timeoutMs: pollTimeoutMs,
       })
 
       console.log('Received and validated a fresh Anthropic login email.')
@@ -218,20 +280,12 @@ export async function authorizeOAuthCredential(
     console.log('Private browser launch unavailable; open the URL below manually.')
   }
 
-  console.log('\nAuthorization URL (manual fallback):')
+  console.log(`\nAuthorization URL (manual fallback):`)
   console.log(url)
-  console.log('\nComplete Anthropic email verification and approve access.')
+  console.log(`\nComplete Anthropic email verification and approve access.`)
   console.log('Copy the complete authorization code (it must contain #).')
 
-  const input = await promptInput(
-    'Authorization code (paste it, or press Enter to read the clipboard): '
-  )
-  const clipboardValue = !input && options.useClipboard ? readTextFromClipboard() : null
-  if (!input && clipboardValue) {
-    console.log('Read authorization code from the clipboard.')
-  }
-
-  return exchangeCodeForTokens(validateAuthorizationCode(input || clipboardValue || ''), verifier)
+  return exchangeCodeForTokens(await readAuthorizationCode(options), verifier)
 }
 
 export async function performOAuthLogin(options: OAuthFlowOptions): Promise<void> {
@@ -316,7 +370,7 @@ if (import.meta.main) {
     const options = parseOAuthLoginOptions(process.argv.slice(2))
     if (options.help) {
       console.log(
-        'Usage: bun run scripts/auth/oauth-login.ts [--gmail] [--no-browser] [--no-clipboard]'
+        'Usage: bun run scripts/auth/oauth-login.ts [--gmail] [--own-browser] [--no-browser] [--no-clipboard]'
       )
     } else {
       await performOAuthLogin(options)

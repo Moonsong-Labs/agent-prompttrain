@@ -22,6 +22,7 @@ export function parseReloginOptions(args: string[]): ReloginCliOptions {
     openBrowser: true,
     useClipboard: true,
     gmailAssisted: false,
+    ownBrowser: false,
     help: false,
   }
 
@@ -45,6 +46,8 @@ export function parseReloginOptions(args: string[]): ReloginCliOptions {
       options.useClipboard = false
     } else if (arg === '--gmail') {
       options.gmailAssisted = true
+    } else if (arg === '--own-browser') {
+      options.ownBrowser = true
     } else if (arg === '--help' || arg === '-h') {
       options.help = true
     } else {
@@ -54,6 +57,10 @@ export function parseReloginOptions(args: string[]): ReloginCliOptions {
 
   if (options.gmailAssisted && !options.openBrowser) {
     throw new Error('--gmail cannot be combined with --no-browser')
+  }
+
+  if (options.ownBrowser && !options.openBrowser) {
+    throw new Error('--own-browser cannot be combined with --no-browser')
   }
 
   return options
@@ -171,7 +178,7 @@ if (import.meta.main) {
     const options = parseReloginOptions(process.argv.slice(2))
     if (options.help) {
       console.log(
-        'Usage: bun run scripts/auth/oauth-relogin-all.ts [--gmail] [--account <id>] [--no-browser] [--no-clipboard]'
+        'Usage: bun run scripts/auth/oauth-relogin-all.ts [--gmail] [--own-browser] [--account <id>] [--no-browser] [--no-clipboard]'
       )
     } else {
       process.exitCode = await reloginAllOAuthCredentials(options)

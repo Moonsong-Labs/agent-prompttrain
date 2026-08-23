@@ -29,6 +29,7 @@ describe('OAuth CLI options', () => {
       openBrowser: false,
       useClipboard: false,
       gmailAssisted: false,
+      ownBrowser: false,
       help: false,
     })
   })
@@ -39,6 +40,7 @@ describe('OAuth CLI options', () => {
       openBrowser: false,
       useClipboard: true,
       gmailAssisted: false,
+      ownBrowser: false,
       help: false,
     })
   })
@@ -49,10 +51,24 @@ describe('OAuth CLI options', () => {
       openBrowser: true,
       useClipboard: true,
       gmailAssisted: true,
+      ownBrowser: false,
       help: false,
     })
     expect(() => parseReloginOptions(['--gmail', '--no-browser'])).toThrow(
       '--gmail cannot be combined with --no-browser'
+    )
+  })
+
+  test('routes Gmail assistance through the operator browser', () => {
+    expect(parseReloginOptions(['--gmail', '--own-browser'])).toEqual({
+      openBrowser: true,
+      useClipboard: true,
+      gmailAssisted: true,
+      ownBrowser: true,
+      help: false,
+    })
+    expect(() => parseReloginOptions(['--own-browser', '--no-browser'])).toThrow(
+      '--own-browser cannot be combined with --no-browser'
     )
   })
 
