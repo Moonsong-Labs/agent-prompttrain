@@ -3,6 +3,7 @@ import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
 import { getErrorMessage, OAuthUsageDisplay } from '@agent-prompttrain/shared'
 import { layout } from '../layout/index.js'
+import { renderUsageWindows } from '../components/usage-windows.js'
 
 export const tokenUsageRoutes = new Hono<{
   Variables: {
@@ -22,45 +23,6 @@ function escapeHtml(unsafe: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
-}
-
-function formatTimeLeft(isoTimestamp: string): string {
-  const resetDate = new Date(isoTimestamp)
-  const now = new Date()
-  const diffMs = resetDate.getTime() - now.getTime()
-
-  if (diffMs <= 0) {
-    return '<span style="font-family: monospace;">now</span>'
-  }
-
-  const totalMins = Math.floor(diffMs / (1000 * 60))
-  const days = Math.floor(totalMins / (60 * 24))
-  const hours = Math.floor((totalMins % (60 * 24)) / 60)
-  const mins = totalMins % 60
-
-  // Build HTML with fixed-width spans for alignment
-  // Each unit gets a fixed width span: days=2ch, hours=3ch, mins=3ch
-  const parts: string[] = []
-
-  if (days > 0) {
-    parts.push(
-      `<span style="display: inline-block; width: 2ch; text-align: right;">${days}</span>d`
-    )
-  } else {
-    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
-  }
-
-  if (days > 0 || hours > 0) {
-    parts.push(
-      `<span style="display: inline-block; width: 2ch; text-align: right;">${hours}</span>h`
-    )
-  } else {
-    parts.push('<span style="display: inline-block; width: 3ch;"></span>')
-  }
-
-  parts.push(`<span style="display: inline-block; width: 2ch; text-align: right;">${mins}</span>m`)
-
-  return `<span style="font-family: monospace; white-space: pre;">${parts.join(' ')}</span>`
 }
 
 function formatRelativeTime(isoTimestamp: string): string {
@@ -391,35 +353,8 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             ${
                               oauthUsage && oauthUsage.available && oauthUsage.windows.length > 0
                                 ? `
-                            <div style="display: grid; gap: 8px; margin-bottom: 8px;">
-                              ${oauthUsage.windows
-                                .map(w => {
-                                  const color =
-                                    w.utilization > 80
-                                      ? '#ef4444'
-                                      : w.utilization > 50
-                                        ? '#fb923c'
-                                        : '#10b981'
-                                  const timeLeft = formatTimeLeft(w.resets_at_iso)
-                                  return `
-                                  <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="min-width: 100px; font-size: 13px; font-weight: 500; color: #374151;">
-                                      ${escapeHtml(w.name)}
-                                    </div>
-                                    <div style="flex: 1; max-width: 200px;">
-                                      <div style="position: relative; background: #f3f4f6; height: 20px; border-radius: 4px; overflow: hidden;">
-                                        <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, w.utilization)}%;"></div>
-                                        <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: #1f2937;">
-                                          ${w.utilization.toFixed(1)}%
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div style="min-width: 90px; font-size: 12px; color: #6b7280;">
-                                      <strong style="color: #374151;">${timeLeft}</strong> left
-                                    </div>
-                                  </div>`
-                                })
-                                .join('')}
+                            <div style="margin-bottom: 8px;">
+                              ${renderUsageWindows(oauthUsage)}
                             </div>
                             <div style="font-size: 11px; color: ${oauthUsage.is_estimated ? '#92400e' : '#9ca3af'}; margin-top: 4px;">${oauthUsage.is_estimated ? '&#9888; Estimated (API rate limited) &bull; ' : ''}Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}</div>
                             `
@@ -569,37 +504,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
             <div class="section">
               <div class="section-header">Claude Account Rate Limits</div>
               <div class="section-content">
-                <div style="display: grid; gap: 12px;">
-                  ${raw(
-                    oauthUsage.windows
-                      .map(window => {
-                        const utilization = window.utilization
-                        const color =
-                          utilization > 80 ? '#ef4444' : utilization > 50 ? '#fb923c' : '#10b981'
-                        const timeLeft = formatTimeLeft(window.resets_at_iso)
-
-                        return `
-                          <div style="display: flex; align-items: center; gap: 16px;">
-                            <div style="min-width: 140px; font-weight: 500; color: #374151;">
-                              ${escapeHtml(window.name)}
-                            </div>
-                            <div style="flex: 1; max-width: 300px;">
-                              <div style="position: relative; background: #f3f4f6; height: 24px; border-radius: 4px; overflow: hidden;">
-                                <div style="position: absolute; left: 0; top: 0; height: 100%; background: ${color}; width: ${Math.min(100, utilization)}%; transition: width 0.3s ease;"></div>
-                                <div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; color: #1f2937;">
-                                  ${utilization.toFixed(1)}%
-                                </div>
-                              </div>
-                            </div>
-                            <div style="min-width: 110px; font-size: 13px; color: #6b7280;">
-                              <strong style="color: #374151;">${timeLeft}</strong> left
-                            </div>
-                          </div>
-                        `
-                      })
-                      .join('')
-                  )}
-                </div>
+                <div>${raw(renderUsageWindows(oauthUsage, 'large'))}</div>
                 <div
                   style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;"
                 >

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { layout } from '../layout/index.js'
 import { container } from '../container.js'
+import { renderUsageWindows } from '../components/usage-windows.js'
 import {
   listProjectsWithAccounts,
   listTrainApiKeys,
@@ -736,7 +737,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                             ${cred.provider === 'anthropic'
                               ? html`
                                   <div
-                                    style="display: inline-flex; align-items: center; margin-left: 0.5rem; vertical-align: middle;"
+                                    style="display: block; margin-top: 8px;"
                                     hx-get="/dashboard/projects/${train.id}/account-utilization/${cred.account_id}"
                                     hx-trigger="load"
                                     hx-swap="innerHTML"
@@ -1705,36 +1706,12 @@ trainsUIRoutes.get('/:projectId/account-utilization/:accountId', async c => {
       return c.html(html`<span style="font-size: 0.75rem; color: #9ca3af;">No usage data</span>`)
     }
 
-    // Find 7-day window utilization
-    const sevenDay = usage.windows.find(w => w.short_name === '7d')
-    const utilization = sevenDay ? sevenDay.utilization : 0
-    const resetsAt = sevenDay ? sevenDay.resets_at : ''
-
-    // Color based on utilization level
-    const barColor = utilization >= 80 ? '#ef4444' : utilization >= 50 ? '#f59e0b' : '#22c55e'
-    const bgColor = utilization >= 80 ? '#fee2e2' : utilization >= 50 ? '#fef3c7' : '#dcfce7'
-
     return c.html(html`
       <div
-        style="display: flex; align-items: center; gap: 0.5rem; min-width: 140px;"
-        title="7-day utilization: ${utilization.toFixed(1)}%${resetsAt
-          ? ` · Resets: ${resetsAt}`
-          : ''}${usage.is_estimated ? ' (estimated)' : ''}"
+        style="margin-top: 0.4rem;"
+        title="${usage.is_estimated ? 'Estimated (usage API rate limited)' : ''}"
       >
-        <div
-          style="flex: 1; height: 8px; background: ${bgColor}; border-radius: 4px; overflow: hidden; min-width: 80px;"
-        >
-          <div
-            style="height: 100%; width: ${Math.min(
-              utilization,
-              100
-            )}%; background: ${barColor}; border-radius: 4px; transition: width 0.3s ease;"
-          ></div>
-        </div>
-        <span
-          style="font-size: 0.7rem; font-weight: 600; color: ${barColor}; white-space: nowrap; min-width: 32px; text-align: right;"
-          >${utilization.toFixed(0)}%</span
-        >
+        ${raw(renderUsageWindows(usage, 'compact'))}
       </div>
     `)
   } catch {
