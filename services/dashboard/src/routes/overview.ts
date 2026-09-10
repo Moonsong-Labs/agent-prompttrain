@@ -93,7 +93,7 @@ overviewRoutes.get('/', async c => {
       layout(
         'Error',
         html`
-          <div class="error-banner">
+          <div class="error-banner" data-testid="page-error">
             <strong>Error:</strong> API client not configured. Please check your configuration.
           </div>
         `,
@@ -235,6 +235,7 @@ overviewRoutes.get('/', async c => {
             <input type="hidden" name="page" value="1" />
             <input type="hidden" name="per_page" value="${itemsPerPage}" />
             <input
+              data-testid="conversation-search"
               type="search"
               name="search"
               placeholder="Search conversations..."
@@ -242,6 +243,7 @@ overviewRoutes.get('/', async c => {
               style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; width: 250px; font-size: 0.875rem;"
             />
             <button
+              data-testid="conversation-search-submit"
               type="submit"
               class="btn btn-secondary"
               style="padding: 0.5rem 1rem; font-size: 0.875rem;"
@@ -286,23 +288,23 @@ overviewRoutes.get('/', async c => {
 
       <!-- Stats Summary -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Conversations</div>
+        <div class="stat-card" data-testid="stat-card">
+          <div class="stat-label" data-testid="stat-label">Total Conversations</div>
           <div class="stat-value">${dashboardStats.totalConversations}</div>
           <div class="stat-meta">Unique conversations</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Active Accounts</div>
+        <div class="stat-card" data-testid="stat-card">
+          <div class="stat-label" data-testid="stat-label">Active Accounts</div>
           <div class="stat-value">${uniqueAccounts}</div>
           <div class="stat-meta">Unique account IDs</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Requests</div>
+        <div class="stat-card" data-testid="stat-card">
+          <div class="stat-label" data-testid="stat-label">Total Requests</div>
           <div class="stat-value">${totalRequests}</div>
           <div class="stat-meta">Across all conversations</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Tokens</div>
+        <div class="stat-card" data-testid="stat-card">
+          <div class="stat-label" data-testid="stat-label">Total Tokens</div>
           <div class="stat-value">${formatNumber(totalTokens)}</div>
           <div class="stat-meta">Combined usage</div>
         </div>
@@ -492,7 +494,7 @@ overviewRoutes.get('/', async c => {
                           return `
                             <tr>
                               <td class="text-sm">
-                                <a href="/dashboard/conversation/${branch.conversationId}${branch.branch !== 'main' ? `?branch=${branch.branch}` : ''}" 
+                                <a data-testid="conversation-link" href="/dashboard/conversation/${branch.conversationId}${branch.branch !== 'main' ? `?branch=${branch.branch}` : ''}"
                                    class="text-blue-600" 
                                    style="font-family: monospace; font-size: 0.75rem;">
                                   ${branch.conversationId.substring(0, 8)}...
@@ -716,7 +718,7 @@ overviewRoutes.get('/', async c => {
       layout(
         'Error',
         html`
-          <div class="error-banner">
+          <div class="error-banner" data-testid="page-error">
             <strong>Error:</strong> ${getErrorMessage(error) || 'Failed to load conversations'}
           </div>
         `,

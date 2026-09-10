@@ -34,7 +34,7 @@ export const layout = (
 
   return html`
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="en" data-testid="document">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -71,11 +71,13 @@ export const layout = (
                 rel="stylesheet"
                 href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css"
                 id="hljs-light-theme"
+                data-testid="hljs-light-theme"
               />
               <link
                 rel="stylesheet"
                 href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
                 id="hljs-dark-theme"
+                data-testid="hljs-dark-theme"
                 disabled
               />
               <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
@@ -210,18 +212,33 @@ export const layout = (
           : ''}
         ${additionalScripts}
       </head>
-      <body>
-        <nav>
+      <body data-testid="page-body">
+        <nav data-testid="navigation">
           <div class="container">
-            <h1 style="display: flex; align-items: center; gap: 0.5rem;">
+            <h1
+              data-testid="navigation-title"
+              style="display: flex; align-items: center; gap: 0.5rem;"
+            >
               ${raw(nexusLogo())}
               <span>Agent Prompt Train Dashboard</span>
             </h1>
             <div class="space-x-4" style="display: flex; align-items: center;">
-              <a href="/dashboard" class="text-sm text-blue-600">Dashboard</a>
-              <a href="/dashboard/requests" class="text-sm text-blue-600">Requests</a>
+              <a data-testid="dashboard-link" href="/dashboard" class="text-sm text-blue-600"
+                >Dashboard</a
+              >
+              <a
+                data-testid="requests-link"
+                href="/dashboard/requests"
+                class="text-sm text-blue-600"
+                >Requests</a
+              >
               <a href="/dashboard/usage" class="text-sm text-blue-600">Project Usage</a>
-              <a href="/dashboard/token-usage" class="text-sm text-blue-600">Token Usage</a>
+              <a
+                data-testid="token-usage-link"
+                href="/dashboard/token-usage"
+                class="text-sm text-blue-600"
+                >Token Usage</a
+              >
               <a href="/dashboard/credentials" class="text-sm text-blue-600">Credentials</a>
               <a href="/dashboard/projects" class="text-sm text-blue-600">Projects</a>
               ${auth.principal
@@ -248,9 +265,15 @@ export const layout = (
                   </span>`
                 : ''}
               <a href="/dashboard/logout" class="text-sm text-blue-600">Logout</a>
-              <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
+              <button
+                class="theme-toggle"
+                id="theme-toggle"
+                data-testid="theme-toggle"
+                title="Toggle dark mode"
+              >
                 <svg
                   id="theme-icon-light"
+                  data-testid="theme-icon-light"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -265,6 +288,7 @@ export const layout = (
                 </svg>
                 <svg
                   id="theme-icon-dark"
+                  data-testid="theme-icon-dark"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -283,7 +307,9 @@ export const layout = (
           </div>
         </nav>
         <div id="toast-container"></div>
-        <main class="container" style="padding: 2rem 1rem;">${content}</main>
+        <main data-testid="page-content" class="container" style="padding: 2rem 1rem;">
+          ${content}
+        </main>
         <script>
           // Dark mode functionality
           ;(function () {

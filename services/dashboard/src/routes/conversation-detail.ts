@@ -810,6 +810,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
           </button>
           <button
             id="timeline-tab"
+            data-testid="timeline-tab"
             class="tab-button ${view === 'timeline' ? 'tab-active' : 'tab-inactive'}"
             style="
               padding: 0.75rem 1.5rem;
@@ -828,6 +829,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
           </button>
           <button
             id="analytics-tab"
+            data-testid="analytics-tab"
             class="tab-button ${view === 'analytics' ? 'tab-active' : 'tab-inactive'}"
             style="
               padding: 0.75rem 1.5rem;
@@ -852,12 +854,17 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         <!-- Graph Visualization -->
         <div
           id="tree-panel"
+          data-testid="tree-panel"
           class="conversation-graph"
           style="display: ${view === 'tree'
             ? 'block'
             : 'none'}; width: 100%; position: relative; overflow: hidden; cursor: grab;"
         >
-          <div id="tree-container" style="position: relative; transform: translate(0px, 0px);">
+          <div
+            id="tree-container"
+            data-testid="tree-container"
+            style="position: relative; transform: translate(0px, 0px);"
+          >
             ${raw(svgGraph)}
           </div>
         </div>
@@ -865,6 +872,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         <!-- Timeline -->
         <div
           id="timeline-panel"
+          data-testid="timeline-panel"
           class="conversation-timeline"
           style="display: ${view === 'timeline' ? 'block' : 'none'};"
         >
@@ -874,6 +882,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         <!-- AI Analysis -->
         <div
           id="analytics-panel"
+          data-testid="analytics-panel"
           class="conversation-analytics"
           style="display: ${view === 'analytics' ? 'block' : 'none'};"
         >

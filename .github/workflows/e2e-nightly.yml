@@ -19,7 +19,29 @@ on:
 jobs:
   e2e-full-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nightly_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nightly_test
+      DASHBOARD_API_KEY: test_dashboard_key_ci
+      TEST_START_SERVERS: 'true'
+      CI: 'true'
+      TEST_RETRIES: 2
     strategy:
+      fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
 
@@ -33,7 +55,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Build shared package
         run: bun run build:shared
@@ -41,8 +63,14 @@ jobs:
       - name: Build dashboard service
         run: bun run build:dashboard
 
+      - name: Build proxy service
+        run: bun run build:proxy
+
+      - name: Initialize E2E database
+        run: bun scripts/e2e/setup-database.ts
+
       - name: Install Playwright browsers
-        run: bunx playwright install ${{ matrix.browser }}
+        run: bunx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Determine test suite
         id: test_suite
@@ -57,26 +85,14 @@ jobs:
       - name: Run E2E tests - All
         if: steps.test_suite.outputs.suite == 'all'
         run: bunx playwright test --project=${{ matrix.browser }}
-        env:
-          DASHBOARD_API_KEY: test_dashboard_key_ci
-          CI: true
-          TEST_RETRIES: 2
 
       - name: Run E2E tests - Smoke only
         if: steps.test_suite.outputs.suite == 'smoke'
         run: bunx playwright test --grep @smoke --project=${{ matrix.browser }}
-        env:
-          DASHBOARD_API_KEY: test_dashboard_key_ci
-          CI: true
-          TEST_RETRIES: 2
 
       - name: Run E2E tests - Journey only
         if: steps.test_suite.outputs.suite == 'journey'
         run: bunx playwright test --grep @journey --project=${{ matrix.browser }}
-        env:
-          DASHBOARD_API_KEY: test_dashboard_key_ci
-          CI: true
-          TEST_RETRIES: 2
 
       - name: Upload test results
         if: always()

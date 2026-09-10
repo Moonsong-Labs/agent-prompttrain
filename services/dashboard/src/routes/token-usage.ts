@@ -58,7 +58,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
       layout(
         'Error',
         html`
-          <div class="error-banner">
+          <div class="error-banner" data-testid="page-error">
             <strong>Error:</strong> API client not configured. Please check your configuration.
           </div>
         `
@@ -123,7 +123,9 @@ tokenUsageRoutes.get('/token-usage', async c => {
           >
         </div>
 
-        <h2 style="margin: 0 0 1.5rem 0;">Token Usage Overview - All Accounts</h2>
+        <h2 data-testid="token-usage-heading" style="margin: 0 0 1.5rem 0;">
+          Token Usage Overview - All Accounts
+        </h2>
 
         <div class="section">
           <div class="section-header">All Accounts (7-Day View with 5-Hour Sliding Windows)</div>
@@ -420,7 +422,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                             })()}
                           </div>
                           <div style="width: 300px; height: 80px; flex-shrink: 0;">
-                            <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                            <canvas data-testid="token-usage-chart" id="${chartId}" style="width: 100%; height: 100%;"></canvas>
                           </div>
                         </div>
                       </a>
@@ -444,7 +446,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
         layout(
           'Token Usage',
           html`
-            <div class="error-banner">
+            <div class="error-banner" data-testid="page-error">
               <strong>Error:</strong> Failed to load accounts data. Please try again later.
             </div>
             <div class="mb-6">
@@ -496,7 +498,9 @@ tokenUsageRoutes.get('/token-usage', async c => {
         <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
       </div>
 
-      <h2 style="margin: 0 0 1.5rem 0;">Token Usage for Account: ${escapeHtml(accountId)}</h2>
+      <h2 data-testid="token-usage-heading" style="margin: 0 0 1.5rem 0;">
+        Token Usage for Account: ${escapeHtml(accountId)}
+      </h2>
 
       <!-- Claude Account Rate Limits (OAuth Usage) -->
       ${oauthUsage && oauthUsage.available && oauthUsage.windows.length > 0
@@ -874,7 +878,11 @@ tokenUsageRoutes.get('/token-usage', async c => {
 
                 return html`
                   <div style="width: 100%; height: 400px; position: relative;">
-                    <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                    <canvas
+                      data-testid="token-usage-chart"
+                      id="${chartId}"
+                      style="width: 100%; height: 100%;"
+                    ></canvas>
                   </div>
                   ${raw(`<script>${chartScript}</script>`)}
                 `
@@ -1132,7 +1140,11 @@ tokenUsageRoutes.get('/token-usage', async c => {
 
                 return html`
                   <div style="width: 100%; height: 500px; position: relative;">
-                    <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                    <canvas
+                      data-testid="token-usage-chart"
+                      id="${chartId}"
+                      style="width: 100%; height: 100%;"
+                    ></canvas>
                   </div>
                   ${raw(`<script>${chartScript}</script>`)}
                 `
@@ -1244,7 +1256,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
       layout(
         'Error',
         html`
-          <div class="error-banner">
+          <div class="error-banner" data-testid="page-error">
             <strong>Error:</strong> ${getErrorMessage(error) || 'Failed to load token usage data'}
           </div>
           <div class="mb-6">
