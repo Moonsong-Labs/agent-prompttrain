@@ -1,5 +1,21 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const baseURL = process.env.TEST_BASE_URL || 'http://localhost:3001'
+const proxyURL = process.env.TEST_PROXY_URL || 'http://localhost:3000'
+const startServers = process.env.TEST_START_SERVERS === 'true'
+if (startServers && (!process.env.E2E_DATABASE_URL || !process.env.DASHBOARD_API_KEY)) {
+  throw new Error('Managed E2E servers require E2E_DATABASE_URL and DASHBOARD_API_KEY')
+}
+const serverEnv = {
+  DATABASE_URL: process.env.E2E_DATABASE_URL || '',
+  INTERNAL_API_KEY: process.env.DASHBOARD_API_KEY || '',
+  STORAGE_ENABLED: 'true',
+  AI_WORKER_ENABLED: 'false',
+  SLACK_ENABLED: 'false',
+  LOG_LEVEL: 'error',
+  PROXY_API_URL: proxyURL,
+}
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -24,7 +40,9 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.TEST_BASE_URL || 'http://localhost:3001',
+    baseURL,
+    extraHTTPHeaders: { 'X-Auth-Request-Email': 'test@ci.localhost' },
+    colorScheme: 'light',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
@@ -68,13 +86,33 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: process.env.CI
-    ? undefined // In CI, we'll start the server manually
-    : {
-        command: 'bun run dev:dashboard',
-        url: 'http://localhost:3001',
-        port: 3001,
-        reuseExistingServer: true,
-        timeout: 120 * 1000,
-      },
+  webServer: startServers
+    ? [
+        {
+          command: 'bun services/proxy/dist/main.js',
+          url: `${proxyURL}/health`,
+          env: { ...serverEnv, PORT: new URL(proxyURL).port },
+          reuseExistingServer: false,
+          timeout: 60_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+        {
+          command: 'bun services/dashboard/dist/main.js',
+          url: `${baseURL}/health`,
+          env: { ...serverEnv, PORT: new URL(baseURL).port },
+          reuseExistingServer: false,
+          timeout: 60_000,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      ]
+    : process.env.CI
+      ? undefined // In CI, we'll start the server manually
+      : {
+          command: 'bun run dev:dashboard',
+          url: 'http://localhost:3001',
+          reuseExistingServer: true,
+          timeout: 120 * 1000,
+        },
 })

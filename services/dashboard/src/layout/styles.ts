@@ -300,7 +300,7 @@ export const dashboardStyles = `
     color: #4b5563;
   }
   .text-blue-600 {
-    color: #2563eb;
+    color: var(--text-link);
   }
   .mb-6 {
     margin-bottom: 1.5rem;

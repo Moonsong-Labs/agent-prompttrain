@@ -191,7 +191,7 @@ function renderIdlePanel(
   const promptId = `prompt-${conversationId}-${branchId}`.replace(/[^a-zA-Z0-9-]/g, '-')
 
   return html`
-    <div id="analysis-panel" class="section">
+    <div id="analysis-panel" data-testid="analysis-panel" class="section">
       <div class="section-header" style="display: flex; align-items: center; gap: 0.75rem;">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -300,6 +300,7 @@ function renderProcessingPanel(conversationId: string, branchId: string, pollCou
   return html`
     <div
       id="analysis-panel"
+      data-testid="analysis-panel"
       class="section"
       hx-get="/partials/analysis/status/${conversationId}/${branchId}?pollCount=${pollCount + 1}"
       hx-trigger="delay:${interval}s"
@@ -391,7 +392,7 @@ function renderCompletedPanel(
   const analysisData = analysisResponse.data
 
   return html`
-    <div id="analysis-panel" class="section">
+    <div id="analysis-panel" data-testid="analysis-panel" class="section">
       <div
         class="section-header"
         style="display: flex; justify-content: space-between; align-items: center;"
@@ -1024,7 +1025,7 @@ function renderFailedPanel(
   _auth?: { isAuthenticated: boolean; principal: string; source: 'dev' | 'sso' }
 ) {
   return html`
-    <div id="analysis-panel" class="section">
+    <div id="analysis-panel" data-testid="analysis-panel" class="section">
       <div class="section-header" style="display: flex; align-items: center; gap: 0.75rem;">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -1105,7 +1106,7 @@ function renderFailedPanel(
 
 function renderErrorPanel(message: string) {
   return html`
-    <div id="analysis-panel" class="section">
+    <div id="analysis-panel" data-testid="analysis-panel" class="section">
       <div class="section-header" style="display: flex; align-items: center; gap: 0.75rem;">
         <svg
           xmlns="http://www.w3.org/2000/svg"

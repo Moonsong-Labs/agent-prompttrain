@@ -133,6 +133,25 @@ Run tests:
 bun test
 ```
 
+To reproduce nightly browser tests, create an empty PostgreSQL database whose name
+ends in `_test`, then run:
+
+```bash
+export E2E_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/e2e_test
+export DASHBOARD_API_KEY=test_dashboard_key_ci
+bun install --frozen-lockfile
+bun run build
+bun scripts/e2e/setup-database.ts
+bunx playwright install --with-deps
+TEST_START_SERVERS=true bunx playwright test --project=chromium --project=firefox --project=webkit
+```
+
+Setup applies the production schema and migrations and inserts synthetic data.
+It refuses an already initialized database. Playwright starts and stops both
+services; use `TEST_BASE_URL` and `TEST_PROXY_URL` to select different local ports.
+See [ADR-021](../04-Architecture/ADRs/adr-021-e2e-testing-strategy.md) for test isolation
+and authentication.
+
 Test specific functionality:
 
 ```bash

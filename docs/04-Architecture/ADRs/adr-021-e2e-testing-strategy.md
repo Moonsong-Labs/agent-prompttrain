@@ -45,9 +45,9 @@ We will implement end-to-end testing using Playwright with the following archite
    - Automatic failure on unexpected console errors
 
 4. **Authentication Strategy**
-   - Use Playwright's storageState for session persistence
-   - Set API key headers at BrowserContext level
-   - Single auth setup shared across tests
+   - Set the test user's `X-Auth-Request-Email` header at BrowserContext level
+   - Use a fresh browser context for each test; preserve storage within a test for theme persistence
+   - Keep `DASHBOARD_API_KEY` configured for dashboard-to-proxy API authentication
 
 ### CI/CD Integration
 
@@ -66,13 +66,35 @@ Building on the existing GitHub Actions infrastructure (ADR-008):
 3. **Test Execution Strategy**
    - Serial execution for auth-dependent tests (avoid race conditions)
    - Parallel execution for independent test files
-   - Fail-fast on CI to save resources
+   - Fail immediately on setup errors; keep independent browser jobs running for diagnostics
 
 ### Test Data Management
 
 - Use existing database for test isolation
 - No mocking of backend services (true e2e)
 - Leverage Docker Compose for consistent environments (ADR-002)
+
+### CI Environment
+
+Both PR smoke tests and nightly tests use an empty PostgreSQL test database. The
+`scripts/e2e/setup-database.ts` script applies the production bootstrap SQL and
+subsequent migrations, then inserts synthetic projects, requests, and analysis
+data. It requires an explicit `E2E_DATABASE_URL` naming a database ending in
+`_test` and refuses an already initialized database.
+
+With `TEST_START_SERVERS=true`, Playwright starts the built proxy and dashboard,
+waits for their health endpoints, and stops both after testing. Set
+`E2E_DATABASE_URL`, `DASHBOARD_API_KEY`, and optionally `TEST_BASE_URL` and
+`TEST_PROXY_URL`. No live provider credentials are required. Install browsers
+with `bunx playwright install --with-deps` so Linux system libraries are present.
+
+The nightly matrix keeps all browser jobs running after a failure so each browser
+produces diagnostics. Stateful journeys remain serial. Test setup and service
+startup failures fail the job before browser assertions begin.
+
+Theme assertions wait for CSS transitions to finish and check the configured
+theme colors. Navigation links use the theme's link color in both light and dark
+mode. Journeys assert seeded content rather than skipping checks on empty pages.
 
 ## Consequences
 
@@ -101,9 +123,8 @@ Building on the existing GitHub Actions infrastructure (ADR-008):
 
 ### Key Files Created
 
-- `e2e/playwright.config.ts` - Playwright configuration
+- `playwright.config.ts` - Playwright configuration
 - `e2e/utils/console-monitor.ts` - Console error detection
-- `e2e/utils/auth-helper.ts` - Authentication setup
 - `e2e/smoke-tests/all-pages.spec.ts` - Smoke test coverage
 - `e2e/journeys/critical-journeys.spec.ts` - User journey tests
 - `.github/workflows/e2e-nightly.yml` - Nightly test workflow
@@ -115,7 +136,7 @@ Building on the existing GitHub Actions infrastructure (ADR-008):
 bunx playwright install --with-deps chromium
 
 # Run all tests
-bun run test:e2e
+bun run test:e2e:all
 
 # Run smoke tests only
 bun run test:e2e:smoke
@@ -140,5 +161,7 @@ bunx playwright test --ui
 ## References
 
 - [Playwright Documentation](https://playwright.dev)
+- [Playwright CI dependencies](https://playwright.dev/docs/ci)
+- [Playwright service lifecycle](https://playwright.dev/docs/test-webserver)
 - [Testing HTMX Applications](https://htmx.org/essays/testing/)
 - Implementation PR: #110

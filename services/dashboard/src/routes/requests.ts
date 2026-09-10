@@ -23,7 +23,7 @@ requestsRoutes.get('/requests', async c => {
       layout(
         'Error',
         html`
-          <div class="error-banner">
+          <div class="error-banner" data-testid="page-error">
             <strong>Error:</strong> API client not configured. Please check your configuration.
           </div>
         `
@@ -84,7 +84,7 @@ requestsRoutes.get('/requests', async c => {
   }
 
   const content = html`
-    ${error ? html`<div class="error-banner">${error}</div>` : ''}
+    ${error ? html`<div class="error-banner" data-testid="page-error">${error}</div>` : ''}
 
     <div class="mb-6">
       <a href="/dashboard" class="text-blue-600">← Back to Dashboard</a>
@@ -94,6 +94,7 @@ requestsRoutes.get('/requests', async c => {
     <div class="mb-6">
       <label class="text-sm text-gray-600">Filter by Project ID:</label>
       <select
+        data-testid="project-filter"
         onchange="window.location.href = '/dashboard/requests' + (this.value ? '?projectId=' + this.value : '')"
         style="margin-left: 0.5rem;"
       >
@@ -148,10 +149,10 @@ requestsRoutes.get('/requests', async c => {
         ${recentRequests.length === 0
           ? html` <p class="text-gray-500">No requests found</p> `
           : html`
-              <table>
+              <table data-testid="requests-table">
                 <thead>
                   <tr>
-                    <th>Time</th>
+                    <th data-testid="requests-table-heading">Time</th>
                     <th>Project ID</th>
                     <th>Account</th>
                     <th>Model</th>
@@ -165,7 +166,7 @@ requestsRoutes.get('/requests', async c => {
                     recentRequests
                       .map(
                         req => `
-                <tr>
+                <tr data-testid="request-row">
                   <td class="text-sm">${formatRelativeTime(req.timestamp)}</td>
                   <td class="text-sm">${escapeHtml(req.projectId || 'unknown')}</td>
                   <td class="text-sm">${escapeHtml(req.accountId || 'N/A')}</td>
@@ -173,7 +174,7 @@ requestsRoutes.get('/requests', async c => {
                   <td class="text-sm">${formatNumber(req.totalTokens || 0)}</td>
                   <td class="text-sm">${req.responseStatus || 'N/A'}</td>
                   <td class="text-sm">
-                    <a href="/dashboard/request/${req.requestId}" class="text-blue-600">View</a>
+                    <a data-testid="request-link" href="/dashboard/request/${req.requestId}" class="text-blue-600">View</a>
                   </td>
                 </tr>
               `
