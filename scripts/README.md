@@ -85,6 +85,12 @@ bun run db:backfill:last-message-summary --days 30 --batch-size 100 --sleep-ms 5
 Run after migration 026 and after the new proxy is deployed, off-peak. Each row's body is
 decompressed once on the database server; expect roughly 1–2 hours for 90 days of production data.
 
+### verify-last-message-summary.ts
+
+Read-only parity check for ADR-037: samples recent requests and confirms the dashboard derives the
+same node types and previews from summaries as from full messages, and that the SQL and JS user-text
+counts agree. Prints request ids only. `bun scripts/db/verify-last-message-summary.ts --sample 2000 --count-sample 50`
+
 ### backup-database.ts
 
 Creates database backups with automatic timestamping.
