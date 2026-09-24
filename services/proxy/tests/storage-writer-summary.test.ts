@@ -56,6 +56,16 @@ afterEach(() => {
   mock.restore()
 })
 
+/**
+ * Silence a logger method and count its calls from now on. Other test files replace logger
+ * methods with long-lived mocks, so clear any calls recorded before this test.
+ */
+function silence(method: 'warn' | 'error') {
+  const spy = spyOn(logger, method).mockImplementation(() => {})
+  spy.mockClear()
+  return spy
+}
+
 describe('StorageWriter.storeRequest summary columns', () => {
   it('stores the precomputed summary in the request INSERT', async () => {
     const { writer, inserts } = createPool()
@@ -72,7 +82,7 @@ describe('StorageWriter.storeRequest summary columns', () => {
 
   for (const code of ['22P02', '22P05']) {
     it(`retries once without the summary when PostgreSQL rejects the INSERT with ${code}`, async () => {
-      const warn = spyOn(logger, 'warn').mockImplementation(() => {})
+      const warn = silence('warn')
       const { writer, inserts } = createPool({ insertFailures: [{ code }] })
 
       await writer.storeRequest(baseRequest)
@@ -90,7 +100,7 @@ describe('StorageWriter.storeRequest summary columns', () => {
   }
 
   it('does not retry other INSERT errors', async () => {
-    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    const error = silence('error')
     const { writer, inserts } = createPool({ insertFailures: [{ code: '23503' }] })
 
     await writer.storeRequest(baseRequest)
@@ -100,7 +110,7 @@ describe('StorageWriter.storeRequest summary columns', () => {
   })
 
   it('does not retry when there is no summary to drop', async () => {
-    spyOn(logger, 'error').mockImplementation(() => {})
+    silence('error')
     const { writer, inserts } = createPool({ insertFailures: [{ code: '22P02' }] })
 
     await writer.storeRequest({ ...baseRequest, body: { prompt: 'no messages' } })
@@ -111,8 +121,8 @@ describe('StorageWriter.storeRequest summary columns', () => {
   })
 
   it('reports a failed retry as a failed store', async () => {
-    spyOn(logger, 'warn').mockImplementation(() => {})
-    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    silence('warn')
+    const error = silence('error')
     const { writer, inserts } = createPool({
       insertFailures: [{ code: '22P02' }, { code: '22P02' }],
     })
@@ -146,7 +156,7 @@ describe('StorageWriter summary column detection (migration 026)', () => {
   })
 
   it('uses the pre-026 INSERT and logs one error when the columns are missing', async () => {
-    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    const error = silence('error')
     const { writer, inserts, columnChecks } = createPool({ columns: [] })
 
     await writer.storeRequest(baseRequest)
@@ -162,7 +172,7 @@ describe('StorageWriter summary column detection (migration 026)', () => {
   })
 
   it('treats a partially applied migration as missing', async () => {
-    spyOn(logger, 'error').mockImplementation(() => {})
+    silence('error')
     const { writer, inserts } = createPool({ columns: ['last_message_summary'] })
 
     await writer.storeRequest(baseRequest)
@@ -172,8 +182,8 @@ describe('StorageWriter summary column detection (migration 026)', () => {
   })
 
   it('stores without summaries while the check fails and checks again next time', async () => {
-    spyOn(logger, 'warn').mockImplementation(() => {})
-    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    silence('warn')
+    const error = silence('error')
     const { writer, inserts, columnChecks } = createPool({ columnCheckFailures: 1 })
 
     await writer.storeRequest(baseRequest)
