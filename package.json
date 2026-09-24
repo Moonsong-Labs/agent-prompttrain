@@ -45,7 +45,7 @@
     "clean": "bun run --filter '*' clean",
     "test": "./scripts/run-all-tests.sh",
     "test:parallel": "bun test",
-    "test:ci": "bun test test/unit services/proxy/tests tests/unit services/dashboard/src/routes/__tests__ services/proxy/src/routes/__tests__ services/dashboard/src/layout/__tests__ packages/shared/src/**/__tests__ scripts/auth/*.test.ts && ./scripts/test-integration.sh",
+    "test:ci": "bun test test/unit services/proxy/tests tests/unit services/dashboard/src/routes/__tests__ services/dashboard/src/utils/__tests__ services/proxy/src/routes/__tests__ services/dashboard/src/layout/__tests__ packages/shared/src/**/__tests__ scripts/auth/*.test.ts && ./scripts/test-integration.sh",
     "test:unit": "bun test test/unit",
     "test:integration": "./scripts/test-integration.sh",
     "test:theme": "bun test services/dashboard/src/layout/__tests__",

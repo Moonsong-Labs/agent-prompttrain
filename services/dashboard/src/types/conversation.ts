@@ -25,8 +25,17 @@ export interface ConversationRequest {
   parent_request_id?: string
   body?: any
   last_message?: any
+  user_text_message_count?: number | null
   response_body?: any
   account_id?: string
+}
+
+export interface SubtaskSummary {
+  request_id: string
+  conversation_id: string | null
+  is_subtask: boolean | null
+  parent_task_request_id: string
+  timestamp: string
 }
 
 export interface ConversationSummary {
