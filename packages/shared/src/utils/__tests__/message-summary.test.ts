@@ -146,6 +146,84 @@ describe('summarizeLastMessage', () => {
   })
 })
 
+describe('summarizeLastMessage surrogate-safe clipping', () => {
+  // Two UTF-16 code units; a plain slice(0, 200) would keep only its high surrogate
+  const EMOJI = '\u{1F916}'
+  const LONE_HIGH_SURROGATE_AT_END = /[\uD800-\uDBFF]$/
+  // Bun's JSON.stringify escapes lone surrogates, which PostgreSQL JSONB rejects
+  const LONE_SURROGATE_ESCAPE = /\\ud[89a-f][0-9a-f]{2}/i
+  const straddling = (prefixLength = SUMMARY_TEXT_LIMIT - 1) =>
+    'a'.repeat(prefixLength) + EMOJI + ' Generated with Claude Code'
+
+  const expectSafe = (value: unknown) => {
+    expect(typeof value).toBe('string')
+    const text = value as string
+    expect(text.length).toBeLessThanOrEqual(SUMMARY_TEXT_LIMIT)
+    expect(text.length).toBeGreaterThanOrEqual(SUMMARY_TEXT_LIMIT - 1)
+    expect(text).not.toMatch(LONE_HIGH_SURROGATE_AT_END)
+  }
+
+  it('does not split an emoji straddling the limit in string content', () => {
+    const summary = summarizeLastMessage({ role: 'user', content: straddling() })!
+    expectSafe(summary.content)
+    expect(summary.content).toBe('a'.repeat(SUMMARY_TEXT_LIMIT - 1))
+    expect(JSON.stringify(summary)).not.toMatch(LONE_SURROGATE_ESCAPE)
+  })
+
+  it('does not split an emoji straddling the limit in a text block', () => {
+    const summary = summarizeLastMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: '  ' + straddling() }],
+    })!
+    const [block] = summary.content as Array<{ text?: string }>
+    expectSafe(block.text)
+    expect(JSON.stringify(summary)).not.toMatch(LONE_SURROGATE_ESCAPE)
+  })
+
+  it('does not split an emoji straddling the limit in tool_result string content', () => {
+    const summary = summarizeLastMessage({
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: straddling() }],
+    })!
+    const [block] = summary.content as Array<{ content?: string }>
+    expectSafe(block.content)
+    expect(JSON.stringify(summary)).not.toMatch(LONE_SURROGATE_ESCAPE)
+  })
+
+  it('does not split an emoji straddling the limit in tool_result array content', () => {
+    const prefix = JSON.stringify([{ type: 'text', text: '' }]).indexOf('""') + 1
+    const arrayContent = [{ type: 'text', text: straddling(SUMMARY_TEXT_LIMIT - 1 - prefix) }]
+    // Precondition: the serialized content has the emoji's high surrogate at index 199
+    expect(JSON.stringify(arrayContent).charCodeAt(SUMMARY_TEXT_LIMIT - 1)).toBe(0xd83e)
+
+    const summary = summarizeLastMessage({
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'toolu_2', content: arrayContent }],
+    })!
+    const [block] = summary.content as Array<{ content?: string }>
+    expectSafe(block.content)
+    expect(JSON.stringify(summary)).not.toMatch(LONE_SURROGATE_ESCAPE)
+  })
+
+  it('does not split an emoji straddling the limit in a tool_use prompt', () => {
+    const summary = summarizeLastMessage({
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'toolu_3', name: 'Task', input: { prompt: straddling() } }],
+    })!
+    const [block] = summary.content as Array<{ input?: { prompt: string } }>
+    expectSafe(block.input?.prompt)
+    expect(JSON.stringify(summary)).not.toMatch(LONE_SURROGATE_ESCAPE)
+  })
+
+  it('keeps a complete surrogate pair that ends exactly at the limit', () => {
+    const content = 'a'.repeat(SUMMARY_TEXT_LIMIT - 2) + EMOJI
+    expect(summarizeLastMessage({ role: 'user', content: content + 'tail' })).toEqual({
+      role: 'user',
+      content,
+    })
+  })
+})
+
 describe('hasVisibleText', () => {
   it('matches the dashboard visible-text rule', () => {
     expect(hasVisibleText({ role: 'user', content: 'hi' })).toBe(true)

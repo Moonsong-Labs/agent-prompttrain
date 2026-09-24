@@ -23,11 +23,22 @@ export interface LastMessageSummary {
 }
 
 /**
+ * Clip to SUMMARY_TEXT_LIMIT UTF-16 code units without splitting a surrogate pair:
+ * PostgreSQL rejects a lone high surrogate in JSONB, which would fail the whole INSERT.
+ * At least SUMMARY_TEXT_LIMIT - 1 units remain, still above 81.
+ */
+function clip(value: string): string {
+  const clipped = value.slice(0, SUMMARY_TEXT_LIMIT)
+  const last = clipped.charCodeAt(clipped.length - 1)
+  return last >= 0xd800 && last <= 0xdbff ? clipped.slice(0, -1) : clipped
+}
+
+/**
  * Trim, then clip. Non-empty whitespace-only text becomes a single space so
  * truthiness checks downstream see the same value as with the original text.
  */
 function clipText(value: string): string {
-  const clipped = value.trim().slice(0, SUMMARY_TEXT_LIMIT)
+  const clipped = clip(value.trim())
   return clipped.length > 0 || value.length === 0 ? clipped : ' '
 }
 
@@ -52,7 +63,7 @@ function summarizeBlock(block: any): SummaryBlock | null {
       if (block.content) {
         const source =
           typeof block.content === 'string' ? block.content : JSON.stringify(block.content)
-        summary.content = source.slice(0, SUMMARY_TEXT_LIMIT)
+        summary.content = clip(source)
       }
       return summary
     }
@@ -60,7 +71,7 @@ function summarizeBlock(block: any): SummaryBlock | null {
       const summary: SummaryBlock = { type: 'tool_use', id: block.id, name: block.name }
       const prompt = block.input?.prompt
       if (typeof prompt === 'string' && prompt.length > 0) {
-        summary.input = { prompt: prompt.slice(0, SUMMARY_TEXT_LIMIT) }
+        summary.input = { prompt: clip(prompt) }
       }
       return summary
     }

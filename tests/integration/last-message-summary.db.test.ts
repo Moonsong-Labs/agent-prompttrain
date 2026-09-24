@@ -13,6 +13,7 @@ import {
 } from '../../services/dashboard/src/utils/last-message'
 import { calculateConversationMetrics } from '../../services/dashboard/src/utils/conversation-metrics'
 import { runBackfill } from '../../scripts/db/backfill-last-message-summary'
+import { StorageWriter } from '../../services/proxy/src/storage/writer'
 
 // Only ever runs against an explicitly named local *_test database
 const databaseUrl = process.env.SUMMARY_TEST_DATABASE_URL
@@ -21,6 +22,16 @@ const root = join(import.meta.dir, '../..')
 
 const CONVERSATION = '55555555-5555-4555-8555-555555555555'
 const BACKFILL_CONVERSATION = '66666666-6666-4666-8666-666666666666'
+const WRITER_CONVERSATION = '77777777-7777-4777-8777-777777777777'
+const EMOJI_BACKFILL_CONVERSATION = '88888888-8888-4888-8888-888888888888'
+const TEST_CONVERSATIONS = [
+  CONVERSATION,
+  BACKFILL_CONVERSATION,
+  WRITER_CONVERSATION,
+  EMOJI_BACKFILL_CONVERSATION,
+]
+// An emoji whose high surrogate sits at index 199, right at the 200-unit clip
+const STRADDLING = 'a'.repeat(199) + '\u{1F916} Generated with Claude Code'
 const id = (n: number) => `99999999-0000-4000-8000-${String(n).padStart(12, '0')}`
 
 describe.skipIf(!enabled)('last-message summary against PostgreSQL', () => {
@@ -77,13 +88,13 @@ describe.skipIf(!enabled)('last-message summary against PostgreSQL', () => {
     pool = new Pool({ connectionString: databaseUrl })
     process.env.DASHBOARD_CACHE_TTL = '0'
     await pool.query('DELETE FROM api_requests WHERE conversation_id = ANY($1::uuid[])', [
-      [CONVERSATION, BACKFILL_CONVERSATION],
+      TEST_CONVERSATIONS,
     ])
   })
 
   afterAll(async () => {
     await pool.query('DELETE FROM api_requests WHERE conversation_id = ANY($1::uuid[])', [
-      [CONVERSATION, BACKFILL_CONVERSATION],
+      TEST_CONVERSATIONS,
     ])
     await pool.end()
   })
@@ -298,5 +309,75 @@ describe.skipIf(!enabled)('last-message summary against PostgreSQL', () => {
         single.map(s => s.request_id)
       )
     }
+  })
+
+  it('the proxy writer stores a request whose last message straddles the clip with an emoji', async () => {
+    const messages = [
+      { role: 'user', content: 'Summarize the release log' },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'tu9', name: 'Bash', input: {} }] },
+      {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu9', content: STRADDLING },
+          { type: 'text', text: STRADDLING },
+        ],
+      },
+    ]
+
+    await new StorageWriter(pool).storeRequest({
+      requestId: id(50),
+      projectId: 'project-e2e',
+      timestamp: new Date(),
+      method: 'POST',
+      path: '/v1/messages',
+      headers: {},
+      body: { messages },
+      apiKey: '',
+      model: 'claude-test',
+      requestType: 'inference',
+      conversationId: WRITER_CONVERSATION,
+      messageCount: messages.length,
+    })
+
+    const { rows } = await pool.query(
+      `SELECT jsonb_typeof(last_message_summary) AS summary_type, last_message_summary,
+              user_text_message_count
+       FROM api_requests WHERE request_id = $1`,
+      [id(50)]
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].summary_type).toBe('object')
+    expect(rows[0].last_message_summary).toEqual(
+      JSON.parse(JSON.stringify(summarizeLastMessage(messages[2])))
+    )
+    expect(rows[0].user_text_message_count).toBe(countUserTextMessages(messages))
+  })
+
+  it('backfills a legacy row whose last message straddles the clip with an emoji', async () => {
+    const messages = [
+      { role: 'user', content: 'Write the changelog' },
+      { role: 'assistant', content: [{ type: 'text', text: STRADDLING }] },
+    ]
+    await insert({
+      requestId: id(60),
+      conversationId: EMOJI_BACKFILL_CONVERSATION,
+      timestamp: new Date(Date.now() - 60_000).toISOString(),
+      messages,
+      summarized: false,
+    })
+
+    await runBackfill(pool, { days: 90, batchSize: 200, sleepMs: 0, execute: true }, () => {})
+
+    const { rows } = await pool.query(
+      `SELECT jsonb_typeof(last_message_summary) AS summary_type, last_message_summary,
+              user_text_message_count
+       FROM api_requests WHERE request_id = $1`,
+      [id(60)]
+    )
+    expect(rows[0].summary_type).toBe('object')
+    expect(rows[0].last_message_summary).toEqual(
+      JSON.parse(JSON.stringify(summarizeLastMessage(messages[1])))
+    )
+    expect(rows[0].user_text_message_count).toBe(countUserTextMessages(messages))
   })
 })

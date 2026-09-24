@@ -4,8 +4,16 @@ import { classifyLastMessage, getLastMessageContent } from '../last-message'
 import { calculateConversationMetrics } from '../conversation-metrics'
 import type { ConversationRequest } from '../../types/conversation'
 
-// Summaries round-trip through JSONB in production
-const stored = (message: unknown) => JSON.parse(JSON.stringify(summarizeLastMessage(message)))
+// Summaries round-trip through JSONB in production. JSONB rejects lone surrogates,
+// which Bun's JSON.stringify writes as \udXXX escapes, while JSON.parse accepts them.
+const stored = (message: unknown) => {
+  const json = JSON.stringify(summarizeLastMessage(message))
+  expect(json).not.toMatch(/\\ud[89a-f][0-9a-f]{2}/i)
+  return JSON.parse(json)
+}
+
+// An emoji whose high surrogate sits at index 199, right at the 200-unit clip
+const STRADDLING = 'a'.repeat(199) + '\u{1F916} Generated with Claude Code'
 
 const LAST_MESSAGES: Record<string, unknown> = {
   userString: { role: 'user', content: 'Please fix the failing test in src/app.ts' },
@@ -64,6 +72,16 @@ const LAST_MESSAGES: Record<string, unknown> = {
   emptyArray: { role: 'user', content: [] },
   document: { role: 'user', content: [{ type: 'document', source: { data: 'D' } }] },
   systemRole: { role: 'system', content: [] },
+  straddlingEmojiString: { role: 'user', content: STRADDLING },
+  straddlingEmojiText: { role: 'assistant', content: [{ type: 'text', text: STRADDLING }] },
+  straddlingEmojiToolResult: {
+    role: 'user',
+    content: [{ type: 'tool_result', tool_use_id: 'toolu_f', content: STRADDLING }],
+  },
+  straddlingEmojiToolUse: {
+    role: 'assistant',
+    content: [{ type: 'tool_use', id: 'toolu_g', name: 'Task', input: { prompt: STRADDLING } }],
+  },
 }
 
 describe('last-message summary parity', () => {
