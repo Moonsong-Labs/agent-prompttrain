@@ -99,7 +99,7 @@ Sub-tasks:
 
 ### 5. Rendering — `services/dashboard/src/routes/conversation-detail.ts`
 
-- Extract `buildTimelineData(conversation, selectedBranch)` (branch filtering + sub-task map) used by both the main route and `/conversation/:id/messages`, so both produce identical timeline HTML (the `/messages` route currently omits sub-task info).
+- Extract `filterRequestsByBranch(requests, selectedBranch)` and `buildSubtasksMap(requests, subtasksByRequest)` (in `services/dashboard/src/utils/conversation-timeline.ts`), used by both the main route and `/conversation/:id/messages`, so both produce identical timeline HTML (the `/messages` route currently omits sub-task info).
 - Timeline panel is server-rendered only when `view=timeline`; otherwise it contains a placeholder that htmx loads from `/dashboard/conversation/:id/messages?branch=…` the first time `switchTab('timeline')` runs.
 - Tree SVG (default view) and the already-lazy analytics panel stay as is. If the tree SVG alone exceeds 500 KB on the 641-request conversation, report it rather than expand scope.
 - Extract the tree node last-message classification into a pure `classifyLastMessage(lastMessage)` helper (enables parity testing; behaviour unchanged).
