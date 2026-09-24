@@ -3104,25 +3104,11 @@ counts agree. Prints request ids only. `bun scripts/db/verify-last-message-summa
 
 - [ ] **Step 2: Prepare the read-only production sandbox**
 
-If `/tmp/e2e-explore/sandbox-env.sh` or `/tmp/e2e-explore/rds-global-bundle.pem` is missing, recreate them:
+Use a database session that is read-only by default (`default_transaction_read_only=on`), has a
+`statement_timeout`, and connects over TLS with certificate verification. In the same shell you will
+use for Steps 3–4, verify the guard before any other query:
 
 ```bash
-mkdir -p /tmp/e2e-explore
-curl -sfo /tmp/e2e-explore/rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-cat > /tmp/e2e-explore/sandbox-env.sh <<'EOF'
-export PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000'
-export HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9
-export NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1
-export AI_WORKER_ENABLED=false SLACK_ENABLED=false SLACK_WEBHOOK_URL= MCP_ENABLED=false MCP_WATCH_FILES=false
-export NODE_EXTRA_CA_CERTS=/tmp/e2e-explore/rds-global-bundle.pem
-case "$DATABASE_URL" in *sslmode=*) ;; *) export DATABASE_URL="${DATABASE_URL}?sslmode=verify-full&sslrootcert=/tmp/e2e-explore/rds-global-bundle.pem" ;; esac
-EOF
-```
-
-Verify the guard in the same shell you will use:
-
-```bash
-set -a; . ./.env; set +a; . /tmp/e2e-explore/sandbox-env.sh
 psql "$DATABASE_URL" -Atc "show default_transaction_read_only"
 ```
 
@@ -3131,7 +3117,7 @@ Expected: `on`. If it is not `on`, stop — do not continue with Steps 3–4.
 - [ ] **Step 3: Run the parity check (read-only)**
 
 ```bash
-set -a; . ./.env; set +a; . /tmp/e2e-explore/sandbox-env.sh
+# in the read-only session from Step 2
 bun scripts/db/verify-last-message-summary.ts --sample 2000 --count-sample 50
 ```
 
@@ -3144,7 +3130,7 @@ Find the largest recent conversation, then time today's query and the post-backf
 The baseline query decompresses every body, so pick the most-requested conversation whose stored bodies stay under 1 GB (`pg_column_size` reads the TOAST pointer only, so this is cheap), and allow 120 s for this step only (still read-only):
 
 ```bash
-set -a; . ./.env; set +a; . /tmp/e2e-explore/sandbox-env.sh
+# in the read-only session from Step 2
 export PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=120000'
 CONV=$(psql "$DATABASE_URL" -Atc "SELECT conversation_id FROM api_requests WHERE timestamp > now() - interval '30 days' AND conversation_id IS NOT NULL GROUP BY 1 HAVING sum(pg_column_size(body)) < 1000000000 ORDER BY count(*) DESC LIMIT 1")
 psql "$DATABASE_URL" -Atc "SELECT count(*), pg_size_pretty(sum(pg_column_size(body))) FROM api_requests WHERE conversation_id = '$CONV'"

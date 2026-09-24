@@ -82,8 +82,15 @@ bun run db:backfill:last-message-summary --execute           # write, last 90 da
 bun run db:backfill:last-message-summary --days 30 --batch-size 100 --sleep-ms 500 --execute
 ```
 
-Run after migration 026 and after the new proxy is deployed, off-peak. Each row's body is
-decompressed once on the database server; expect roughly 1–2 hours for 90 days of production data.
+Run after migration 026 and after the new proxy is deployed, off-peak. Bodies are decompressed on
+the database server (only the last message and a count cross the network); expect roughly 1–2
+hours for 90 days of production data.
+
+The updates are mostly non-HOT, so every updated row re-inserts its entries into each index on
+`api_requests`, including the GIN index on `response_body` (`idx_api_requests_response_body_task`),
+which grows and does not shrink. Pilot first: run `--max-batches 50 --execute` off-peak, compare
+`pg_relation_size('idx_api_requests_response_body_task')` before and after, and extrapolate before
+starting the full run.
 
 ### verify-last-message-summary.ts
 

@@ -74,14 +74,18 @@ ALTER TABLE api_requests
 
 Trimming before slicing keeps `hasVisibleText` and the existing previews (trim → 77 chars + `...` when > 80) byte-identical. 200 chars > 81 keeps every length decision unchanged.
 
+Every slice counts UTF-16 code units and drops a trailing high surrogate, so a character above U+FFFF (e.g. an emoji) at the boundary is never split: PostgreSQL rejects a lone surrogate in JSONB. At least 199 units remain, still > 81.
+
 `countUserTextMessages(messages) → number` — count of `role === 'user'` messages where `hasVisibleText` is true. `hasVisibleText` moves from `services/dashboard/src/utils/conversation-metrics.ts` to shared (ADR-001); the dashboard imports it.
 
 `USER_TEXT_MESSAGE_COUNT_SQL` — exported SQL fragment implementing the same rule over `body -> 'messages'` (string content with a non-whitespace char, or an array containing a `text` block with a non-whitespace char). Used by the reader fallback and the backfill. Parity with the JS function is covered by tests; any unavoidable Unicode-whitespace difference is documented.
 
 ### 3. Write path — `services/proxy/src/storage/writer.ts` `storeRequest`
 
-- Compute both values from `request.body.messages` (already parsed in memory) and add them to the existing INSERT (two extra parameters; no extra query).
+- Compute both values from `request.body.messages` (already parsed in memory) and add them to the existing INSERT (two extra parameters; no extra query per request).
 - Summary computation is wrapped so any failure stores `NULL` and the INSERT still happens — the summary can never cause a lost request row.
+- If PostgreSQL still rejects the INSERT as invalid text (SQLSTATE `22P02`/`22P05`) while summary values are present, it is retried once with both summary columns `NULL` and a warning is logged.
+- The writer checks once per process (`information_schema.columns`) whether both columns exist. Without them (migration 026 not applied) it uses the pre-026 INSERT and logs one error, so request rows are kept.
 
 ### 4. Read path — `services/dashboard/src/storage/reader.ts`
 
@@ -103,7 +107,7 @@ Sub-tasks:
 - Timeline panel is server-rendered only when `view=timeline`; otherwise it contains a placeholder that htmx loads from `/dashboard/conversation/:id/messages?branch=…` the first time `switchTab('timeline')` runs.
 - Tree SVG (default view) and the already-lazy analytics panel stay as is. If the tree SVG alone exceeds 500 KB on the 641-request conversation, report it rather than expand scope.
 - Extract the tree node last-message classification into a pure `classifyLastMessage(lastMessage)` helper (enables parity testing; behaviour unchanged).
-- Access control is unchanged in this PR (tracked separately).
+- Access control: unchanged.
 
 ### 6. Backfill — `scripts/db/backfill-last-message-summary.ts`
 
@@ -113,7 +117,7 @@ Sub-tasks:
 - Keyset pagination newest-first on `(timestamp, request_id)` over `timestamp >= now() - N days AND last_message_summary IS NULL` (uses the timestamp index).
 - Per batch selects only `request_id`, `body -> 'messages' -> -1`, and `USER_TEXT_MESSAGE_COUNT_SQL` — decompression stays server-side; only the last message and an integer cross the network. Summarises in JS with the shared function, then one `UPDATE … FROM (VALUES …) … WHERE a.last_message_summary IS NULL` per batch (idempotent, resumable, never overwrites writer-populated rows).
 - Safety: prints masked DB host and row estimate; refuses `--execute` on a read-only session; `statement_timeout 120s`, `lock_timeout 5s`, `application_name = backfill-last-message-summary`; Ctrl-C finishes the current batch and prints the resume cursor; progress with rows/s and ETA.
-- Expected 90-day cost: ~515k rows; ~240 GB of compressed bodies read once server-side; ~515k mostly non-HOT updates (dead tuples and index entries reclaimed by autovacuum; transient heap growth < 1 GB); ~1–2 h throttled; run off-peak (busiest hour is 20:00 UTC).
+- Expected 90-day cost: ~515k rows; ~240 GB of compressed bodies read once server-side; ~515k mostly non-HOT updates (dead tuples and index entries reclaimed by autovacuum; transient heap growth < 1 GB; each update re-inserts its entries in every index, including the GIN index on `response_body`, which does not shrink — pilot with `--max-batches 50 --execute` first); ~1–2 h throttled; run off-peak (busiest hour is 20:00 UTC).
 - Operated by a human against production; never run automatically.
 
 ## Testing & Verification

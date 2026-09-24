@@ -32,8 +32,8 @@ Claude Code sessions, 8–9 s for a 641-request conversation).
 ## Decision
 
 Option 1. The proxy stores `last_message_summary` (a truncated copy of the last message: text
-trimmed and clipped to 200 characters per block, tool-result ids/error flags, tool-use names,
-no binary payloads) and `user_text_message_count` in the same INSERT. The logic lives in
+trimmed and clipped to 200 UTF-16 code units per field without splitting a surrogate pair,
+tool-result ids/error flags, tool-use names, no binary payloads) and `user_text_message_count` in the same INSERT. The logic lives in
 `packages/shared/src/utils/message-summary.ts`, with a SQL twin (`userTextMessageCountSql`)
 used by the dashboard fallback and the backfill. Readers prefer the stored columns and fall
 back to body extraction only for rows without a summary. `scripts/db/backfill-last-message-summary.ts`
@@ -43,5 +43,8 @@ fills recent history (default 90 days), dry-run by default.
 
 - Positive: the conversation page reads only small columns for summarised rows.
 - Negative: summaries duplicate a small, truncated part of each body (~0.2–2 KB per row).
-- Deployment order: migration 026 → proxy and dashboard → backfill.
-- Summary failures store NULL and never block the request INSERT.
+- Deployment order: migration 026 → proxy and dashboard → backfill. A proxy started before the
+  migration stores requests without summaries and logs an error until the migration is applied
+  and the proxy is restarted.
+- Summary failures store NULL and never block the request INSERT; an INSERT that PostgreSQL
+  rejects as invalid text (`22P02`/`22P05`) is retried once without the summary.
