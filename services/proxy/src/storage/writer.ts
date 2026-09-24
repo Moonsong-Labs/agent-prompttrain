@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { logger } from '../middleware/logger.js'
 import { SUBAGENT_TOOL_NAMES } from '@agent-prompttrain/shared'
+import { buildSummaryColumns } from './summary-columns.js'
 
 /**
  * Length of the compact-summary prefix used to locate the summarizing response.
@@ -126,13 +127,16 @@ export class StorageWriter {
       // get a branch ID instead of inheriting "main" from its parent
       const branchId = request.branchId || 'main'
 
+      const summaryColumns = buildSummaryColumns(request.body)
+
       const query = `
         INSERT INTO api_requests (
-          request_id, project_id, account_id, timestamp, method, path, headers, body, 
-          api_key_hash, model, request_type, current_message_hash, 
+          request_id, project_id, account_id, timestamp, method, path, headers, body,
+          api_key_hash, model, request_type, current_message_hash,
           parent_message_hash, conversation_id, branch_id, system_hash, message_count,
-          parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+          parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id,
+          last_message_summary, user_text_message_count
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         ON CONFLICT (request_id) DO NOTHING
       `
 
@@ -158,6 +162,8 @@ export class StorageWriter {
         isSubtask,
         request.taskToolInvocation ? JSON.stringify(request.taskToolInvocation) : null,
         request.parentRequestId || null,
+        summaryColumns.lastMessageSummary,
+        summaryColumns.userTextMessageCount,
       ]
 
       await this.pool.query(query, values)
