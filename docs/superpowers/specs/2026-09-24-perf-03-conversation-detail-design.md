@@ -9,7 +9,7 @@ Make the dashboard conversation detail page (`/dashboard/conversation/:id`) fast
 
 ## Problem
 
-Measured against the production database on 2026-09-23 (from a workstation ~90 ms from the DB):
+Measured read-only against production data on 2026-09-23:
 
 | Conversation              | Stored bodies (compressed) | Page time                    | HTML    |
 | ------------------------- | -------------------------- | ---------------------------- | ------- |
