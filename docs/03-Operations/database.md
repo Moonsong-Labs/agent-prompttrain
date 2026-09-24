@@ -45,6 +45,8 @@ The main table storing all API requests and responses.
 | parent_task_request_id      | UUID         | Links sub-task requests to parent task                          |
 | is_subtask                  | BOOLEAN      | Indicates if request is a sub-task                              |
 | task_tool_invocation        | JSONB        | Task tool invocation details                                    |
+| last_message_summary        | JSONB        | Truncated copy of the request's last message (ADR-037)          |
+| user_text_message_count     | INTEGER      | User messages with visible text in the request (ADR-037)        |
 | created_at                  | TIMESTAMPTZ  | Record creation timestamp                                       |
 
 ### streaming_chunks

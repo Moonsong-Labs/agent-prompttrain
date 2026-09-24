@@ -9,6 +9,7 @@ export * from './utils/conversation-linker.js'
 export * from './utils/system-reminder.js'
 export * from './utils/validation.js'
 export * from './utils/auth.js'
+export * from './utils/message-summary.js'
 
 // Re-export specific functions to ensure they're available
 export {

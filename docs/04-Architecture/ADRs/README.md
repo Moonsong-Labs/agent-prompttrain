@@ -68,6 +68,7 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-034](./adr-034-project-system-prompt-override.md)                       | Project System Prompt Override                     | Accepted   | 2026-03-19 |
 | [ADR-035](./adr-035-model-pricing-registry-and-fallback-cost-attribution.md) | Model Pricing Registry & Fallback Cost Attribution | Accepted   | 2026-07-05 |
 | [ADR-036](./adr-036-gmail-assisted-oauth-relogin.md)                         | Gmail-Assisted Anthropic OAuth Relogin             | Accepted   | 2026-07-22 |
+| [ADR-037](./adr-037-precomputed-last-message-summary.md)                     | Precomputed Last-Message Summary                   | Accepted   | 2026-09-24 |
 
 ## Creating a New ADR
 

@@ -69,6 +69,35 @@ Updates the message_count field for all requests in the database.
 bun run scripts/db/recalculate-message-counts.ts
 ```
 
+### backfill-last-message-summary.ts
+
+Fills `api_requests.last_message_summary` and `user_text_message_count` (ADR-037) for recent rows.
+Dry-run by default; writes only with `--execute`. Newest rows first, only rows whose summary is
+still NULL, so it is safe to stop (Ctrl-C finishes the current batch) and resume with the printed
+`--before` value.
+
+```bash
+bun run db:backfill:last-message-summary                     # dry run, last 90 days
+bun run db:backfill:last-message-summary --execute           # write, last 90 days
+bun run db:backfill:last-message-summary --days 30 --batch-size 100 --sleep-ms 500 --execute
+```
+
+Run after migration 026 and after the new proxy is deployed, off-peak. Bodies are decompressed on
+the database server (only the last message and a count cross the network); expect roughly 1–2
+hours for 90 days of production data.
+
+The updates are mostly non-HOT, so every updated row re-inserts its entries into each index on
+`api_requests`, including the GIN index on `response_body` (`idx_api_requests_response_body_task`),
+which grows and does not shrink. Pilot first: run `--max-batches 50 --execute` off-peak, compare
+`pg_relation_size('idx_api_requests_response_body_task')` before and after, and extrapolate before
+starting the full run.
+
+### verify-last-message-summary.ts
+
+Read-only parity check for ADR-037: samples recent requests and confirms the dashboard derives the
+same node types and previews from summaries as from full messages, and that the SQL and JS user-text
+counts agree. Prints request ids only. `bun scripts/db/verify-last-message-summary.ts --sample 2000 --count-sample 50`
+
 ### backup-database.ts
 
 Creates database backups with automatic timestamping.

@@ -14,6 +14,12 @@ import {
   calculateConversationMetrics,
   formatDuration as formatMetricDuration,
 } from '../utils/conversation-metrics.js'
+import { classifyLastMessage, getLastMessageContent } from '../utils/last-message.js'
+import {
+  buildSubtasksMap,
+  filterRequestsByBranch,
+  hasTaskInvocation,
+} from '../utils/conversation-timeline.js'
 import type { ConversationRequest } from '../types/conversation.js'
 
 export const conversationDetailRoutes = new Hono<{
@@ -67,49 +73,11 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
       }
     }
 
-    // Fetch sub-tasks for requests that have task invocations
-    const subtasksMap = new Map<string, any[]>()
-    for (const req of conversation.requests) {
-      if (
-        req.task_tool_invocation &&
-        Array.isArray(req.task_tool_invocation) &&
-        req.task_tool_invocation.length > 0
-      ) {
-        const subtasks = await storageService.getSubtasksForRequest(req.request_id)
-        if (subtasks.length > 0) {
-          // Group sub-tasks by their conversation ID
-          const subtasksByConversation = subtasks.reduce(
-            (acc, subtask) => {
-              const convId = subtask.conversation_id || 'unknown'
-              if (!acc[convId]) {
-                acc[convId] = []
-              }
-              acc[convId].push(subtask)
-              return acc
-            },
-            {} as Record<string, any[]>
-          )
-
-          // Link sub-task conversations to task invocations
-          const enrichedInvocations = req.task_tool_invocation.map((invocation: any) => {
-            // Find matching sub-task conversation by checking first message content
-            for (const [convId, convSubtasks] of Object.entries(subtasksByConversation)) {
-              // Check if any subtask in this conversation matches the invocation prompt
-              const matches = convSubtasks.some(st => {
-                // This is a simplified check - you might need more sophisticated matching
-                return st.is_subtask && st.parent_task_request_id === req.request_id
-              })
-              if (matches) {
-                return { ...invocation, linked_conversation_id: convId }
-              }
-            }
-            return invocation
-          })
-
-          subtasksMap.set(req.request_id, enrichedInvocations)
-        }
-      }
-    }
+    // One batched lookup for every request that spawned sub-tasks
+    const subtasksByRequest = await storageService.getSubtasksForRequests(
+      conversation.requests.filter(hasTaskInvocation).map(req => req.request_id)
+    )
+    const subtasksMap = buildSubtasksMap(conversation.requests, subtasksByRequest)
 
     // Use the actual message count from the database
     const requestDetailsMap = new Map<string, { messageCount: number; messageTypes: string[] }>()
@@ -169,20 +137,6 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         parentId = parentReq?.request_id
       }
 
-      // Check if the last message in the request is a user message with text content
-      let hasUserMessage = false
-      const lastMessage = req.last_message
-      if (lastMessage?.role === 'user') {
-        // Check if content has text type
-        if (typeof lastMessage.content === 'string') {
-          hasUserMessage = lastMessage.content.trim().length > 0
-        } else if (Array.isArray(lastMessage.content)) {
-          hasUserMessage = lastMessage.content.some(
-            (item: any) => item.type === 'text' && item.text && item.text.trim().length > 0
-          )
-        }
-      }
-
       // Calculate context tokens for this request
       let contextTokens = 0
       if (req.response_body?.usage) {
@@ -193,36 +147,9 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
           (usage.cache_creation_input_tokens || 0)
       }
 
-      // Determine the last message type and tool result status
-      let lastMessageType: 'user' | 'assistant' | 'tool_result' = 'assistant'
-      let toolResultStatus: 'success' | 'error' | 'mixed' | undefined
-
-      // Check if the last message in the request contains tool results
-      if (lastMessage && lastMessage.content && Array.isArray(lastMessage.content)) {
-        const toolResults = lastMessage.content.filter((item: any) => item.type === 'tool_result')
-
-        if (toolResults.length > 0) {
-          lastMessageType = 'tool_result'
-
-          // Check for errors in tool results
-          const hasError = toolResults.some((result: any) => result.is_error === true)
-          const hasSuccess = toolResults.some((result: any) => result.is_error !== true)
-
-          if (hasError && hasSuccess) {
-            toolResultStatus = 'mixed'
-          } else if (hasError) {
-            toolResultStatus = 'error'
-          } else {
-            toolResultStatus = 'success'
-          }
-        }
-      }
-
-      // Override if last message is actually a user message
-      if (hasUserMessage) {
-        lastMessageType = 'user'
-        toolResultStatus = undefined
-      }
+      const { hasUserMessage, lastMessageType, toolResultStatus } = classifyLastMessage(
+        req.last_message
+      )
 
       graphNodes.push({
         id: req.request_id,
@@ -257,8 +184,8 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
         Array.isArray(req.task_tool_invocation) &&
         req.task_tool_invocation.length > 0
       ) {
-        // Get actual sub-task count from database
-        const actualSubtaskCount = await storageService.countSubtasksForRequests([req.request_id])
+        // Get actual sub-task count from the batched lookup
+        const actualSubtaskCount = (subtasksByRequest.get(req.request_id) ?? []).length
 
         // Even if actualSubtaskCount is 0, show the task invocations if they exist
         const displayCount = actualSubtaskCount || req.task_tool_invocation.length
@@ -299,7 +226,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
 
         // If we still don't have a linked conversation, try to find it from sub-tasks
         if (!linkedConversationId) {
-          const subtasks = await storageService.getSubtasksForRequest(req.request_id)
+          const subtasks = subtasksByRequest.get(req.request_id) ?? []
           if (subtasks.length > 0 && subtasks[0].conversation_id) {
             linkedConversationId = subtasks[0].conversation_id
           }
@@ -357,33 +284,7 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
     const svgGraph = renderGraphSVG(graphLayout, true)
 
     // Filter requests by branch if selected
-    let filteredRequests = conversation.requests
-    if (selectedBranch && selectedBranch !== 'main') {
-      // Find the first request in the selected branch
-      const branchRequests = conversation.requests.filter(r => r.branch_id === selectedBranch)
-      if (branchRequests.length > 0) {
-        // Sort by timestamp to get the first request in the branch
-        branchRequests.sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        )
-        const firstBranchRequest = branchRequests[0]
-
-        // Get all requests from main branch that happened before the branch diverged
-        const mainRequestsBeforeBranch = conversation.requests.filter(
-          r =>
-            (r.branch_id === 'main' || !r.branch_id) &&
-            new Date(r.timestamp) < new Date(firstBranchRequest.timestamp)
-        )
-
-        // Combine main requests before branch + all branch requests
-        filteredRequests = [...mainRequestsBeforeBranch, ...branchRequests]
-      } else {
-        filteredRequests = branchRequests
-      }
-    } else if (selectedBranch === 'main') {
-      // For main branch, show only main branch requests
-      filteredRequests = conversation.requests.filter(r => r.branch_id === 'main' || !r.branch_id)
-    }
+    const filteredRequests = filterRequestsByBranch(conversation.requests, selectedBranch)
 
     // Calculate stats
     const totalDuration =
@@ -876,7 +777,24 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
           class="conversation-timeline"
           style="display: ${view === 'timeline' ? 'block' : 'none'};"
         >
-          ${raw(renderConversationMessages(filteredRequests, conversation.branches, subtasksMap))}
+          ${view === 'timeline'
+            ? raw(renderConversationMessages(filteredRequests, conversation.branches, subtasksMap))
+            : html`<div
+                id="timeline-lazy"
+                data-testid="timeline-lazy"
+                hx-get="/dashboard/conversation/${conversationId}/messages${selectedBranch
+                  ? `?branch=${encodeURIComponent(selectedBranch)}`
+                  : ''}"
+                hx-trigger="timeline-open once"
+                hx-swap="outerHTML"
+              >
+                <div class="section">
+                  <div class="section-content">
+                    <span class="spinner"></span>
+                    <span>Loading timeline...</span>
+                  </div>
+                </div>
+              </div>`}
         </div>
 
         <!-- AI Analysis -->
@@ -915,6 +833,14 @@ conversationDetailRoutes.get('/conversation/:id', async c => {
             tabName === 'timeline' ? 'block' : 'none'
           document.getElementById('analytics-panel').style.display =
             tabName === 'analytics' ? 'block' : 'none'
+
+          // Load the timeline on first open
+          if (tabName === 'timeline') {
+            const lazyTimeline = document.getElementById('timeline-lazy')
+            if (lazyTimeline && window.htmx) {
+              window.htmx.trigger(lazyTimeline, 'timeline-open')
+            }
+          }
 
           // Update tab styles
           const treeTab = document.getElementById('tree-tab')
@@ -1163,123 +1089,18 @@ conversationDetailRoutes.get('/conversation/:id/messages', async c => {
       }
     }
 
-    let filteredRequests = conversation.requests
-    if (selectedBranch && selectedBranch !== 'main') {
-      // Find the first request in the selected branch
-      const branchRequests = conversation.requests.filter(r => r.branch_id === selectedBranch)
-      if (branchRequests.length > 0) {
-        // Sort by timestamp to get the first request in the branch
-        branchRequests.sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        )
-        const firstBranchRequest = branchRequests[0]
+    const filteredRequests = filterRequestsByBranch(conversation.requests, selectedBranch)
+    const subtasksByRequest = await storageService.getSubtasksForRequests(
+      filteredRequests.filter(hasTaskInvocation).map(req => req.request_id)
+    )
+    const subtasksMap = buildSubtasksMap(filteredRequests, subtasksByRequest)
 
-        // Get all requests from main branch that happened before the branch diverged
-        const mainRequestsBeforeBranch = conversation.requests.filter(
-          r =>
-            (r.branch_id === 'main' || !r.branch_id) &&
-            new Date(r.timestamp) < new Date(firstBranchRequest.timestamp)
-        )
-
-        // Combine main requests before branch + all branch requests
-        filteredRequests = [...mainRequestsBeforeBranch, ...branchRequests]
-      } else {
-        filteredRequests = branchRequests
-      }
-    } else if (selectedBranch === 'main') {
-      // For main branch, show only main branch requests
-      filteredRequests = conversation.requests.filter(r => r.branch_id === 'main' || !r.branch_id)
-    }
-
-    return c.html(renderConversationMessages(filteredRequests, conversation.branches))
+    return c.html(renderConversationMessages(filteredRequests, conversation.branches, subtasksMap))
   } catch (error) {
     console.error('Error loading conversation messages:', error)
     return c.html(html`<div class="error-banner">Failed to load messages</div>`)
   }
 })
-
-/**
- * Helper to extract the last message content from a request
- */
-function getLastMessageContent(req: ConversationRequest): string {
-  try {
-    // Check if we have the optimized last_message field
-    if (req.last_message) {
-      const lastMessage = req.last_message
-
-      // Handle the last message directly
-      if (typeof lastMessage.content === 'string') {
-        const content = lastMessage.content.trim()
-        return content.length > 80 ? content.substring(0, 77) + '...' : content
-      } else if (Array.isArray(lastMessage.content)) {
-        for (const block of lastMessage.content) {
-          if (block.type === 'text' && block.text) {
-            const content = block.text.trim()
-            return content.length > 80 ? content.substring(0, 77) + '...' : content
-          } else if (block.type === 'tool_use' && block.name) {
-            return `🔧 Tool: ${block.name}${block.input?.prompt ? ' - ' + block.input.prompt.substring(0, 50) + '...' : ''}`
-          } else if (block.type === 'tool_result' && block.tool_use_id) {
-            return `✅ Tool Result${block.content ? ': ' + (typeof block.content === 'string' ? block.content : JSON.stringify(block.content)).substring(0, 50) + '...' : ''}`
-          }
-        }
-      }
-
-      // Fallback to role-based description
-      if (lastMessage.role === 'assistant') {
-        return '🤖 Assistant response'
-      } else if (lastMessage.role === 'user') {
-        return '👤 User message'
-      } else if (lastMessage.role === 'system') {
-        return '⚙️ System message'
-      }
-    }
-
-    // Legacy fallback for old data structure
-    if (!req.body || !req.body.messages || !Array.isArray(req.body.messages)) {
-      return 'Request ID: ' + req.request_id
-    }
-
-    const messages = req.body.messages
-    if (messages.length === 0) {
-      return 'Request ID: ' + req.request_id
-    }
-
-    // Get the last message
-    const lastMessage = messages[messages.length - 1]
-
-    // Handle different message formats
-    if (typeof lastMessage.content === 'string') {
-      // Simple string content
-      const content = lastMessage.content.trim()
-      return content.length > 80 ? content.substring(0, 77) + '...' : content
-    } else if (Array.isArray(lastMessage.content)) {
-      // Array of content blocks
-      for (const block of lastMessage.content) {
-        if (block.type === 'text' && block.text) {
-          const content = block.text.trim()
-          return content.length > 80 ? content.substring(0, 77) + '...' : content
-        } else if (block.type === 'tool_use' && block.name) {
-          return `🔧 Tool: ${block.name}${block.input?.prompt ? ' - ' + block.input.prompt.substring(0, 50) + '...' : ''}`
-        } else if (block.type === 'tool_result' && block.tool_use_id) {
-          return `✅ Tool Result${block.content ? ': ' + (typeof block.content === 'string' ? block.content : JSON.stringify(block.content)).substring(0, 50) + '...' : ''}`
-        }
-      }
-    }
-
-    // Fallback to role-based description
-    if (lastMessage.role === 'assistant') {
-      return '🤖 Assistant response'
-    } else if (lastMessage.role === 'user') {
-      return '👤 User message'
-    } else if (lastMessage.role === 'system') {
-      return '⚙️ System message'
-    }
-
-    return 'Request ID: ' + req.request_id
-  } catch (_error) {
-    return 'Request ID: ' + req.request_id
-  }
-}
 
 /**
  * Helper to extract the response summary from a request
@@ -1339,7 +1160,7 @@ function renderConversationMessages(
   )
 
   return html`
-    <div style="display: grid; gap: 0.25rem;">
+    <div data-testid="timeline-content" style="display: grid; gap: 0.25rem;">
       ${raw(
         sortedRequests
           .map(req => {

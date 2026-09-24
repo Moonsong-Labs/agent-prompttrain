@@ -219,6 +219,23 @@ Adds PostgreSQL coordination for multi-instance account pooling:
 - per-credential/model upstream cooldowns
 - shared project affinity and in-flight request counts
 
+### 026-add-last-message-summary.ts
+
+Adds two nullable columns to `api_requests` so the conversation page no longer decompresses full
+request bodies ([ADR-037](../../../docs/04-Architecture/ADRs/adr-037-precomputed-last-message-summary.md)):
+
+- `last_message_summary` JSONB: truncated copy of the request's last message
+- `user_text_message_count` INTEGER: number of user messages with visible text
+
+Metadata-only (no default, no index) and idempotent. Apply it before deploying the proxy and
+dashboard that use the columns, then fill recent history with
+`bun run db:backfill:last-message-summary` (see [scripts/README.md](../../README.md)). A proxy started
+without the columns stores requests without summaries and logs an error until the migration is
+applied and the proxy is restarted.
+
+The migration sets `lock_timeout = '5s'` so it never queues behind long-running queries on
+`api_requests`. If it fails with a lock timeout, re-run it (off-peak if it keeps failing).
+
 ## Future Migrations
 
 When adding new migrations:

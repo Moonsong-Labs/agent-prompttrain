@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS api_requests (
     account_id VARCHAR(255),
     parent_request_id UUID REFERENCES api_requests(request_id),
     system_hash VARCHAR(64),
+    -- Read-path summary columns (migration 026, ADR-037)
+    last_message_summary JSONB,
+    user_text_message_count INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT chk_parent_request_not_self CHECK (parent_request_id != request_id)
 );

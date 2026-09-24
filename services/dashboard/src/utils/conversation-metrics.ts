@@ -3,6 +3,7 @@
  * and user reply times (excluding tool execution periods)
  */
 
+import { hasVisibleText } from '@agent-prompttrain/shared'
 import type { ConversationRequest } from '../types/conversation.js'
 
 interface ToolExecution {
@@ -41,23 +42,6 @@ export interface ConversationMetrics {
     count: number
     requests: string[]
   }
-}
-
-/**
- * Check if a message contains user-visible text (not just tool operations)
- */
-function hasVisibleText(message: any): boolean {
-  if (!message?.content) {
-    return false
-  }
-
-  if (typeof message.content === 'string') {
-    return message.content.trim().length > 0
-  }
-
-  return message.content.some(
-    (item: any) => item.type === 'text' && item.text && item.text.trim().length > 0
-  )
 }
 
 /**
@@ -237,13 +221,13 @@ function countUserInteractions(requests: ConversationRequest[]): {
   count: number
   requests: string[]
 } {
-  // Find the last request per branch (which should have full body)
+  // Find the last request per branch that carries either a precomputed count or a full body
   const lastRequestPerBranch = new Map<string, ConversationRequest>()
 
   for (const request of requests) {
     const branch = request.branch_id || 'main'
     if (
-      request.body?.messages &&
+      (typeof request.user_text_message_count === 'number' || request.body?.messages) &&
       (!lastRequestPerBranch.has(branch) ||
         new Date(request.timestamp) > new Date(lastRequestPerBranch.get(branch)!.timestamp))
     ) {
@@ -251,9 +235,12 @@ function countUserInteractions(requests: ConversationRequest[]): {
     }
   }
 
-  // If we have a last request with full body, use it
+  // Use the first branch's latest request (unchanged selection rule)
   if (lastRequestPerBranch.size > 0) {
     const lastRequest = Array.from(lastRequestPerBranch.values())[0]
+    if (typeof lastRequest.user_text_message_count === 'number') {
+      return { count: lastRequest.user_text_message_count, requests: [] }
+    }
     return countUserInteractionsFromLastRequest(lastRequest)
   }
 
