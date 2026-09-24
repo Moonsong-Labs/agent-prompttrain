@@ -69,6 +69,22 @@ Updates the message_count field for all requests in the database.
 bun run scripts/db/recalculate-message-counts.ts
 ```
 
+### backfill-last-message-summary.ts
+
+Fills `api_requests.last_message_summary` and `user_text_message_count` (ADR-037) for recent rows.
+Dry-run by default; writes only with `--execute`. Newest rows first, only rows whose summary is
+still NULL, so it is safe to stop (Ctrl-C finishes the current batch) and resume with the printed
+`--before` value.
+
+```bash
+bun run db:backfill:last-message-summary                     # dry run, last 90 days
+bun run db:backfill:last-message-summary --execute           # write, last 90 days
+bun run db:backfill:last-message-summary --days 30 --batch-size 100 --sleep-ms 500 --execute
+```
+
+Run after migration 026 and after the new proxy is deployed, off-peak. Each row's body is
+decompressed once on the database server; expect roughly 1–2 hours for 90 days of production data.
+
 ### backup-database.ts
 
 Creates database backups with automatic timestamping.

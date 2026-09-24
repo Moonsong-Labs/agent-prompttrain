@@ -13,7 +13,7 @@ OVERALL_SUCCESS=0
 
 # Run unit tests
 echo -e "\n${GREEN}Running unit tests...${NC}"
-if bun test test/unit services/proxy/tests tests/unit services/dashboard/src/routes/__tests__ services/dashboard/src/utils/__tests__ services/dashboard/src/storage/__tests__ services/proxy/src/routes/__tests__ services/dashboard/src/layout/__tests__ packages/shared/src/**/__tests__; then
+if bun test test/unit services/proxy/tests tests/unit services/dashboard/src/routes/__tests__ services/dashboard/src/utils/__tests__ services/dashboard/src/storage/__tests__ services/proxy/src/routes/__tests__ services/dashboard/src/layout/__tests__ packages/shared/src/**/__tests__ scripts/db/__tests__; then
     echo -e "${GREEN}✓ Unit tests passed${NC}"
 else
     echo -e "${RED}✗ Unit tests failed${NC}"
