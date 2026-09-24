@@ -19,6 +19,14 @@ const COMPACT_SUMMARY_PROBE_CHARS = 2000
  */
 const COMPACT_SUMMARY_MIN_CHARS = 100
 
+/** SQLSTATEs for text the column type rejects, e.g. JSON that JSONB refuses (lone surrogate, \u0000). */
+const INVALID_TEXT_SQLSTATES = new Set(['22P02', '22P05'])
+
+function isInvalidTextError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' && INVALID_TEXT_SQLSTATES.has(code)
+}
+
 interface StorageRequest {
   requestId: string
   projectId: string
@@ -166,7 +174,24 @@ export class StorageWriter {
         summaryColumns.userTextMessageCount,
       ]
 
-      await this.pool.query(query, values)
+      try {
+        await this.pool.query(query, values)
+      } catch (error) {
+        const hasSummary =
+          summaryColumns.lastMessageSummary !== null || summaryColumns.userTextMessageCount !== null
+        if (!hasSummary || !isInvalidTextError(error)) {
+          throw error
+        }
+        // A summary must never cost the request row (ADR-037): store it once more without one
+        logger.warn('Request summary rejected by the database, storing the request without it', {
+          requestId: request.requestId,
+          metadata: {
+            code: (error as { code?: unknown }).code,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+        await this.pool.query(query, [...values.slice(0, -2), null, null])
+      }
     } catch (error) {
       logger.error('Failed to store request', {
         requestId: request.requestId,
