@@ -5,7 +5,14 @@ interface BranchScopedRequest {
   timestamp: string | Date
 }
 
-export function hasTaskInvocation(req: { task_tool_invocation?: any }): boolean {
+/** A Task tool invocation as stored in api_requests.task_tool_invocation. */
+export interface TaskInvocation {
+  input?: { prompt?: string }
+  linked_conversation_id?: string
+  [key: string]: unknown
+}
+
+export function hasTaskInvocation(req: { task_tool_invocation?: unknown }): boolean {
   return Array.isArray(req.task_tool_invocation) && req.task_tool_invocation.length > 0
 }
 
@@ -48,10 +55,10 @@ export function filterRequestsByBranch<T extends BranchScopedRequest>(
  * Link each task invocation to the sub-task conversation it spawned.
  */
 export function buildSubtasksMap(
-  requests: Array<{ request_id: string; task_tool_invocation?: any }>,
+  requests: Array<{ request_id: string; task_tool_invocation?: unknown }>,
   subtasksByRequest: Map<string, SubtaskSummary[]>
-): Map<string, any[]> {
-  const subtasksMap = new Map<string, any[]>()
+): Map<string, TaskInvocation[]> {
+  const subtasksMap = new Map<string, TaskInvocation[]>()
 
   for (const req of requests) {
     if (!hasTaskInvocation(req)) {
@@ -77,7 +84,8 @@ export function buildSubtasksMap(
     )
 
     // Link sub-task conversations to task invocations
-    const enrichedInvocations = req.task_tool_invocation.map((invocation: any) => {
+    const invocations = req.task_tool_invocation as TaskInvocation[]
+    const enrichedInvocations = invocations.map(invocation => {
       for (const [convId, convSubtasks] of Object.entries(subtasksByConversation)) {
         const matches = convSubtasks.some(
           st => st.is_subtask && st.parent_task_request_id === req.request_id

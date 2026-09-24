@@ -9,11 +9,25 @@ export interface LastMessageClassification {
   toolResultStatus?: ToolResultStatus
 }
 
+interface MessageLike {
+  role?: unknown
+  content?: unknown
+}
+
+/** Fields read from content blocks; access stays unguarded, as with the full messages. */
+interface ContentBlockLike {
+  type?: unknown
+  text?: string
+  is_error?: unknown
+}
+
 /**
  * Classify a request's last message for the conversation tree
  * (works on full messages and on ADR-037 summaries alike).
  */
-export function classifyLastMessage(lastMessage: any): LastMessageClassification {
+export function classifyLastMessage(message: unknown): LastMessageClassification {
+  const lastMessage = message as MessageLike | null | undefined
+
   // Check if the last message in the request is a user message with text content
   let hasUserMessage = false
   if (lastMessage?.role === 'user') {
@@ -21,7 +35,7 @@ export function classifyLastMessage(lastMessage: any): LastMessageClassification
       hasUserMessage = lastMessage.content.trim().length > 0
     } else if (Array.isArray(lastMessage.content)) {
       hasUserMessage = lastMessage.content.some(
-        (item: any) => item.type === 'text' && item.text && item.text.trim().length > 0
+        (item: ContentBlockLike) => item.type === 'text' && item.text && item.text.trim().length > 0
       )
     }
   }
@@ -31,13 +45,15 @@ export function classifyLastMessage(lastMessage: any): LastMessageClassification
 
   // Check if the last message in the request contains tool results
   if (lastMessage && lastMessage.content && Array.isArray(lastMessage.content)) {
-    const toolResults = lastMessage.content.filter((item: any) => item.type === 'tool_result')
+    const toolResults = lastMessage.content.filter(
+      (item: ContentBlockLike) => item.type === 'tool_result'
+    )
 
     if (toolResults.length > 0) {
       lastMessageType = 'tool_result'
 
-      const hasError = toolResults.some((result: any) => result.is_error === true)
-      const hasSuccess = toolResults.some((result: any) => result.is_error !== true)
+      const hasError = toolResults.some((result: ContentBlockLike) => result.is_error === true)
+      const hasSuccess = toolResults.some((result: ContentBlockLike) => result.is_error !== true)
 
       if (hasError && hasSuccess) {
         toolResultStatus = 'mixed'

@@ -29,7 +29,7 @@ export interface ConversationNode {
   isSubtask?: boolean
   hasSubtasks?: boolean
   subtaskCount?: number
-  linkedConversationId?: string
+  linkedConversationId?: string | null
   subtaskPrompt?: string
   hasUserMessage?: boolean
   contextTokens?: number
@@ -61,7 +61,7 @@ export interface LayoutNode {
   isSubtask?: boolean
   hasSubtasks?: boolean
   subtaskCount?: number
-  linkedConversationId?: string
+  linkedConversationId?: string | null
   subtaskPrompt?: string
   hasUserMessage?: boolean
   contextTokens?: number
