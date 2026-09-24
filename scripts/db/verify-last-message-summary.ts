@@ -4,12 +4,13 @@
  * Read-only parity check for ADR-037 summaries against a real database.
  * Samples recent requests and verifies that the dashboard derives the same node
  * classification and timeline preview from the summary as from the full last message,
- * and that the SQL user-text count matches the JS count.
+ * that PostgreSQL accepts every computed summary as JSONB, and that the SQL user-text
+ * count matches the JS count.
  *
  * Usage: bun scripts/db/verify-last-message-summary.ts [--sample 2000] [--count-sample 50]
  */
 
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import {
   countUserTextMessages,
   summarizeLastMessage,
@@ -30,6 +31,37 @@ function readOption(name: string, fallback: number): number {
     throw new Error(`${name} must be a positive integer`)
   }
   return value
+}
+
+/** Ids whose summary PostgreSQL rejects as JSONB (JS JSON.parse accepts more, e.g. lone surrogates). */
+async function findJsonbRejects(
+  client: PoolClient,
+  summaries: Array<{ requestId: string; json: string }>
+): Promise<string[]> {
+  const isDataException = (error: unknown) =>
+    String((error as { code?: unknown } | null)?.code ?? '').startsWith('22')
+  try {
+    await client.query('SELECT cardinality($1::text[]::jsonb[])', [summaries.map(s => s.json)])
+    return []
+  } catch (error) {
+    if (!isDataException(error)) {
+      throw error
+    }
+  }
+
+  // The batch was rejected: cast one by one to name the offending rows
+  const rejected: string[] = []
+  for (const summary of summaries) {
+    try {
+      await client.query('SELECT $1::jsonb', [summary.json])
+    } catch (error) {
+      if (!isDataException(error)) {
+        throw error
+      }
+      rejected.push(summary.requestId)
+    }
+  }
+  return rejected
 }
 
 async function main() {
@@ -69,11 +101,14 @@ async function main() {
       if (rows.length === 0) {
         break
       }
+      const computed: Array<{ requestId: string; json: string }> = []
       for (const row of rows) {
         if (!row.last_message) {
           continue
         }
-        const summary = JSON.parse(JSON.stringify(summarizeLastMessage(row.last_message)))
+        const json = JSON.stringify(summarizeLastMessage(row.last_message))
+        computed.push({ requestId: row.request_id, json })
+        const summary = JSON.parse(json)
         const sameClass =
           JSON.stringify(classifyLastMessage(summary)) ===
           JSON.stringify(classifyLastMessage(row.last_message))
@@ -87,6 +122,11 @@ async function main() {
           mismatches.push(`derived:${row.request_id}`)
         }
         checked++
+      }
+      if (computed.length > 0) {
+        for (const requestId of await findJsonbRejects(client, computed)) {
+          mismatches.push(`jsonb:${requestId}`)
+        }
       }
       const last = rows[rows.length - 1]
       cursor = { timestamp: last.timestamp, requestId: last.request_id }
