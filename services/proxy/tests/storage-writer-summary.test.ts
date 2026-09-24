@@ -4,14 +4,21 @@ import { logger } from '../src/middleware/logger'
 
 const SUMMARY_COLUMNS = ['last_message_summary', 'user_text_message_count']
 
-function createPool(options: { columns?: string[]; insertFailures?: unknown[] } = {}) {
+function createPool(
+  options: { columns?: string[]; insertFailures?: unknown[]; columnCheckFailures?: number } = {}
+) {
   const columns = options.columns ?? SUMMARY_COLUMNS
   const insertFailures = [...(options.insertFailures ?? [])]
+  let columnCheckFailures = options.columnCheckFailures ?? 0
   const calls: Array<{ sql: string; values?: unknown[] }> = []
   const pool = {
     query: mock(async (sql: string, values?: unknown[]) => {
       calls.push({ sql, values })
       if (sql.includes('information_schema.columns')) {
+        if (columnCheckFailures > 0) {
+          columnCheckFailures--
+          throw new Error('connection reset')
+        }
         return { rows: columns.map(column_name => ({ column_name })), rowCount: columns.length }
       }
       if (sql.includes('INSERT INTO api_requests') && insertFailures.length > 0) {
@@ -21,7 +28,8 @@ function createPool(options: { columns?: string[]; insertFailures?: unknown[] } 
     }),
   }
   const inserts = () => calls.filter(call => call.sql.includes('INSERT INTO api_requests'))
-  return { writer: new StorageWriter(pool as any), calls, inserts }
+  const columnChecks = () => calls.filter(call => call.sql.includes('information_schema.columns'))
+  return { writer: new StorageWriter(pool as any), calls, inserts, columnChecks }
 }
 
 const baseRequest = {
@@ -113,5 +121,67 @@ describe('StorageWriter.storeRequest summary columns', () => {
 
     expect(inserts()).toHaveLength(2)
     expect(error).toHaveBeenCalledWith('Failed to store request', expect.anything())
+  })
+})
+
+describe('StorageWriter summary column detection (migration 026)', () => {
+  const secondRequest = { ...baseRequest, requestId: '33333333-3333-4333-8333-333333333333' }
+
+  const expectPre026Insert = (insert: { sql: string; values?: unknown[] }) => {
+    expect(insert.values).toHaveLength(21)
+    expect(insert.sql).not.toContain('last_message_summary')
+    expect(insert.sql).not.toContain('user_text_message_count')
+    expect(insert.sql).not.toContain('$22')
+  }
+
+  it('checks once and stores summaries when both columns exist', async () => {
+    const { writer, inserts, columnChecks } = createPool()
+
+    await writer.storeRequest(baseRequest)
+    await writer.storeRequest(secondRequest)
+
+    expect(columnChecks()).toHaveLength(1)
+    expect(columnChecks()[0].values).toEqual([SUMMARY_COLUMNS])
+    expect(inserts().map(insert => insert.values!.length)).toEqual([23, 23])
+  })
+
+  it('uses the pre-026 INSERT and logs one error when the columns are missing', async () => {
+    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    const { writer, inserts, columnChecks } = createPool({ columns: [] })
+
+    await writer.storeRequest(baseRequest)
+    await writer.storeRequest(secondRequest)
+
+    expect(columnChecks()).toHaveLength(1)
+    expect(inserts()).toHaveLength(2)
+    inserts().forEach(expectPre026Insert)
+    expect(inserts()[0].values![0]).toBe(baseRequest.requestId)
+    expect(inserts()[1].values![0]).toBe(secondRequest.requestId)
+    expect(error).toHaveBeenCalledTimes(1)
+    expect(error.mock.calls[0][0]).toContain('026')
+  })
+
+  it('treats a partially applied migration as missing', async () => {
+    spyOn(logger, 'error').mockImplementation(() => {})
+    const { writer, inserts } = createPool({ columns: ['last_message_summary'] })
+
+    await writer.storeRequest(baseRequest)
+
+    expect(inserts()).toHaveLength(1)
+    expectPre026Insert(inserts()[0])
+  })
+
+  it('stores without summaries while the check fails and checks again next time', async () => {
+    spyOn(logger, 'warn').mockImplementation(() => {})
+    const error = spyOn(logger, 'error').mockImplementation(() => {})
+    const { writer, inserts, columnChecks } = createPool({ columnCheckFailures: 1 })
+
+    await writer.storeRequest(baseRequest)
+    await writer.storeRequest(secondRequest)
+
+    expect(columnChecks()).toHaveLength(2)
+    expectPre026Insert(inserts()[0])
+    expect(inserts()[1].values).toHaveLength(23)
+    expect(error).not.toHaveBeenCalled()
   })
 })

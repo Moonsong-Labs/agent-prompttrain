@@ -353,6 +353,48 @@ describe.skipIf(!enabled)('last-message summary against PostgreSQL', () => {
     expect(rows[0].user_text_message_count).toBe(countUserTextMessages(messages))
   })
 
+  it('the proxy writer keeps storing requests when migration 026 is missing', async () => {
+    // A schema whose api_requests lacks the summary columns, resolved through search_path
+    const schema = 'pre026_writer_test'
+    await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`)
+    await pool.query(`CREATE SCHEMA ${schema}`)
+    await pool.query(
+      `CREATE TABLE ${schema}.api_requests (LIKE public.api_requests INCLUDING DEFAULTS INCLUDING INDEXES)`
+    )
+    await pool.query(
+      `ALTER TABLE ${schema}.api_requests DROP COLUMN last_message_summary, DROP COLUMN user_text_message_count`
+    )
+    const pre026Pool = new Pool({
+      connectionString: databaseUrl,
+      options: `-c search_path=${schema}`,
+    })
+    try {
+      await new StorageWriter(pre026Pool).storeRequest({
+        requestId: id(55),
+        projectId: 'project-e2e',
+        timestamp: new Date(),
+        method: 'POST',
+        path: '/v1/messages',
+        headers: {},
+        body: { messages: history },
+        apiKey: '',
+        model: 'claude-test',
+        requestType: 'inference',
+        conversationId: WRITER_CONVERSATION,
+        messageCount: history.length,
+      })
+
+      const { rows } = await pool.query(
+        `SELECT request_id, message_count FROM ${schema}.api_requests WHERE request_id = $1`,
+        [id(55)]
+      )
+      expect(rows).toEqual([{ request_id: id(55), message_count: history.length }])
+    } finally {
+      await pre026Pool.end()
+      await pool.query(`DROP SCHEMA ${schema} CASCADE`)
+    }
+  })
+
   it('backfills a legacy row whose last message straddles the clip with an emoji', async () => {
     const messages = [
       { role: 'user', content: 'Write the changelog' },

@@ -27,6 +27,47 @@ function isInvalidTextError(error: unknown): boolean {
   return typeof code === 'string' && INVALID_TEXT_SQLSTATES.has(code)
 }
 
+/** api_requests columns written for every request, in parameter order. */
+const REQUEST_COLUMNS = [
+  'request_id',
+  'project_id',
+  'account_id',
+  'timestamp',
+  'method',
+  'path',
+  'headers',
+  'body',
+  'api_key_hash',
+  'model',
+  'request_type',
+  'current_message_hash',
+  'parent_message_hash',
+  'conversation_id',
+  'branch_id',
+  'system_hash',
+  'message_count',
+  'parent_task_request_id',
+  'is_subtask',
+  'task_tool_invocation',
+  'parent_request_id',
+]
+
+/** Columns added by migration 026 (ADR-037), written after REQUEST_COLUMNS. */
+const SUMMARY_COLUMN_NAMES = ['last_message_summary', 'user_text_message_count']
+
+function requestInsertSql(columns: string[]): string {
+  const placeholders = columns.map((_, index) => `$${index + 1}`).join(', ')
+  return `
+    INSERT INTO api_requests (${columns.join(', ')})
+    VALUES (${placeholders})
+    ON CONFLICT (request_id) DO NOTHING
+  `
+}
+
+const INSERT_REQUEST_SQL = requestInsertSql([...REQUEST_COLUMNS, ...SUMMARY_COLUMN_NAMES])
+/** Used while migration 026 is not applied, so requests are still stored (see hasSummaryColumns). */
+const INSERT_REQUEST_PRE_026_SQL = requestInsertSql(REQUEST_COLUMNS)
+
 interface StorageRequest {
   requestId: string
   projectId: string
@@ -74,6 +115,8 @@ interface StorageResponse {
  * Write-only operations for the proxy service
  */
 export class StorageWriter {
+  private summaryColumnsCheck?: Promise<boolean>
+
   constructor(private pool: Pool) {}
 
   /**
@@ -135,20 +178,7 @@ export class StorageWriter {
       // get a branch ID instead of inheriting "main" from its parent
       const branchId = request.branchId || 'main'
 
-      const summaryColumns = buildSummaryColumns(request.body)
-
-      const query = `
-        INSERT INTO api_requests (
-          request_id, project_id, account_id, timestamp, method, path, headers, body,
-          api_key_hash, model, request_type, current_message_hash,
-          parent_message_hash, conversation_id, branch_id, system_hash, message_count,
-          parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id,
-          last_message_summary, user_text_message_count
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-        ON CONFLICT (request_id) DO NOTHING
-      `
-
-      const values = [
+      const values: unknown[] = [
         request.requestId,
         request.projectId,
         request.accountId || null,
@@ -170,16 +200,20 @@ export class StorageWriter {
         isSubtask,
         request.taskToolInvocation ? JSON.stringify(request.taskToolInvocation) : null,
         request.parentRequestId || null,
-        summaryColumns.lastMessageSummary,
-        summaryColumns.userTextMessageCount,
       ]
 
+      if (!(await this.hasSummaryColumns())) {
+        await this.pool.query(INSERT_REQUEST_PRE_026_SQL, values)
+        return
+      }
+
+      const summaryColumns = buildSummaryColumns(request.body)
+      const summaryValues = [summaryColumns.lastMessageSummary, summaryColumns.userTextMessageCount]
+
       try {
-        await this.pool.query(query, values)
+        await this.pool.query(INSERT_REQUEST_SQL, [...values, ...summaryValues])
       } catch (error) {
-        const hasSummary =
-          summaryColumns.lastMessageSummary !== null || summaryColumns.userTextMessageCount !== null
-        if (!hasSummary || !isInvalidTextError(error)) {
+        if (summaryValues.every(value => value === null) || !isInvalidTextError(error)) {
           throw error
         }
         // A summary must never cost the request row (ADR-037): store it once more without one
@@ -190,7 +224,7 @@ export class StorageWriter {
             error: error instanceof Error ? error.message : String(error),
           },
         })
-        await this.pool.query(query, [...values.slice(0, -2), null, null])
+        await this.pool.query(INSERT_REQUEST_SQL, [...values, null, null])
       }
     } catch (error) {
       logger.error('Failed to store request', {
@@ -199,6 +233,48 @@ export class StorageWriter {
           error: error instanceof Error ? error.message : String(error),
         },
       })
+    }
+  }
+
+  /**
+   * Whether api_requests has the summary columns of migration 026, checked once per writer.
+   * Without them requests are stored with the pre-026 INSERT, so a proxy deployed before
+   * the migration still keeps every request row.
+   */
+  private hasSummaryColumns(): Promise<boolean> {
+    if (!this.summaryColumnsCheck) {
+      this.summaryColumnsCheck = this.checkSummaryColumns()
+    }
+    return this.summaryColumnsCheck
+  }
+
+  private async checkSummaryColumns(): Promise<boolean> {
+    try {
+      const result = await this.pool.query<{ column_name: string }>(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = 'api_requests'
+           AND column_name = ANY($1)`,
+        [SUMMARY_COLUMN_NAMES]
+      )
+      const found = new Set(result.rows.map(row => row.column_name))
+      const missingColumns = SUMMARY_COLUMN_NAMES.filter(column => !found.has(column))
+      if (missingColumns.length > 0) {
+        logger.error(
+          'api_requests is missing the last-message summary columns: run migration 026 (scripts/db/migrations/026-add-last-message-summary.ts), then restart the proxy. Until then requests are stored without summaries.',
+          { metadata: { missingColumns } }
+        )
+        return false
+      }
+      return true
+    } catch (error) {
+      // Check again on the next request; the pre-026 INSERT is valid either way
+      this.summaryColumnsCheck = undefined
+      logger.warn('Could not check for the last-message summary columns', {
+        metadata: { error: error instanceof Error ? error.message : String(error) },
+      })
+      return false
     }
   }
 

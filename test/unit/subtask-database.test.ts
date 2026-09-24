@@ -16,10 +16,17 @@ const mockPool = {
 describe('Sub-task Database Logic', () => {
   let writer: StorageWriter
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset mocks
     mockPool.query.mockClear()
     writer = new StorageWriter(mockPool as any)
+
+    // Resolve the one-time summary column check (migration 026) so each test sees only its own queries
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ column_name: 'last_message_summary' }, { column_name: 'user_text_message_count' }],
+    })
+    await (writer as any).hasSummaryColumns()
+    mockPool.query.mockClear()
   })
 
   describe('findMatchingTaskInvocation', () => {
