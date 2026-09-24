@@ -44,6 +44,7 @@ test.describe('@journey Critical User Journeys', () => {
     await expect(page.getByTestId('tree-panel')).toBeVisible()
     await page.getByTestId('timeline-tab').click()
     await expect(page.getByTestId('timeline-panel')).toBeVisible()
+    await expect(page.getByTestId('timeline-content')).toBeVisible()
     await expect(page.getByTestId('tree-panel')).not.toBeVisible()
   })
 
