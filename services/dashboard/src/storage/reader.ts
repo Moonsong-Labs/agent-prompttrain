@@ -1,7 +1,8 @@
 import { Pool } from 'pg'
 import NodeCache from 'node-cache'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import { getErrorMessage, userTextMessageCountSql } from '@agent-prompttrain/shared'
+import type { SubtaskSummary } from '../types/conversation.js'
 
 interface ApiRequest {
   request_id: string
@@ -26,6 +27,7 @@ interface ApiRequest {
   parent_request_id?: string
   body?: any
   last_message?: any
+  user_text_message_count?: number | null
   response_body?: any
 }
 
@@ -599,14 +601,18 @@ export class StorageReader {
 
       const conversationRow = conversationRows[0]
 
-      // Now get all requests for this conversation with optimized last_message and response_body
-      // Only fetch full body for the last request per branch (for metrics calculation)
+      // Precomputed summaries (ADR-037): only rows without one decompress their body
       const requestsQuery = `
         WITH ranked_requests AS (
-          SELECT 
-            *,
-            ROW_NUMBER() OVER (PARTITION BY COALESCE(branch_id, 'main') ORDER BY timestamp DESC) as rn
-          FROM api_requests 
+          SELECT
+            request_id, project_id, timestamp, model,
+            input_tokens, output_tokens, total_tokens, duration_ms,
+            error, request_type, tool_call_count, conversation_id,
+            current_message_hash, parent_message_hash, branch_id, message_count,
+            parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id,
+            response_body, account_id, body, last_message_summary, user_text_message_count,
+            ROW_NUMBER() OVER (PARTITION BY COALESCE(branch_id, 'main') ORDER BY timestamp DESC) AS rn
+          FROM api_requests
           WHERE conversation_id = $1
         )
         SELECT
@@ -616,14 +622,17 @@ export class StorageReader {
           current_message_hash, parent_message_hash, branch_id, message_count,
           parent_task_request_id, is_subtask, task_tool_invocation, parent_request_id,
           response_body, account_id,
-          -- Only include full body for last request per branch
-          CASE WHEN rn = 1 THEN body ELSE NULL END as body,
           CASE
+            WHEN last_message_summary IS NOT NULL THEN last_message_summary
             WHEN body -> 'messages' IS NOT NULL AND jsonb_array_length(body -> 'messages') > 0 THEN
               body -> 'messages' -> -1
-            ELSE
-              NULL
-          END as last_message
+            ELSE NULL
+          END AS last_message,
+          -- Only the latest request per branch feeds countUserInteractions
+          CASE
+            WHEN rn = 1 THEN COALESCE(user_text_message_count, ${userTextMessageCountSql('body')})
+            ELSE NULL
+          END AS user_text_message_count
         FROM ranked_requests
         ORDER BY timestamp ASC
       `
@@ -656,8 +665,8 @@ export class StorageReader {
         is_subtask: row.is_subtask,
         task_tool_invocation: row.task_tool_invocation,
         parent_request_id: row.parent_request_id,
-        body: row.body,
         last_message: row.last_message,
+        user_text_message_count: row.user_text_message_count ?? null,
         response_body: row.response_body,
         account_id: row.account_id,
       }))
@@ -994,6 +1003,47 @@ export class StorageReader {
         },
       })
       return []
+    }
+  }
+
+  /**
+   * Get sub-tasks for many parent requests in one query, grouped by parent request
+   */
+  async getSubtasksForRequests(requestIds: string[]): Promise<Map<string, SubtaskSummary[]>> {
+    const subtasksByRequest = new Map<string, SubtaskSummary[]>()
+    if (requestIds.length === 0) {
+      return subtasksByRequest
+    }
+
+    try {
+      const query = `
+        SELECT request_id, conversation_id, is_subtask, parent_task_request_id, timestamp
+        FROM api_requests
+        WHERE parent_task_request_id = ANY($1::uuid[])
+        ORDER BY timestamp ASC
+      `
+
+      const rows = await this.executeQuery<SubtaskSummary>(
+        query,
+        [requestIds],
+        'getSubtasksForRequests'
+      )
+
+      for (const row of rows) {
+        const subtasks = subtasksByRequest.get(row.parent_task_request_id) ?? []
+        subtasks.push(row)
+        subtasksByRequest.set(row.parent_task_request_id, subtasks)
+      }
+
+      return subtasksByRequest
+    } catch (error) {
+      logger.error('Failed to get sub-tasks for requests', {
+        metadata: {
+          requestCount: requestIds.length,
+          error: getErrorMessage(error),
+        },
+      })
+      return subtasksByRequest
     }
   }
 
