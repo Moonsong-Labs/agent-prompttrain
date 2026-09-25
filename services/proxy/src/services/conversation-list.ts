@@ -218,6 +218,29 @@ function whereClause(filter: ConversationFilter, ...extra: string[]): string {
 
 const hasExplicitDates = (params: ConversationListParams) => !!(params.dateFrom || params.dateTo)
 
+/** Blank principals are anonymous; emails compare case-insensitively */
+const normalizePrincipal = (principal?: string) => principal?.trim().toLowerCase() || undefined
+
+/**
+ * Key for caching a whole GET /api/conversations response. JSON keeps an
+ * anonymous caller (null) apart from any principal string and cannot be
+ * confused by separators inside values; empty filters equal absent ones.
+ */
+export function conversationListCacheKey(
+  params: ConversationListParams,
+  principal?: string
+): string {
+  return `conversations:${JSON.stringify([
+    normalizePrincipal(principal) ?? null,
+    params.projectId || null,
+    params.accountId || null,
+    params.dateFrom || null,
+    params.dateTo || null,
+    params.limit,
+    params.offset,
+  ])}`
+}
+
 /**
  * Lists one page of conversations visible to `principal` (an authenticated
  * user email; anonymous callers see every project).
@@ -234,7 +257,7 @@ export async function listConversations(
   principal?: string,
   options: ListConversationsOptions = {}
 ): Promise<ConversationListResult> {
-  const normalizedPrincipal = principal?.trim().toLowerCase() || undefined
+  const normalizedPrincipal = normalizePrincipal(principal)
   const filter = buildFilter(params, normalizedPrincipal)
   const olderCountCache = options.olderCountCache ?? olderConversationCountCache
 
@@ -243,9 +266,9 @@ export async function listConversations(
     hasExplicitDates(params)
       ? countExact(pool, filter)
       : countRecentPlusOlder(pool, filter, olderCountCache, [
-          normalizedPrincipal || 'public',
-          params.projectId || '',
-          params.accountId || '',
+          normalizedPrincipal ?? null,
+          params.projectId || null,
+          params.accountId || null,
         ]),
   ])
 
@@ -404,7 +427,7 @@ async function countRecentPlusOlder(
   pool: ConversationListPool,
   filter: ConversationFilter,
   cache: OlderConversationCountCache,
-  keyParts: string[]
+  keyParts: Array<string | null>
 ): Promise<number> {
   const recentQuery = pool.query(
     `

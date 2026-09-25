@@ -5,7 +5,11 @@ import { logger } from '../middleware/logger.js'
 import { getErrorMessage, getErrorStack, type AnthropicCredential } from '@agent-prompttrain/shared'
 import { container } from '../container.js'
 import { apiResponseCache } from '../services/response-cache.js'
-import { listConversations, type ConversationListResult } from '../services/conversation-list.js'
+import {
+  conversationListCacheKey,
+  listConversations,
+  type ConversationListResult,
+} from '../services/conversation-list.js'
 
 // Query parameter schemas
 const statsQuerySchema = z.object({
@@ -709,24 +713,14 @@ apiRoutes.get('/conversations', async c => {
       },
     })
 
-    const normalizedUserEmail = userEmail?.trim().toLowerCase()
-    const cacheKey = [
-      'conversations',
-      normalizedUserEmail || 'public',
-      params.projectId || '',
-      params.accountId || '',
-      params.dateFrom || '',
-      params.dateTo || '',
-      params.limit,
-      params.offset,
-    ].join(':')
+    const cacheKey = conversationListCacheKey(params, userEmail)
 
     const cachedResponse = apiResponseCache.get<ConversationListResult>(cacheKey)
     if (cachedResponse) {
       return c.json(cachedResponse)
     }
 
-    const responseData = await listConversations(pool, params, normalizedUserEmail)
+    const responseData = await listConversations(pool, params, userEmail)
 
     apiResponseCache.set(cacheKey, responseData, 15)
     return c.json(responseData)

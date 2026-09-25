@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test'
 import {
+  conversationListCacheKey,
   listConversations,
   OlderConversationCountCache,
   type ConversationListParams,
@@ -340,6 +341,52 @@ describe('listConversations', () => {
     })
     expect(of('older')).toHaveLength(2)
     expect(result.pagination.total).toBe(75)
+  })
+
+  it('keeps the older count of anonymous callers apart from a principal named public', async () => {
+    const cache = new OlderConversationCountCache()
+    const { pool, state, of } = createPool({ recent: 0, older: () => 10 })
+
+    const anonymous = await listConversations(pool, page(), undefined, { olderCountCache: cache })
+    state.older = () => 3
+    const named = await listConversations(pool, page(), 'public', { olderCountCache: cache })
+
+    expect(of('older')).toHaveLength(2)
+    expect(anonymous.pagination.total).toBe(10)
+    expect(named.pagination.total).toBe(3)
+
+    // Same principal after normalisation, and an empty filter equals no filter
+    await listConversations(pool, page({ projectId: '' }), ' PUBLIC ', { olderCountCache: cache })
+    expect(of('older')).toHaveLength(2)
+  })
+
+  it('keeps anonymous and principal-named-public responses under different keys', () => {
+    expect(conversationListCacheKey(page(), undefined)).not.toBe(
+      conversationListCacheKey(page(), 'public')
+    )
+    expect(conversationListCacheKey(page(), '')).toBe(conversationListCacheKey(page(), undefined))
+    expect(conversationListCacheKey(page(), ' Public ')).toBe(
+      conversationListCacheKey(page(), 'public')
+    )
+    expect(conversationListCacheKey(page({ projectId: '' }), 'a@x.com')).toBe(
+      conversationListCacheKey(page(), 'a@x.com')
+    )
+    // Every parameter is part of the key
+    const base = conversationListCacheKey(page(), 'a@x.com')
+    for (const variant of [
+      page({ projectId: 'p' }),
+      page({ accountId: 'a' }),
+      page({ dateFrom: '2026-01-01' }),
+      page({ dateTo: '2026-01-01' }),
+      page({ limit: 10 }),
+      page({ offset: 50 }),
+    ]) {
+      expect(conversationListCacheKey(variant, 'a@x.com')).not.toBe(base)
+    }
+    // Values containing the separator cannot collide
+    expect(conversationListCacheKey(page({ projectId: 'p:a' }), 'x')).not.toBe(
+      conversationListCacheKey(page({ projectId: 'p' }), 'x:a')
+    )
   })
 
   it('takes anonymous aggregates from the un-windowed details query', async () => {
