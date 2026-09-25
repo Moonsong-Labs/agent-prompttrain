@@ -50,6 +50,7 @@
     "test:integration": "./scripts/test-integration.sh",
     "test:db:summary": "bun test tests/integration/last-message-summary.db.test.ts",
     "test:db:conversations": "bun test tests/integration/conversation-list.db.test.ts",
+    "test:db:projects": "bun test tests/integration/project-overviews.db.test.ts",
     "test:db:conversation-summaries": "bun test tests/integration/conversation-summaries.db.test.ts tests/integration/verify-conversation-summaries.db.test.ts",
     "test:theme": "bun test services/dashboard/src/layout/__tests__",
     "test:e2e": "bun test test/e2e",

@@ -325,6 +325,60 @@ export async function getProjectStats(
   }
 }
 
+/** Per-project facts for the projects list page */
+export interface ProjectOverview {
+  /** projects.id */
+  id: string
+  /** Latest use of any of the project's API keys, as getProjectStats */
+  lastUsedAt: Date | null
+  membersCount: number
+  /** The owner getProjectMembers lists first */
+  firstOwnerEmail: string | null
+  /** Whether principal owns the project, as isProjectOwner; false without a principal */
+  isOwner: boolean
+}
+
+/**
+ * Get the list page's facts for every project in one query, instead of getProjectStats,
+ * getProjectMembers and isProjectOwner per project.
+ */
+export async function listProjectOverviews(
+  pool: Pool,
+  principal: string | null
+): Promise<ProjectOverview[]> {
+  const result = await pool.query<{
+    id: string
+    last_used_at: Date | null
+    members_count: number
+    first_owner_email: string | null
+    is_owner: boolean
+  }>(
+    `
+    SELECT
+      p.id,
+      (SELECT MAX(k.last_used_at) FROM project_api_keys k WHERE k.project_id = p.id)
+        AS last_used_at,
+      (SELECT COUNT(*)::int FROM project_members m WHERE m.project_id = p.id) AS members_count,
+      (SELECT MIN(m.user_email) FROM project_members m
+        WHERE m.project_id = p.id AND m.role = 'owner') AS first_owner_email,
+      EXISTS (
+        SELECT 1 FROM project_members m
+        WHERE m.project_id = p.id AND m.user_email = $1 AND m.role = 'owner'
+      ) AS is_owner
+    FROM projects p
+    `,
+    [principal]
+  )
+
+  return result.rows.map(row => ({
+    id: row.id,
+    lastUsedAt: row.last_used_at,
+    membersCount: row.members_count,
+    firstOwnerEmail: row.first_owner_email,
+    isOwner: row.is_owner,
+  }))
+}
+
 /**
  * Get the system prompt configuration for a project
  */

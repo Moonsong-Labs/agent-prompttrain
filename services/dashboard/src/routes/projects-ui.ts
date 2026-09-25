@@ -3,6 +3,7 @@ import { html, raw } from 'hono/html'
 import { layout } from '../layout/index.js'
 import { container } from '../container.js'
 import { renderUsageWindows } from '../components/usage-windows.js'
+import { logger } from '../middleware/logger.js'
 import {
   listProjectsWithAccounts,
   listTrainApiKeys,
@@ -17,7 +18,7 @@ import {
   deleteProject,
   isProjectOwner,
   isProjectMember,
-  getProjectStats,
+  listProjectOverviews,
   getProjectWithAccounts,
   getProjectById,
   updateProject,
@@ -54,28 +55,25 @@ trainsUIRoutes.get('/', async c => {
   }
 
   try {
-    const projects = await listProjectsWithAccounts(pool)
+    // Stats and ownership for every project in one query, not three per project
+    const [projects, overviews] = await Promise.all([
+      listProjectsWithAccounts(pool),
+      listProjectOverviews(pool, auth.isAuthenticated ? auth.principal : null),
+    ])
+    const overviewById = new Map(overviews.map(overview => [overview.id, overview]))
 
-    // Fetch stats and ownership for each train
-    const trainData = await Promise.all(
-      projects.map(async train => {
-        const [stats, members, isOwner] = await Promise.all([
-          getProjectStats(pool, train.id),
-          getProjectMembers(pool, train.id),
-          auth.isAuthenticated ? isProjectOwner(pool, train.id, auth.principal) : false,
-        ])
+    const trainData = projects.map(train => {
+      // A project created between the two queries has no overview yet
+      const overview = overviewById.get(train.id)
 
-        const firstOwner = members.find(m => m.role === 'owner')
-
-        return {
-          ...train,
-          stats,
-          membersCount: members.length,
-          firstOwner: firstOwner?.user_email || 'Unknown',
-          isOwner,
-        }
-      })
-    )
+      return {
+        ...train,
+        stats: { lastUsedAt: overview?.lastUsedAt ?? null },
+        membersCount: overview?.membersCount ?? 0,
+        firstOwner: overview?.firstOwnerEmail || 'Unknown',
+        isOwner: overview?.isOwner ?? false,
+      }
+    })
 
     // Default sort: last used descending (most recently used first)
     trainData.sort((a, b) => {
@@ -415,6 +413,7 @@ trainsUIRoutes.get('/', async c => {
       )
     )
   } catch (error) {
+    logger.error('Failed to load the projects page', { error: getErrorMessage(error) })
     return c.html(
       layout(
         'Projects - Error',
@@ -425,7 +424,8 @@ trainsUIRoutes.get('/', async c => {
         `,
         '',
         c
-      )
+      ),
+      500
     )
   }
 })
