@@ -69,6 +69,7 @@
     "generate:prompts": "bun run scripts/generate-prompt-assets.ts",
     "db:recalculate-counts": "bun run scripts/db/recalculate-message-counts.ts",
     "db:backfill:last-message-summary": "bun run scripts/db/backfill-last-message-summary.ts",
+    "db:backfill:conversation-summaries": "bun run scripts/db/backfill-conversation-summaries.ts",
     "db:backup": "bun run scripts/db/backup-database.ts",
     "db:backup:file": "bun run scripts/db/backup-database.ts --file",
     "db:migrate:token-usage": "bun run scripts/migrate-token-usage.ts",

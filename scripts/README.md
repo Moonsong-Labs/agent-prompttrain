@@ -98,6 +98,26 @@ Read-only parity check for ADR-037: samples recent requests and confirms the das
 same node types and previews from summaries as from full messages, and that the SQL and JS user-text
 counts agree. Prints request ids only. `bun scripts/db/verify-last-message-summary.ts --sample 2000 --count-sample 50`
 
+### backfill-conversation-summaries.ts
+
+Derives `conversation_summaries` (ADR-039) from `api_requests`: one grouped upsert per chunk of
+history (7 days by default, newest first) with the proxy's merge rules (earliest first activity,
+latest last activity, union of accounts). Safe to run while the proxy is writing and safe to
+re-run: rows that would not change are not rewritten. Dry-run by default (reports the groups per
+chunk); writes only with `--execute`.
+
+```bash
+bun run db:backfill:conversation-summaries                     # dry run, whole history
+bun run db:backfill:conversation-summaries --execute           # write, whole history
+bun run db:backfill:conversation-summaries --since 2026-09-01T00:00:00Z --execute  # reconcile
+```
+
+Run after migration 027 and after deploying the proxy that maintains the table (requests stored
+after the run starts are the proxy's to upsert). It only adds and widens rows: after re-keying or
+deleting requests outside the proxy (for example with `rebuild-conversations.ts`), turn
+`CONVERSATION_SUMMARIES_ENABLED` off, `TRUNCATE conversation_summaries`, re-run with `--execute`
+and verify before turning it back on.
+
 ### backup-database.ts
 
 Creates database backups with automatic timestamping.
