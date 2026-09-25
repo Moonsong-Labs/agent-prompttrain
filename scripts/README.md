@@ -29,7 +29,10 @@ bun run scripts/db/analyze-conversations.ts
 
 ### rebuild-conversations.ts
 
-Retroactively computes conversation IDs and branches from existing requests.
+Retroactively computes conversation IDs and branches from existing requests. In `--execute` mode
+it also refreshes `conversation_summaries` (ADR-039) for every conversation it re-keys, old and
+new id, so the flag-on landing page is not left with a ghost row or a stale `last_activity_at`
+(see `backfill-conversation-summaries.ts` below for the recovery if that refresh itself fails).
 
 ```bash
 # IMPORTANT: Backup first!
@@ -113,10 +116,26 @@ bun run db:backfill:conversation-summaries --since 2026-09-01T00:00:00Z --execut
 ```
 
 Run after migration 027 and after deploying the proxy that maintains the table (requests stored
-after the run starts are the proxy's to upsert). It only adds and widens rows: after re-keying or
-deleting requests outside the proxy (for example with `rebuild-conversations.ts`), turn
-`CONVERSATION_SUMMARIES_ENABLED` off, `TRUNCATE conversation_summaries`, re-run with `--execute`
-and verify before turning it back on.
+after the run starts are the proxy's to upsert). It only adds and widens rows: `rebuild-conversations.ts`
+now refreshes the `conversation_summaries` rows of every conversation it re-keys, so no extra step
+is needed after running it. For any other re-key or delete of requests outside the proxy (SQL
+seeds, a manual `UPDATE`/`DELETE` on `api_requests`), turn `CONVERSATION_SUMMARIES_ENABLED` off,
+run `SET lock_timeout = '5s'; TRUNCATE conversation_summaries;` (the explicit `lock_timeout` keeps
+the `TRUNCATE` from queuing behind a long reader, such as the verify script's 1-2 minute snapshot,
+and blocking every live upsert behind it), re-run the backfill with `--execute`, verify, then turn
+the flag back on. The module also exports `refreshConversationSummaries(pool, conversationIds)`,
+which rebuilds just the given conversations' rows from `api_requests` in batches of 1000, for
+scripts (like `rebuild-conversations.ts`) that know exactly which conversations they touched.
+
+**Production:**
+
+- Run it off-peak with `--chunk-days 1`: each chunk holds row locks on every conversation it
+  touches until it commits, and live upserts of those conversations wait for it (re-runs lock rows
+  too, even when nothing changes).
+- Start it only after every proxy task runs the version that maintains the table: requests stored
+  by an old task after their chunk has run are missing until the next backfill.
+- `--since` filters on the request `timestamp`, not on when the row was stored: after
+  `copy-conversation.ts` or SQL seeds, run a full backfill (no `--since`).
 
 ### verify-conversation-summaries.ts
 

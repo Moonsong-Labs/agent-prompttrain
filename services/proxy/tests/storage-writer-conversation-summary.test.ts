@@ -10,6 +10,8 @@ interface PoolOptions {
   /** rowCount of a successful request INSERT (0 when the request id is already stored) */
   insertRowCount?: number
   tableExists?: boolean
+  /** Answers for successive information_schema.tables checks; falls back to `tableExists` once exhausted */
+  tableExistsSequence?: boolean[]
   tableCheckFailures?: number
   upsertFailures?: unknown[]
 }
@@ -18,6 +20,7 @@ function createPool(options: PoolOptions = {}) {
   const columns = options.columns ?? SUMMARY_COLUMNS
   const insertFailures = [...(options.insertFailures ?? [])]
   const upsertFailures = [...(options.upsertFailures ?? [])]
+  const tableExistsSequence = [...(options.tableExistsSequence ?? [])]
   let tableCheckFailures = options.tableCheckFailures ?? 0
   const calls: Array<{ sql: string; values?: unknown[] }> = []
   const pool = {
@@ -31,7 +34,10 @@ function createPool(options: PoolOptions = {}) {
           tableCheckFailures--
           throw new Error('connection reset')
         }
-        const exists = options.tableExists ?? true
+        const exists =
+          tableExistsSequence.length > 0
+            ? tableExistsSequence.shift()!
+            : (options.tableExists ?? true)
         return {
           rows: exists ? [{ table_name: 'conversation_summaries' }] : [],
           rowCount: exists ? 1 : 0,
@@ -77,6 +83,7 @@ const baseRequest = {
   body: { messages: [{ role: 'user', content: 'hello' }] },
 }
 const secondRequest = { ...baseRequest, requestId: '33333333-3333-4333-8333-333333333333' }
+const thirdRequest = { ...baseRequest, requestId: '44444444-4444-4444-8444-444444444444' }
 
 afterEach(() => {
   mock.restore()
@@ -221,5 +228,31 @@ describe('StorageWriter conversation summaries (migration 027)', () => {
     expect(upserts()).toHaveLength(1)
     expect(warn).toHaveBeenCalledTimes(1)
     expect(error).not.toHaveBeenCalled()
+  })
+
+  it('re-checks the table after an undefined-table error (SQLSTATE 42P01) and stops upserting', async () => {
+    const error = silence('error')
+    const { writer, inserts, upserts, tableChecks } = createPool({
+      tableExistsSequence: [true, false],
+      upsertFailures: [{ code: '42P01' }],
+    })
+
+    await writer.storeRequest(baseRequest)
+    await writer.storeRequest(secondRequest)
+    await writer.storeRequest(thirdRequest)
+
+    expect(inserts()).toHaveLength(3)
+    // First request: table check passes, then the upsert fails with 42P01
+    // Second request: the table check re-runs and now finds no rows, so no upsert is attempted
+    // Third request: the missing result is cached, so neither the check nor the upsert re-runs
+    expect(tableChecks()).toHaveLength(2)
+    expect(upserts()).toHaveLength(1)
+    expect(error).toHaveBeenCalledTimes(2)
+    expect(error).toHaveBeenNthCalledWith(
+      1,
+      'Failed to update the conversation summary',
+      expect.anything()
+    )
+    expect(error.mock.calls[1][0]).toContain('027')
   })
 })

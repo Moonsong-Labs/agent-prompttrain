@@ -304,7 +304,8 @@ async function main() {
     await backfillConversationSummaries(pool, options)
   } catch (error) {
     console.error('❌ Backfill failed:', error)
-    process.exit(1)
+    // Set the exit code rather than exiting here, so the pool always gets to close (below)
+    process.exitCode = 1
   } finally {
     await pool.end()
   }

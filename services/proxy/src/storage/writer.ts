@@ -28,6 +28,13 @@ function isInvalidTextError(error: unknown): boolean {
   return typeof code === 'string' && INVALID_TEXT_SQLSTATES.has(code)
 }
 
+/** SQLSTATE for undefined_table, e.g. conversation_summaries dropped by a migration `down`. */
+const UNDEFINED_TABLE_SQLSTATE = '42P01'
+
+function isUndefinedTableError(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === UNDEFINED_TABLE_SQLSTATE
+}
+
 /** api_requests columns written for every request, in parameter order. */
 const REQUEST_COLUMNS = [
   'request_id',
@@ -272,6 +279,11 @@ export class StorageWriter {
         request.accountId ? [request.accountId] : [],
       ])
     } catch (error) {
+      if (isUndefinedTableError(error)) {
+        // The table disappeared (e.g. migration 027 `down`): re-detect it on the next request,
+        // which logs the "missing" error once and stops upserting until it exists again.
+        this.summaryTableCheck = undefined
+      }
       logger.error('Failed to update the conversation summary', {
         requestId: request.requestId,
         metadata: {

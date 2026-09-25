@@ -301,21 +301,26 @@ async function main() {
 
   console.log(`Target database host: ${maskHost(databaseUrl)}`)
   const pool = new Pool({ connectionString: databaseUrl, max: 1 })
-  let mismatches: string[]
+  let mismatches: string[] = []
   try {
     mismatches = await verifyConversationSummaries(pool, options)
   } catch (error) {
     console.error('❌ Verification failed:', error)
-    process.exit(1)
+    // Set the exit code rather than exiting here, so the pool always gets to close (above)
+    process.exitCode = 1
   } finally {
     await pool.end()
+  }
+  if (process.exitCode) {
+    return
   }
 
   if (mismatches.length > 0) {
     console.error(
       `❌ ${mismatches.length} mismatches (first 10): ${mismatches.slice(0, 10).join(', ')}`
     )
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
   console.log('✅ conversation_summaries matches api_requests')
 }

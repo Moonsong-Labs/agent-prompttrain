@@ -111,6 +111,22 @@ WHERE response_body IS NOT NULL
 -- Create indexes for streaming_chunks
 CREATE INDEX IF NOT EXISTS idx_chunks_request_id ON streaming_chunks(request_id);
 
+-- conversation_summaries: one row per conversation and project (migration 027, ADR-039)
+CREATE TABLE IF NOT EXISTS conversation_summaries (
+    conversation_id   UUID         NOT NULL,
+    project_id        VARCHAR(255) NOT NULL,
+    first_activity_at TIMESTAMPTZ  NOT NULL,
+    last_activity_at  TIMESTAMPTZ  NOT NULL,
+    account_ids       TEXT[]       NOT NULL DEFAULT '{}',
+    PRIMARY KEY (conversation_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_conversation_summaries_last_activity
+  ON conversation_summaries (last_activity_at DESC, conversation_id DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_summaries_project_last_activity
+  ON conversation_summaries (project_id, last_activity_at DESC, conversation_id DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_summaries_account_ids
+  ON conversation_summaries USING GIN (account_ids);
+
 -- Add column comments
 COMMENT ON COLUMN api_requests.current_message_hash IS 'SHA-256 hash of the last message in this request';
 COMMENT ON COLUMN api_requests.parent_message_hash IS 'SHA-256 hash of the previous message (null for conversation start)';
