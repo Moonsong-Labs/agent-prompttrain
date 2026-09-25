@@ -83,13 +83,18 @@ New path, used when `CONVERSATION_SUMMARIES_ENABLED === 'true'` and the request 
 
 1. **Accessible projects.** Resolve the principal's accessible project slugs with the existing privacy rule (public projects, or private projects where the principal is a member), intersected with `projectId` when given. Anonymous requests have no project restriction (as today).
 2. **Page IDs.**
+
    ```sql
    SELECT conversation_id, last_activity_at FROM conversation_summaries
    WHERE [project_id = ANY($projects)] [AND $accountId = ANY(account_ids)]
    ORDER BY last_activity_at DESC, conversation_id DESC
    LIMIT $offset + $limit + 32
    ```
+
    De-duplicate by `conversation_id` keeping the first (newest) occurrence; if fewer than `offset + limit` distinct IDs remain and the scan returned its full limit, re-scan with a doubled limit until satisfied or exhausted; slice `[offset, offset + limit)`. Ordering and tiebreak are identical to the request-level path.
+
+   **Amendment (approved 2026-09-25):** with an `accountId` filter the request-level list orders conversations by their last request _with that account_, which `last_activity_at` (all accounts) cannot reproduce for multi-account conversations (8.6 %). Account-filtered requests therefore keep the #213 request-level page selection; only their exact total comes from the table (`account_ids @> ARRAY[$accountId]`, served by the GIN index).
+
 3. **Total.** `SELECT COUNT(DISTINCT conversation_id) FROM conversation_summaries WHERE …same filters…` — exact.
 4. **Details.** Unchanged: the existing `fetchDetails` query over `api_requests` for the selected IDs with the same filters and privacy.
 5. The response shape, the 15 s route response cache and its key are unchanged.
