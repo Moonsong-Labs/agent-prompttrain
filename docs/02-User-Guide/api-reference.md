@@ -374,6 +374,8 @@ GET /api/conversations?projectId=project-alpha&accountId=acc_123&limit=50&offset
 - `dateFrom` - Filter conversations after this date (ISO 8601 format, optional)
 - `dateTo` - Filter conversations before this date (ISO 8601 format, optional)
 
+Conversations are ordered by last message time (newest first); aggregates always cover each conversation's full history. Without `dateFrom`/`dateTo`, `pagination.total` adds a live count of conversations active in the last 7 days to a count of older conversations that is cached for up to one hour, so it can briefly lag. With either date bound the total is an exact count.
+
 **Response:**
 
 ```json

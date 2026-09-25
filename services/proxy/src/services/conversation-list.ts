@@ -82,8 +82,80 @@ export interface ConversationListResult {
   pagination: ConversationListPagination
 }
 
-const accessibleProjectsCte = `
-      accessible_projects AS (
+export interface OlderConversationCountCacheOptions {
+  ttlMs?: number
+  now?: () => number
+  maxEntries?: number
+}
+
+/** How long the count of conversations idle for over 7 days is reused */
+export const OLDER_CONVERSATION_COUNT_TTL_MS = 60 * 60 * 1000
+
+/**
+ * Caches the number of conversations without activity in the recent window.
+ * Concurrent misses for one key share a single computation; a failed
+ * computation is not cached.
+ */
+export class OlderConversationCountCache {
+  private readonly ttlMs: number
+  private readonly now: () => number
+  private readonly maxEntries: number
+  private readonly entries = new Map<string, { count: number; expiresAt: number }>()
+  private readonly inFlight = new Map<string, Promise<number>>()
+
+  constructor(options: OlderConversationCountCacheOptions = {}) {
+    this.ttlMs = options.ttlMs ?? OLDER_CONVERSATION_COUNT_TTL_MS
+    this.now = options.now ?? Date.now
+    this.maxEntries = options.maxEntries ?? 1000
+  }
+
+  get(key: string, compute: () => Promise<number>): Promise<number> {
+    const entry = this.entries.get(key)
+    if (entry && this.now() < entry.expiresAt) {
+      return Promise.resolve(entry.count)
+    }
+
+    const pending = this.inFlight.get(key)
+    if (pending) {
+      return pending
+    }
+
+    const computation = (async () => {
+      try {
+        const count = await compute()
+        this.store(key, count)
+        return count
+      } finally {
+        this.inFlight.delete(key)
+      }
+    })()
+    this.inFlight.set(key, computation)
+    return computation
+  }
+
+  private store(key: string, count: number): void {
+    this.entries.delete(key)
+    if (this.entries.size >= this.maxEntries) {
+      const oldest = this.entries.keys().next().value
+      if (oldest !== undefined) {
+        this.entries.delete(oldest)
+      }
+    }
+    this.entries.set(key, { count, expiresAt: this.now() + this.ttlMs })
+  }
+}
+
+/** Shared by default so every request reuses the hourly older count */
+export const olderConversationCountCache = new OlderConversationCountCache()
+
+export interface ListConversationsOptions {
+  olderCountCache?: OlderConversationCountCache
+}
+
+/** Conversations active here sort before every conversation that is not */
+const RECENT_WINDOW = `ar.timestamp >= NOW() - INTERVAL '7 days'`
+
+const ACCESSIBLE_PROJECTS_CTE = `accessible_projects AS (
         SELECT DISTINCT p.project_id
         FROM projects p
         LEFT JOIN project_members pm
@@ -92,75 +164,157 @@ const accessibleProjectsCte = `
         WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
       )`
 
+/** Project/account/privacy/date filters applied identically to every query */
+interface ConversationFilter {
+  /** Positional values; $1 is the principal when there is one */
+  values: unknown[]
+  conditions: string[]
+  ctes: string[]
+  join: string
+}
+
+function buildFilter(params: ConversationListParams, principal?: string): ConversationFilter {
+  const values: unknown[] = []
+  const conditions = ['ar.conversation_id IS NOT NULL']
+  const add = (condition: (ref: string) => string, value: unknown) => {
+    values.push(value)
+    conditions.push(condition(`$${values.length}`))
+  }
+
+  if (principal) {
+    values.push(principal)
+  }
+  if (params.projectId) {
+    add(ref => `ar.project_id = ${ref}`, params.projectId)
+  }
+  if (params.accountId) {
+    add(ref => `ar.account_id = ${ref}`, params.accountId)
+  }
+  if (params.dateFrom) {
+    add(ref => `ar.timestamp >= ${ref}`, params.dateFrom)
+  }
+  if (params.dateTo) {
+    add(ref => `ar.timestamp <= ${ref}`, params.dateTo)
+  }
+
+  return {
+    values,
+    conditions,
+    ctes: principal ? [ACCESSIBLE_PROJECTS_CTE] : [],
+    join: principal ? 'JOIN accessible_projects ap ON ar.project_id = ap.project_id' : '',
+  }
+}
+
+function withClause(filter: ConversationFilter, ...ctes: string[]): string {
+  const all = [...filter.ctes, ...ctes]
+  return all.length > 0 ? `WITH ${all.join(',\n      ')}` : ''
+}
+
+function whereClause(filter: ConversationFilter, ...extra: string[]): string {
+  return `WHERE ${[...filter.conditions, ...extra].join(' AND ')}`
+}
+
+const hasExplicitDates = (params: ConversationListParams) => !!(params.dateFrom || params.dateTo)
+
 /**
  * Lists one page of conversations visible to `principal` (an authenticated
  * user email; anonymous callers see every project).
+ *
+ * Without explicit dates the page is selected from the last 7 days first:
+ * every conversation active there sorts before every one that is not, so a
+ * full windowed page equals the same page over full history. Only a short
+ * windowed page falls back to scanning full history. Per-conversation
+ * details are always computed over full history for the selected IDs.
  */
 export async function listConversations(
   pool: ConversationListPool,
   params: ConversationListParams,
-  principal?: string
+  principal?: string,
+  options: ListConversationsOptions = {}
 ): Promise<ConversationListResult> {
-  const normalizedUserEmail = principal?.trim().toLowerCase()
-  const conditions: string[] = []
-  const values: unknown[] = []
-  let paramCount = 0
+  const normalizedPrincipal = principal?.trim().toLowerCase() || undefined
+  const filter = buildFilter(params, normalizedPrincipal)
+  const olderCountCache = options.olderCountCache ?? olderConversationCountCache
 
-  if (normalizedUserEmail) {
-    values.push(normalizedUserEmail)
-    paramCount++
+  const [rows, total] = await Promise.all([
+    selectPage(pool, filter, params).then(ids => fetchDetails(pool, filter, ids)),
+    hasExplicitDates(params)
+      ? countExact(pool, filter)
+      : countRecentPlusOlder(pool, filter, olderCountCache, [
+          normalizedPrincipal || 'public',
+          params.projectId || '',
+          params.accountId || '',
+        ]),
+  ])
+
+  return {
+    conversations: rows.map(toConversationListItem),
+    pagination: {
+      total,
+      limit: params.limit,
+      offset: params.offset,
+      hasMore: params.offset + params.limit < total,
+      page: Math.floor(params.offset / params.limit) + 1,
+      totalPages: Math.ceil(total / params.limit),
+    },
+  }
+}
+
+async function selectPage(
+  pool: ConversationListPool,
+  filter: ConversationFilter,
+  params: ConversationListParams
+): Promise<string[]> {
+  if (hasExplicitDates(params)) {
+    return selectPageIds(pool, filter, params, false)
   }
 
-  if (params.projectId) {
-    conditions.push(`ar.project_id = $${++paramCount}`)
-    values.push(params.projectId)
+  const recent = await selectPageIds(pool, filter, params, true)
+  if (recent.length >= params.limit) {
+    return recent
+  }
+  return selectPageIds(pool, filter, params, false)
+}
+
+async function selectPageIds(
+  pool: ConversationListPool,
+  filter: ConversationFilter,
+  params: ConversationListParams,
+  recentOnly: boolean
+): Promise<string[]> {
+  const values = [...filter.values, params.limit, params.offset]
+  const query = `
+      ${withClause(filter)}
+      SELECT
+        ar.conversation_id,
+        MAX(ar.timestamp) AS last_message_time
+      FROM api_requests ar
+      ${filter.join}
+      ${recentOnly ? whereClause(filter, RECENT_WINDOW) : whereClause(filter)}
+      GROUP BY ar.conversation_id
+      ORDER BY last_message_time DESC, ar.conversation_id DESC
+      LIMIT $${values.length - 1}
+      OFFSET $${values.length}
+    `
+  const result = await pool.query(query, values)
+  return result.rows.map((row: { conversation_id: string }) => row.conversation_id)
+}
+
+async function fetchDetails(
+  pool: ConversationListPool,
+  filter: ConversationFilter,
+  conversationIds: string[]
+): Promise<ConversationRow[]> {
+  if (conversationIds.length === 0) {
+    return []
   }
 
-  if (params.accountId) {
-    conditions.push(`ar.account_id = $${++paramCount}`)
-    values.push(params.accountId)
-  }
-
-  if (params.dateFrom) {
-    conditions.push(`ar.timestamp >= $${++paramCount}`)
-    values.push(params.dateFrom)
-  }
-
-  if (params.dateTo) {
-    conditions.push(`ar.timestamp <= $${++paramCount}`)
-    values.push(params.dateTo)
-  }
-
-  const needsRows = params.offset + params.limit
-  const useTimeBound =
-    !normalizedUserEmail && !params.dateFrom && !params.dateTo && needsRows <= 200
-  const baseFilters = ['ar.conversation_id IS NOT NULL', ...conditions]
-  if (useTimeBound) {
-    baseFilters.push(`ar.timestamp >= NOW() - INTERVAL '7 days'`)
-  }
-  const whereClause = `WHERE ${baseFilters.join(' AND ')}`
-
-  const privacyCte = normalizedUserEmail ? `${accessibleProjectsCte},` : ''
-  const privacyJoin = normalizedUserEmail
-    ? 'JOIN accessible_projects ap ON ar.project_id = ap.project_id'
-    : ''
-
-  const conversationsQuery = `
-      WITH
-      ${privacyCte}
-      paginated_conversations AS (
-        SELECT
-          ar.conversation_id,
-          MAX(ar.timestamp) AS last_message_time
-        FROM api_requests ar
-        ${privacyJoin}
-        ${whereClause}
-        GROUP BY ar.conversation_id
-        ORDER BY last_message_time DESC
-        LIMIT $${++paramCount}
-        OFFSET $${++paramCount}
-      ),
-      conversation_rollups AS (
+  const values = [...filter.values, conversationIds]
+  const where = whereClause(filter, `ar.conversation_id = ANY($${values.length})`)
+  const query = `
+      ${withClause(
+        filter,
+        `conversation_rollups AS (
         SELECT
           ar.conversation_id,
           ARRAY_AGG(DISTINCT ar.project_id) FILTER (WHERE ar.project_id IS NOT NULL) AS train_ids,
@@ -182,34 +336,32 @@ export async function listConversations(
           BOOL_OR(ar.is_subtask) AS is_subtask,
           COUNT(*) FILTER (WHERE ar.is_subtask) AS subtask_message_count
         FROM api_requests ar
-        ${privacyJoin}
-        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
-        ${whereClause}
+        ${filter.join}
+        ${where}
         GROUP BY ar.conversation_id
-      ),
-      latest_requests AS (
+      )`,
+        `latest_requests AS (
         SELECT DISTINCT ON (ar.conversation_id)
           ar.conversation_id,
           ar.request_id AS latest_request_id,
           ar.model AS latest_model,
           ar.response_body AS latest_response_body
         FROM api_requests ar
-        ${privacyJoin}
-        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
-        ${whereClause}
+        ${filter.join}
+        ${where}
         ORDER BY ar.conversation_id, ar.timestamp DESC, ar.request_id DESC
-      ),
-      first_subtasks AS (
+      )`,
+        `first_subtasks AS (
         SELECT DISTINCT ON (ar.conversation_id)
           ar.conversation_id,
           ar.parent_task_request_id
         FROM api_requests ar
-        ${privacyJoin}
-        INNER JOIN paginated_conversations pc ON ar.conversation_id = pc.conversation_id
-        ${whereClause}
+        ${filter.join}
+        ${where}
           AND ar.is_subtask = true
         ORDER BY ar.conversation_id, ar.timestamp ASC, ar.request_id ASC
-      )
+      )`
+      )}
       SELECT
         cr.*,
         lr.latest_request_id,
@@ -218,51 +370,70 @@ export async function listConversations(
         fs.parent_task_request_id,
         parent_req.conversation_id AS parent_conversation_id
       FROM conversation_rollups cr
-      INNER JOIN paginated_conversations pc ON cr.conversation_id = pc.conversation_id
       LEFT JOIN latest_requests lr ON lr.conversation_id = cr.conversation_id
       LEFT JOIN first_subtasks fs ON fs.conversation_id = cr.conversation_id
       LEFT JOIN api_requests parent_req ON fs.parent_task_request_id = parent_req.request_id
-      ORDER BY pc.last_message_time DESC
+      ORDER BY cr.last_message_time DESC, cr.conversation_id DESC
     `
+  const result = await pool.query(query, values)
+  return result.rows
+}
 
-  values.push(params.limit)
-  values.push(params.offset)
-
-  const countQuery = normalizedUserEmail
-    ? `
-      WITH
-      ${accessibleProjectsCte}
+async function countExact(pool: ConversationListPool, filter: ConversationFilter): Promise<number> {
+  const result = await pool.query(
+    `
+      ${withClause(filter)}
       SELECT COUNT(DISTINCT ar.conversation_id) AS total
       FROM api_requests ar
-      JOIN accessible_projects ap ON ar.project_id = ap.project_id
-      ${whereClause}
+      ${filter.join}
+      ${whereClause(filter)}
+    `,
+    filter.values
+  )
+  return parseInt(result.rows[0]?.total || '0')
+}
+
+/**
+ * Live count of conversations active in the window plus the cached count of
+ * the rest; both terms are exact when computed, the older one may lag by up
+ * to the cache TTL.
+ */
+async function countRecentPlusOlder(
+  pool: ConversationListPool,
+  filter: ConversationFilter,
+  cache: OlderConversationCountCache,
+  keyParts: string[]
+): Promise<number> {
+  const recentQuery = pool.query(
     `
-    : `
-      SELECT COUNT(DISTINCT ar.conversation_id) AS total
+      ${withClause(filter)}
+      SELECT COUNT(DISTINCT ar.conversation_id) AS recent_total
       FROM api_requests ar
-      ${whereClause}
-    `
+      ${filter.join}
+      ${whereClause(filter, RECENT_WINDOW)}
+    `,
+    filter.values
+  )
 
-  const countValues = values.slice(0, values.length - 2)
-  const [conversationsResult, countResult] = await Promise.all([
-    pool.query(conversationsQuery, values),
-    pool.query(countQuery, countValues),
-  ])
+  // Total minus recent in one statement, so both terms share one snapshot
+  const olderCount = cache.get(JSON.stringify(keyParts), async () => {
+    const result = await pool.query(
+      `
+      ${withClause(filter)}
+      SELECT
+        COUNT(DISTINCT ar.conversation_id)
+          - COUNT(DISTINCT ar.conversation_id) FILTER (WHERE ${RECENT_WINDOW}) AS older_total
+      FROM api_requests ar
+      ${filter.join}
+      ${whereClause(filter)}
+    `,
+      filter.values
+    )
+    return parseInt(result.rows[0]?.older_total || '0')
+  })
 
-  const totalCount = parseInt(countResult.rows[0]?.total || 0)
-  const hasMore = params.offset + params.limit < totalCount
-
-  return {
-    conversations: conversationsResult.rows.map(toConversationListItem),
-    pagination: {
-      total: totalCount,
-      limit: params.limit,
-      offset: params.offset,
-      hasMore,
-      page: Math.floor(params.offset / params.limit) + 1,
-      totalPages: Math.ceil(totalCount / params.limit),
-    },
-  }
+  const [recent, older] = await Promise.all([recentQuery, olderCount])
+  return parseInt(recent.rows[0]?.recent_total || '0') + older
 }
 
 function toConversationListItem(row: ConversationRow): ConversationListItem {
