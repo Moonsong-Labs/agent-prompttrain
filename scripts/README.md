@@ -118,6 +118,17 @@ deleting requests outside the proxy (for example with `rebuild-conversations.ts`
 `CONVERSATION_SUMMARIES_ENABLED` off, `TRUNCATE conversation_summaries`, re-run with `--execute`
 and verify before turning it back on.
 
+### verify-conversation-summaries.ts
+
+Read-only parity check for ADR-039, run in one `REPEATABLE READ` snapshot of a session it makes
+read-only: every `(conversation_id, project_id)` group of `api_requests` must match its
+`conversation_summaries` row (none missing, stale or different), and pages 1-3 and the total
+served from the table must equal the request-level listing for anonymous callers, sampled
+principals (`--principals`, default 3), the busiest project and the busiest account.
+Conversations with a request stored within `--settle-seconds` (default 60) before the snapshot are
+skipped, as their upsert may still be in flight. Prints conversation ids and counts only; exits 1
+on any mismatch. `bun scripts/db/verify-conversation-summaries.ts --principals 3 --page-size 50`
+
 ### backup-database.ts
 
 Creates database backups with automatic timestamping.
