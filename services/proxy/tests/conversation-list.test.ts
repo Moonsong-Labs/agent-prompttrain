@@ -382,3 +382,17 @@ describe('listConversations', () => {
     expect(result.pagination.total).toBe(75)
   })
 })
+
+describe('OlderConversationCountCache', () => {
+  it('recovers when compute throws synchronously', async () => {
+    const cache = new OlderConversationCountCache()
+
+    await expect(
+      cache.get('key', () => {
+        throw new Error('sync failure')
+      })
+    ).rejects.toThrow('sync failure')
+
+    expect(await cache.get('key', async () => 5)).toBe(5)
+  })
+})

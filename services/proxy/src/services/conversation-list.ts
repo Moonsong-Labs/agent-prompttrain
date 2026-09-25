@@ -120,15 +120,17 @@ export class OlderConversationCountCache {
       return pending
     }
 
-    const computation = (async () => {
-      try {
-        const count = await compute()
+    // compute runs on a later microtask, after the promise is registered, so
+    // even a synchronous throw settles through finally and leaves inFlight
+    const computation = Promise.resolve()
+      .then(compute)
+      .then(count => {
         this.store(key, count)
         return count
-      } finally {
+      })
+      .finally(() => {
         this.inFlight.delete(key)
-      }
-    })()
+      })
     this.inFlight.set(key, computation)
     return computation
   }
