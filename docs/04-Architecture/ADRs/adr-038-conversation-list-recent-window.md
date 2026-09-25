@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-25)
+Superseded by [ADR-039](./adr-039-conversation-summaries-table.md) (2026-09-25); originally Accepted (2026-09-25). The recent-window path remains the default until `CONVERSATION_SUMMARIES_ENABLED` is removed.
 
 ## Context
 
