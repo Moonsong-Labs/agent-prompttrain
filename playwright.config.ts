@@ -14,6 +14,8 @@ const serverEnv = {
   SLACK_ENABLED: 'false',
   LOG_LEVEL: 'error',
   PROXY_API_URL: proxyURL,
+  // Explicit, so a value in .env can never switch the managed proxy's read path (ADR-039)
+  CONVERSATION_SUMMARIES_ENABLED: process.env.CONVERSATION_SUMMARIES_ENABLED || 'false',
 }
 
 /**
