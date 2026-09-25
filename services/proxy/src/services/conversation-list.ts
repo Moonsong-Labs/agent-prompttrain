@@ -272,8 +272,9 @@ export async function listConversations(
         ]),
   ])
 
-  // The rows on this page are ground truth; a stale estimate must not hide them
-  const total = Math.max(counted, params.offset + rows.length)
+  // Rows on this page prove at least offset + rows.length conversations, so a
+  // stale estimate must not hide them; an empty page proves nothing
+  const total = rows.length > 0 ? Math.max(counted, params.offset + rows.length) : counted
 
   return {
     conversations: rows.map(toConversationListItem),

@@ -344,6 +344,24 @@ describe('listConversations', () => {
     })
   })
 
+  it('does not inflate the total for a page past the end', async () => {
+    const { pool } = createPool({ ids: () => [], recent: 30, older: () => 45 })
+
+    const result = await listConversations(pool, page({ offset: 150 }), 'alice@example.com', {
+      olderCountCache: new OlderConversationCountCache(),
+    })
+
+    expect(result.conversations).toEqual([])
+    expect(result.pagination).toEqual({
+      total: 75,
+      limit: 50,
+      offset: 150,
+      hasMore: false,
+      page: 4,
+      totalPages: 2,
+    })
+  })
+
   it('shares one in-flight older count between concurrent requests', async () => {
     let release: (count: number) => void = () => {}
     const { pool, of } = createPool({
