@@ -483,4 +483,26 @@ describe('OlderConversationCountCache', () => {
 
     expect(await cache.get('key', async () => 5)).toBe(5)
   })
+
+  it('evicts the oldest entry beyond maxEntries', async () => {
+    const cache = new OlderConversationCountCache({ maxEntries: 2 })
+    const computed: string[] = []
+    const count = (key: string) =>
+      cache.get(key, async () => {
+        computed.push(key)
+        return key.length
+      })
+
+    await count('a')
+    await count('bb')
+    await count('ccc') // evicts 'a'
+    await count('bb')
+    await count('ccc')
+    expect(computed).toEqual(['a', 'bb', 'ccc'])
+
+    await count('a') // recomputed, evicts 'bb'
+    await count('ccc')
+    await count('bb') // recomputed, evicts 'ccc'
+    expect(computed).toEqual(['a', 'bb', 'ccc', 'a', 'bb'])
+  })
 })
