@@ -261,7 +261,7 @@ export async function listConversations(
   const filter = buildFilter(params, normalizedPrincipal)
   const olderCountCache = options.olderCountCache ?? olderConversationCountCache
 
-  const [rows, total] = await Promise.all([
+  const [rows, counted] = await Promise.all([
     selectPage(pool, filter, params).then(ids => fetchDetails(pool, filter, ids)),
     hasExplicitDates(params)
       ? countExact(pool, filter)
@@ -271,6 +271,9 @@ export async function listConversations(
           params.accountId || null,
         ]),
   ])
+
+  // The rows on this page are ground truth; a stale estimate must not hide them
+  const total = Math.max(counted, params.offset + rows.length)
 
   return {
     conversations: rows.map(toConversationListItem),

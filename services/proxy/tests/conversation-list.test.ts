@@ -75,7 +75,8 @@ const idsFrom = (prefix: string, count: number) =>
 
 function createPool(overrides: Partial<PoolState> = {}) {
   const state: PoolState = {
-    ids: ({ limit }) => idsFrom('conv', limit),
+    // 75 conversations in all, matching the default recent + older counts
+    ids: ({ limit, offset }) => idsFrom('conv', 75).slice(offset, offset + limit),
     recent: 30,
     older: () => 45,
     exact: 99,
@@ -237,7 +238,7 @@ describe('listConversations', () => {
   })
 
   it('treats a single date bound as explicit too', async () => {
-    const { pool, calls, of } = createPool({ exact: 7 })
+    const { pool, calls, of } = createPool({ ids: () => idsFrom('dated', 7), exact: 7 })
 
     const result = await listConversations(pool, page({ dateFrom: '2026-01-01' }), undefined, {
       olderCountCache: new OlderConversationCountCache(),
@@ -303,6 +304,46 @@ describe('listConversations', () => {
     expect(third.pagination.total).toBe(1032)
   })
 
+  it('never reports a total below the rows already returned', async () => {
+    // A stale older count can undercount; the page itself is ground truth
+    const { pool } = createPool({
+      ids: ({ limit }) => idsFrom('conv', limit),
+      recent: 20,
+      older: () => 40,
+    })
+
+    const result = await listConversations(pool, page({ offset: 50 }), 'alice@example.com', {
+      olderCountCache: new OlderConversationCountCache(),
+    })
+
+    expect(result.conversations).toHaveLength(50)
+    expect(result.pagination).toEqual({
+      total: 100,
+      limit: 50,
+      offset: 50,
+      hasMore: false,
+      page: 2,
+      totalPages: 2,
+    })
+
+    const short = createPool({
+      ids: ({ windowed }) => (windowed ? [] : idsFrom('conv', 7)),
+      recent: 0,
+      older: () => 0,
+    })
+    const partial = await listConversations(short.pool, page({ offset: 100 }), undefined, {
+      olderCountCache: new OlderConversationCountCache(),
+    })
+    expect(partial.pagination).toEqual({
+      total: 107,
+      limit: 50,
+      offset: 100,
+      hasMore: false,
+      page: 3,
+      totalPages: 3,
+    })
+  })
+
   it('shares one in-flight older count between concurrent requests', async () => {
     let release: (count: number) => void = () => {}
     const { pool, of } = createPool({
@@ -345,7 +386,7 @@ describe('listConversations', () => {
 
   it('keeps the older count of anonymous callers apart from a principal named public', async () => {
     const cache = new OlderConversationCountCache()
-    const { pool, state, of } = createPool({ recent: 0, older: () => 10 })
+    const { pool, state, of } = createPool({ ids: () => [], recent: 0, older: () => 10 })
 
     const anonymous = await listConversations(pool, page(), undefined, { olderCountCache: cache })
     state.older = () => 3
