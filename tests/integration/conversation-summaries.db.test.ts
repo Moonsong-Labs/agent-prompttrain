@@ -7,7 +7,10 @@ import {
   type ConversationListPool,
 } from '../../services/proxy/src/services/conversation-list'
 import { StorageWriter } from '../../services/proxy/src/storage/writer'
-import { backfillConversationSummaries } from '../../scripts/db/backfill-conversation-summaries'
+import {
+  backfillConversationSummaries,
+  refreshConversationSummaries,
+} from '../../scripts/db/backfill-conversation-summaries'
 
 // Only ever runs against an explicitly named local *_test database
 const databaseUrl = process.env.CONVERSATION_SUMMARIES_TEST_DATABASE_URL
@@ -471,5 +474,71 @@ describe.skipIf(!enabled)('conversation summaries against PostgreSQL', () => {
     ])
 
     expect(await tableRows()).toEqual(await groupedReference())
+  })
+
+  it('refreshConversationSummaries repairs rows a re-key outside the proxy left stale', async () => {
+    const oldId = conv(200)
+    const newId = conv(201)
+    const rowsFor = (rows: Array<{ conversation_id: string }>, id: string) =>
+      rows.filter(row => row.conversation_id === id)
+
+    const firstRequest = nextRequest
+    await store({ conversation: 200, project: PUBLIC_A, account: ACC_A, at: now - 5 * DAY })
+    await store({ conversation: 200, project: PUBLIC_A, account: ACC_B, at: now - 4 * DAY })
+    await store({ conversation: 200, project: PUBLIC_A, account: ACC_A, at: now - 3 * DAY })
+    // Re-key two of the three requests the way rebuild-conversations.ts does: plain SQL against
+    // api_requests, which never touches conversation_summaries
+    const movedRequestIds = [req(firstRequest + 1), req(firstRequest + 2)]
+    await pool.query(
+      `UPDATE api_requests SET conversation_id = $2 WHERE request_id = ANY($1::uuid[])`,
+      [movedRequestIds, newId]
+    )
+
+    // Before refresh: the old row is stale (still reflects all 3 original requests) and the new
+    // id has no row at all, even though api_requests now has two of its own
+    const staleOldRow = rowsFor(await tableRows(), oldId)
+    const correctOldRow = rowsFor(await groupedReference(), oldId)
+    expect(staleOldRow).not.toEqual(correctOldRow)
+    expect(rowsFor(await tableRows(), newId)).toEqual([])
+    expect(rowsFor(await groupedReference(), newId)).not.toEqual([])
+
+    const result = await refreshConversationSummaries(pool, [oldId, newId], quiet)
+    expect(result.conversations).toBe(2)
+
+    expect(rowsFor(await tableRows(), oldId)).toEqual(rowsFor(await groupedReference(), oldId))
+    expect(rowsFor(await tableRows(), newId)).toEqual(rowsFor(await groupedReference(), newId))
+
+    // Idempotent: refreshing an already-correct pair changes nothing
+    const again = await refreshConversationSummaries(pool, [oldId, newId], quiet)
+    expect(again.conversations).toBe(2)
+    expect(rowsFor(await tableRows(), oldId)).toEqual(rowsFor(await groupedReference(), oldId))
+    expect(rowsFor(await tableRows(), newId)).toEqual(rowsFor(await groupedReference(), newId))
+  })
+
+  it('backfillConversationSummaries releases its connection without leaking session settings (M3)', async () => {
+    // max: 1 forces the very next query on this pool to reuse the connection the backfill used,
+    // unless it was actually destroyed rather than returned to the pool
+    const leakPool = new Pool({ connectionString: databaseUrl, max: 1 })
+    try {
+      await backfillConversationSummaries(leakPool, { chunkDays: 7, execute: false }, quiet)
+
+      const lockTimeout = await leakPool.query('SHOW lock_timeout')
+      const applicationName = await leakPool.query('SHOW application_name')
+
+      const freshPool = new Pool({ connectionString: databaseUrl, max: 1 })
+      try {
+        const freshLockTimeout = await freshPool.query('SHOW lock_timeout')
+        const freshApplicationName = await freshPool.query('SHOW application_name')
+
+        expect(lockTimeout.rows[0].lock_timeout).toBe(freshLockTimeout.rows[0].lock_timeout)
+        expect(applicationName.rows[0].application_name).toBe(
+          freshApplicationName.rows[0].application_name
+        )
+      } finally {
+        await freshPool.end()
+      }
+    } finally {
+      await leakPool.end()
+    }
   })
 })

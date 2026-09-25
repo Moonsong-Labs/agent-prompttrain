@@ -3,6 +3,7 @@ import {
   backfillConversationSummaries,
   parseSummariesBackfillArgs,
   planBackfillChunks,
+  refreshConversationSummaries,
 } from '../backfill-conversation-summaries'
 
 const at = (iso: string) => new Date(iso)
@@ -184,5 +185,79 @@ describe('backfillConversationSummaries', () => {
 
     expect(result).toEqual({ chunks: 0, groups: 0, changed: 0 })
     expect(of('INSERT')).toHaveLength(0)
+  })
+})
+
+function createRefreshPool(options: { tableExists?: boolean } = {}) {
+  const calls: Array<{ sql: string; values?: unknown[] }> = []
+  let released: boolean | undefined
+  const client = {
+    query: async (sql: string, values?: unknown[]) => {
+      calls.push({ sql, values })
+      if (sql.includes('information_schema.tables')) {
+        return {
+          rows: options.tableExists === false ? [] : [{ table_name: 'conversation_summaries' }],
+        }
+      }
+      if (sql.startsWith('DELETE FROM conversation_summaries')) {
+        return { rowCount: (values?.[0] as string[]).length }
+      }
+      if (sql.includes('INSERT INTO conversation_summaries')) {
+        return { rowCount: (values?.[0] as string[]).length }
+      }
+      return { rows: [] }
+    },
+    release: (destroy?: boolean) => {
+      released = destroy
+    },
+  }
+  return {
+    pool: { connect: async () => client } as any,
+    calls,
+    released: () => released,
+    of: (fragment: string) => calls.filter(call => call.sql.includes(fragment)),
+  }
+}
+
+describe('refreshConversationSummaries', () => {
+  const quiet = () => {}
+
+  it('returns zeros for an empty list without issuing any query', async () => {
+    const { pool, calls, released } = createRefreshPool()
+
+    const result = await refreshConversationSummaries(pool, [], quiet)
+
+    expect(result).toEqual({ conversations: 0, deleted: 0, inserted: 0 })
+    expect(calls).toHaveLength(0)
+    expect(released()).toBeUndefined()
+  })
+
+  it('issues no DELETE or INSERT and returns zeros when the table is missing', async () => {
+    const { pool, calls, released } = createRefreshPool({ tableExists: false })
+
+    const result = await refreshConversationSummaries(pool, ['a', 'b'], quiet)
+
+    expect(result).toEqual({ conversations: 0, deleted: 0, inserted: 0 })
+    expect(calls.some(call => /DELETE|INSERT/.test(call.sql))).toBe(false)
+    expect(released()).toBe(true)
+  })
+
+  it('runs 2500 distinct ids as 3 batched transactions of at most 1000', async () => {
+    const ids = Array.from({ length: 2500 }, (_, i) => `id-${i}`)
+    const { pool, calls, released } = createRefreshPool()
+
+    // Duplicated on the way in: only the 2500 distinct ids should be counted and processed
+    const result = await refreshConversationSummaries(pool, [...ids, ...ids], quiet)
+
+    expect(result.conversations).toBe(2500)
+    expect(calls.filter(call => call.sql === 'BEGIN')).toHaveLength(3)
+    expect(calls.filter(call => call.sql === 'COMMIT')).toHaveLength(3)
+    const deletes = calls.filter(call => call.sql.startsWith('DELETE FROM conversation_summaries'))
+    expect(deletes.map(call => (call.values![0] as string[]).length)).toEqual([1000, 1000, 500])
+    const inserts = calls.filter(call => call.sql.includes('INSERT INTO conversation_summaries'))
+    expect(inserts).toHaveLength(3)
+    expect(result.deleted).toBe(2500)
+    expect(result.inserted).toBe(2500)
+    expect(released()).toBe(true)
   })
 })

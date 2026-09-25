@@ -79,18 +79,25 @@ export function planBackfillChunks(start: Date, end: Date, chunkDays: number): B
   return chunks
 }
 
-/** One chunk of api_requests grouped as the table stores it; $1/$2 bound [from, to) */
-const CHUNK_GROUPS_SQL = `
+/**
+ * Shared SELECT/GROUP BY grouping api_requests exactly as conversation_summaries stores them.
+ * The caller supplies the WHERE clause that selects which requests to group.
+ */
+const GROUP_SELECT_SQL = `
   SELECT conversation_id, project_id,
          MIN(timestamp) AS first_activity_at,
          MAX(timestamp) AS last_activity_at,
          COALESCE(ARRAY_AGG(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL), '{}')
            AS account_ids
-  FROM api_requests
+  FROM api_requests`
+const GROUP_BY_SQL = `GROUP BY conversation_id, project_id`
+
+/** One chunk of api_requests grouped as the table stores it; $1/$2 bound [from, to) */
+const CHUNK_GROUPS_SQL = `${GROUP_SELECT_SQL}
   WHERE conversation_id IS NOT NULL
     AND timestamp >= $1
     AND timestamp < $2
-  GROUP BY conversation_id, project_id`
+  ${GROUP_BY_SQL}`
 
 const COUNT_CHUNK_SQL = `SELECT COUNT(*)::int AS groups FROM (${CHUNK_GROUPS_SQL}) chunk_groups`
 
@@ -106,6 +113,95 @@ const UPSERT_CHUNK_SQL = `
   )
   SELECT (SELECT COUNT(*) FROM grouped)::int AS groups,
          (SELECT COUNT(*) FROM upserted)::int AS changed`
+
+/** The given conversations grouped as the table stores them; $1 is the conversation id array */
+const REFRESH_GROUPS_SQL = `${GROUP_SELECT_SQL}
+  WHERE conversation_id = ANY($1::uuid[])
+  ${GROUP_BY_SQL}`
+
+const REFRESH_DELETE_SQL = `DELETE FROM conversation_summaries WHERE conversation_id = ANY($1::uuid[])`
+
+const REFRESH_INSERT_SQL = `
+  WITH grouped AS (${REFRESH_GROUPS_SQL})
+  INSERT INTO conversation_summaries AS cs
+    (conversation_id, project_id, first_activity_at, last_activity_at, account_ids)
+  SELECT conversation_id, project_id, first_activity_at, last_activity_at, account_ids
+  FROM grouped
+  ${CONVERSATION_SUMMARY_MERGE_SQL}`
+
+const REFRESH_BATCH_SIZE = 1000
+
+async function summaryTableExists(client: PoolClient): Promise<boolean> {
+  const { rows } = await client.query(
+    `SELECT table_name
+     FROM information_schema.tables
+     WHERE table_schema = current_schema()
+       AND table_name = 'conversation_summaries'`
+  )
+  return rows.length > 0
+}
+
+export interface SummariesRefreshResult {
+  conversations: number // distinct IDs given
+  deleted: number // summary rows removed
+  inserted: number // summary rows written back
+}
+
+/**
+ * Rebuild the conversation_summaries rows of the given conversations exactly from api_requests,
+ * removing rows whose requests were re-keyed or deleted outside the proxy (ADR-039). Safe while
+ * the proxy writes: a live upsert of a refreshed conversation waits for the batch and merges.
+ */
+export async function refreshConversationSummaries(
+  pool: Pool,
+  conversationIds: string[],
+  log: (line: string) => void = console.log
+): Promise<SummariesRefreshResult> {
+  const zero: SummariesRefreshResult = { conversations: 0, deleted: 0, inserted: 0 }
+  const uniqueIds = [...new Set(conversationIds)]
+  if (uniqueIds.length === 0) {
+    return zero
+  }
+
+  const client = await pool.connect()
+  try {
+    if (!(await summaryTableExists(client))) {
+      log('conversation_summaries does not exist: nothing to refresh')
+      return zero
+    }
+
+    const result: SummariesRefreshResult = {
+      conversations: uniqueIds.length,
+      deleted: 0,
+      inserted: 0,
+    }
+    const batchCount = Math.ceil(uniqueIds.length / REFRESH_BATCH_SIZE)
+
+    for (let i = 0; i < uniqueIds.length; i += REFRESH_BATCH_SIZE) {
+      const batch = uniqueIds.slice(i, i + REFRESH_BATCH_SIZE)
+      try {
+        await client.query('BEGIN')
+        await client.query("SET LOCAL statement_timeout = '120s'")
+        await client.query("SET LOCAL lock_timeout = '5s'")
+        const deleted = await client.query(REFRESH_DELETE_SQL, [batch])
+        const inserted = await client.query(REFRESH_INSERT_SQL, [batch])
+        await client.query('COMMIT')
+        result.deleted += deleted.rowCount ?? 0
+        result.inserted += inserted.rowCount ?? 0
+        log(
+          `refresh batch ${i / REFRESH_BATCH_SIZE + 1}/${batchCount}: ${deleted.rowCount ?? 0} deleted, ${inserted.rowCount ?? 0} inserted`
+        )
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      }
+    }
+
+    return result
+  } finally {
+    client.release(true)
+  }
+}
 
 function maskHost(databaseUrl: string): string {
   const host = new URL(databaseUrl).hostname
@@ -177,7 +273,9 @@ export async function backfillConversationSummaries(
     log(`Done: ${JSON.stringify(result)}`)
     return result
   } finally {
-    client.release()
+    // configureSession set statement_timeout/lock_timeout/application_name at session level:
+    // never hand that connection back to the caller's pool (M3)
+    client.release(true)
   }
 }
 
