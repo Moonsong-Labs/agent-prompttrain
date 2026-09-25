@@ -1,7 +1,7 @@
 # Conversation Summaries Table — Design Spec
 
 **Date**: 2026-09-25
-**Status**: Approved in chat, awaiting written review
+**Status**: Approved
 **Supersedes**: ADR-038 (conversation list recent window), via a new ADR-039
 
 ## Summary
