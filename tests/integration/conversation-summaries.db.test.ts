@@ -515,6 +515,34 @@ describe.skipIf(!enabled)('conversation summaries against PostgreSQL', () => {
     expect(rowsFor(await tableRows(), newId)).toEqual(rowsFor(await groupedReference(), newId))
   })
 
+  it('refreshConversationSummaries removes the row of a conversation merged into another', async () => {
+    const retiredId = conv(210)
+    const survivorId = conv(211)
+    const others = (rows: Array<{ conversation_id: string }>) =>
+      rows.filter(row => row.conversation_id !== retiredId && row.conversation_id !== survivorId)
+
+    await store({ conversation: 211, project: PUBLIC_A, account: ACC_A, at: now - 6 * DAY })
+    await store({ conversation: 210, project: PUBLIC_A, account: ACC_B, at: now - 2 * DAY })
+    await store({ conversation: 210, project: PUBLIC_A, account: ACC_C, at: now - DAY })
+    const untouchedBefore = others(await tableRows())
+    // Merge every request of the retired conversation into the survivor, as rebuild-conversations.ts
+    // does when it links fragments: the retired row survives and the survivor's row is too old
+    await pool.query(`UPDATE api_requests SET conversation_id = $2 WHERE conversation_id = $1`, [
+      retiredId,
+      survivorId,
+    ])
+    expect((await tableRows()).some(row => row.conversation_id === retiredId)).toBe(true)
+
+    await refreshConversationSummaries(pool, [retiredId, survivorId], quiet)
+
+    const rows = await tableRows()
+    expect(rows.some(row => row.conversation_id === retiredId)).toBe(false)
+    expect(rows.filter(row => row.conversation_id === survivorId)).toEqual(
+      (await groupedReference()).filter(row => row.conversation_id === survivorId)
+    )
+    expect(others(rows)).toEqual(untouchedBefore)
+  })
+
   it('backfillConversationSummaries releases its connection without leaking session settings (M3)', async () => {
     // max: 1 forces the very next query on this pool to reuse the connection the backfill used,
     // unless it was actually destroyed rather than returned to the pool
