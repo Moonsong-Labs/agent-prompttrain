@@ -110,7 +110,7 @@ export class AuthenticationService {
     }
 
     if (selection.fromPool) {
-      logger.info('Account selected from pool', {
+      logger.debug('Account selected from pool', {
         requestId: context.requestId,
         projectId,
         metadata: {
@@ -211,7 +211,7 @@ export class AuthenticationService {
       })
     }
 
-    logger.info('Using Anthropic OAuth credentials for account', {
+    logger.debug('Using Anthropic OAuth credentials for account', {
       requestId: context.requestId,
       projectId: context.projectId,
       metadata: {

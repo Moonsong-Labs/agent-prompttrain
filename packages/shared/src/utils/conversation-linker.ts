@@ -238,7 +238,7 @@ export class ConversationLinker {
               : 0
             const finalSequence = baseSequence + invocationIndex
 
-            this.logger.info('Linked as subtask', {
+            this.logger.debug('Linked as subtask', {
               projectId,
               metadata: {
                 ...traceMeta,
@@ -284,7 +284,7 @@ export class ConversationLinker {
           if (parent) {
             const branchId = this.generateCompactBranchId(timestamp)
 
-            this.logger.info('Linked as compact conversation', {
+            this.logger.debug('Linked as compact conversation', {
               projectId,
               metadata: {
                 ...traceMeta,
@@ -307,7 +307,7 @@ export class ConversationLinker {
         }
 
         // Case b: Skip - no parent
-        this.logger.info('Created new conversation (single message)', {
+        this.logger.debug('Created new conversation (single message)', {
           projectId,
           metadata: {
             ...traceMeta,
@@ -342,7 +342,7 @@ export class ConversationLinker {
 
       // If after deduplication we have fewer than 3 messages, we can't compute parent hash
       if (deduplicatedMessages.length < MIN_MESSAGES_FOR_PARENT_HASH) {
-        this.logger.info('Created new conversation (insufficient messages for parent)', {
+        this.logger.debug('Created new conversation (insufficient messages for parent)', {
           projectId,
           metadata: {
             ...traceMeta,
@@ -581,7 +581,7 @@ export class ConversationLinker {
           if (compactParent) {
             const branchId = this.generateCompactBranchId(timestamp)
 
-            this.logger.info('Linked as compact conversation', {
+            this.logger.debug('Linked as compact conversation', {
               projectId,
               metadata: {
                 ...traceMeta,
@@ -652,7 +652,7 @@ export class ConversationLinker {
           }
         }
 
-        this.logger.info('Linked to existing conversation', {
+        this.logger.debug('Linked to existing conversation', {
           projectId,
           metadata: {
             ...traceMeta,
@@ -675,7 +675,7 @@ export class ConversationLinker {
       }
 
       // No parent found - new conversation
-      this.logger.info('Created new conversation', {
+      this.logger.debug('Created new conversation', {
         projectId,
         metadata: {
           ...traceMeta,

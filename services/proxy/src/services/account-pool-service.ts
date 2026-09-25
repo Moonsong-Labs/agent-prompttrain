@@ -121,7 +121,7 @@ export class AccountPoolService {
     }
     const { credential, evaluation } = selected
 
-    logger.info('Selected account from pool', {
+    logger.debug('Selected account from pool', {
       metadata: {
         projectId,
         accountId: credential.account_id,

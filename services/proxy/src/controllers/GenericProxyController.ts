@@ -28,7 +28,7 @@ export class GenericProxyController {
       // Authenticate to determine provider
       authResult = await this.authService.authenticate(requestContext)
 
-      logger.info('Handling generic proxy request', {
+      logger.debug('Handling generic proxy request', {
         path,
         provider: authResult.provider,
         method: c.req.method,

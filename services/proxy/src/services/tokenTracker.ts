@@ -1,3 +1,5 @@
+import { logger } from '../middleware/logger'
+
 export interface TrainTokenStats {
   inputTokens: number
   outputTokens: number
@@ -51,6 +53,11 @@ class TokenTracker {
   startReporting(intervalMs: number = 10000) {
     if (this.intervalId) {
       clearInterval(this.intervalId)
+    }
+
+    // A debugging aid only: the dashboard shows the same per-project totals
+    if (!logger.isDebugEnabled()) {
+      return
     }
 
     // Print initial header
