@@ -72,6 +72,10 @@ class Logger {
     }
   }
 
+  isDebugEnabled(): boolean {
+    return this.config.level === LogLevel.DEBUG
+  }
+
   private shouldLog(level: LogLevel): boolean {
     const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR]
     const currentLevelIndex = levels.indexOf(this.config.level)
@@ -225,21 +229,22 @@ export function loggingMiddleware() {
     const method = c.req.method
     const path = c.req.path
     const userAgent = c.req.header('user-agent')
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip')
 
     // Skip logging for health check endpoint
     const isHealthCheck = path === '/health'
 
-    // Log incoming request
+    // Log incoming request; the completion line carries the same fields at info level
     if (!isHealthCheck) {
-      logger.info('Incoming request', {
+      logger.debug('Incoming request', {
         requestId,
         projectId,
         method,
         path,
         metadata: {
           userAgent,
-          ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip'),
-          headers: logger['config'].level === LogLevel.DEBUG ? c.req.header() : undefined,
+          ip,
+          headers: logger.isDebugEnabled() ? c.req.header() : undefined,
         },
       })
     }
@@ -252,13 +257,16 @@ export function loggingMiddleware() {
         const duration = Date.now() - startTime
         logger.info('Request completed', {
           requestId,
-          projectId,
+          // Client auth resolves the project after this middleware starts
+          projectId: c.get('projectId') || projectId,
           method,
           path,
           statusCode: c.res.status,
           duration,
           metadata: {
             contentLength: c.res.headers.get('content-length'),
+            userAgent,
+            ip,
           },
         })
       }
@@ -267,7 +275,7 @@ export function loggingMiddleware() {
       const duration = Date.now() - startTime
       logger.error('Request failed', {
         requestId,
-        projectId,
+        projectId: c.get('projectId') || projectId,
         method,
         path,
         statusCode: c.res.status || 500,

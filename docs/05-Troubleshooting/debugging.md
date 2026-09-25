@@ -42,6 +42,33 @@ Debug mode enables:
 }
 ```
 
+### Production Logs
+
+Production containers write one JSON object per line, so CloudWatch Logs Insights can filter on any field (`requestId`, `projectId`, `level`, `message`). Log groups keep 30 days.
+
+At the default `info` level, each proxied inference request writes three lines that share its `requestId`:
+
+- `Forwarding request to Claude`: model, streaming, request type and the account used
+- `Request processed`: input and output tokens
+- `Request completed`: status code and duration
+
+Warnings and errors are always logged. To follow one request, or to list recent errors:
+
+```
+fields @timestamp, level, message, projectId, statusCode, duration
+| filter requestId = "<request id>"
+| sort @timestamp asc
+```
+
+```
+fields @timestamp, message, projectId, error.message
+| filter level = "error"
+| sort @timestamp desc
+| limit 50
+```
+
+For more detail during an incident, register a new task definition revision with `LOG_LEVEL=debug`, deploy it, and roll back to the previous revision afterwards. Debug adds each request's arrival, account pool selection, conversation linking and the token usage table every 10 seconds.
+
 ## Common Debugging Scenarios
 
 ### Authentication Issues

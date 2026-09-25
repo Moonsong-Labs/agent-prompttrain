@@ -65,12 +65,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Proxy Service
 
-| Variable       | Description                                                                                                                                                                                                     | Default       | Required |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
-| `SERVICE_MODE` | Service operational mode: `full` (all endpoints), `proxy` (Claude Code endpoints only), `api` (Dashboard API endpoints only). See [ADR-028](../04-Architecture/ADRs/adr-028-proxy-service-operational-modes.md) | `full`        | ❌       |
-| `PROXY_PORT`   | Port for proxy service                                                                                                                                                                                          | `3000`        | ❌       |
-| `NODE_ENV`     | Node environment                                                                                                                                                                                                | `development` | ❌       |
-| `LOG_LEVEL`    | Logging level                                                                                                                                                                                                   | `info`        | ❌       |
+| Variable       | Description                                                                                                                                                                                                                                         | Default       | Required |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
+| `SERVICE_MODE` | Service operational mode: `full` (all endpoints), `proxy` (Claude Code endpoints only), `api` (Dashboard API endpoints only). See [ADR-028](../04-Architecture/ADRs/adr-028-proxy-service-operational-modes.md)                                     | `full`        | ❌       |
+| `PROXY_PORT`   | Port for proxy service                                                                                                                                                                                                                              | `3000`        | ❌       |
+| `NODE_ENV`     | Node environment. The production builds bake in `production` at build time, so the runtime value does not change them                                                                                                                               | `development` | ❌       |
+| `LOG_LEVEL`    | Logging level: `debug`, `info`, `warn` or `error`. `debug` adds per-request detail (arrival, account selection, conversation linking) and the periodic token usage table. See [Production Logs](../05-Troubleshooting/debugging.md#production-logs) | `info`        | ❌       |
 
 **SERVICE_MODE Details:**
 

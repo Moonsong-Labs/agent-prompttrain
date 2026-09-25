@@ -314,7 +314,7 @@ export class StorageAdapter {
     } else {
       const mapping = this.requestIdMap.get(requestId)
       if (!mapping) {
-        logger.warn('No UUID mapping found for request in linkConversation', {
+        logger.debug('No UUID mapping found for request in linkConversation', {
           requestId,
           metadata: {
             mapSize: this.requestIdMap.size,
@@ -453,8 +453,7 @@ export class StorageAdapter {
 
       const durationMs = Date.now() - startTime
 
-      // Always log metrics for observability
-      logger.info('Storage adapter cleanup cycle completed', {
+      logger.debug('Storage adapter cleanup cycle completed', {
         metadata: {
           cleanedCount,
           initialSize,

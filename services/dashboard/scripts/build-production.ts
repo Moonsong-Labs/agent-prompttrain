@@ -29,9 +29,11 @@ try {
   console.log('📦 Bundling with optimizations...')
 
   // Build with Bun - production optimizations
+  // --production bakes NODE_ENV=production into the bundle; without it Bun inlines "development"
   await $`bun build ${join(srcDir, 'main.ts')} \
     --outdir ${distDir} \
     --target node \
+    --production \
     --minify \
     --sourcemap \
     --external pg`
