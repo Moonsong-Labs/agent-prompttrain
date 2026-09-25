@@ -38,11 +38,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ## Feature Flags
 
-| Variable               | Description                         | Default |
-| ---------------------- | ----------------------------------- | ------- |
-| `STORAGE_ENABLED`      | Enable request/response storage     | `false` |
-| `DEBUG`                | Enable debug logging                | `false` |
-| `COLLECT_TEST_SAMPLES` | Collect request samples for testing | `false` |
+| Variable                         | Description                                                                                                                                                                                                         | Default |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `STORAGE_ENABLED`                | Enable request/response storage                                                                                                                                                                                     | `false` |
+| `DEBUG`                          | Enable debug logging                                                                                                                                                                                                | `false` |
+| `COLLECT_TEST_SAMPLES`           | Collect request samples for testing                                                                                                                                                                                 | `false` |
+| `CONVERSATION_SUMMARIES_ENABLED` | Serve `GET /api/conversations` pages and exact totals from `conversation_summaries` (ADR-039) when no date bounds are given; only the exact value `true` enables it. Apply migration 027 and run the backfill first | `false` |
 
 ## Performance Configuration
 
