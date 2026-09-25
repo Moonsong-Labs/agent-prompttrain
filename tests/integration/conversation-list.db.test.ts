@@ -22,6 +22,7 @@ const ACCOUNT_B = 'convlist-acc-b'
 const ACCOUNT_OLD = 'convlist-acc-old'
 
 const HOUR = 3_600_000
+const TIED = [49, 50]
 const DAY = 24 * HOUR
 const conv = (n: number) => `c0ffee00-0000-4000-8000-${String(n).padStart(12, '0')}`
 const req = (n: number) => `c0ffee01-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -127,7 +128,11 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
     // 60 public conversations active within the last 5 days; every fifth one
     // also has requests from 20+ days ago, outside the recent window
     for (let c = 0; c < 60; c++) {
-      const last = now - c * 2 * HOUR - 30 * 60_000
+      // Conversations 49 and 50 tie on last activity at positions 49/50,
+      // straddling the page-1 (windowed) / page-2 (fallback) boundary
+      const last = TIED.includes(c)
+        ? now - 99 * HOUR - 30 * 60_000
+        : now - c * 2 * HOUR - 30 * 60_000
       const account = c % 2 === 0 ? ACCOUNT_A : ACCOUNT_B
       // Every tenth one has sub-task requests both before and inside the window
       const subtask = c % 4 === 1 || c % 10 === 0
@@ -238,17 +243,8 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
     await pool.end()
   })
 
-  /** Full-history reference, written independently of the code under test */
-  const reference = async (principal: string | undefined, filters: Filters = {}) => {
-    const { rows } = await pool.query<VisibleRow>(
-      `SELECT ar.request_id, ar.conversation_id, ar.project_id, ar.account_id, ar.timestamp,
-              ar.model, ar.input_tokens, ar.output_tokens, ar.branch_id, ar.is_subtask,
-              ar.parent_task_request_id, ar.response_body,
-              parent.conversation_id AS parent_conversation_id
-       FROM api_requests ar
-       LEFT JOIN api_requests parent ON parent.request_id = ar.parent_task_request_id
-       WHERE ar.conversation_id IS NOT NULL
-         AND ($1::text IS NULL OR ar.project_id IN (
+  const visibility = `
+         ($1::text IS NULL OR ar.project_id IN (
            SELECT p.project_id FROM projects p
            WHERE NOT p.is_private
               OR EXISTS (
@@ -259,14 +255,42 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
          AND ($2::text IS NULL OR ar.project_id = $2)
          AND ($3::text IS NULL OR ar.account_id = $3)
          AND ($4::timestamptz IS NULL OR ar.timestamp >= $4)
-         AND ($5::timestamptz IS NULL OR ar.timestamp <= $5)`,
-      [
-        principal ?? null,
-        filters.projectId ?? null,
-        filters.accountId ?? null,
-        filters.dateFrom ?? null,
-        filters.dateTo ?? null,
-      ]
+         AND ($5::timestamptz IS NULL OR ar.timestamp <= $5)`
+  const visibilityValues = (principal: string | undefined, filters: Filters) => [
+    principal ?? null,
+    filters.projectId ?? null,
+    filters.accountId ?? null,
+    filters.dateFrom ?? null,
+    filters.dateTo ?? null,
+  ]
+  const isSeeded = (conversationId: string) => conversationId.startsWith('c0ffee00-')
+
+  /** Exact count of every visible conversation, seeded or not */
+  const visibleCount = async (principal: string | undefined, filters: Filters = {}) => {
+    const { rows } = await pool.query(
+      `SELECT COUNT(DISTINCT ar.conversation_id)::int AS total
+       FROM api_requests ar
+       WHERE ar.conversation_id IS NOT NULL AND ${visibility}`,
+      visibilityValues(principal, filters)
+    )
+    return rows[0].total as number
+  }
+
+  /**
+   * Full-history reference for the seeded conversations only, written
+   * independently of the code under test (other rows in the database
+   * cannot change it)
+   */
+  const reference = async (principal: string | undefined, filters: Filters = {}) => {
+    const { rows } = await pool.query<VisibleRow>(
+      `SELECT ar.request_id, ar.conversation_id, ar.project_id, ar.account_id, ar.timestamp,
+              ar.model, ar.input_tokens, ar.output_tokens, ar.branch_id, ar.is_subtask,
+              ar.parent_task_request_id, ar.response_body,
+              parent.conversation_id AS parent_conversation_id
+       FROM api_requests ar
+       LEFT JOIN api_requests parent ON parent.request_id = ar.parent_task_request_id
+       WHERE ar.conversation_id::text LIKE 'c0ffee00-%' AND ${visibility}`,
+      visibilityValues(principal, filters)
     )
 
     const byConversation = new Map<string, VisibleRow[]>()
@@ -309,7 +333,10 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
         userBranchCount: branches.filter(
           b => !b.startsWith('subtask_') && !b.startsWith('compact_') && b !== 'main'
         ).length,
-        modelsUsed: distinctSorted(list.map(r => r.model)),
+        // ARRAY_AGG over zero non-null models is NULL, not an empty array
+        modelsUsed: distinctSorted(list.map(r => r.model)).length
+          ? distinctSorted(list.map(r => r.model))
+          : null,
         latestRequestId: latest.request_id,
         latestModel: latest.model,
         latestContextTokens: usage
@@ -406,19 +433,24 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
   })
 
   it('never shows private projects to a non-member and matches every page', async () => {
+    // Unscoped: rows outside the seed may be listed too; they are counted
+    // exactly and must not disturb the seeded conversations' order or values
     const expected = await reference(VIEWER)
-    const seen: string[] = []
+    const expectedTotal = await visibleCount(VIEWER)
+    const seen: ReturnType<typeof normalize>[] = []
 
-    for (let offset = 0; offset < expected.length + 50; offset += 50) {
+    for (let offset = 0; offset < expectedTotal + 50; offset += 50) {
       const result = await list(VIEWER, { limit: 50, offset })
-      expect(result.items).toEqual(expected.slice(offset, offset + 50))
-      expect(result.pagination.total).toBe(expected.length)
-      seen.push(...result.items.map(item => item.conversationId))
+      expect(result.pagination.total).toBe(expectedTotal)
+      seen.push(...result.items)
     }
 
-    expect(seen).toHaveLength(expected.length)
-    expect(seen.filter(id => privateConversations.includes(id))).toEqual([])
-    expect(memberConversations.every(id => seen.includes(id))).toBe(true)
+    const seenIds = seen.map(item => item.conversationId)
+    expect(seenIds).toHaveLength(expectedTotal)
+    expect(new Set(seenIds).size).toBe(expectedTotal)
+    expect(seen.filter(item => isSeeded(item.conversationId))).toEqual(expected)
+    expect(seenIds.filter(id => privateConversations.includes(id))).toEqual([])
+    expect(memberConversations.every(id => seenIds.includes(id))).toBe(true)
 
     const hidden = await list(VIEWER, { projectId: PRIVATE_PROJECT, limit: 50, offset: 0 })
     expect(hidden.conversations).toEqual([])
@@ -433,13 +465,36 @@ describe.skipIf(!enabled)('conversation list against PostgreSQL', () => {
     expect(result.items).toEqual(expected.slice(0, 50))
     expect(result.pagination.total).toBe(100)
 
-    const everything = await reference(undefined)
-    const unscoped = await list(undefined, { limit: 50, offset: 0 })
-    expect(unscoped.items).toEqual(everything.slice(0, 50))
-    expect(unscoped.pagination.total).toBe(everything.length)
-    expect(unscoped.items.some(item => privateConversations.includes(item.conversationId))).toBe(
-      true
+    // Anonymous callers are not privacy-filtered
+    const privateExpected = await reference(undefined, { projectId: PRIVATE_PROJECT })
+    const privateResult = await list(undefined, {
+      projectId: PRIVATE_PROJECT,
+      limit: 50,
+      offset: 0,
+    })
+    expect(privateResult.items).toEqual(privateExpected)
+    expect(privateResult.items.map(item => item.conversationId).sort()).toEqual(
+      [...privateConversations].sort()
     )
+    expect(privateResult.pagination.total).toBe(privateConversations.length)
+  })
+
+  it('breaks last-message ties by conversation id across the fallback boundary', async () => {
+    const first = await list(VIEWER, { projectId: PUBLIC_PROJECT, limit: 50, offset: 0 })
+    const second = await list(VIEWER, { projectId: PUBLIC_PROJECT, limit: 50, offset: 50 })
+
+    expect(first.idQueries).toHaveLength(1) // page 1 from the window
+    expect(second.idQueries).toHaveLength(2) // page 2 falls back
+    const [lastOfFirst, firstOfSecond] = [first.items[49], second.items[0]]
+    expect(lastOfFirst.lastMessageTime).toBe(firstOfSecond.lastMessageTime)
+    expect([lastOfFirst.conversationId, firstOfSecond.conversationId]).toEqual([
+      conv(TIED[1]),
+      conv(TIED[0]),
+    ])
+
+    const ids = [...first.items, ...second.items].map(item => item.conversationId)
+    expect(new Set(ids).size).toBe(100)
+    expect([...ids].sort()).toEqual(Array.from({ length: 100 }, (_, c) => conv(c)).sort())
   })
 
   it('selects and counts exactly within explicit date bounds', async () => {
