@@ -5,6 +5,7 @@ import { join } from 'path'
 import { logger } from '../middleware/logger.js'
 import { SUBAGENT_TOOL_NAMES } from '@agent-prompttrain/shared'
 import { buildSummaryColumns } from './summary-columns.js'
+import { UPSERT_CONVERSATION_SUMMARY_SQL } from './conversation-summaries.js'
 
 /**
  * Length of the compact-summary prefix used to locate the summarizing response.
@@ -25,6 +26,13 @@ const INVALID_TEXT_SQLSTATES = new Set(['22P02', '22P05'])
 function isInvalidTextError(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code
   return typeof code === 'string' && INVALID_TEXT_SQLSTATES.has(code)
+}
+
+/** SQLSTATE for undefined_table, e.g. conversation_summaries dropped by a migration `down`. */
+const UNDEFINED_TABLE_SQLSTATE = '42P01'
+
+function isUndefinedTableError(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === UNDEFINED_TABLE_SQLSTATE
 }
 
 /** api_requests columns written for every request, in parameter order. */
@@ -116,6 +124,7 @@ interface StorageResponse {
  */
 export class StorageWriter {
   private summaryColumnsCheck?: Promise<boolean>
+  private summaryTableCheck?: Promise<boolean>
 
   constructor(private pool: Pool) {}
 
@@ -202,29 +211,11 @@ export class StorageWriter {
         request.parentRequestId || null,
       ]
 
-      if (!(await this.hasSummaryColumns())) {
-        await this.pool.query(INSERT_REQUEST_PRE_026_SQL, values)
-        return
-      }
+      const stored = await this.insertRequest(request, values)
 
-      const summaryColumns = buildSummaryColumns(request.body)
-      const summaryValues = [summaryColumns.lastMessageSummary, summaryColumns.userTextMessageCount]
-
-      try {
-        await this.pool.query(INSERT_REQUEST_SQL, [...values, ...summaryValues])
-      } catch (error) {
-        if (summaryValues.every(value => value === null) || !isInvalidTextError(error)) {
-          throw error
-        }
-        // A summary must never cost the request row (ADR-037): store it once more without one
-        logger.warn('Request summary rejected by the database, storing the request without it', {
-          requestId: request.requestId,
-          metadata: {
-            code: (error as { code?: unknown }).code,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        })
-        await this.pool.query(INSERT_REQUEST_SQL, [...values, null, null])
+      // A request id that is already stored adds no activity
+      if (stored > 0 && request.conversationId) {
+        await this.upsertConversationSummary(request, request.conversationId)
       }
     } catch (error) {
       logger.error('Failed to store request', {
@@ -233,6 +224,108 @@ export class StorageWriter {
           error: error instanceof Error ? error.message : String(error),
         },
       })
+    }
+  }
+
+  /**
+   * Insert the request row, with the migration 026 summary columns when they exist, and return
+   * how many rows were stored (0 when the request id is already stored).
+   */
+  private async insertRequest(request: StorageRequest, values: unknown[]): Promise<number> {
+    if (!(await this.hasSummaryColumns())) {
+      const result = await this.pool.query(INSERT_REQUEST_PRE_026_SQL, values)
+      return result.rowCount ?? 0
+    }
+
+    const summaryColumns = buildSummaryColumns(request.body)
+    const summaryValues = [summaryColumns.lastMessageSummary, summaryColumns.userTextMessageCount]
+
+    try {
+      const result = await this.pool.query(INSERT_REQUEST_SQL, [...values, ...summaryValues])
+      return result.rowCount ?? 0
+    } catch (error) {
+      if (summaryValues.every(value => value === null) || !isInvalidTextError(error)) {
+        throw error
+      }
+      // A summary must never cost the request row (ADR-037): store it once more without one
+      logger.warn('Request summary rejected by the database, storing the request without it', {
+        requestId: request.requestId,
+        metadata: {
+          code: (error as { code?: unknown }).code,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      const result = await this.pool.query(INSERT_REQUEST_SQL, [...values, null, null])
+      return result.rowCount ?? 0
+    }
+  }
+
+  /**
+   * Record the request's activity in conversation_summaries (ADR-039). Runs after the request
+   * row is stored and never throws, so it can neither fail nor lose the request.
+   */
+  private async upsertConversationSummary(
+    request: StorageRequest,
+    conversationId: string
+  ): Promise<void> {
+    try {
+      if (!(await this.hasSummaryTable())) {
+        return
+      }
+      await this.pool.query(UPSERT_CONVERSATION_SUMMARY_SQL, [
+        conversationId,
+        request.projectId,
+        request.timestamp,
+        request.accountId ? [request.accountId] : [],
+      ])
+    } catch (error) {
+      if (isUndefinedTableError(error)) {
+        // The table disappeared (e.g. migration 027 `down`): re-detect it on the next request,
+        // which logs the "missing" error once and stops upserting until it exists again.
+        this.summaryTableCheck = undefined
+      }
+      logger.error('Failed to update the conversation summary', {
+        requestId: request.requestId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
+
+  /**
+   * Whether conversation_summaries exists (migration 027), checked once per writer. Without it
+   * requests are stored as usual and no summary is maintained.
+   */
+  private hasSummaryTable(): Promise<boolean> {
+    if (!this.summaryTableCheck) {
+      this.summaryTableCheck = this.checkSummaryTable()
+    }
+    return this.summaryTableCheck
+  }
+
+  private async checkSummaryTable(): Promise<boolean> {
+    try {
+      const result = await this.pool.query(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = current_schema()
+           AND table_name = 'conversation_summaries'`
+      )
+      if (result.rows.length === 0) {
+        logger.error(
+          'conversation_summaries is missing: run migration 027 (scripts/db/migrations/027-add-conversation-summaries.ts), then restart the proxy. Until then conversation summaries are not maintained.'
+        )
+        return false
+      }
+      return true
+    } catch (error) {
+      // Check again on the next request; a skipped summary is repaired by the backfill
+      this.summaryTableCheck = undefined
+      logger.warn('Could not check for the conversation_summaries table', {
+        metadata: { error: error instanceof Error ? error.message : String(error) },
+      })
+      return false
     }
   }
 

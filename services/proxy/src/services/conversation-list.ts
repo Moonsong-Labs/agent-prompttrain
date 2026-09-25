@@ -152,19 +152,35 @@ export const olderConversationCountCache = new OlderConversationCountCache()
 
 export interface ListConversationsOptions {
   olderCountCache?: OlderConversationCountCache
+  /** Overrides CONVERSATION_SUMMARIES_ENABLED (the verify script forces the table path) */
+  summaries?: boolean
 }
+
+/**
+ * Whether GET /api/conversations reads pages and totals from conversation_summaries
+ * (ADR-039). Read on every call; only the exact value 'true' enables it.
+ */
+export function conversationSummariesEnabled(): boolean {
+  return process.env.CONVERSATION_SUMMARIES_ENABLED === 'true'
+}
+
+/** Rows read beyond offset + limit, absorbing conversations listed under several projects */
+export const SUMMARY_SCAN_SLACK = 32
 
 /** Conversations active here sort before every conversation that is not */
 const RECENT_WINDOW = `ar.timestamp >= NOW() - INTERVAL '7 days'`
 
-const ACCESSIBLE_PROJECTS_CTE = `accessible_projects AS (
+/** Projects the principal ($1) may see: public ones and private ones they are a member of */
+const ACCESSIBLE_PROJECTS_SELECT = `
         SELECT DISTINCT p.project_id
         FROM projects p
         LEFT JOIN project_members pm
           ON p.id = pm.project_id
           AND LOWER(pm.user_email) = $1
         WHERE (p.is_private = false OR pm.user_email IS NOT NULL)
-      )`
+      `
+
+const ACCESSIBLE_PROJECTS_CTE = `accessible_projects AS (${ACCESSIBLE_PROJECTS_SELECT})`
 
 /** Project/account/privacy/date filters applied identically to every query */
 interface ConversationFilter {
@@ -245,11 +261,13 @@ export function conversationListCacheKey(
  * Lists one page of conversations visible to `principal` (an authenticated
  * user email; anonymous callers see every project).
  *
- * Without explicit dates the page is selected from the last 7 days first:
- * every conversation active there sorts before every one that is not, so a
- * full windowed page equals the same page over full history. Only a short
- * windowed page falls back to scanning full history. Per-conversation
- * details are always computed over full history for the selected IDs.
+ * With CONVERSATION_SUMMARIES_ENABLED=true and no explicit dates, page IDs and
+ * an exact total come from conversation_summaries (ADR-039). Otherwise, without
+ * explicit dates, the page is selected from the last 7 days first: every
+ * conversation active there sorts before every one that is not, so a full
+ * windowed page equals the same page over full history. Only a short windowed
+ * page falls back to scanning full history (ADR-038). Per-conversation details
+ * are always computed over full history for the selected IDs.
  */
 export async function listConversations(
   pool: ConversationListPool,
@@ -259,6 +277,11 @@ export async function listConversations(
 ): Promise<ConversationListResult> {
   const normalizedPrincipal = normalizePrincipal(principal)
   const filter = buildFilter(params, normalizedPrincipal)
+
+  if ((options.summaries ?? conversationSummariesEnabled()) && !hasExplicitDates(params)) {
+    return listFromSummaries(pool, filter, params, normalizedPrincipal)
+  }
+
   const olderCountCache = options.olderCountCache ?? olderConversationCountCache
 
   const [rows, counted] = await Promise.all([
@@ -272,6 +295,14 @@ export async function listConversations(
         ]),
   ])
 
+  return buildResult(rows, counted, params)
+}
+
+function buildResult(
+  rows: ConversationRow[],
+  counted: number,
+  params: ConversationListParams
+): ConversationListResult {
   // Rows on this page prove at least offset + rows.length conversations, so a
   // stale estimate must not hide them; an empty page proves nothing
   const total = rows.length > 0 ? Math.max(counted, params.offset + rows.length) : counted
@@ -463,6 +494,136 @@ async function countRecentPlusOlder(
 
   const [recent, older] = await Promise.all([recentQuery, olderCount])
   return parseInt(recent.rows[0]?.recent_total || '0') + older
+}
+
+/**
+ * Page IDs and the exact total from conversation_summaries (ADR-039); details
+ * still come from api_requests with the same filters and privacy.
+ */
+async function listFromSummaries(
+  pool: ConversationListPool,
+  filter: ConversationFilter,
+  params: ConversationListParams,
+  principal?: string
+): Promise<ConversationListResult> {
+  const projects = await summaryProjects(pool, params, principal)
+  if (projects?.length === 0) {
+    // Nothing is accessible: an empty list must never widen to every project
+    return buildResult([], 0, params)
+  }
+
+  const accountId = params.accountId || undefined
+  const summaryFilter = buildSummaryFilter(projects, accountId)
+  // A row's last_activity_at covers every account, but an account-filtered list
+  // orders by that account's own activity: keep the request-level selection
+  const pageIds = accountId
+    ? selectPage(pool, filter, params)
+    : selectSummaryPageIds(pool, summaryFilter, params)
+
+  const [rows, counted] = await Promise.all([
+    pageIds.then(ids => fetchDetails(pool, filter, ids)),
+    countSummaries(pool, summaryFilter),
+  ])
+
+  return buildResult(rows, counted, params)
+}
+
+/**
+ * Projects whose summaries the caller may list: undefined (no restriction) for
+ * an anonymous caller without projectId, otherwise the accessible projects
+ * (the accessible_projects rule) intersected with projectId.
+ */
+async function summaryProjects(
+  pool: ConversationListPool,
+  params: ConversationListParams,
+  principal?: string
+): Promise<string[] | undefined> {
+  if (!principal) {
+    return params.projectId ? [params.projectId] : undefined
+  }
+  const result = await pool.query(ACCESSIBLE_PROJECTS_SELECT, [principal])
+  const accessible: string[] = result.rows.map((row: { project_id: string }) => row.project_id)
+  return params.projectId ? accessible.filter(project => project === params.projectId) : accessible
+}
+
+/** Project/account conditions on conversation_summaries (alias cs) */
+interface SummaryFilter {
+  values: unknown[]
+  where: string
+}
+
+function buildSummaryFilter(projects?: string[], accountId?: string): SummaryFilter {
+  const values: unknown[] = []
+  const conditions: string[] = []
+  if (projects) {
+    // A single project compares with = so its index can be walked in order
+    values.push(projects.length === 1 ? projects[0] : projects)
+    conditions.push(
+      projects.length === 1
+        ? `cs.project_id = $${values.length}`
+        : `cs.project_id = ANY($${values.length}::text[])`
+    )
+  }
+  if (accountId) {
+    // @> rather than = ANY, so the GIN index on account_ids applies
+    values.push(accountId)
+    conditions.push(`cs.account_ids @> ARRAY[$${values.length}::text]`)
+  }
+  return { values, where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' }
+}
+
+/**
+ * Newest conversations first, ordered like the request-level list. Each
+ * conversation has one row per project, so the scan reads SUMMARY_SCAN_SLACK
+ * extra rows and keeps each conversation's first (newest) row; when duplicates
+ * exceed the slack it scans again with a doubled limit, until the page is full
+ * or the table is exhausted.
+ */
+async function selectSummaryPageIds(
+  pool: ConversationListPool,
+  summaryFilter: SummaryFilter,
+  params: ConversationListParams
+): Promise<string[]> {
+  const needed = params.offset + params.limit
+  let scanLimit = needed + SUMMARY_SCAN_SLACK
+
+  for (;;) {
+    const values = [...summaryFilter.values, scanLimit]
+    const result = await pool.query(
+      `
+      SELECT cs.conversation_id, cs.last_activity_at
+      FROM conversation_summaries cs
+      ${summaryFilter.where}
+      ORDER BY cs.last_activity_at DESC, cs.conversation_id DESC
+      LIMIT $${values.length}
+    `,
+      values
+    )
+    const ids = [
+      ...new Set<string>(
+        result.rows.map((row: { conversation_id: string }) => row.conversation_id)
+      ),
+    ]
+    if (ids.length >= needed || result.rows.length < scanLimit) {
+      return ids.slice(params.offset, needed)
+    }
+    scanLimit *= 2
+  }
+}
+
+async function countSummaries(
+  pool: ConversationListPool,
+  summaryFilter: SummaryFilter
+): Promise<number> {
+  const result = await pool.query(
+    `
+      SELECT COUNT(DISTINCT cs.conversation_id) AS total
+      FROM conversation_summaries cs
+      ${summaryFilter.where}
+    `,
+    summaryFilter.values
+  )
+  return parseInt(result.rows[0]?.total || '0')
 }
 
 function toConversationListItem(row: ConversationRow): ConversationListItem {

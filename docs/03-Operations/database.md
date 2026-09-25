@@ -86,6 +86,21 @@ Stores AI-generated analyses of conversations.
 | created_at             | TIMESTAMPTZ                  | Record creation timestamp                               |
 | updated_at             | TIMESTAMPTZ                  | Last update timestamp (auto-updated)                    |
 
+### conversation_summaries
+
+One row per conversation and project (migration 027, ADR-039). The proxy upserts it for every
+stored request with a conversation, and `scripts/db/backfill-conversation-summaries.ts` fills it
+from history. `GET /api/conversations` selects pages and counts totals from it when
+`CONVERSATION_SUMMARIES_ENABLED=true`.
+
+| Column            | Type         | Description                                                      |
+| ----------------- | ------------ | ---------------------------------------------------------------- |
+| conversation_id   | UUID         | Conversation (primary key with `project_id`)                     |
+| project_id        | VARCHAR(255) | Project slug, as in `api_requests.project_id` (no foreign key)   |
+| first_activity_at | TIMESTAMPTZ  | Earliest request `timestamp` of the conversation in this project |
+| last_activity_at  | TIMESTAMPTZ  | Latest request `timestamp` of the conversation in this project   |
+| account_ids       | TEXT[]       | Accounts used by those requests (default `'{}'`)                 |
+
 ## Indexes
 
 ### Performance Indexes
@@ -122,6 +137,12 @@ Stores AI-generated analyses of conversations.
 
 - `idx_conversation_analyses_status` - Partial index on pending status for queue processing
 - `idx_conversation_analyses_conversation` - Composite index on (conversation_id, branch_id)
+
+### Conversation Summary Indexes
+
+- `idx_conversation_summaries_last_activity` - Newest-first page selection
+- `idx_conversation_summaries_project_last_activity` - Newest-first page selection within a project
+- `idx_conversation_summaries_account_ids` - GIN index for account filters
 
 ## Key Features
 

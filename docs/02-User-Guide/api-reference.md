@@ -374,7 +374,7 @@ GET /api/conversations?projectId=project-alpha&accountId=acc_123&limit=50&offset
 - `dateFrom` - Filter conversations after this date (ISO 8601 format, optional)
 - `dateTo` - Filter conversations before this date (ISO 8601 format, optional)
 
-Conversations are ordered by last message time (newest first, ties broken by conversation ID). Per-conversation aggregates cover all of the conversation's requests that match the filters (project, account, date bounds and project access), not just the last 7 days. Without `dateFrom`/`dateTo`, `pagination.total` adds a live count of conversations active in the last 7 days to a count of older conversations cached for up to one hour, so it may be off, over or under, by up to an hour of activity. When a page returns conversations, the total is at least `offset` plus their number. With either date bound the total is an exact count.
+Conversations are ordered by last message time (newest first, ties broken by conversation ID). Per-conversation aggregates cover all of the conversation's requests that match the filters (project, account, date bounds and project access), not just the last 7 days. By default, without `dateFrom`/`dateTo`, `pagination.total` adds a live count of conversations active in the last 7 days to a count of older conversations cached for up to one hour, so it may be off, over or under, by up to an hour of activity. When a page returns conversations, the total is at least `offset` plus their number. With either date bound the total is an exact count. When the proxy runs with `CONVERSATION_SUMMARIES_ENABLED=true` (ADR-039), requests without date bounds are paged from the `conversation_summaries` table and the total is exact as well.
 
 **Response:**
 

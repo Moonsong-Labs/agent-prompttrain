@@ -14,6 +14,10 @@ const serverEnv = {
   SLACK_ENABLED: 'false',
   LOG_LEVEL: 'error',
   PROXY_API_URL: proxyURL,
+  // Explicit, so the managed proxy always gets a definite value: the caller's own
+  // CONVERSATION_SUMMARIES_ENABLED (which `bun run test:e2e:*` may load from .env), else 'false'
+  // (ADR-039)
+  CONVERSATION_SUMMARIES_ENABLED: process.env.CONVERSATION_SUMMARIES_ENABLED || 'false',
 }
 
 /**

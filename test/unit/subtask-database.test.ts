@@ -26,6 +26,13 @@ describe('Sub-task Database Logic', () => {
       rows: [{ column_name: 'last_message_summary' }, { column_name: 'user_text_message_count' }],
     })
     await (writer as any).hasSummaryColumns()
+
+    // Resolve the one-time conversation_summaries table check (migration 027) likewise
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ table_name: 'conversation_summaries' }],
+    })
+    await (writer as any).hasSummaryTable()
+
     mockPool.query.mockClear()
   })
 
@@ -142,8 +149,8 @@ describe('Sub-task Database Logic', () => {
 
       await writer.storeRequest(request)
 
-      // Verify all queries were called
-      expect(mockPool.query).toHaveBeenCalledTimes(2)
+      // Verify all queries were called: sub-task check, INSERT, and the conversation summary upsert
+      expect(mockPool.query).toHaveBeenCalledTimes(3)
 
       // Check the INSERT query (second call)
       const insertCall = mockPool.query.mock.calls[1]
@@ -245,8 +252,8 @@ describe('Sub-task Database Logic', () => {
 
       await writer.storeRequest(request)
 
-      // Two queries: check sub-task and one INSERT (detectBranch was removed)
-      expect(mockPool.query).toHaveBeenCalledTimes(2)
+      // Three queries: check sub-task, INSERT (detectBranch was removed), and the summary upsert
+      expect(mockPool.query).toHaveBeenCalledTimes(3)
 
       const insertCall = mockPool.query.mock.calls[1]
       const insertValues = insertCall[1]

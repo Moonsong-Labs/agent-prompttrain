@@ -13,6 +13,7 @@ import { createLoggingPool } from './utils/create-logging-pool.js'
 import { enableSqlLogging } from '../../services/proxy/src/utils/sql-logger.js'
 import { StorageAdapter } from '../../services/proxy/src/storage/StorageAdapter.js'
 import { generateConversationId } from '@agent-prompttrain/shared'
+import { refreshConversationSummaries } from './backfill-conversation-summaries.js'
 
 // Load environment variables
 config()
@@ -61,6 +62,13 @@ class ConversationRebuilderFinal {
   private limit: number | null
   private debugMode: boolean
   private requestIds: string[] | null
+  /** Old and new conversation_id of every request actually re-keyed (ADR-039) */
+  private touchedConversationIds = new Set<string>()
+  private summariesRefreshFailed = false
+
+  get hasSummariesRefreshFailure(): boolean {
+    return this.summariesRefreshFailed
+  }
 
   constructor(
     pool: Pool,
@@ -252,6 +260,13 @@ class ConversationRebuilderFinal {
                   isSubtask: linkingResult.isSubtask,
                   parentTaskRequestId: linkingResult.parentTaskRequestId || null,
                 })
+
+                if (request.conversation_id !== conversationId) {
+                  if (request.conversation_id) {
+                    this.touchedConversationIds.add(request.conversation_id)
+                  }
+                  this.touchedConversationIds.add(conversationId)
+                }
               }
               batchUpdates++
             }
@@ -320,6 +335,30 @@ class ConversationRebuilderFinal {
       console.log(
         `\nFinal memory: Heap ${finalMemory.heap} (Δ+${totalMemoryDelta}MB from baseline)`
       )
+
+      // Re-keying conversation_id in place would otherwise leave conversation_summaries (ADR-039)
+      // with a ghost row for every retired id and a stale last_activity_at for every survivor
+      if (!this.dryRun && this.touchedConversationIds.size > 0) {
+        console.log(
+          `\nRefreshing conversation_summaries for ${this.touchedConversationIds.size} touched conversation(s)...`
+        )
+        try {
+          const refreshResult = await refreshConversationSummaries(this.pool, [
+            ...this.touchedConversationIds,
+          ])
+          console.log(`✓ conversation_summaries refreshed: ${JSON.stringify(refreshResult)}`)
+        } catch (error) {
+          this.summariesRefreshFailed = true
+          console.error(
+            `❌ Failed to refresh conversation_summaries for ${this.touchedConversationIds.size} touched conversation(s): ` +
+              `${error instanceof Error ? error.message : String(error)}`
+          )
+          console.error(
+            '   Recovery: bun run db:backfill:conversation-summaries cannot remove stale rows by itself. See ' +
+              'scripts/README.md "backfill-conversation-summaries.ts" for the flag-off / TRUNCATE / backfill / verify procedure.'
+          )
+        }
+      }
 
       // Show final statistics
       await this.showFinalStats()
@@ -485,6 +524,10 @@ Examples:
 
 Note: This script uses the StorageAdapter to ensure consistency with the proxy's
 conversation linking logic, including subtask detection and branch management.
+
+Note: in execute mode, it refreshes conversation_summaries (ADR-039) for every conversation
+it re-keys, old and new id, so the flag-on landing page is not left with a ghost row or a stale
+last_activity_at.
   `)
 }
 
@@ -613,6 +656,7 @@ async function main() {
   // Create database pool
   const pool = createLoggingPool(dbUrl, { max: 10 })
 
+  let exitCode = 0
   try {
     const rebuilder = new ConversationRebuilderFinal(
       pool,
@@ -624,13 +668,16 @@ async function main() {
     )
     await rebuilder.rebuild()
     console.log('\n✅ Rebuild completed successfully!')
+    if (rebuilder.hasSummariesRefreshFailure) {
+      exitCode = 1
+    }
   } catch (error) {
     console.error('\n❌ Rebuild failed:', error)
     process.exit(1)
   } finally {
     await pool.end()
     // Ensure the process exits cleanly after pool is closed
-    process.exit(0)
+    process.exit(exitCode)
   }
 }
 

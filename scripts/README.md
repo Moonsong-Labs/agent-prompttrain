@@ -29,7 +29,10 @@ bun run scripts/db/analyze-conversations.ts
 
 ### rebuild-conversations.ts
 
-Retroactively computes conversation IDs and branches from existing requests.
+Retroactively computes conversation IDs and branches from existing requests. In `--execute` mode
+it also refreshes `conversation_summaries` (ADR-039) for every conversation it re-keys, old and
+new id, so the flag-on landing page is not left with a ghost row or a stale `last_activity_at`
+(see `backfill-conversation-summaries.ts` below for the recovery if that refresh itself fails).
 
 ```bash
 # IMPORTANT: Backup first!
@@ -97,6 +100,53 @@ starting the full run.
 Read-only parity check for ADR-037: samples recent requests and confirms the dashboard derives the
 same node types and previews from summaries as from full messages, and that the SQL and JS user-text
 counts agree. Prints request ids only. `bun scripts/db/verify-last-message-summary.ts --sample 2000 --count-sample 50`
+
+### backfill-conversation-summaries.ts
+
+Derives `conversation_summaries` (ADR-039) from `api_requests`: one grouped upsert per chunk of
+history (7 days by default, newest first) with the proxy's merge rules (earliest first activity,
+latest last activity, union of accounts). Safe to run while the proxy is writing and safe to
+re-run: rows that would not change are not rewritten. Dry-run by default (reports the groups per
+chunk); writes only with `--execute`.
+
+```bash
+bun run db:backfill:conversation-summaries                     # dry run, whole history
+bun run db:backfill:conversation-summaries --execute           # write, whole history
+bun run db:backfill:conversation-summaries --since 2026-09-01T00:00:00Z --execute  # reconcile
+```
+
+Run after migration 027 and after deploying the proxy that maintains the table (requests stored
+after the run starts are the proxy's to upsert). It only adds and widens rows: `rebuild-conversations.ts`
+now refreshes the `conversation_summaries` rows of every conversation it re-keys, so no extra step
+is needed after running it. For any other re-key or delete of requests outside the proxy (SQL
+seeds, a manual `UPDATE`/`DELETE` on `api_requests`), turn `CONVERSATION_SUMMARIES_ENABLED` off,
+run `SET lock_timeout = '5s'; TRUNCATE conversation_summaries;` (the explicit `lock_timeout` keeps
+the `TRUNCATE` from queuing behind a long reader, such as the verify script's 1-2 minute snapshot,
+and blocking every live upsert behind it), re-run the backfill with `--execute`, verify, then turn
+the flag back on. The module also exports `refreshConversationSummaries(pool, conversationIds)`,
+which rebuilds just the given conversations' rows from `api_requests` in batches of 1000, for
+scripts (like `rebuild-conversations.ts`) that know exactly which conversations they touched.
+
+**Production:**
+
+- Run it off-peak with `--chunk-days 1`: each chunk holds row locks on every conversation it
+  touches until it commits, and live upserts of those conversations wait for it (re-runs lock rows
+  too, even when nothing changes).
+- Start it only after every proxy task runs the version that maintains the table: requests stored
+  by an old task after their chunk has run are missing until the next backfill.
+- `--since` filters on the request `timestamp`, not on when the row was stored: after
+  `copy-conversation.ts` or SQL seeds, run a full backfill (no `--since`).
+
+### verify-conversation-summaries.ts
+
+Read-only parity check for ADR-039, run in one `REPEATABLE READ` snapshot of a session it makes
+read-only: every `(conversation_id, project_id)` group of `api_requests` must match its
+`conversation_summaries` row (none missing, stale or different), and pages 1-3 and the total
+served from the table must equal the request-level listing for anonymous callers, sampled
+principals (`--principals`, default 3), the busiest project and the busiest account.
+Conversations with a request stored within `--settle-seconds` (default 60) before the snapshot are
+skipped, as their upsert may still be in flight. Prints conversation ids and counts only; exits 1
+on any mismatch. `bun scripts/db/verify-conversation-summaries.ts --principals 3 --page-size 50`
 
 ### backup-database.ts
 

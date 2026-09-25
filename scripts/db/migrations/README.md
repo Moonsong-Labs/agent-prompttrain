@@ -236,6 +236,18 @@ applied and the proxy is restarted.
 The migration sets `lock_timeout = '5s'` so it never queues behind long-running queries on
 `api_requests`. If it fails with a lock timeout, re-run it (off-peak if it keeps failing).
 
+### 027-add-conversation-summaries.ts
+
+Creates `conversation_summaries`, one row per conversation and project with its first and last
+activity and the accounts used, so `GET /api/conversations` can select pages and count totals
+without scanning `api_requests` (ADR-039). Idempotent (`IF NOT EXISTS`), sets
+`lock_timeout = '5s'` and is created empty, so it is effectively instant.
+
+Apply it before deploying the proxy that maintains the table (a proxy started without it stores
+requests normally and logs one error until the migration is applied and the proxy restarted),
+then fill history with `bun run db:backfill:conversation-summaries --execute` (see
+[scripts/README.md](../../README.md)) and only then set `CONVERSATION_SUMMARIES_ENABLED=true`.
+
 ## Future Migrations
 
 When adding new migrations:

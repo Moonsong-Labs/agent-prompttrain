@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import { join } from 'node:path'
 import { up as addProjectApiKeys } from '../db/migrations/016-project-api-keys'
+import { backfillConversationSummaries } from '../db/backfill-conversation-summaries'
 
 // Use only an explicitly selected, empty test database. Never load a developer's DATABASE_URL.
 const databaseUrl = process.env.E2E_DATABASE_URL
@@ -67,6 +68,8 @@ try {
       'E2E analysis: the assistant answered the test message.', NOW()
     );
   `)
+  // The seed bypasses the proxy writer, so derive its conversation summaries (ADR-039)
+  await backfillConversationSummaries(pool, { chunkDays: 7, execute: true })
   console.log('E2E database initialized with synthetic data')
 } finally {
   await pool.end()
