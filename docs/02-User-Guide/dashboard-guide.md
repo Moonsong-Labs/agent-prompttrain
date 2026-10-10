@@ -404,9 +404,11 @@ curl "http://localhost:3001/api/token-usage/current?window=300" \
 
 ### Get Conversations
 
+Conversations are listed via the proxy's paginated API, not the dashboard:
+
 ```bash
-curl "http://localhost:3001/api/conversations?limit=10" \
-  -H "X-Internal-API-Key: $INTERNAL_API_KEY"
+curl "http://localhost:3000/api/conversations?limit=10" \
+  -H "Authorization: Bearer $DASHBOARD_API_KEY"
 ```
 
 ## Customization
