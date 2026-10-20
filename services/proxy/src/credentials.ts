@@ -4,6 +4,7 @@ import {
   updateCredentialTokens,
 } from '@agent-prompttrain/shared/database/queries'
 import { CredentialManager } from './services/CredentialManager'
+import { notifyRefreshTokenRejected } from './services/refresh-token-alert'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
@@ -13,6 +14,48 @@ const OAUTH_CONFIG = {
 }
 
 const credentialManager = new CredentialManager()
+
+/**
+ * Error returned by the OAuth token endpoint when a refresh fails
+ */
+export class OAuthRefreshError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly errorCode?: string,
+    readonly description?: string
+  ) {
+    super(message)
+    this.name = 'OAuthRefreshError'
+  }
+
+  /**
+   * True when the refresh token itself was rejected (expired, revoked or already used),
+   * so retrying cannot succeed and the account must be re-authorized
+   */
+  get isRefreshTokenRejected(): boolean {
+    return this.status === 400 || this.status === 401 || this.errorCode === 'invalid_grant'
+  }
+
+  static async fromResponse(response: Response): Promise<OAuthRefreshError> {
+    const errorText = await response.text()
+    let errorCode: string | undefined
+    let description: string | undefined
+    try {
+      const body = JSON.parse(errorText)
+      errorCode = typeof body.error === 'string' ? body.error : body.error?.type
+      description = body.error_description ?? body.error?.message
+    } catch {
+      // Non-JSON error body; keep the raw text in the message only
+    }
+    return new OAuthRefreshError(
+      `Failed to refresh token: ${response.status} - ${errorText}`,
+      response.status,
+      errorCode,
+      description
+    )
+  }
+}
 
 /**
  * Refresh OAuth access token
@@ -39,8 +82,7 @@ export async function refreshToken(refreshToken: string): Promise<{
   })
 
   if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to refresh token: ${response.status} - ${errorText}`)
+    throw await OAuthRefreshError.fromResponse(response)
   }
 
   const payload = (await response.json()) as any
@@ -93,8 +135,9 @@ export async function getApiKey(
       const startTime = Date.now()
       credentialManager.updateMetrics('attempt')
 
+      const usedRefreshToken = credential.oauth_refresh_token || ''
       try {
-        const newTokens = await refreshToken(credential.oauth_refresh_token || '')
+        const newTokens = await refreshToken(usedRefreshToken)
 
         // Update database
         await updateCredentialTokens(pool, credentialId, {
@@ -112,6 +155,11 @@ export async function getApiKey(
         const errorMessage = refreshError instanceof Error ? refreshError.message : 'Unknown error'
 
         credentialManager.recordFailedRefresh(cacheKey, errorMessage)
+
+        if (refreshError instanceof OAuthRefreshError && refreshError.isRefreshTokenRejected) {
+          // Fire and forget: alerting must never delay or fail the caller
+          void notifyRefreshTokenRejected(pool, credential, usedRefreshToken, refreshError)
+        }
 
         return null
       } finally {

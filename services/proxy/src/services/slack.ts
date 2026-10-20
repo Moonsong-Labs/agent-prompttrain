@@ -20,6 +20,15 @@ export interface MessageInfo {
   outputTokens?: number
 }
 
+export interface RefreshTokenAlertInfo {
+  accountId: string
+  accountName: string
+  accountEmail?: string | null
+  status: number
+  errorCode?: string
+  description?: string
+}
+
 let webhook: IncomingWebhook | null = null
 let slackConfig: SlackConfig | null = null
 
@@ -244,4 +253,50 @@ export async function sendErrorToSlack(
   } catch (err) {
     console.error('Failed to send error to Slack:', err)
   }
+}
+
+/**
+ * Whether the global Slack webhook is configured and enabled
+ */
+export function isSlackEnabled(): boolean {
+  return webhook instanceof IncomingWebhook && !!slackConfig?.enabled
+}
+
+/**
+ * Send an alert to the global Slack webhook that an account's OAuth refresh token
+ * was rejected and the account must be re-authorized.
+ * Throws when Slack does not accept the message so the caller can retry later.
+ */
+export async function sendRefreshTokenExpiredToSlack(info: RefreshTokenAlertInfo): Promise<void> {
+  if (!webhook || !isSlackEnabled()) {
+    return
+  }
+
+  const reason = [info.errorCode, info.description].filter(Boolean).join(': ')
+  const fields = [
+    { title: 'Account ID', value: info.accountId, short: true },
+    { title: 'Account Name', value: info.accountName, short: true },
+  ]
+  if (info.accountEmail) {
+    fields.push({ title: 'Email', value: info.accountEmail, short: true })
+  }
+  fields.push({ title: 'Time', value: new Date().toISOString(), short: true })
+
+  const message: IncomingWebhookSendArguments = {
+    text: `:key: OAuth refresh token expired for account *${info.accountName}*`,
+    attachments: [
+      {
+        color: '#ff0000',
+        title: 'Account needs to be re-authorized',
+        text:
+          `Anthropic rejected the refresh token (HTTP ${info.status}${reason ? ` - ${reason}` : ''}), ` +
+          'so the access token can no longer be refreshed and requests using this account will fail.\n' +
+          `Re-authorize with: \`bun run scripts/auth/oauth-relogin-all.ts --account ${info.accountId}\``,
+        fields,
+        footer: 'Agent Prompt Train',
+      },
+    ],
+  }
+
+  await webhook.send(message)
 }

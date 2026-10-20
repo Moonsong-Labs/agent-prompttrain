@@ -254,3 +254,50 @@ export async function deleteCredential(pool: Pool, id: string): Promise<boolean>
   const result = await pool.query('DELETE FROM credentials WHERE id = $1', [id])
   return (result.rowCount ?? 0) > 0
 }
+
+// SHA-256 of the refresh token, so the alert marker never stores a usable token
+const REFRESH_TOKEN_HASH_SQL = `encode(sha256(convert_to($2::text, 'UTF8')), 'hex')`
+
+/**
+ * Claim the right to alert that this refresh token was rejected (Anthropic only).
+ *
+ * Returns true for exactly one caller per refresh token, across all proxy instances.
+ * Returns false when the alert was already claimed, or when the credential no longer
+ * holds this refresh token (another instance rotated it, so it has not expired).
+ */
+export async function claimRefreshTokenAlert(
+  pool: Pool,
+  id: string,
+  refreshToken: string
+): Promise<boolean> {
+  const result = await pool.query(
+    `
+    UPDATE credentials
+    SET oauth_refresh_alerted_token_hash = ${REFRESH_TOKEN_HASH_SQL}
+    WHERE id = $1
+      AND provider = 'anthropic'
+      AND COALESCE(oauth_refresh_token, '') = $2
+      AND oauth_refresh_alerted_token_hash IS DISTINCT FROM ${REFRESH_TOKEN_HASH_SQL}
+    `,
+    [id, refreshToken]
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+/**
+ * Release a refresh token alert claim so a later attempt can send it again
+ */
+export async function releaseRefreshTokenAlert(
+  pool: Pool,
+  id: string,
+  refreshToken: string
+): Promise<void> {
+  await pool.query(
+    `
+    UPDATE credentials
+    SET oauth_refresh_alerted_token_hash = NULL
+    WHERE id = $1 AND oauth_refresh_alerted_token_hash = ${REFRESH_TOKEN_HASH_SQL}
+    `,
+    [id, refreshToken]
+  )
+}
