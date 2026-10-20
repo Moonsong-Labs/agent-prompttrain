@@ -100,9 +100,14 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Slack Integration
 
-| Variable            | Description                     | Default |
-| ------------------- | ------------------------------- | ------- |
-| `SLACK_WEBHOOK_URL` | Slack webhook for notifications | -       |
+| Variable            | Description                                                  | Default                        |
+| ------------------- | ------------------------------------------------------------ | ------------------------------ |
+| `SLACK_WEBHOOK_URL` | Slack webhook for notifications and refresh-token alerts     | -                              |
+| `SLACK_ENABLED`     | Set to `false` to disable the global webhook while it is set | `true` when the webhook is set |
+
+The global webhook also receives an alert when an account's OAuth refresh token expires or is
+revoked, so the account can be re-authorized (see
+[Authentication](../02-User-Guide/authentication.md#oauth-auto-refresh)).
 
 Example:
 

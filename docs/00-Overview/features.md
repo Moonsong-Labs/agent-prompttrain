@@ -71,7 +71,7 @@ Agent Prompt Train is a high-performance proxy for the Claude API with comprehen
 
 ### 🔔 Notifications & Alerts
 
-- **Slack webhook integration** for notifications
+- **Slack webhook integration** for notifications and OAuth refresh-token expiry alerts
 - **Configurable alert thresholds**
 - **Error notification** with detailed context
 

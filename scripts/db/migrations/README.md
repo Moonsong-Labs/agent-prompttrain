@@ -248,6 +248,17 @@ requests normally and logs one error until the migration is applied and the prox
 then fill history with `bun run db:backfill:conversation-summaries --execute` (see
 [scripts/README.md](../../README.md)) and only then set `CONVERSATION_SUMMARIES_ENABLED=true`.
 
+### 028-add-refresh-token-alert.ts
+
+Adds the nullable `credentials.oauth_refresh_alerted_token_hash` column: the SHA-256 of the refresh
+token the proxy already sent a "refresh token expired" Slack alert for, so the alert goes out once per
+expired token across all proxy instances. Idempotent (`IF NOT EXISTS`), sets `lock_timeout = '5s'`
+and is metadata-only, so it is effectively instant.
+
+Apply it before deploying the proxy that sends the alert. A proxy started without it serves requests
+normally, but logs `Failed to claim refresh token alert` and sends no alert when a refresh token is
+rejected.
+
 ## Future Migrations
 
 When adding new migrations:
