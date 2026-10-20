@@ -29,8 +29,19 @@ export interface RefreshTokenAlertInfo {
   description?: string
 }
 
+export interface SlackAppConfig {
+  webhookUrl: string
+  alertWebhookUrl: string
+  channel: string
+  username: string
+  iconEmoji: string
+  enabled: boolean
+}
+
 let webhook: IncomingWebhook | null = null
 let slackConfig: SlackConfig | null = null
+// Receives operational alerts only, never conversation notifications
+let alertWebhook: IncomingWebhook | null = null
 
 /**
  * Initialize Slack integration
@@ -54,6 +65,27 @@ export function initializeSlack(config: Partial<SlackConfig>) {
     channel: slackConfig.channel,
     username: slackConfig.username,
     icon_emoji: slackConfig.icon_emoji,
+  })
+}
+
+/**
+ * Initialize the global and alert webhooks from the proxy configuration (config.slack)
+ */
+export function initializeSlackFromConfig(appConfig: SlackAppConfig) {
+  initializeSlack(
+    appConfig.enabled && appConfig.webhookUrl
+      ? {
+          webhook_url: appConfig.webhookUrl,
+          channel: appConfig.channel || undefined,
+          username: appConfig.username,
+          icon_emoji: appConfig.iconEmoji,
+        }
+      : {}
+  )
+  initializeSlackAlerts({
+    webhook_url: appConfig.alertWebhookUrl || undefined,
+    username: appConfig.username,
+    icon_emoji: appConfig.iconEmoji,
   })
 }
 
@@ -256,19 +288,43 @@ export async function sendErrorToSlack(
 }
 
 /**
- * Whether the global Slack webhook is configured and enabled
+ * Initialize the dedicated webhook for operational alerts (SLACK_ALERT_WEBHOOK_URL)
  */
-export function isSlackEnabled(): boolean {
-  return webhook instanceof IncomingWebhook && !!slackConfig?.enabled
+export function initializeSlackAlerts(config: Partial<SlackConfig>) {
+  alertWebhook = config.webhook_url
+    ? new IncomingWebhook(config.webhook_url, {
+        username: config.username || 'Agent Prompt Train',
+        icon_emoji: config.icon_emoji || ':robot_face:',
+      })
+    : null
 }
 
 /**
- * Send an alert to the global Slack webhook that an account's OAuth refresh token
- * was rejected and the account must be re-authorized.
+ * Webhook for operational alerts: the dedicated alert webhook, otherwise the global
+ * webhook when it is enabled
+ */
+function getAlertWebhook(): IncomingWebhook | null {
+  if (alertWebhook) {
+    return alertWebhook
+  }
+  return webhook instanceof IncomingWebhook && slackConfig?.enabled ? webhook : null
+}
+
+/**
+ * Whether operational alerts can be sent to Slack
+ */
+export function isSlackAlertEnabled(): boolean {
+  return getAlertWebhook() !== null
+}
+
+/**
+ * Send an alert that an account's OAuth refresh token was rejected and the account
+ * must be re-authorized.
  * Throws when Slack does not accept the message so the caller can retry later.
  */
 export async function sendRefreshTokenExpiredToSlack(info: RefreshTokenAlertInfo): Promise<void> {
-  if (!webhook || !isSlackEnabled()) {
+  const target = getAlertWebhook()
+  if (!target) {
     return
   }
 
@@ -298,5 +354,5 @@ export async function sendRefreshTokenExpiredToSlack(info: RefreshTokenAlertInfo
     ],
   }
 
-  await webhook.send(message)
+  await target.send(message)
 }

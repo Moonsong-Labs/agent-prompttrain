@@ -431,7 +431,8 @@ The OAuth refresh process includes:
 - **Negative Caching**: Failed refresh attempts are cached for 5 seconds to prevent retry storms
 - **Refresh Metrics**: Track attempt counts, success rates, failures, and durations
 - **Expiry Alerts**: When Anthropic rejects a refresh token (HTTP 400/401, e.g. `invalid_grant`), the
-  proxy posts one alert to the global `SLACK_WEBHOOK_URL` naming the account and the relogin command.
+  proxy posts one alert to `SLACK_ALERT_WEBHOOK_URL` (or `SLACK_WEBHOOK_URL` when unset) naming the
+  account and the relogin command.
   Exactly one proxy instance sends it per refresh token (claimed in `credentials`, migration 028), a
   rejection caused by another instance rotating the token is ignored, and a relogin re-arms it.
   Transient failures (network errors, 5xx) never alert.
@@ -677,8 +678,8 @@ If you have existing filesystem-based credentials:
 
 ### "Failed to refresh OAuth token"
 
-**Cause**: Refresh token expired or revoked. With `SLACK_WEBHOOK_URL` set, the proxy posts a Slack
-alert when this happens.
+**Cause**: Refresh token expired or revoked. With `SLACK_ALERT_WEBHOOK_URL` or `SLACK_WEBHOOK_URL`
+set, the proxy posts a Slack alert when this happens.
 
 **Solution**: Re-authenticate the account:
 `bun run scripts/auth/oauth-relogin-all.ts --account <account_id>`

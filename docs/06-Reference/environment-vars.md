@@ -100,14 +100,17 @@ DATABASE_URL=postgresql://user:password@localhost:5432/claude_nexus
 
 ### Slack Integration
 
-| Variable            | Description                                                  | Default                        |
-| ------------------- | ------------------------------------------------------------ | ------------------------------ |
-| `SLACK_WEBHOOK_URL` | Slack webhook for notifications and refresh-token alerts     | -                              |
-| `SLACK_ENABLED`     | Set to `false` to disable the global webhook while it is set | `true` when the webhook is set |
+| Variable                  | Description                                                  | Default                        |
+| ------------------------- | ------------------------------------------------------------ | ------------------------------ |
+| `SLACK_WEBHOOK_URL`       | Slack webhook for notifications and refresh-token alerts     | -                              |
+| `SLACK_ALERT_WEBHOOK_URL` | Slack webhook for operational alerts only                    | `SLACK_WEBHOOK_URL`            |
+| `SLACK_ENABLED`           | Set to `false` to disable the global webhook while it is set | `true` when the webhook is set |
 
-The global webhook also receives an alert when an account's OAuth refresh token expires or is
-revoked, so the account can be re-authorized (see
-[Authentication](../02-User-Guide/authentication.md#oauth-auto-refresh)).
+`SLACK_WEBHOOK_URL` receives conversation notifications for every project without its own Slack
+configuration, plus operational alerts such as an account's OAuth refresh token expiring (see
+[Authentication](../02-User-Guide/authentication.md#oauth-auto-refresh)). To receive only the
+alerts, set `SLACK_ALERT_WEBHOOK_URL` instead; it never receives conversations and works without
+`SLACK_WEBHOOK_URL` or `SLACK_ENABLED`.
 
 Example:
 

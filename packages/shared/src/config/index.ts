@@ -186,6 +186,10 @@ export const config = {
     get webhookUrl() {
       return env.string('SLACK_WEBHOOK_URL', '')
     },
+    // Dedicated webhook for operational alerts only; falls back to webhookUrl when unset
+    get alertWebhookUrl() {
+      return env.string('SLACK_ALERT_WEBHOOK_URL', '')
+    },
     get channel() {
       return env.string('SLACK_CHANNEL', '')
     },
@@ -360,6 +364,10 @@ export function validateConfig(): void {
     !config.slack.webhookUrl.startsWith('https://')
   ) {
     errors.push('Invalid Slack webhook URL')
+  }
+
+  if (config.slack.alertWebhookUrl && !config.slack.alertWebhookUrl.startsWith('https://')) {
+    errors.push('Invalid Slack alert webhook URL')
   }
 
   // Validate service mode requirements

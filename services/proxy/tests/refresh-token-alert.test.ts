@@ -3,7 +3,12 @@ import { IncomingWebhook } from '@slack/webhook'
 import type { Pool } from 'pg'
 import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
-import { initializeSlack } from '../src/services/slack'
+import {
+  initializeSlack,
+  initializeSlackAlerts,
+  initializeSlackFromConfig,
+  sendToSlack,
+} from '../src/services/slack'
 import { notifyRefreshTokenRejected } from '../src/services/refresh-token-alert'
 import { OAuthRefreshError } from '../src/credentials'
 
@@ -26,6 +31,9 @@ const credential: AnthropicCredential = {
   updated_at: new Date(),
 }
 
+const GLOBAL_WEBHOOK = 'https://hooks.slack.com/services/T000/B000/GLOBAL'
+const ALERT_WEBHOOK = 'https://hooks.slack.com/services/T000/B000/ALERTS'
+
 const rejection = new OAuthRefreshError(
   'Failed to refresh token: 400 - invalid_grant',
   400,
@@ -37,18 +45,24 @@ describe('notifyRefreshTokenRejected', () => {
   let sendSpy: any
   let claimSpy: any
   let releaseSpy: any
+  let sentTo: string[]
 
   beforeEach(() => {
-    initializeSlack({ webhook_url: 'https://hooks.slack.com/services/T000/B000/XXXX' })
-    sendSpy = spyOn(IncomingWebhook.prototype, 'send').mockImplementation(
-      async () => ({ text: 'ok' }) as any
-    )
+    initializeSlack({ webhook_url: GLOBAL_WEBHOOK })
+    sentTo = []
+    sendSpy = spyOn(IncomingWebhook.prototype, 'send').mockImplementation(async function (
+      this: any
+    ) {
+      sentTo.push(this.url)
+      return { text: 'ok' } as any
+    })
     claimSpy = spyOn(queries, 'claimRefreshTokenAlert').mockImplementation(async () => true)
     releaseSpy = spyOn(queries, 'releaseRefreshTokenAlert').mockImplementation(async () => {})
   })
 
   afterEach(() => {
     initializeSlack({})
+    initializeSlackAlerts({})
     sendSpy.mockRestore()
     claimSpy.mockRestore()
     releaseSpy.mockRestore()
@@ -78,6 +92,44 @@ describe('notifyRefreshTokenRejected', () => {
     expect(message).not.toContain('refresh-token')
   })
 
+  it('posts to the dedicated alert webhook when the global webhook is not set', async () => {
+    initializeSlack({})
+    initializeSlackAlerts({ webhook_url: ALERT_WEBHOOK })
+
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+
+    expect(sentTo).toEqual([ALERT_WEBHOOK])
+  })
+
+  it('prefers the dedicated alert webhook over the global webhook', async () => {
+    initializeSlackAlerts({ webhook_url: ALERT_WEBHOOK })
+
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+
+    expect(sentTo).toEqual([ALERT_WEBHOOK])
+  })
+
+  it('falls back to the global webhook when no dedicated alert webhook is set', async () => {
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+
+    expect(sentTo).toEqual([GLOBAL_WEBHOOK])
+  })
+
+  it('never mirrors conversations to the dedicated alert webhook', async () => {
+    initializeSlack({})
+    initializeSlackAlerts({ webhook_url: ALERT_WEBHOOK })
+
+    await sendToSlack({
+      requestId: 'req-1',
+      projectId: 'team-alpha',
+      role: 'conversation',
+      content: 'User: hello',
+      timestamp: new Date().toISOString(),
+    })
+
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
   it('stays silent when another proxy task already alerted for this refresh token', async () => {
     claimSpy.mockImplementation(async () => false)
 
@@ -86,7 +138,7 @@ describe('notifyRefreshTokenRejected', () => {
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
-  it('does not claim the alert when Slack is not configured', async () => {
+  it('does not claim the alert when no Slack webhook is configured', async () => {
     initializeSlack({})
 
     await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
@@ -95,11 +147,8 @@ describe('notifyRefreshTokenRejected', () => {
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
-  it('does not claim the alert when Slack is disabled', async () => {
-    initializeSlack({
-      webhook_url: 'https://hooks.slack.com/services/T000/B000/XXXX',
-      enabled: false,
-    })
+  it('does not claim the alert when the global webhook is disabled and no alert webhook is set', async () => {
+    initializeSlack({ webhook_url: GLOBAL_WEBHOOK, enabled: false })
 
     await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
 
@@ -125,5 +174,75 @@ describe('notifyRefreshTokenRejected', () => {
     await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
 
     expect(sendSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('initializeSlackFromConfig', () => {
+  let sendSpy: any
+  let claimSpy: any
+  let sentTo: string[]
+
+  const proxyConfig = (overrides: Record<string, unknown> = {}) => ({
+    webhookUrl: '',
+    alertWebhookUrl: '',
+    channel: '',
+    username: 'Claude Proxy',
+    iconEmoji: ':robot_face:',
+    enabled: false,
+    ...overrides,
+  })
+
+  const conversation = () =>
+    sendToSlack({
+      requestId: 'req-1',
+      projectId: 'team-alpha',
+      role: 'conversation',
+      content: 'User: hello',
+      timestamp: new Date().toISOString(),
+    })
+
+  beforeEach(() => {
+    sentTo = []
+    sendSpy = spyOn(IncomingWebhook.prototype, 'send').mockImplementation(async function (
+      this: any
+    ) {
+      sentTo.push(this.url)
+      return { text: 'ok' } as any
+    })
+    claimSpy = spyOn(queries, 'claimRefreshTokenAlert').mockImplementation(async () => true)
+  })
+
+  afterEach(() => {
+    initializeSlack({})
+    initializeSlackAlerts({})
+    sendSpy.mockRestore()
+    claimSpy.mockRestore()
+  })
+
+  it('sends alerts and conversations to SLACK_WEBHOOK_URL from the proxy config', async () => {
+    initializeSlackFromConfig(proxyConfig({ webhookUrl: GLOBAL_WEBHOOK, enabled: true }))
+
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+    await conversation()
+
+    expect(sentTo).toEqual([GLOBAL_WEBHOOK, GLOBAL_WEBHOOK])
+  })
+
+  it('sends only alerts when only SLACK_ALERT_WEBHOOK_URL is configured', async () => {
+    initializeSlackFromConfig(proxyConfig({ alertWebhookUrl: ALERT_WEBHOOK }))
+
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+    await conversation()
+
+    expect(sentTo).toEqual([ALERT_WEBHOOK])
+  })
+
+  it('keeps SLACK_WEBHOOK_URL off when SLACK_ENABLED is false', async () => {
+    initializeSlackFromConfig(proxyConfig({ webhookUrl: GLOBAL_WEBHOOK, enabled: false }))
+
+    await notifyRefreshTokenRejected(pool, credential, 'refresh-token', rejection, 0)
+    await conversation()
+
+    expect(sentTo).toEqual([])
   })
 })
