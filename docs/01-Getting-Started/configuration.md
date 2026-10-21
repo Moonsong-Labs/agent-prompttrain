@@ -129,14 +129,14 @@ ENABLE_CLIENT_AUTH=false
 OAuth tokens are automatically refreshed 1 minute before expiry. Manual management:
 
 ```bash
-# Check OAuth status
-bun run auth:oauth-status
+# Check OAuth status of one account
+bun run auth:oauth-status acc_team_alpha
 
-# Refresh all tokens
+# Refresh all tokens that expire within 5 minutes
 bun run auth:oauth-refresh
 
-# Refresh specific project ID
-bun run scripts/auth/oauth-refresh.ts team-alpha
+# Refresh one account
+bun run scripts/auth/oauth-refresh.ts acc_team_alpha
 ```
 
 ### Project Identification

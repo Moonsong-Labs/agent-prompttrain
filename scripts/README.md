@@ -268,26 +268,34 @@ bun run auth:bedrock-login
 
 ### oauth-refresh.ts
 
-Manually refreshes OAuth token for a specific train.
+Refreshes the OAuth token of one Anthropic account when it expires within a minute, or always
+with `--force`.
 
 ```bash
-bun run scripts/auth/oauth-refresh.ts example.com
+bun run scripts/auth/oauth-refresh.ts acc_team_alpha [--force]
 ```
 
 ### oauth-refresh-all.ts
 
-Refreshes all OAuth tokens across all configured trains.
+Refreshes every Anthropic OAuth token that expires within 5 minutes. `--dry-run` lists them
+without refreshing.
 
 ```bash
-bun run scripts/auth/oauth-refresh-all.ts
+bun run auth:oauth-refresh [--dry-run]
 ```
+
+Both refresh scripts take the same per-credential refresh lock as the proxy, so they are safe to
+run while proxies serve traffic: Anthropic revokes a refresh token presented twice (ADR-040). A
+token Anthropic rejects is recorded like a proxy rejection, and the script prints the relogin
+command.
 
 ### check-oauth-status.ts
 
-Displays OAuth status and token information for all trains.
+Displays the OAuth status and token information of one Anthropic account, including whether
+Anthropic already rejected its refresh token.
 
 ```bash
-bun run scripts/auth/check-oauth-status.ts
+bun run auth:oauth-status acc_team_alpha
 ```
 
 ## Development Scripts (`dev/`)

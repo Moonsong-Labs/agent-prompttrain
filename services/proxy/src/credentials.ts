@@ -145,7 +145,7 @@ export async function getApiKey(
       credentialManager.updateMetrics('attempt')
 
       try {
-        const accessToken = await refreshUnderLock(pool, credentialId)
+        const accessToken = await refreshAccessToken(pool, credentialId)
 
         const duration = Date.now() - startTime
         credentialManager.updateMetrics('success', duration)
@@ -182,17 +182,24 @@ function needsRefresh(credential: AnthropicCredential): boolean {
 /**
  * Refresh the access token while holding the credential's cluster-wide refresh lock.
  *
- * Anthropic revokes a refresh token presented twice, so only one proxy task may use it
- * (ADR-040). The credential is read again under the lock: when another task refreshed it
- * while this one waited, its stored token is used and Anthropic is not called.
+ * Anthropic revokes a refresh token presented twice, so only one proxy task (or script)
+ * may use it (ADR-040). The credential is read again under the lock: when another task
+ * refreshed it while this one waited, its stored token is used and Anthropic is not called,
+ * unless `force` asks for a new access token regardless.
+ *
+ * Throws the refresh error (an OAuthRefreshError when Anthropic answered).
  */
-async function refreshUnderLock(pool: Pool, credentialId: string): Promise<string | null> {
+export async function refreshAccessToken(
+  pool: Pool,
+  credentialId: string,
+  options: { force?: boolean } = {}
+): Promise<string | null> {
   return withCredentialRefreshLock(pool, credentialId, async client => {
     const credential = await getCredentialById(client, credentialId)
     if (credential?.provider !== 'anthropic') {
       return null
     }
-    if (!needsRefresh(credential)) {
+    if (!options.force && !needsRefresh(credential)) {
       return credential.oauth_access_token || null
     }
 
