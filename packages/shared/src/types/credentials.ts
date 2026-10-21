@@ -29,6 +29,8 @@ export interface AnthropicCredential extends BaseCredential {
   oauth_scopes: string[]
   oauth_is_max: boolean
   last_refresh_at: Date | null
+  /** SHA-256 of the refresh token Anthropic rejected (migration 029, ADR-040) */
+  oauth_refresh_rejected_token_hash?: string | null
   aws_api_key?: never
   aws_region?: never
 }
@@ -43,6 +45,7 @@ export interface BedrockCredential extends BaseCredential {
   oauth_scopes?: never
   oauth_is_max?: never
   last_refresh_at?: never
+  oauth_refresh_rejected_token_hash?: never
 }
 
 export type Credential = AnthropicCredential | BedrockCredential

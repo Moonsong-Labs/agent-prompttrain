@@ -90,9 +90,66 @@ export class AuthenticationService {
     }
 
     // Priority 2: Account pool or default account
-    let selection
+    const excludeCredentialIds = [...(options.excludeCredentialIds ?? [])]
+    for (;;) {
+      const selection = await this.selectAccount(context, model, excludeCredentialIds)
+
+      if (selection.fromPool) {
+        logger.debug('Account selected from pool', {
+          requestId: context.requestId,
+          projectId,
+          metadata: {
+            accountId: selection.credential.account_id,
+            maxUtilization: Math.round(selection.maxUtilization * 100),
+          },
+        })
+      }
+
+      try {
+        return await this.buildAuthResult(selection.credential, context, {
+          fromPool: selection.fromPool,
+          reserved: selection.reserved,
+          explicitlySelected: false,
+        })
+      } catch (error) {
+        if (selection.reserved) {
+          try {
+            await this.accountPoolService.releaseAccount(selection.credential.id)
+          } catch (releaseError) {
+            logger.error('Failed to release reservation after authentication error', {
+              metadata: {
+                credentialId: selection.credential.id,
+                error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+              },
+            })
+          }
+        }
+
+        // A pooled account that cannot get an access token must not fail the request
+        // while another account of the pool can serve it (ADR-040). The selection
+        // that succeeds takes over the project affinity.
+        if (!(error instanceof AuthenticationError) || !selection.fromPool) {
+          throw error
+        }
+        logger.warn('Trying another pooled account', {
+          requestId: context.requestId,
+          projectId,
+          metadata: { failedAccountId: selection.credential.account_id },
+        })
+        excludeCredentialIds.push(selection.credential.id)
+      }
+    }
+  }
+
+  private async selectAccount(
+    context: RequestContext,
+    model: string | undefined,
+    excludeCredentialIds: string[]
+  ) {
     try {
-      selection = await this.accountPoolService.selectAccount(projectId, model, options)
+      return await this.accountPoolService.selectAccount(context.projectId, model, {
+        excludeCredentialIds,
+      })
     } catch (error) {
       if (error instanceof AccountPoolExhaustedError) {
         throw error
@@ -102,42 +159,9 @@ export class AuthenticationService {
       if (error instanceof Error && error.message.includes('No default credential')) {
         throw new AuthenticationError('No default account configured for this project', {
           requestId: context.requestId,
-          projectId,
+          projectId: context.projectId,
           hint: 'Set a default account for this project via the dashboard',
         })
-      }
-      throw error
-    }
-
-    if (selection.fromPool) {
-      logger.debug('Account selected from pool', {
-        requestId: context.requestId,
-        projectId,
-        metadata: {
-          accountId: selection.credential.account_id,
-          maxUtilization: Math.round(selection.maxUtilization * 100),
-        },
-      })
-    }
-
-    try {
-      return await this.buildAuthResult(selection.credential, context, {
-        fromPool: selection.fromPool,
-        reserved: selection.reserved,
-        explicitlySelected: false,
-      })
-    } catch (error) {
-      if (selection.reserved) {
-        try {
-          await this.accountPoolService.releaseAccount(selection.credential.id)
-        } catch (releaseError) {
-          logger.error('Failed to release reservation after authentication error', {
-            metadata: {
-              credentialId: selection.credential.id,
-              error: releaseError instanceof Error ? releaseError.message : String(releaseError),
-            },
-          })
-        }
       }
       throw error
     }
@@ -205,6 +229,11 @@ export class AuthenticationService {
     const accessToken = await getApiKey(credential.id, this.pool)
 
     if (!accessToken) {
+      logger.warn('Failed to retrieve access token for account', {
+        requestId: context.requestId,
+        projectId: context.projectId,
+        metadata: { accountId: credential.account_id, credentialId: credential.id },
+      })
       throw new AuthenticationError('Failed to retrieve access token', {
         requestId: context.requestId,
         account: credential.account_name,

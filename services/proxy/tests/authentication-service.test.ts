@@ -6,6 +6,8 @@ import type { Pool } from 'pg'
 import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
 import * as credentials from '../src/credentials'
+import { AccountPoolExhaustedError } from '../src/services/account-pool-service'
+import { UsageCacheService, type CachedUsageEntry } from '../src/services/usage-cache-service'
 
 const createRequestContext = (projectId: string, account?: string) =>
   new RequestContext(
@@ -289,5 +291,124 @@ describe('AuthenticationService account selection priority', () => {
     // Both requests should use the same default account
     expect(result1.accountName).toBe('primary')
     expect(result2.accountName).toBe('primary')
+  })
+})
+
+describe('AuthenticationService pool failover', () => {
+  let mockGetTrainCredentials: any
+  let mockGetLinkedCredentials: any
+  let mockGetApiKey: any
+  let mockGetUsage: any
+
+  const makeCredential = (id: string): AnthropicCredential => ({
+    id,
+    account_id: `acct-${id}`,
+    account_name: `Account ${id}`,
+    provider: 'anthropic',
+    token_limit_threshold: 0.95,
+    five_hour_limit_threshold: 0.9,
+    seven_day_limit_threshold: 0.95,
+    oauth_access_token: `stored-token-${id}`,
+    oauth_refresh_token: `refresh-${id}`,
+    oauth_expires_at: new Date(Date.now() - 60_000),
+    oauth_scopes: ['user:inference'],
+    oauth_is_max: true,
+    last_refresh_at: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  })
+
+  const usageEntry = (utilization: number): CachedUsageEntry => ({
+    usage: {
+      five_hour: { utilization, resets_at: '2027-02-24T12:00:00Z' },
+      seven_day: { utilization, resets_at: '2027-02-28T00:00:00Z' },
+      seven_day_oauth_apps: null,
+      seven_day_opus: null,
+      seven_day_sonnet: null,
+      iguana_necktie: null,
+      extra_usage: {
+        is_enabled: false,
+        monthly_limit: null,
+        used_credits: null,
+        utilization: null,
+      },
+    },
+    fetchedAt: Date.now(),
+    isEstimated: false,
+  })
+
+  beforeEach(() => {
+    mockGetTrainCredentials = spyOn(queries, 'getProjectCredentials').mockImplementation(
+      async () => []
+    )
+    mockGetLinkedCredentials = spyOn(queries, 'getProjectLinkedCredentials').mockImplementation(
+      async () => [makeCredential('cred-a'), makeCredential('cred-b')]
+    )
+    // cred-a is the least used account, so the pool picks it first
+    mockGetUsage = spyOn(UsageCacheService.prototype, 'getUsageMultiple').mockImplementation(
+      async credentialsToRead =>
+        new Map(
+          credentialsToRead.map(credential => [
+            credential.id,
+            usageEntry(credential.id === 'cred-a' ? 10 : 50),
+          ])
+        )
+    )
+    // cred-a cannot refresh its access token
+    mockGetApiKey = spyOn(credentials, 'getApiKey').mockImplementation(async (id: string) =>
+      id === 'cred-a' ? null : `token-${id}`
+    )
+  })
+
+  afterEach(() => {
+    mockGetTrainCredentials.mockRestore()
+    mockGetLinkedCredentials.mockRestore()
+    mockGetApiKey.mockRestore()
+    mockGetUsage.mockRestore()
+  })
+
+  it('fails over to another pooled account when the selected one has no access token', async () => {
+    const service = new AuthenticationService({} as Pool)
+
+    const auth = await service.authenticate(createRequestContext('project-alpha'))
+
+    expect(auth.credentialId).toBe('cred-b')
+    expect(auth.headers.Authorization).toBe('Bearer token-cred-b')
+    expect(auth.fromPool).toBe(true)
+  })
+
+  it('keeps the project on the working account for the next requests', async () => {
+    const service = new AuthenticationService({} as Pool)
+    const first = await service.authenticate(createRequestContext('project-alpha'))
+    await service.release(first)
+    mockGetApiKey.mockClear()
+
+    const second = await service.authenticate(createRequestContext('project-alpha'))
+
+    expect(second.credentialId).toBe('cred-b')
+    expect(mockGetApiKey.mock.calls.map((call: unknown[]) => call[0])).toEqual(['cred-b'])
+  })
+
+  it('stops with an exhausted pool once every pooled account failed', async () => {
+    mockGetApiKey.mockImplementation(async () => null)
+    const service = new AuthenticationService({} as Pool)
+
+    await expect(
+      service.authenticate(createRequestContext('project-alpha'))
+    ).rejects.toBeInstanceOf(AccountPoolExhaustedError)
+    expect(mockGetApiKey.mock.calls.map((call: unknown[]) => call[0]).sort()).toEqual([
+      'cred-a',
+      'cred-b',
+    ])
+  })
+
+  it('returns 401 when the project default account has no access token', async () => {
+    mockGetLinkedCredentials.mockImplementation(async () => [])
+    mockGetTrainCredentials.mockImplementation(async () => [makeCredential('cred-a')])
+    const service = new AuthenticationService({} as Pool)
+
+    await expect(service.authenticate(createRequestContext('project-alpha'))).rejects.toThrow(
+      'Failed to retrieve access token'
+    )
   })
 })

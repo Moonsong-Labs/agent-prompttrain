@@ -259,6 +259,18 @@ Apply it before deploying the proxy that sends the alert. A proxy started withou
 normally, but logs `Failed to claim refresh token alert` and sends no alert when a refresh token is
 rejected.
 
+### 029-add-credential-refresh-rejected.ts
+
+Adds the nullable `credentials.oauth_refresh_rejected_token_hash` column: the SHA-256 of the refresh
+token Anthropic rejected with `invalid_grant`. While it matches the stored refresh token, account
+pools skip the account; a relogin stores a new refresh token, which clears it (ADR-040).
+Idempotent (`IF NOT EXISTS`), sets `lock_timeout = '5s'` and is metadata-only, so it is effectively
+instant.
+
+Apply it before deploying the proxy that records rejections. A proxy started without it still
+refreshes and stores tokens, but logs `Failed to record rejected refresh token` and keeps trying
+accounts whose refresh token was rejected (failing over to another pooled account each time).
+
 ## Future Migrations
 
 When adding new migrations:

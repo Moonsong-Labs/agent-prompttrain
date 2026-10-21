@@ -507,6 +507,56 @@ describe('AccountPoolService', () => {
     })
   })
 
+  describe('rejected refresh tokens', () => {
+    // SHA-256 of 'refresh-dead' and 'refresh-old', as stored by markRefreshTokenRejected
+    const REFRESH_DEAD_HASH = '76621db4f23aa952211a8ebb1b5d319cb8e390978b3ebc13095bc54382e24733'
+    const REFRESH_OLD_HASH = 'de1d36e8005c3eaadc5370acfd54a70781a20b4c316ab220d0d02b321d6a9d21'
+
+    test('leaves the sticky account once its refresh token is rejected', async () => {
+      const cred1 = makeAnthropicCredential({
+        id: 'cred-1',
+        account_id: 'acct-1',
+        oauth_refresh_token: 'refresh-dead',
+      })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2', account_id: 'acct-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+      // cred-1 stays the least used account: it no longer serves any request
+      mockFetchWithUsage({
+        'cred-1': makeUsageResponse(10, 10),
+        'cred-2': makeUsageResponse(50, 40),
+      })
+
+      const first = await service.selectAccount('project-1')
+      expect(first.credential.id).toBe('cred-1')
+      await service.releaseAccount(first.credential.id)
+
+      mockGetProjectLinkedCredentials.mockImplementation(() =>
+        Promise.resolve([{ ...cred1, oauth_refresh_rejected_token_hash: REFRESH_DEAD_HASH }, cred2])
+      )
+
+      const second = await service.selectAccount('project-1')
+      expect(second.credential.id).toBe('cred-2')
+    })
+
+    test('uses the account again once a relogin stored a new refresh token', async () => {
+      const cred1 = makeAnthropicCredential({
+        id: 'cred-1',
+        account_id: 'acct-1',
+        oauth_refresh_token: 'refresh-new',
+        oauth_refresh_rejected_token_hash: REFRESH_OLD_HASH,
+      })
+      const cred2 = makeAnthropicCredential({ id: 'cred-2', account_id: 'acct-2' })
+      mockGetProjectLinkedCredentials.mockImplementation(() => Promise.resolve([cred1, cred2]))
+      mockFetchWithUsage({
+        'cred-1': makeUsageResponse(10, 10),
+        'cred-2': makeUsageResponse(50, 40),
+      })
+
+      const selection = await service.selectAccount('project-1')
+      expect(selection.credential.id).toBe('cred-1')
+    })
+  })
+
   describe('shared upstream cooldowns', () => {
     test('skips a rate-limited credential for the affected model', async () => {
       const cred1 = makeAnthropicCredential({ id: 'cred-1', account_id: 'acct-1' })

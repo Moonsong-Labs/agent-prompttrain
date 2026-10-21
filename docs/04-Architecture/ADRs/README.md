@@ -71,6 +71,7 @@ What becomes easier or more difficult to do because of this change?
 | [ADR-037](./adr-037-precomputed-last-message-summary.md)                     | Precomputed Last-Message Summary                   | Accepted   | 2026-09-24 |
 | [ADR-038](./adr-038-conversation-list-recent-window.md)                      | Conversation List Recent Window                    | Superseded | 2026-09-25 |
 | [ADR-039](./adr-039-conversation-summaries-table.md)                         | Conversation Summaries Table                       | Accepted   | 2026-09-25 |
+| [ADR-040](./adr-040-cluster-wide-oauth-refresh.md)                           | Cluster-Wide OAuth Refresh & Account Failover      | Accepted   | 2026-10-21 |
 
 ## Creating a New ADR
 

@@ -52,6 +52,7 @@
     "test:db:conversations": "bun test tests/integration/conversation-list.db.test.ts",
     "test:db:projects": "bun test tests/integration/project-overviews.db.test.ts",
     "test:db:refresh-alert": "bun test tests/integration/refresh-token-alert.db.test.ts",
+    "test:db:refresh-lock": "bun test tests/integration/credential-refresh-lock.db.test.ts",
     "test:db:conversation-summaries": "bun test tests/integration/conversation-summaries.db.test.ts tests/integration/verify-conversation-summaries.db.test.ts",
     "test:theme": "bun test services/dashboard/src/layout/__tests__",
     "test:e2e": "bun test test/e2e",

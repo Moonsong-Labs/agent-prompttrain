@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import type {
   Credential,
   AnthropicCredential,
@@ -8,6 +8,11 @@ import type {
   CreateBedrockCredentialRequest,
   UpdateCredentialTokensRequest,
 } from '../../types/credentials'
+
+/**
+ * A pool, or a client holding a transaction
+ */
+export type Queryable = Pick<Pool, 'query'>
 
 /**
  * Create a new Anthropic credential
@@ -135,7 +140,7 @@ export async function createBedrockCredential(
 /**
  * Get credential by ID
  */
-export async function getCredentialById(pool: Pool, id: string): Promise<Credential | null> {
+export async function getCredentialById(pool: Queryable, id: string): Promise<Credential | null> {
   const result = await pool.query<Credential>('SELECT * FROM credentials WHERE id = $1', [id])
 
   return result.rows[0] || null
@@ -214,7 +219,7 @@ export async function getCredentialSafeById(
  * Update OAuth tokens for a credential (Anthropic only)
  */
 export async function updateCredentialTokens(
-  pool: Pool,
+  pool: Queryable,
   id: string,
   request: UpdateCredentialTokensRequest
 ): Promise<AnthropicCredential> {
@@ -278,6 +283,60 @@ export async function claimRefreshTokenAlert(
       AND provider = 'anthropic'
       AND COALESCE(oauth_refresh_token, '') = $2
       AND oauth_refresh_alerted_token_hash IS DISTINCT FROM ${REFRESH_TOKEN_HASH_SQL}
+    `,
+    [id, refreshToken]
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+/**
+ * Run `task` while holding the cluster-wide OAuth refresh lock of a credential (ADR-040).
+ *
+ * Anthropic revokes a refresh token that is presented twice, so proxy instances must not
+ * refresh the same credential at once. The lock is held by a transaction on the client
+ * given to `task`: queries run on it see what the previous holder stored. What `task`
+ * wrote is committed even when it throws, so it can record a failure before rethrowing.
+ */
+export async function withCredentialRefreshLock<T>(
+  pool: Pool,
+  id: string,
+  task: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    try {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`oauth-refresh:${id}`])
+      return await task(client)
+    } finally {
+      // Releases the lock; a transaction aborted by a failed statement is rolled back instead
+      await client.query('COMMIT')
+    }
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Record that Anthropic rejected this refresh token (Anthropic only), so account pools
+ * skip the credential until new tokens are stored.
+ *
+ * Returns false when the credential no longer holds this refresh token (a relogin or
+ * another instance stored a new one) or the rejection was already recorded.
+ */
+export async function markRefreshTokenRejected(
+  pool: Queryable,
+  id: string,
+  refreshToken: string
+): Promise<boolean> {
+  const result = await pool.query(
+    `
+    UPDATE credentials
+    SET oauth_refresh_rejected_token_hash = ${REFRESH_TOKEN_HASH_SQL}
+    WHERE id = $1
+      AND provider = 'anthropic'
+      AND COALESCE(oauth_refresh_token, '') = $2
+      AND oauth_refresh_rejected_token_hash IS DISTINCT FROM ${REFRESH_TOKEN_HASH_SQL}
     `,
     [id, refreshToken]
   )

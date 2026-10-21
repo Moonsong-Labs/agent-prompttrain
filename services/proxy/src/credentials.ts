@@ -1,12 +1,22 @@
 import { Pool } from 'pg'
+import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import {
   getCredentialById,
+  markRefreshTokenRejected,
   updateCredentialTokens,
+  withCredentialRefreshLock,
 } from '@agent-prompttrain/shared/database/queries'
 import { CredentialManager } from './services/CredentialManager'
 import { notifyRefreshTokenRejected } from './services/refresh-token-alert'
+import { logger } from './middleware/logger'
 
 const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
+
+// Refresh the access token this long before it expires
+const REFRESH_BEFORE_EXPIRY_MS = 60_000
+
+// Other proxy tasks wait for a refresh holding the lock, so the token request must end
+const TOKEN_REQUEST_TIMEOUT_MS = 30_000
 
 const OAUTH_CONFIG = {
   clientId: process.env.CLAUDE_OAUTH_CLIENT_ID || DEFAULT_OAUTH_CLIENT_ID,
@@ -79,6 +89,7 @@ export async function refreshToken(refreshToken: string): Promise<{
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }),
+    signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
   })
 
   if (!response.ok) {
@@ -114,9 +125,7 @@ export async function getApiKey(
 
   const cacheKey = `credential:${credentialId}`
 
-  // Check if token needs refresh (refresh 1 minute before expiry)
-  const expiresAt = new Date(credential.oauth_expires_at || 0)
-  if (Date.now() >= expiresAt.getTime() - 60000) {
+  if (needsRefresh(credential)) {
     // Check for recent failure (negative cache)
     const failureCheck = credentialManager.hasRecentFailure(cacheKey)
     if (failureCheck.failed) {
@@ -135,31 +144,22 @@ export async function getApiKey(
       const startTime = Date.now()
       credentialManager.updateMetrics('attempt')
 
-      const usedRefreshToken = credential.oauth_refresh_token || ''
       try {
-        const newTokens = await refreshToken(usedRefreshToken)
-
-        // Update database
-        await updateCredentialTokens(pool, credentialId, {
-          oauth_access_token: newTokens.accessToken,
-          oauth_refresh_token: newTokens.refreshToken,
-          oauth_expires_at: newTokens.expiresAt,
-        })
+        const accessToken = await refreshUnderLock(pool, credentialId)
 
         const duration = Date.now() - startTime
         credentialManager.updateMetrics('success', duration)
 
-        return newTokens.accessToken
+        return accessToken
       } catch (refreshError: unknown) {
         credentialManager.updateMetrics('failure')
         const errorMessage = refreshError instanceof Error ? refreshError.message : 'Unknown error'
 
         credentialManager.recordFailedRefresh(cacheKey, errorMessage)
 
-        if (refreshError instanceof OAuthRefreshError && refreshError.isRefreshTokenRejected) {
-          // Fire and forget: alerting must never delay or fail the caller
-          void notifyRefreshTokenRejected(pool, credential, usedRefreshToken, refreshError)
-        }
+        logger.warn('OAuth token refresh failed', {
+          metadata: { accountId: credential.account_id, credentialId, error: errorMessage },
+        })
 
         return null
       } finally {
@@ -172,6 +172,63 @@ export async function getApiKey(
   }
 
   return credential.oauth_access_token || null
+}
+
+function needsRefresh(credential: AnthropicCredential): boolean {
+  const expiresAt = new Date(credential.oauth_expires_at || 0)
+  return Date.now() >= expiresAt.getTime() - REFRESH_BEFORE_EXPIRY_MS
+}
+
+/**
+ * Refresh the access token while holding the credential's cluster-wide refresh lock.
+ *
+ * Anthropic revokes a refresh token presented twice, so only one proxy task may use it
+ * (ADR-040). The credential is read again under the lock: when another task refreshed it
+ * while this one waited, its stored token is used and Anthropic is not called.
+ */
+async function refreshUnderLock(pool: Pool, credentialId: string): Promise<string | null> {
+  return withCredentialRefreshLock(pool, credentialId, async client => {
+    const credential = await getCredentialById(client, credentialId)
+    if (credential?.provider !== 'anthropic') {
+      return null
+    }
+    if (!needsRefresh(credential)) {
+      return credential.oauth_access_token || null
+    }
+
+    const usedRefreshToken = credential.oauth_refresh_token || ''
+    try {
+      const newTokens = await refreshToken(usedRefreshToken)
+
+      await updateCredentialTokens(client, credentialId, {
+        oauth_access_token: newTokens.accessToken,
+        oauth_refresh_token: newTokens.refreshToken,
+        oauth_expires_at: newTokens.expiresAt,
+      })
+
+      return newTokens.accessToken
+    } catch (refreshError: unknown) {
+      if (refreshError instanceof OAuthRefreshError && refreshError.isRefreshTokenRejected) {
+        // Fire and forget: alerting must never delay or fail the caller
+        void notifyRefreshTokenRejected(pool, credential, usedRefreshToken, refreshError)
+
+        // Only invalid_grant reliably means this refresh token is dead; any other error
+        // could be an upstream incident, which must not take accounts out of pools
+        if (refreshError.errorCode === 'invalid_grant') {
+          await markRefreshTokenRejected(client, credentialId, usedRefreshToken).catch(
+            (markError: unknown) =>
+              logger.error('Failed to record rejected refresh token', {
+                metadata: {
+                  accountId: credential.account_id,
+                  error: markError instanceof Error ? markError.message : String(markError),
+                },
+              })
+          )
+        }
+      }
+      throw refreshError
+    }
+  })
 }
 
 /**
