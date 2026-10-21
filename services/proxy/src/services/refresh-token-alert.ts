@@ -5,7 +5,7 @@ import {
   releaseRefreshTokenAlert,
 } from '@agent-prompttrain/shared/database/queries'
 import type { OAuthRefreshError } from '../credentials'
-import { isSlackEnabled, sendRefreshTokenExpiredToSlack } from './slack'
+import { isSlackAlertEnabled, sendRefreshTokenExpiredToSlack } from './slack'
 import { logger } from '../middleware/logger'
 
 // Another proxy task may have used the same refresh token moments earlier and not yet
@@ -29,7 +29,7 @@ export async function notifyRefreshTokenRejected(
   error: OAuthRefreshError,
   settleMs = ROTATION_SETTLE_MS
 ): Promise<void> {
-  if (!isSlackEnabled()) {
+  if (!isSlackAlertEnabled()) {
     return
   }
 

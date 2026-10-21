@@ -11,7 +11,7 @@ import { apiRoutes } from './routes/api.js'
 import { sparkApiRoutes } from './routes/spark-api.js'
 import { analysisRoutes } from './routes/analyses.js'
 import { initializeAnalysisRateLimiters } from './middleware/analysis-rate-limit.js'
-import { initializeSlack } from './services/slack.js'
+import { initializeSlackFromConfig } from './services/slack.js'
 import { initializeDatabase } from './storage/writer.js'
 import { apiAuthMiddleware } from './middleware/api-auth.js'
 import { projectIdExtractorMiddleware } from './middleware/project-id-extractor.js'
@@ -338,10 +338,15 @@ async function initializeExternalServices(): Promise<void> {
   }
 
   // Initialize Slack if configured
-  if (config.slack.enabled && config.slack.webhookUrl) {
+  if ((config.slack.enabled && config.slack.webhookUrl) || config.slack.alertWebhookUrl) {
     try {
-      initializeSlack(config.slack)
-      logger.info('Slack integration initialized')
+      initializeSlackFromConfig(config.slack)
+      logger.info('Slack integration initialized', {
+        metadata: {
+          notifications: config.slack.enabled && !!config.slack.webhookUrl,
+          dedicatedAlertWebhook: !!config.slack.alertWebhookUrl,
+        },
+      })
     } catch (error) {
       logger.error('Failed to initialize Slack', {
         error: error instanceof Error ? { message: error.message } : { message: String(error) },

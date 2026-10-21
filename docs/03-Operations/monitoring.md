@@ -210,6 +210,11 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 The proxy also sends an alert to this webhook when an account's OAuth refresh token is rejected,
 once per expired token (see [Authentication](../02-User-Guide/authentication.md#oauth-auto-refresh)).
+To receive only alerts, without conversation notifications, set a dedicated webhook instead:
+
+```bash
+SLACK_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/ALERTS/WEBHOOK
+```
 
 ## External Monitoring
 

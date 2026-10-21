@@ -118,6 +118,7 @@ Environment Variables:
   DATABASE_URL                PostgreSQL connection string (for storage)
   STORAGE_ENABLED             Enable request/response storage (default: false)
   SLACK_WEBHOOK_URL           Slack webhook URL for notifications (optional)
+  SLACK_ALERT_WEBHOOK_URL     Slack webhook URL for operational alerts only (optional, defaults to SLACK_WEBHOOK_URL)
   SLACK_CHANNEL               Slack channel override (optional)
   SLACK_USERNAME              Slack bot username (default: Agent Prompt Train)
   SLACK_ICON_EMOJI            Slack bot icon (default: :robot_face:)
@@ -196,6 +197,10 @@ async function main() {
         console.log(`  - Username: ${process.env.SLACK_USERNAME}`)
       }
       console.log(`  - Enabled: ${process.env.SLACK_ENABLED !== 'false' ? 'Yes' : 'No'}`)
+    }
+    if (process.env.SLACK_ALERT_WEBHOOK_URL) {
+      console.log('\nSlack Alerts:')
+      console.log(`  - Webhook: Configured`)
     }
 
     // Show storage configuration
