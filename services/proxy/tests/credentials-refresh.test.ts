@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
 import * as alerts from '../src/services/refresh-token-alert'
 import { getApiKey, OAuthRefreshError } from '../src/credentials'
 
 const pool = {} as Pool
+const lockClient = {} as PoolClient
 
 // Each test uses its own credential ID: getApiKey keeps a per-credential failure cooldown
 const makeExpiredCredential = (id: string): AnthropicCredential => ({
@@ -28,11 +29,19 @@ describe('getApiKey refresh failures', () => {
   const originalFetch = globalThis.fetch
   let getCredentialSpy: any
   let updateTokensSpy: any
+  let markRejectedSpy: any
+  let lockSpy: any
   let notifySpy: any
 
   beforeEach(() => {
     updateTokensSpy = spyOn(queries, 'updateCredentialTokens').mockImplementation(
       async () => ({}) as any
+    )
+    markRejectedSpy = spyOn(queries, 'markRefreshTokenRejected').mockImplementation(
+      async () => true
+    )
+    lockSpy = spyOn(queries, 'withCredentialRefreshLock').mockImplementation(
+      async (_pool, _id, task) => task(lockClient)
     )
     notifySpy = spyOn(alerts, 'notifyRefreshTokenRejected').mockImplementation(async () => {})
   })
@@ -41,14 +50,24 @@ describe('getApiKey refresh failures', () => {
     globalThis.fetch = originalFetch
     getCredentialSpy?.mockRestore()
     updateTokensSpy.mockRestore()
+    markRejectedSpy.mockRestore()
+    lockSpy.mockRestore()
     notifySpy.mockRestore()
   })
 
+  // Every read returns the credential, including the one made under the refresh lock
   const useCredential = (credential: AnthropicCredential) => {
     getCredentialSpy = spyOn(queries, 'getCredentialById').mockImplementation(
       async () => credential
     )
   }
+
+  const tokenResponse = () =>
+    Response.json({
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 28_800,
+    })
 
   it('alerts when Anthropic rejects the refresh token', async () => {
     const credential = makeExpiredCredential('rejected')
@@ -72,6 +91,38 @@ describe('getApiKey refresh failures', () => {
     expect(updateTokensSpy).not.toHaveBeenCalled()
   })
 
+  it('records the rejection on the locked connection when Anthropic answers invalid_grant', async () => {
+    const credential = makeExpiredCredential('invalid-grant')
+    useCredential(credential)
+    globalThis.fetch = (async () =>
+      Response.json(
+        { error: 'invalid_grant', error_description: 'Refresh token not found or invalid' },
+        { status: 400 }
+      )) as unknown as typeof fetch
+
+    expect(await getApiKey(credential.id, pool)).toBeNull()
+
+    expect(markRejectedSpy).toHaveBeenCalledTimes(1)
+    expect(markRejectedSpy.mock.calls[0]).toEqual([
+      lockClient,
+      'invalid-grant',
+      'refresh-invalid-grant',
+    ])
+  })
+
+  it('does not record a rejection for a 401 without invalid_grant', async () => {
+    const credential = makeExpiredCredential('unauthorized')
+    useCredential(credential)
+    globalThis.fetch = (async () =>
+      Response.json(
+        { error: { type: 'authentication_error', message: 'Unauthorized' } },
+        { status: 401 }
+      )) as unknown as typeof fetch
+
+    expect(await getApiKey(credential.id, pool)).toBeNull()
+    expect(markRejectedSpy).not.toHaveBeenCalled()
+  })
+
   it('does not alert when the token endpoint is temporarily unavailable', async () => {
     const credential = makeExpiredCredential('unavailable')
     useCredential(credential)
@@ -80,6 +131,7 @@ describe('getApiKey refresh failures', () => {
 
     expect(await getApiKey(credential.id, pool)).toBeNull()
     expect(notifySpy).not.toHaveBeenCalled()
+    expect(markRejectedSpy).not.toHaveBeenCalled()
   })
 
   it('does not alert when the token endpoint cannot be reached', async () => {
@@ -93,18 +145,69 @@ describe('getApiKey refresh failures', () => {
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
-  it('stores the new tokens when the refresh succeeds', async () => {
+  it('stores the new tokens on the locked connection when the refresh succeeds', async () => {
     const credential = makeExpiredCredential('refreshed')
     useCredential(credential)
-    globalThis.fetch = (async () =>
-      Response.json({
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-        expires_in: 28_800,
-      })) as unknown as typeof fetch
+    globalThis.fetch = (async () => tokenResponse()) as unknown as typeof fetch
 
     expect(await getApiKey(credential.id, pool)).toBe('new-access-token')
+    expect(lockSpy).toHaveBeenCalledTimes(1)
+    expect(lockSpy.mock.calls[0][1]).toBe('refreshed')
     expect(updateTokensSpy).toHaveBeenCalledTimes(1)
+    const [calledClient, calledId, tokens] = updateTokensSpy.mock.calls[0]
+    expect(calledClient).toBe(lockClient)
+    expect(calledId).toBe('refreshed')
+    expect(tokens.oauth_access_token).toBe('new-access-token')
+    expect(tokens.oauth_refresh_token).toBe('new-refresh-token')
     expect(notifySpy).not.toHaveBeenCalled()
+  })
+
+  it('gives up on a token request that does not answer, so it cannot hold the lock', async () => {
+    const credential = makeExpiredCredential('hanging')
+    useCredential(credential)
+    // The request only ends when its signal aborts; make the timeout fire immediately
+    const timeoutSpy = spyOn(AbortSignal, 'timeout').mockImplementation(() =>
+      AbortSignal.abort(new DOMException('The operation timed out.', 'TimeoutError'))
+    )
+    globalThis.fetch = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal
+        if (signal?.aborted) {
+          reject(signal.reason)
+        }
+        signal?.addEventListener('abort', () => reject(signal.reason))
+      })) as unknown as typeof fetch
+
+    try {
+      expect(await getApiKey(credential.id, pool)).toBeNull()
+      expect(notifySpy).not.toHaveBeenCalled()
+      expect(markRejectedSpy).not.toHaveBeenCalled()
+    } finally {
+      timeoutSpy.mockRestore()
+    }
+  })
+
+  it('uses the token another proxy task stored while this one waited for the lock', async () => {
+    const expired = makeExpiredCredential('refreshed-elsewhere')
+    const refreshedElsewhere: AnthropicCredential = {
+      ...expired,
+      oauth_access_token: 'access-token-from-other-task',
+      oauth_refresh_token: 'refresh-token-from-other-task',
+      oauth_expires_at: new Date(Date.now() + 28_800_000),
+    }
+    // The first read happens before the lock, the second one under it
+    const reads = [expired, refreshedElsewhere]
+    getCredentialSpy = spyOn(queries, 'getCredentialById').mockImplementation(
+      async () => reads.shift() ?? refreshedElsewhere
+    )
+    let tokenRequests = 0
+    globalThis.fetch = (async () => {
+      tokenRequests++
+      return tokenResponse()
+    }) as unknown as typeof fetch
+
+    expect(await getApiKey(expired.id, pool)).toBe('access-token-from-other-task')
+    expect(tokenRequests).toBe(0)
+    expect(updateTokensSpy).not.toHaveBeenCalled()
   })
 })

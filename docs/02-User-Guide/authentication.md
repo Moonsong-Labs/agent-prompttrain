@@ -428,6 +428,12 @@ The proxy automatically refreshes OAuth tokens:
 The OAuth refresh process includes:
 
 - **Concurrent Request Coalescing**: Multiple simultaneous requests share the same refresh operation
+- **Cluster-Wide Lock**: Only one proxy instance refreshes an account at a time; the others wait and
+  reuse the stored token. Anthropic revokes the refresh token when two instances refresh with it
+  ([ADR-040](../04-Architecture/ADRs/adr-040-cluster-wide-oauth-refresh.md))
+- **Rejected Token Tracking**: When Anthropic answers `invalid_grant`, the hash of the rejected refresh
+  token is stored in `credentials.oauth_refresh_rejected_token_hash` (migration 029) and the account is
+  skipped by account pools until a relogin stores a new refresh token
 - **Negative Caching**: Failed refresh attempts are cached for 5 seconds to prevent retry storms
 - **Refresh Metrics**: Track attempt counts, success rates, failures, and durations
 - **Expiry Alerts**: When Anthropic rejects a refresh token (HTTP 400/401, e.g. `invalid_grant`), the
@@ -439,7 +445,7 @@ The OAuth refresh process includes:
 
 ### Credential Failover
 
-Trains can link multiple credentials for automatic failover. When one credential expires or encounters errors, the proxy automatically tries the next linked credential.
+Trains can link multiple credentials for automatic failover. When a pooled credential cannot provide an access token (its refresh failed), the proxy tries another linked credential, and that credential takes over the project affinity. A project with a single default account has no alternative and returns HTTP 401 until the account is reauthorized.
 
 **Example**: Link two credentials to a train for redundancy:
 
@@ -468,7 +474,7 @@ When a project has **2 or more linked accounts**, the proxy automatically enable
 1. **Sticky routing**: PostgreSQL shares project affinity across all proxy instances
 2. **Usage monitoring**: One cluster-wide refresh per account caches Anthropic usage for five minutes
 3. **Automatic switching**: The proxy switches at 90% five-hour/session usage or 95% seven-day/weekly usage
-4. **Reactive failover**: An upstream 429 cools down that account/model and immediately tries one different pooled account
+4. **Reactive failover**: An upstream 429 cools down that account/model and immediately tries one different pooled account. An account that cannot provide an access token is skipped for that request, and accounts whose refresh token was rejected are skipped until a relogin
 5. **Exhaustion handling**: If no account remains, the proxy returns HTTP 429 with a `Retry-After` value based on upstream reset information
 
 ### Per-Account Threshold

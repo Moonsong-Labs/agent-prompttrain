@@ -28,13 +28,12 @@
 import { promises as fs } from 'fs'
 import { Pool } from 'pg'
 import { config } from 'dotenv'
+import { getApiKey } from '../services/proxy/src/credentials'
 
 config()
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
-const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
-const DEFAULT_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 const BILLING_HEADER = 'x-anthropic-billing-header: cc_version=replay; cc_entrypoint=cli;'
 
 interface Credential {
@@ -118,47 +117,13 @@ async function getCredential(pool: Pool, accountName?: string): Promise<Credenti
 }
 
 async function ensureFreshToken(pool: Pool, credential: Credential): Promise<string> {
-  const expiresAt = new Date(credential.oauth_expires_at || 0)
-
-  if (Date.now() < expiresAt.getTime() - 60000) {
-    return credential.oauth_access_token!
+  // Refresh under the proxy's cluster-wide lock: a refresh racing the proxy would make
+  // Anthropic revoke the account's refresh token (ADR-040)
+  const accessToken = await getApiKey(credential.id, pool)
+  if (!accessToken) {
+    throw new Error(`Could not get an access token for account ${credential.account_name}`)
   }
-
-  console.log('Token expired or expiring soon, refreshing...')
-
-  const response = await fetch('https://console.anthropic.com/v1/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-beta': OAUTH_BETA_HEADER,
-    },
-    body: JSON.stringify({
-      client_id: process.env.CLAUDE_OAUTH_CLIENT_ID || DEFAULT_OAUTH_CLIENT_ID,
-      refresh_token: credential.oauth_refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Token refresh failed: ${response.status} - ${errorText}`)
-  }
-
-  const payload = (await response.json()) as any
-  const newAccessToken = payload.access_token
-  const newRefreshToken = payload.refresh_token || credential.oauth_refresh_token
-  const newExpiresAt = new Date(Date.now() + payload.expires_in * 1000)
-
-  await pool.query(
-    `UPDATE credentials
-     SET oauth_access_token = $2, oauth_refresh_token = $3, oauth_expires_at = $4,
-         updated_at = NOW(), last_refresh_at = NOW()
-     WHERE id = $1`,
-    [credential.id, newAccessToken, newRefreshToken, newExpiresAt]
-  )
-
-  console.log('Token refreshed successfully.')
-  return newAccessToken
+  return accessToken
 }
 
 function injectBillingHeader(body: any) {

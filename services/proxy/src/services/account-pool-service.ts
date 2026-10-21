@@ -1,6 +1,7 @@
 import type { Pool } from 'pg'
 import {
   getRetryAfter,
+  hasRejectedRefreshToken,
   type Credential,
   type AnthropicCredential,
   type AnthropicOAuthUsageResponse,
@@ -85,7 +86,11 @@ export class AccountPoolService {
       return this.selectDefaultAccount(projectId, model, excluded)
     }
 
-    const credentials = allAnthropicCredentials.filter(credential => !excluded.has(credential.id))
+    // An account whose refresh token was rejected cannot get an access token until a
+    // relogin; its usage is no longer polled, so it would look idle and be preferred
+    const credentials = allAnthropicCredentials.filter(
+      credential => !excluded.has(credential.id) && !hasRejectedRefreshToken(credential)
+    )
     const usageMap = await this.usageCacheService.getUsageMultiple(credentials)
     const evaluated = credentials.map(credential => ({
       credential,
