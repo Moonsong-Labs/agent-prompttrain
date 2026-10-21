@@ -46,13 +46,19 @@ credentialsUIRoutes.get('/', async c => {
             <li>
               Anthropic OAuth:
               <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
-                >bun run scripts/auth/oauth-login.ts</code
+                >bun run auth:oauth-login</code
+              >
+            </li>
+            <li>
+              Expired Anthropic account:
+              <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
+                >bun run auth:oauth-relogin --account &lt;account_id&gt;</code
               >
             </li>
             <li>
               AWS Bedrock:
               <code style="background: white; padding: 0.125rem 0.25rem; border-radius: 0.125rem;"
-                >bun run scripts/auth/bedrock-login.ts</code
+                >bun run auth:bedrock-login</code
               >
             </li>
           </ul>
@@ -190,7 +196,7 @@ credentialsUIRoutes.get('/', async c => {
             </h4>
             <pre
               style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.75rem;"
-            ><code>bun run scripts/auth/oauth-login.ts</code></pre>
+            ><code>bun run auth:oauth-login</code></pre>
           </div>
           <div>
             <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">
@@ -198,7 +204,7 @@ credentialsUIRoutes.get('/', async c => {
             </h4>
             <pre
               style="background: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; font-size: 0.75rem;"
-            ><code>bun run scripts/auth/bedrock-login.ts</code></pre>
+            ><code>bun run auth:bedrock-login</code></pre>
           </div>
         </div>
       </div>

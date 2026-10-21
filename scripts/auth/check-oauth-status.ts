@@ -76,7 +76,7 @@ async function checkOAuthStatus() {
       console.error(
         '\nERROR: Token is expired and no refresh token available. Re-authentication required!'
       )
-      console.log('Run: bun run scripts/auth/oauth-login.ts')
+      console.log(`Run: bun run auth:oauth-relogin --account ${credential.account_id}`)
     }
   } catch (error) {
     console.error('Error checking OAuth status:', error)

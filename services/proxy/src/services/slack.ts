@@ -347,7 +347,7 @@ export async function sendRefreshTokenExpiredToSlack(info: RefreshTokenAlertInfo
         text:
           `Anthropic rejected the refresh token (HTTP ${info.status}${reason ? ` - ${reason}` : ''}), ` +
           'so the access token can no longer be refreshed and requests using this account will fail.\n' +
-          `Re-authorize with: \`bun run scripts/auth/oauth-relogin-all.ts --account ${info.accountId}\``,
+          `Re-authorize with: \`bun run auth:oauth-relogin --account ${info.accountId}\``,
         fields,
         footer: 'Agent Prompt Train',
       },

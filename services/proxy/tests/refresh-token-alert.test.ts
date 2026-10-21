@@ -88,7 +88,7 @@ describe('notifyRefreshTokenRejected', () => {
     expect(message).toContain('acc_team_alpha')
     expect(message).toContain('alpha@example.com')
     expect(message).toContain('invalid_grant')
-    expect(message).toContain('bun run scripts/auth/oauth-relogin-all.ts --account acc_team_alpha')
+    expect(message).toContain('bun run auth:oauth-relogin --account acc_team_alpha')
     expect(message).not.toContain('refresh-token')
   })
 

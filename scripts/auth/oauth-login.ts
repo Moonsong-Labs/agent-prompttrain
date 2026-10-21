@@ -370,7 +370,7 @@ if (import.meta.main) {
     const options = parseOAuthLoginOptions(process.argv.slice(2))
     if (options.help) {
       console.log(
-        'Usage: bun run scripts/auth/oauth-login.ts [--gmail] [--own-browser] [--no-browser] [--no-clipboard]'
+        'Usage: bun run auth:oauth-login [--gmail] [--own-browser] [--no-browser] [--no-clipboard]'
       )
     } else {
       await performOAuthLogin(options)
