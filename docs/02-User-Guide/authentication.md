@@ -157,7 +157,7 @@ The proxy uses **OAuth-only authentication** stored in the PostgreSQL database. 
 The OAuth login script will guide you through the authentication flow:
 
 ```bash
-bun run scripts/auth/oauth-login.ts
+bun run auth:oauth-login
 ```
 
 The script will:
@@ -215,10 +215,10 @@ place, so project associations do not need to be rebuilt:
 
 ```bash
 # All Anthropic credentials
-bun run scripts/auth/oauth-relogin-all.ts
+bun run auth:oauth-relogin
 
 # One credential only
-bun run scripts/auth/oauth-relogin-all.ts --account acc_marketing
+bun run auth:oauth-relogin --account acc_marketing
 ```
 
 Each account still requires Anthropic's email verification and authorization approval. The script
@@ -651,7 +651,7 @@ If you have existing filesystem-based credentials:
 2. **Re-Add OAuth Credentials**: Run the OAuth login script for each account
 
    ```bash
-   bun run scripts/auth/oauth-login.ts
+   bun run auth:oauth-login
    ```
 
 3. **Create Trains**: Use dashboard API to create trains
@@ -688,7 +688,7 @@ If you have existing filesystem-based credentials:
 set, the proxy posts a Slack alert when this happens.
 
 **Solution**: Re-authenticate the account:
-`bun run scripts/auth/oauth-relogin-all.ts --account <account_id>`
+`bun run auth:oauth-relogin --account <account_id>`
 
 ### Database Connection Errors
 

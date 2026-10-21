@@ -1464,7 +1464,7 @@ bun run scripts/db/migrations/013-credential-train-management.ts
 ### Task 4.2: Test OAuth Login Script
 
 ```bash
-bun run scripts/auth/oauth-login.ts
+bun run auth:oauth-login
 ```
 
 **Follow prompts to:**
@@ -1739,7 +1739,7 @@ Migrates credential and train management from filesystem to database with OAuth-
 ### Migration Steps
 
 1. Run migration: `bun run scripts/db/migrations/013-credential-train-management.ts`
-2. Add credentials: `bun run scripts/auth/oauth-login.ts`
+2. Add credentials: `bun run auth:oauth-login`
 3. Create trains via dashboard
 4. Link credentials to trains
 5. Generate API keys

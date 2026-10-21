@@ -106,7 +106,7 @@ export async function reloginAllOAuthCredentials(options: ReloginCliOptions): Pr
 
       if (!credential.account_email) {
         console.log(
-          '  Note: Store the email next time with scripts/auth/oauth-login.ts to make this explicit.'
+          '  Note: Store the email next time with bun run auth:oauth-login to make this explicit.'
         )
       }
 
@@ -178,7 +178,7 @@ if (import.meta.main) {
     const options = parseReloginOptions(process.argv.slice(2))
     if (options.help) {
       console.log(
-        'Usage: bun run scripts/auth/oauth-relogin-all.ts [--gmail] [--own-browser] [--account <id>] [--no-browser] [--no-clipboard]'
+        'Usage: bun run auth:oauth-relogin [--gmail] [--own-browser] [--account <id>] [--no-browser] [--no-clipboard]'
       )
     } else {
       process.exitCode = await reloginAllOAuthCredentials(options)

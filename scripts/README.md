@@ -189,7 +189,7 @@ Requires `DATABASE_URL` environment variable.
 Generates secure API keys for client authentication.
 
 ```bash
-bun run scripts/auth/generate-api-key.ts
+bun run auth:generate-key
 ```
 
 ### oauth-login.ts
@@ -199,7 +199,7 @@ opens the authorization URL in a private browser window when Chrome, Chromium, o
 available and copies the credential email to the system clipboard when supported.
 
 ```bash
-bun run scripts/auth/oauth-login.ts
+bun run auth:oauth-login
 ```
 
 Use `--no-browser` or `--no-clipboard` for a fully manual flow.
@@ -213,13 +213,13 @@ platform provides a clipboard command.
 
 ```bash
 # Reauthorize every Anthropic credential
-bun run scripts/auth/oauth-relogin-all.ts
+bun run auth:oauth-relogin
 
 # Reauthorize one account
-bun run scripts/auth/oauth-relogin-all.ts --account acc_team_alpha
+bun run auth:oauth-relogin --account acc_team_alpha
 
 # Disable browser or clipboard assistance
-bun run scripts/auth/oauth-relogin-all.ts --no-browser --no-clipboard
+bun run auth:oauth-relogin --no-browser --no-clipboard
 ```
 
 The browser fallback always prints the authorization URL, so the workflow also works on headless
@@ -252,7 +252,7 @@ limited to matching messages or labels.
 Adds AWS Bedrock credentials to the database. Interactive CLI that prompts for AWS API key, account details, and region.
 
 ```bash
-bun run scripts/auth/bedrock-login.ts
+bun run auth:bedrock-login
 ```
 
 **Prerequisites:**

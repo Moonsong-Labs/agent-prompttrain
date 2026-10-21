@@ -63,7 +63,7 @@ async function refreshOAuthCredential() {
 
     if (!credential.oauth_refresh_token) {
       console.error('\nERROR: No refresh token available. Re-authentication required.')
-      console.error(`Run: bun run scripts/auth/oauth-login.ts`)
+      console.error(`Run: bun run auth:oauth-relogin --account ${credential.account_id}`)
       process.exit(1)
     }
 
@@ -107,7 +107,7 @@ async function refreshOAuthCredential() {
       if (error.errorCode === 'invalid_grant' || error.status === 400) {
         console.error('\nThe refresh token is invalid or has been revoked.')
         console.error('You need to re-authenticate to get new credentials.')
-        console.error(`\nRun: bun run scripts/auth/oauth-login.ts`)
+        console.error(`\nRun: bun run auth:oauth-relogin --account ${credential.account_id}`)
       } else if (error.status) {
         console.error(`\nHTTP Status: ${error.status}`)
         console.error(`Error Code: ${error.errorCode || 'unknown'}`)
