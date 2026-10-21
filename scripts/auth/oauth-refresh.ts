@@ -1,20 +1,29 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
-import {
-  getCredential,
-  updateCredential,
-} from '../../packages/shared/src/database/queries/index.js'
-import { refreshOAuthToken } from '../../services/proxy/src/credentials/index.js'
+import { getCredentialByAccountId } from '../../packages/shared/src/database/queries/index.js'
+import { OAuthRefreshError, refreshAccessToken } from '../../services/proxy/src/credentials.ts'
+
+const USAGE = 'Usage: bun run scripts/auth/oauth-refresh.ts <account-id> [--force]'
+
+function printUsage(log: (message: string) => void) {
+  log(USAGE)
+  log('Example: bun run scripts/auth/oauth-refresh.ts acc_team_alpha')
+  log('\nOptions:')
+  log('  --force    Force refresh even if token is not expired')
+}
 
 async function refreshOAuthCredential() {
-  const credentialId = process.argv[2]
-  const forceRefresh = process.argv[3] === '--force'
+  const args = process.argv.slice(2)
+  const accountId = args.find(arg => !arg.startsWith('-'))
+  const forceRefresh = args.includes('--force')
 
-  if (!credentialId) {
-    console.error('Usage: bun run scripts/auth/oauth-refresh.ts <credential-id> [--force]')
-    console.error('Example: bun run scripts/auth/oauth-refresh.ts acc_team_alpha')
-    console.error('\nOptions:')
-    console.error('  --force    Force refresh even if token is not expired')
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage(console.log)
+    process.exit(0)
+  }
+
+  if (!accountId) {
+    printUsage(console.error)
     process.exit(1)
   }
 
@@ -27,18 +36,22 @@ async function refreshOAuthCredential() {
   const pool = new Pool({ connectionString: databaseUrl })
 
   try {
-    console.log(`Loading credential: ${credentialId}`)
+    console.log(`Loading credential: ${accountId}`)
 
-    // Load the credential from database
-    const credential = await getCredential(pool, credentialId)
+    const credential = await getCredentialByAccountId(pool, accountId)
 
     if (!credential) {
-      console.error(`Credential not found: ${credentialId}`)
+      console.error(`Credential not found: ${accountId}`)
+      process.exit(1)
+    }
+
+    if (credential.provider !== 'anthropic') {
+      console.error(`${accountId} is a ${credential.provider} credential, not Anthropic OAuth`)
       process.exit(1)
     }
 
     const now = new Date()
-    const expiresAt = credential.oauth_expires_at
+    const expiresAt = credential.oauth_expires_at ? new Date(credential.oauth_expires_at) : null
     const isExpired = expiresAt ? now >= expiresAt : true
     const willExpireSoon = expiresAt ? now >= new Date(expiresAt.getTime() - 60000) : true // 1 minute before expiry
 
@@ -67,51 +80,49 @@ async function refreshOAuthCredential() {
       process.exit(1)
     }
 
-    // Perform the refresh
+    // Refresh under the same cluster-wide lock as the proxy: Anthropic revokes a refresh
+    // token presented twice, so a refresh racing a proxy task would kill the account
     console.log('\nRefreshing OAuth token...')
     const startTime = Date.now()
 
     try {
-      const newTokens = await refreshOAuthToken(credential.oauth_refresh_token)
+      await refreshAccessToken(pool, credential.id, { force: forceRefresh })
 
-      // Update credential in database
-      await updateCredential(pool, credentialId, {
-        oauth_access_token: newTokens.accessToken,
-        oauth_refresh_token: newTokens.refreshToken,
-        oauth_expires_at: new Date(newTokens.expiresAt),
-        oauth_scopes: newTokens.scopes,
-        oauth_is_max: newTokens.isMax,
-      })
+      const refreshed = await getCredentialByAccountId(pool, accountId)
+      const newExpiresAt = refreshed?.oauth_expires_at ? new Date(refreshed.oauth_expires_at) : null
+      const rotated = refreshed?.oauth_refresh_token !== credential.oauth_refresh_token
 
-      const refreshTime = Date.now() - startTime
-
-      console.log(`\n✅ Token refreshed successfully in ${refreshTime}ms`)
-      console.log('\nNew OAuth status:')
-      console.log(`- Access Token: ${newTokens.accessToken.substring(0, 20)}...`)
       console.log(
-        `- Refresh Token: ${newTokens.refreshToken ? newTokens.refreshToken.substring(0, 20) + '...' : 'reused existing'}`
+        rotated
+          ? `\n✅ Token refreshed successfully in ${Date.now() - startTime}ms`
+          : '\n✅ Another proxy instance had already refreshed this token'
       )
-      console.log(`- Expires At: ${new Date(newTokens.expiresAt).toISOString()}`)
-      console.log(`- Scopes: ${newTokens.scopes.join(', ')}`)
-      console.log(`- Is Max: ${newTokens.isMax}`)
+      console.log(`- Expires At: ${newExpiresAt ? newExpiresAt.toISOString() : 'unknown'}`)
 
-      const expiresIn = newTokens.expiresAt - Date.now()
-      const hours = Math.floor(expiresIn / (1000 * 60 * 60))
-      const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
-      console.log(`- Valid For: ${hours}h ${minutes}m`)
+      if (newExpiresAt) {
+        const expiresIn = newExpiresAt.getTime() - Date.now()
+        const hours = Math.floor(expiresIn / (1000 * 60 * 60))
+        const minutes = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60))
+        console.log(`- Valid For: ${hours}h ${minutes}m`)
+      }
 
-      console.log(`\nCredential updated in database: ${credentialId}`)
-    } catch (error: any) {
-      console.error('\n❌ Failed to refresh token:', error.message)
+      console.log(`\nCredential updated in database: ${accountId}`)
+    } catch (error) {
+      console.error(
+        '\n❌ Failed to refresh token:',
+        error instanceof Error ? error.message : String(error)
+      )
 
-      if (error.errorCode === 'invalid_grant' || error.status === 400) {
-        console.error('\nThe refresh token is invalid or has been revoked.')
-        console.error('You need to re-authenticate to get new credentials.')
-        console.error(`\nRun: bun run auth:oauth-relogin --account ${credential.account_id}`)
-      } else if (error.status) {
-        console.error(`\nHTTP Status: ${error.status}`)
-        console.error(`Error Code: ${error.errorCode || 'unknown'}`)
-        console.error(`Description: ${error.errorDescription || 'No description provided'}`)
+      if (error instanceof OAuthRefreshError) {
+        if (error.isRefreshTokenRejected) {
+          console.error('\nThe refresh token is invalid or has been revoked.')
+          console.error('You need to re-authenticate to get new credentials.')
+          console.error(`\nRun: bun run auth:oauth-relogin --account ${credential.account_id}`)
+        } else {
+          console.error(`\nHTTP Status: ${error.status}`)
+          console.error(`Error Code: ${error.errorCode || 'unknown'}`)
+          console.error(`Description: ${error.description || 'No description provided'}`)
+        }
       }
 
       process.exit(1)

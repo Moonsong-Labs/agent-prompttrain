@@ -1,12 +1,16 @@
 #!/usr/bin/env bun
 import { Pool } from 'pg'
-import {
-  listCredentials,
-  updateCredential,
-} from '../../packages/shared/src/database/queries/index.js'
-import { refreshOAuthToken } from '../../services/proxy/src/credentials/index.js'
+import { listAnthropicCredentials } from '../../packages/shared/src/database/queries/index.js'
+import { OAuthRefreshError, refreshAccessToken } from '../../services/proxy/src/credentials.ts'
 
 async function refreshAllOAuthTokens() {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log('Usage: bun run auth:oauth-refresh [--dry-run]')
+    console.log('\nRefreshes every Anthropic OAuth token that expires within 5 minutes.')
+    console.log('  --dry-run    List the tokens that would be refreshed without refreshing them')
+    process.exit(0)
+  }
+
   const dryRun = process.argv.includes('--dry-run')
 
   console.log('OAuth Refresh All Tool')
@@ -22,11 +26,10 @@ async function refreshAllOAuthTokens() {
   const pool = new Pool({ connectionString: databaseUrl })
 
   try {
-    // Get all credentials from database
-    const credentials = await listCredentials(pool)
+    const credentials = await listAnthropicCredentials(pool)
 
     if (credentials.length === 0) {
-      console.log('No credentials found in database.')
+      console.log('No Anthropic OAuth credentials found in database.')
       process.exit(0)
     }
 
@@ -48,7 +51,7 @@ async function refreshAllOAuthTokens() {
 
       try {
         const now = new Date()
-        const expiresAt = credential.oauth_expires_at
+        const expiresAt = credential.oauth_expires_at ? new Date(credential.oauth_expires_at) : null
         const isExpired = expiresAt ? now >= expiresAt : true
         const willExpireSoon = expiresAt ? now >= new Date(expiresAt.getTime() - 300000) : true // 5 minutes before expiry
 
@@ -76,30 +79,25 @@ async function refreshAllOAuthTokens() {
         }
 
         try {
-          const newTokens = await refreshOAuthToken(credential.oauth_refresh_token)
-
-          // Update credential in database
-          await updateCredential(pool, accountId, {
-            oauth_access_token: newTokens.accessToken,
-            oauth_refresh_token: newTokens.refreshToken,
-            oauth_expires_at: new Date(newTokens.expiresAt),
-            oauth_scopes: newTokens.scopes,
-            oauth_is_max: newTokens.isMax,
-          })
-
-          const expiresIn = newTokens.expiresAt - Date.now()
-          const hours = Math.floor(expiresIn / (1000 * 60 * 60))
-          console.log(`  ✅ Refreshed! Valid for ${hours}h`)
+          // Same cluster-wide lock as the proxy, so this never races a proxy refresh;
+          // forced because the proxy itself only refreshes within a minute of expiry
+          await refreshAccessToken(pool, credential.id, { force: true })
+          console.log('  ✅ Refreshed!')
           results.refreshed++
-        } catch (error: any) {
-          console.log(`  ❌ Refresh failed: ${error.message}`)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          console.log(`  ❌ Refresh failed: ${message}`)
+          if (error instanceof OAuthRefreshError && error.isRefreshTokenRejected) {
+            console.log(`  Run: bun run auth:oauth-relogin --account ${accountId}`)
+          }
           results.failed++
-          results.errors.push({ accountId, error: error.message })
+          results.errors.push({ accountId, error: message })
         }
-      } catch (error: any) {
-        console.log(`  ❌ Error: ${error.message}`)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.log(`  ❌ Error: ${message}`)
         results.failed++
-        results.errors.push({ accountId, error: error.message })
+        results.errors.push({ accountId, error: message })
       }
     }
 

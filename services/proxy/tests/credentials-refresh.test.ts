@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { AnthropicCredential } from '@agent-prompttrain/shared'
 import * as queries from '@agent-prompttrain/shared/database/queries'
 import * as alerts from '../src/services/refresh-token-alert'
-import { getApiKey, OAuthRefreshError } from '../src/credentials'
+import { getApiKey, OAuthRefreshError, refreshAccessToken } from '../src/credentials'
 
 const pool = {} as Pool
 const lockClient = {} as PoolClient
@@ -209,5 +209,92 @@ describe('getApiKey refresh failures', () => {
     expect(await getApiKey(expired.id, pool)).toBe('access-token-from-other-task')
     expect(tokenRequests).toBe(0)
     expect(updateTokensSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('refreshAccessToken', () => {
+  const originalFetch = globalThis.fetch
+  let getCredentialSpy: any
+  let updateTokensSpy: any
+  let markRejectedSpy: any
+  let lockSpy: any
+  let notifySpy: any
+  let tokenRequests: number
+
+  const validCredential = (id: string): AnthropicCredential => ({
+    ...makeExpiredCredential(id),
+    oauth_expires_at: new Date(Date.now() + 28_800_000),
+  })
+
+  beforeEach(() => {
+    tokenRequests = 0
+    updateTokensSpy = spyOn(queries, 'updateCredentialTokens').mockImplementation(
+      async () => ({}) as any
+    )
+    markRejectedSpy = spyOn(queries, 'markRefreshTokenRejected').mockImplementation(
+      async () => true
+    )
+    lockSpy = spyOn(queries, 'withCredentialRefreshLock').mockImplementation(
+      async (_pool, _id, task) => task(lockClient)
+    )
+    notifySpy = spyOn(alerts, 'notifyRefreshTokenRejected').mockImplementation(async () => {})
+    globalThis.fetch = (async () => {
+      tokenRequests++
+      return Response.json({
+        access_token: 'forced-access-token',
+        refresh_token: 'forced-refresh-token',
+        expires_in: 28_800,
+      })
+    }) as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    getCredentialSpy?.mockRestore()
+    updateTokensSpy.mockRestore()
+    markRejectedSpy.mockRestore()
+    lockSpy.mockRestore()
+    notifySpy.mockRestore()
+  })
+
+  it('refreshes a still valid token under the lock when forced', async () => {
+    const credential = validCredential('forced')
+    getCredentialSpy = spyOn(queries, 'getCredentialById').mockImplementation(
+      async () => credential
+    )
+
+    expect(await refreshAccessToken(pool, credential.id, { force: true })).toBe(
+      'forced-access-token'
+    )
+
+    expect(tokenRequests).toBe(1)
+    expect(lockSpy.mock.calls[0][1]).toBe('forced')
+    expect(updateTokensSpy.mock.calls[0][0]).toBe(lockClient)
+    expect(updateTokensSpy.mock.calls[0][2].oauth_refresh_token).toBe('forced-refresh-token')
+  })
+
+  it('keeps a still valid token without calling Anthropic when not forced', async () => {
+    const credential = validCredential('not-forced')
+    getCredentialSpy = spyOn(queries, 'getCredentialById').mockImplementation(
+      async () => credential
+    )
+
+    expect(await refreshAccessToken(pool, credential.id)).toBe('old-access-token')
+    expect(tokenRequests).toBe(0)
+  })
+
+  it('throws the rejection to its caller after recording it', async () => {
+    const credential = validCredential('forced-rejected')
+    getCredentialSpy = spyOn(queries, 'getCredentialById').mockImplementation(
+      async () => credential
+    )
+    globalThis.fetch = (async () =>
+      Response.json({ error: 'invalid_grant' }, { status: 400 })) as unknown as typeof fetch
+
+    const error = await refreshAccessToken(pool, credential.id, { force: true }).catch(e => e)
+
+    expect(error).toBeInstanceOf(OAuthRefreshError)
+    expect(error.isRefreshTokenRejected).toBe(true)
+    expect(markRejectedSpy).toHaveBeenCalledTimes(1)
   })
 })
