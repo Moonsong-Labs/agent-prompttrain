@@ -3,7 +3,7 @@
 
 # ===== Builder Stage =====
 # Use BUILDPLATFORM to run builder on native architecture for speed
-FROM --platform=$BUILDPLATFORM oven/bun:alpine AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.4-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN bun install
 RUN cd services/proxy && bun run build:production
 
 # ===== Runtime Stage =====
-FROM oven/bun:alpine AS runtime
+FROM oven/bun:1.4.4-alpine AS runtime
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates
