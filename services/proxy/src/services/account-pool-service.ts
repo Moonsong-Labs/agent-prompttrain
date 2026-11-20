@@ -1,7 +1,13 @@
 import type { Pool } from 'pg'
 import {
+  ACCOUNT_POOL_MIN_ACCOUNTS,
+  DEFAULT_FIVE_HOUR_THRESHOLD,
+  DEFAULT_SEVEN_DAY_THRESHOLD,
+  getFiveHourThreshold,
   getRetryAfter,
+  getSevenDayThreshold,
   hasRejectedRefreshToken,
+  isSessionLimit,
   type Credential,
   type AnthropicCredential,
   type AnthropicOAuthUsageResponse,
@@ -16,8 +22,6 @@ import { UsageCacheService, type CachedUsageEntry } from './usage-cache-service'
 import { AccountPoolStateService, type AccountCandidate } from './account-pool-state-service'
 import { logger } from '../middleware/logger'
 
-const DEFAULT_FIVE_HOUR_THRESHOLD = 0.9
-const DEFAULT_SEVEN_DAY_THRESHOLD = 0.95
 const FALLBACK_COOLDOWN_MS = 60_000
 
 export class AccountPoolExhaustedError extends Error {
@@ -82,7 +86,7 @@ export class AccountPoolService {
     )
     const excluded = new Set(options.excludeCredentialIds ?? [])
 
-    if (allAnthropicCredentials.length < 2) {
+    if (allAnthropicCredentials.length < ACCOUNT_POOL_MIN_ACCOUNTS) {
       return this.selectDefaultAccount(projectId, model, excluded)
     }
 
@@ -275,17 +279,15 @@ export class AccountPoolService {
   }
 
   private isSessionLimit(limit: OAuthLimitEntry): boolean {
-    const kind = limit.kind.toLowerCase()
-    const group = limit.group?.toLowerCase() ?? ''
-    return kind.includes('session') || kind.includes('hour') || group.includes('session')
+    return isSessionLimit(limit)
   }
 
   private fiveHourThreshold(credential: AnthropicCredential): number {
-    return Number(credential.five_hour_limit_threshold ?? DEFAULT_FIVE_HOUR_THRESHOLD)
+    return getFiveHourThreshold(credential)
   }
 
   private sevenDayThreshold(credential: AnthropicCredential): number {
-    return Number(credential.seven_day_limit_threshold ?? DEFAULT_SEVEN_DAY_THRESHOLD)
+    return getSevenDayThreshold(credential)
   }
 
   private findEarliestReset(

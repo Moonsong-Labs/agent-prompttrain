@@ -25,7 +25,11 @@ import {
   addProjectAccount,
   removeProjectAccount,
 } from '@agent-prompttrain/shared/database/queries'
-import { getErrorMessage } from '@agent-prompttrain/shared'
+import {
+  getErrorMessage,
+  getLinkedAnthropicAccounts,
+  hasActiveAccountPool,
+} from '@agent-prompttrain/shared'
 import type { CredentialSafe, ProjectApiKeySafe } from '@agent-prompttrain/shared/types'
 import type { AuthContext } from '../middleware/auth.js'
 
@@ -136,7 +140,7 @@ trainsUIRoutes.get('/', async c => {
                     <th
                       style="padding: 0.75rem 1rem; text-align: left; font-size: 0.875rem; font-weight: 600; color: #374151;"
                     >
-                      Default Account
+                      Accounts
                     </th>
                     <th
                       data-sort="owner"
@@ -203,8 +207,30 @@ trainsUIRoutes.get('/', async c => {
                               </span>`}
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
-                          ${train.accounts.find(a => a.id === train.default_account_id)
-                            ?.account_name || 'None'}
+                          ${(() => {
+                            const linkedAnthropic = getLinkedAnthropicAccounts(
+                              train.accounts,
+                              train.linked_account_ids
+                            )
+                            if (hasActiveAccountPool(train.accounts, train.linked_account_ids)) {
+                              return html`<div
+                                data-testid="project-linked-accounts"
+                                style="display: flex; flex-wrap: wrap; gap: 0.25rem;"
+                              >
+                                ${linkedAnthropic.map(
+                                  account =>
+                                    html`<span
+                                      style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 500;"
+                                      >${account.account_name}</span
+                                    >`
+                                )}
+                              </div>`
+                            }
+                            return (
+                              train.accounts.find(a => a.id === train.default_account_id)
+                                ?.account_name || 'None'
+                            )
+                          })()}
                         </td>
                         <td style="padding: 0.75rem 1rem; font-size: 0.875rem;">
                           ${train.firstOwner}
@@ -470,6 +496,8 @@ trainsUIRoutes.get('/:projectId/view', async c => {
         ])
       : [false, false]
 
+    const poolActive = hasActiveAccountPool(train.accounts, train.linked_account_ids)
+
     const content = html`
       <div style="margin-bottom: 2rem;">
         <div style="margin-bottom: 1.5rem;">
@@ -682,8 +710,9 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
         >
           <h3 style="font-size: 1.125rem; font-weight: bold; margin-bottom: 0.25rem;">Accounts</h3>
           <p style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.75rem;">
-            Link 2+ Anthropic accounts to enable automatic load balancing. The default account is
-            used as fallback.
+            ${poolActive
+              ? 'Automatic load balancing is active across the linked Anthropic accounts.'
+              : 'Link 2+ Anthropic accounts to enable automatic load balancing. Until then, the default account is used.'}
           </p>
 
           ${!train.accounts || train.accounts.length === 0
@@ -700,14 +729,16 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                   ${train.accounts.map((cred: CredentialSafe) => {
                     const isDefault = train.default_account_id === cred.id
+                    const showDefault = !poolActive && isDefault
                     const isLinked = train.linked_account_ids.includes(cred.id)
                     return html`
                       <div
-                        style="background: ${isDefault
+                        data-testid="project-account-card"
+                        style="background: ${showDefault
                           ? '#eff6ff'
                           : isLinked
                             ? '#f0fdf4'
-                            : '#f9fafb'}; border: 1px solid ${isDefault
+                            : '#f9fafb'}; border: 1px solid ${showDefault
                           ? '#3b82f6'
                           : isLinked
                             ? '#22c55e'
@@ -716,14 +747,16 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                         <div style="flex: 1;">
                           <div style="font-weight: 600; font-size: 0.875rem;">
                             ${cred.account_name}
-                            ${isDefault
+                            ${showDefault
                               ? html`<span
+                                  data-testid="default-account-badge"
                                   style="background: #3b82f6; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
                                   >DEFAULT</span
                                 >`
                               : ''}
                             ${isLinked
                               ? html`<span
+                                  data-testid="linked-account-badge"
                                   style="background: #22c55e; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.5rem; font-weight: 600;"
                                   >LINKED</span
                                 >`
@@ -751,7 +784,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                           </div>
                         </div>
                         <div style="display: flex; gap: 0.375rem; align-items: center;">
-                          ${isOwner && !isDefault
+                          ${isOwner && !poolActive && !isDefault
                             ? html`
                                 <form
                                   hx-post="/dashboard/projects/${train.id}/set-default-account"
@@ -762,6 +795,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                                   <input type="hidden" name="credential_id" value="${cred.id}" />
                                   <button
                                     type="submit"
+                                    data-testid="set-default-account-button"
                                     style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
                                   >
                                     Set Default
@@ -780,6 +814,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                                   <input type="hidden" name="credential_id" value="${cred.id}" />
                                   <button
                                     type="submit"
+                                    data-testid="link-account-button"
                                     style="background: #22c55e; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
                                   >
                                     Link
@@ -787,7 +822,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                                 </form>
                               `
                             : ''}
-                          ${isOwner && isLinked && !isDefault
+                          ${isOwner && isLinked
                             ? html`
                                 <form
                                   hx-delete="/dashboard/projects/${train.id}/unlink-account/${cred.id}"
@@ -798,6 +833,7 @@ ${train.system_prompt ? JSON.stringify(train.system_prompt, null, 2) : ''}</text
                                 >
                                   <button
                                     type="submit"
+                                    data-testid="unlink-account-button"
                                     style="background: #ef4444; color: white; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; border: none; cursor: pointer; font-size: 0.75rem;"
                                   >
                                     Unlink
@@ -1656,16 +1692,6 @@ trainsUIRoutes.delete('/:projectId/unlink-account/:credentialId', async c => {
   }
 
   try {
-    // Prevent unlinking the default account
-    const project = await getProjectById(pool, projectId)
-    if (project?.default_account_id === credentialId) {
-      return c.html(html`
-        <div style="background: #fee2e2; color: #991b1b; padding: 0.75rem; border-radius: 0.25rem;">
-          <strong>Error:</strong> Cannot unlink the default account. Change the default first.
-        </div>
-      `)
-    }
-
     await removeProjectAccount(pool, projectId, credentialId)
 
     return c.html(html`

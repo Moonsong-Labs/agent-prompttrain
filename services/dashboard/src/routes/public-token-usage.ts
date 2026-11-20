@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
 import { container } from '../container.js'
+import { renderThresholdNotice } from '../components/usage-windows.js'
 
 export const publicTokenUsageRoutes = new Hono()
 
@@ -80,8 +81,8 @@ function escapeHtml(unsafe: string): string {
 /**
  * Get progress bar color based on utilization percentage
  */
-function getBarColor(utilization: number): string {
-  if (utilization > 80) {
+function getBarColor(utilization: number, overThreshold?: boolean): string {
+  if (overThreshold || utilization > 80) {
     return '#ef4444'
   }
   if (utilization > 50) {
@@ -120,7 +121,7 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
 
         const windowBars = data.windows
           .map(w => {
-            const color = getBarColor(w.utilization)
+            const color = getBarColor(w.utilization, w.over_threshold)
             const timeLeft = formatTimeLeft(w.resets_at_iso)
             return `
             <div class="window-row">
@@ -136,6 +137,8 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
           })
           .join('')
 
+        const thresholdNotice = renderThresholdNotice(data, 'compact')
+
         const lastCheckedText = data.is_estimated
           ? `&#9888; Est. ${formatRelativeTime(data.fetched_at)}`
           : formatRelativeTime(data.fetched_at)
@@ -149,6 +152,7 @@ publicTokenUsageRoutes.get('/token-usage', async c => {
             <span class="last-checked" style="color: ${lastCheckedColor};">${lastCheckedText}</span>
           </div>
           <div class="windows">${windowBars}</div>
+          ${thresholdNotice}
         </div>`
       })
       .join('')
