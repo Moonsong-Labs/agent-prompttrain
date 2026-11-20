@@ -3,7 +3,7 @@ import { html, raw } from 'hono/html'
 import { ProxyApiClient } from '../services/api-client.js'
 import { getErrorMessage, OAuthUsageDisplay } from '@agent-prompttrain/shared'
 import { layout } from '../layout/index.js'
-import { renderUsageWindows } from '../components/usage-windows.js'
+import { renderThresholdNotice, renderUsageWindows } from '../components/usage-windows.js'
 
 export const tokenUsageRoutes = new Hono<{
   Variables: {
@@ -357,6 +357,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
                                 ? `
                             <div style="margin-bottom: 8px;">
                               ${renderUsageWindows(oauthUsage)}
+                              ${renderThresholdNotice(oauthUsage, 'compact')}
                             </div>
                             <div style="font-size: 11px; color: ${oauthUsage.is_estimated ? '#92400e' : '#9ca3af'}; margin-top: 4px;">${oauthUsage.is_estimated ? '&#9888; Estimated (API rate limited) &bull; ' : ''}Last checked: ${formatRelativeTime(oauthUsage.fetched_at)}</div>
                             `
@@ -509,6 +510,7 @@ tokenUsageRoutes.get('/token-usage', async c => {
               <div class="section-header">Claude Account Rate Limits</div>
               <div class="section-content">
                 <div>${raw(renderUsageWindows(oauthUsage, 'large'))}</div>
+                ${raw(renderThresholdNotice(oauthUsage, 'regular'))}
                 <div
                   style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;"
                 >

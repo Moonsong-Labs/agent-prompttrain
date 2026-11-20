@@ -2,7 +2,15 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { Pool } from 'pg'
 import { logger } from '../middleware/logger.js'
-import { getErrorMessage, getErrorStack, type AnthropicCredential } from '@agent-prompttrain/shared'
+import {
+  evaluateOAuthUsageThresholds,
+  evaluateScopedLimitThreshold,
+  getErrorMessage,
+  getErrorStack,
+  isSessionLimit,
+  type AnthropicCredential,
+  type OAuthUsageWindowDisplay,
+} from '@agent-prompttrain/shared'
 import { container } from '../container.js'
 import { apiResponseCache } from '../services/response-cache.js'
 import {
@@ -1439,6 +1447,11 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       return c.json(errorResponse)
     }
 
+    const thresholdSummary = evaluateOAuthUsageThresholds(
+      entry.usage,
+      credential as AnthropicCredential
+    )
+
     // Transform raw usage to display format
     type WindowKey =
       | 'five_hour'
@@ -1458,7 +1471,7 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       { key: 'seven_day_sonnet', name: '7-Day Sonnet', shortName: '7d Sonnet' },
     ]
 
-    const windows = []
+    const windows: OAuthUsageWindowDisplay[] = []
     for (const mapping of windowMappings) {
       const windowData = entry.usage[mapping.key] as
         | { utilization: number; resets_at: string }
@@ -1466,13 +1479,21 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
         | undefined
       if (windowData && typeof windowData === 'object' && 'utilization' in windowData) {
         const resetDate = new Date(windowData.resets_at)
-        windows.push({
+        const windowDisplay: OAuthUsageWindowDisplay = {
           name: mapping.name,
           short_name: mapping.shortName,
           utilization: windowData.utilization,
           resets_at: formatResetTime(resetDate),
           resets_at_iso: windowData.resets_at,
-        })
+        }
+        if (mapping.key === 'five_hour') {
+          windowDisplay.threshold = thresholdSummary.thresholds.five_hour
+          windowDisplay.over_threshold = thresholdSummary.fiveHourOverThreshold
+        } else if (mapping.key === 'seven_day') {
+          windowDisplay.threshold = thresholdSummary.thresholds.seven_day
+          windowDisplay.over_threshold = thresholdSummary.sevenDayOverThreshold
+        }
+        windows.push(windowDisplay)
       }
     }
 
@@ -1485,13 +1506,18 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
       if (!scopedModelName) {
         continue // unscoped kinds (session/weekly_all) duplicate 5h/7d above
       }
-      const groupLabel = limit.group === 'session' ? 'Session' : '7-Day'
+      const session = isSessionLimit(limit)
+      const groupLabel = session ? 'Session' : '7-Day'
+      const scopedThreshold = evaluateScopedLimitThreshold(limit, credential as AnthropicCredential)
       windows.push({
         name: `${groupLabel} ${scopedModelName}`,
-        short_name: `${limit.group === 'session' ? '5h' : '7d'} ${scopedModelName}`,
+        short_name: `${session ? '5h' : '7d'} ${scopedModelName}`,
         utilization: limit.percent ?? 0,
         resets_at: limit.resets_at ? formatResetTime(new Date(limit.resets_at)) : '—',
         resets_at_iso: limit.resets_at ?? '',
+        threshold: scopedThreshold.threshold,
+        over_threshold: scopedThreshold.overThreshold,
+        scoped_model: scopedModelName,
       })
     }
 
@@ -1504,6 +1530,10 @@ apiRoutes.get('/oauth-usage/:accountId', async c => {
         windows,
         fetched_at: new Date(entry.fetchedAt).toISOString(),
         is_estimated: entry.isEstimated,
+        thresholds: thresholdSummary.thresholds,
+        over_threshold: thresholdSummary.overThreshold,
+        over_threshold_windows: thresholdSummary.overThresholdWindows,
+        blocked_until_iso: thresholdSummary.blockedUntilIso,
         extra_usage: entry.usage.extra_usage ?? undefined,
       },
     }

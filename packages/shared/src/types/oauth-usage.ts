@@ -81,6 +81,16 @@ export interface AnthropicOAuthUsageResponse {
 }
 
 /**
+ * Configured pool utilization thresholds for an account (percentage 0-100)
+ */
+export interface OAuthUsageThresholds {
+  /** 5-hour / session utilization threshold percentage (e.g. 90) */
+  five_hour: number
+  /** 7-day / weekly utilization threshold percentage (e.g. 95) */
+  seven_day: number
+}
+
+/**
  * Processed OAuth usage for display in dashboard
  */
 export interface OAuthUsageDisplay {
@@ -96,6 +106,14 @@ export interface OAuthUsageDisplay {
   fetched_at: string
   /** Whether this data is extrapolated due to API rate limiting */
   is_estimated?: boolean
+  /** Configured pool utilization thresholds (percentage 0-100) */
+  thresholds?: OAuthUsageThresholds
+  /** Whether an account-wide window is at or above threshold (account excluded from pool until reset) */
+  over_threshold?: boolean
+  /** Account-wide window names currently at or above threshold */
+  over_threshold_windows?: string[]
+  /** ISO timestamp when all account-wide blocking windows will have reset */
+  blocked_until_iso?: string | null
 }
 
 /**
@@ -112,6 +130,12 @@ export interface OAuthUsageWindowDisplay {
   resets_at: string
   /** ISO timestamp for reset */
   resets_at_iso: string
+  /** Pool utilization threshold percentage (0-100) that gates this window, if applicable */
+  threshold?: number
+  /** Whether this window is currently at or above its pool utilization threshold */
+  over_threshold?: boolean
+  /** Model label if this window only gates requests for a specific model */
+  scoped_model?: string
 }
 
 /**

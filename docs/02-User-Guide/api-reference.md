@@ -764,14 +764,18 @@ Get Claude account rate limits directly from Anthropic's OAuth API. This endpoin
         "short_name": "5h",
         "utilization": 34.0,
         "resets_at": "12:59 PM EST",
-        "resets_at_iso": "2026-01-21T12:59:59.893091+00:00"
+        "resets_at_iso": "2026-01-21T12:59:59.893091+00:00",
+        "threshold": 90,
+        "over_threshold": false
       },
       {
         "name": "7-Day Window",
         "short_name": "7d",
         "utilization": 28.0,
         "resets_at": "Jan 26, 07:59 PM",
-        "resets_at_iso": "2026-01-26T19:59:59.893113+00:00"
+        "resets_at_iso": "2026-01-26T19:59:59.893113+00:00",
+        "threshold": 95,
+        "over_threshold": false
       },
       {
         "name": "7-Day Sonnet",
@@ -781,7 +785,14 @@ Get Claude account rate limits directly from Anthropic's OAuth API. This endpoin
         "resets_at_iso": "2026-01-27T08:59:59.893127+00:00"
       }
     ],
-    "fetched_at": "2026-01-21T10:30:00.000Z"
+    "fetched_at": "2026-01-21T10:30:00.000Z",
+    "thresholds": {
+      "five_hour": 90,
+      "seven_day": 95
+    },
+    "over_threshold": false,
+    "over_threshold_windows": [],
+    "blocked_until_iso": null
   }
 }
 ```

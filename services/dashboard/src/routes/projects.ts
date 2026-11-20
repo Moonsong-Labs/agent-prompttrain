@@ -10,7 +10,6 @@ import {
   deleteProject,
   addProjectAccount,
   removeProjectAccount,
-  getProjectById,
 } from '@agent-prompttrain/shared/database/queries'
 import {
   validateSystemPrompt,
@@ -210,12 +209,6 @@ projects.delete('/:id/accounts/:credentialId', requireProjectOwner, async c => {
     const pool = container.getPool()
     const projectId = c.req.param('id')
     const credentialId = c.req.param('credentialId')
-
-    // Prevent unlinking the default account
-    const project = await getProjectById(pool, projectId)
-    if (project?.default_account_id === credentialId) {
-      return c.json({ error: 'Cannot unlink the default account. Change the default first.' }, 400)
-    }
 
     const removed = await removeProjectAccount(pool, projectId, credentialId)
     if (!removed) {
